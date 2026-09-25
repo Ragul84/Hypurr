@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Codync — Real-time Claude Code Monitor",
+  title: "Codync — Your coding agents, as teammates",
   description:
-    "Monitor your Claude Code sessions in real-time on iPhone and Mac. Live Activity on Dynamic Island, Lock Screen, and macOS menu bar.",
+    "Message Claude Code, Codex, Cursor, Pi and more as persistent bots from your iPhone, Mac or Linux desktop. Approve actions and get notified when they're done.",
   icons: {
     icon: "/icon.png",
     apple: "/apple-touch-icon.png",

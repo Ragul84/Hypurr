@@ -3,56 +3,52 @@ export default function Privacy() {
     <main className="flex-1 flex flex-col items-center px-6 py-16">
       <article className="max-w-2xl w-full space-y-6">
         <h1 className="text-3xl font-bold text-white">Privacy Policy</h1>
-        <p className="text-neutral-400 text-sm">Last updated: March 23, 2026</p>
+        <p className="text-neutral-400 text-sm">Last updated: September 25, 2026</p>
 
         <Section title="Overview">
-          Codync is a real-time monitoring tool for Claude Code sessions. We are
-          committed to protecting your privacy and being transparent about the
-          data we handle.
+          Codync lets you message the coding agents that run on your own computer. It is built so that your code, conversations and credentials stay on your devices.
         </Section>
 
-        <Section title="Data Collection">
-          <p>Codync does <strong>not</strong> collect, store, or transmit any personal data to our servers.</p>
-          <ul className="list-disc pl-5 space-y-2 mt-2">
-            <li><strong>Session data</strong> (project names, status, tasks, costs) is synced between your Mac and iPhone exclusively through your personal iCloud account (CloudKit). We never see this data.</li>
-            <li><strong>Code content</strong> is never read, stored, or transmitted. Codync only reads session metadata (status, model, task names).</li>
-            <li><strong>Push notifications</strong> for Pro subscribers are relayed through a Cloudflare Worker that forwards Live Activity updates via Apple Push Notification service (APNs). The Worker processes session status data transiently and does not store it.</li>
-          </ul>
-        </Section>
-
-        <Section title="iCloud Sync">
-          All data synchronization between your devices uses Apple CloudKit with your personal iCloud account. This data is governed by{" "}
-          <a href="https://www.apple.com/legal/privacy/" className="text-white underline">Apple&apos;s Privacy Policy</a>.
-        </Section>
-
-        <Section title="Subscriptions">
-          Codync Pro is an optional auto-renewable subscription managed entirely through the App Store. Payment processing is handled by Apple. We use RevenueCat to manage subscription status — RevenueCat receives an anonymous app user ID and subscription status, but no personal information.
-        </Section>
-
-        <Section title="Third-Party Services">
+        <Section title="What stays on your devices">
           <ul className="list-disc pl-5 space-y-2">
-            <li><strong>Apple CloudKit</strong> — iCloud sync between your devices</li>
-            <li><strong>Apple APNs</strong> — Push notifications for Live Activity updates</li>
-            <li><strong>RevenueCat</strong> — Subscription management (anonymous user ID only)</li>
-            <li><strong>Cloudflare Workers</strong> — APNs push relay (no data stored)</li>
+            <li><strong>Bots and conversations</strong> are stored by the Codync host on your computer (in <code>~/.codync</code>). Your phone keeps a cache so the app opens instantly.</li>
+            <li><strong>Your phone talks directly to your computer</strong> over your local network or Tailscale. There is no Codync server in between and no Codync account.</li>
+            <li><strong>Agents run with your own logins</strong> (Claude Code, Codex, Cursor and others). Codync never sees or stores their credentials.</li>
+            <li><strong>Usage limits</strong> are read locally from the agents installed on your computer. Only percentages reach your phone.</li>
           </ul>
         </Section>
 
-        <Section title="Data Retention">
-          Session data in CloudKit is automatically deleted when sessions end. No historical data is retained. Deleting the app removes all local data. iCloud data can be managed through your iCloud settings.
+        <Section title="Push notifications">
+          To notify you when a bot needs you or finishes, your computer sends a short alert (the bot&apos;s name and a one-line preview) through our push relay, a Cloudflare Worker that forwards it to Apple Push Notification service. The relay does not store notifications. Your device token is encrypted into a ticket that only the relay can read; your computer never sees the raw token.
         </Section>
 
-        <Section title="Children's Privacy">
-          Codync is not directed at children under the age of 13 and we do not knowingly collect information from children.
+        <Section title="Data we collect">
+          None. Codync has no analytics, no tracking and no advertising identifiers.
+        </Section>
+
+        <Section title="Third-party services">
+          <ul className="list-disc pl-5 space-y-2">
+            <li><strong>Apple Push Notification service</strong>: delivers notifications and Live Activity updates.</li>
+            <li><strong>Cloudflare Workers</strong>: runs the push relay (nothing stored).</li>
+            <li><strong>The coding agents you choose</strong>: they run on your computer under their own terms and privacy policies.</li>
+          </ul>
+        </Section>
+
+        <Section title="Data retention">
+          Everything lives on your devices. Delete a bot to remove its conversation; uninstall the host and delete <code>~/.codync</code> to remove all of it. Deleting the iPhone app removes its cache.
+        </Section>
+
+        <Section title="Children's privacy">
+          Codync is not directed at children under the age of 13.
         </Section>
 
         <Section title="Changes">
-          We may update this policy from time to time. Changes will be posted on this page with an updated revision date.
+          We may update this policy. Changes will be posted on this page with a new date.
         </Section>
 
         <Section title="Contact">
-          If you have questions, contact us at{" "}
-          <a href="mailto:kevin2005ha@gmail.com" className="text-white underline">kevin2005ha@gmail.com</a>.
+          Questions? Open an issue at{" "}
+          <a href="https://github.com/leepokai/Codync/issues" className="text-white underline">github.com/leepokai/Codync/issues</a>.
         </Section>
 
         <div className="pt-4">

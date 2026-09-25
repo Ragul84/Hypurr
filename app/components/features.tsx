@@ -7,73 +7,62 @@ const features = [
   {
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-5 h-5">
-        <rect x="5" y="2" width="14" height="20" rx="4" />
-        <path d="M9 2h6" strokeLinecap="round" />
-        <circle cx="12" cy="5" r="1.5" fill="currentColor" stroke="none" />
+        <circle cx="12" cy="9" r="5" /><circle cx="10" cy="8.5" r="0.8" fill="currentColor" /><circle cx="14" cy="8.5" r="0.8" fill="currentColor" /><path d="M6 20c1.2-2.5 3.4-4 6-4s4.8 1.5 6 4" strokeLinecap="round" />
       </svg>
     ),
-    title: "Dynamic Island",
+    title: "Bots, not sessions",
     description:
-      "Live session status on your Lock Screen and Dynamic Island. See what Claude is doing without opening the app.",
+      "Give each agent a name, a job and a project. One ongoing chat per bot — no hunting for the right session.",
   },
   {
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-5 h-5">
-        <rect x="2" y="4" width="20" height="14" rx="2" />
-        <path d="M8 22h8M12 18v4" strokeLinecap="round" />
-        <circle cx="12" cy="7" r="1" fill="currentColor" stroke="none" />
+        <path d="M12 3l7 4v5c0 4.4-3 8-7 9-4-1-7-4.6-7-9V7l7-4z" /><path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
-    title: "Menu Bar App",
+    title: "Approve from anywhere",
     description:
-      "macOS menu bar app with instant session overview. Click to see all active Claude Code sessions.",
+      "Commands and file changes arrive as approval cards: Allow once, Always allow or Deny.",
   },
   {
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-5 h-5">
-        <path d="M12 3v3M12 18v3M3 12h3M18 12h3" strokeLinecap="round" />
-        <path d="M5.6 5.6l2.2 2.2M16.2 16.2l2.2 2.2M5.6 18.4l2.2-2.2M16.2 7.8l2.2-2.2" strokeLinecap="round" />
-        <circle cx="12" cy="12" r="4" />
+        <rect x="3" y="4" width="18" height="14" rx="2" /><path d="M8 9h8M8 13h5" strokeLinecap="round" />
       </svg>
     ),
-    title: "Always-on Push",
+    title: "Every agent you have",
     description:
-      "Live Activity stays updated even when the app is closed. Never miss a status change.",
+      "Finds Claude Code, Codex, Cursor, Pi, OpenCode, Grok, Gemini, Copilot and more — or installs any agent from the ACP registry.",
   },
   {
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-5 h-5">
-        <path d="M4 16.5C2.8 15.3 2 13.7 2 12c0-3.3 2.7-6 6-6 .3 0 .7 0 1 .1C10.1 4.2 12 3 14.2 3c3 0 5.5 2.3 5.8 5.2C22 9 23 10.8 23 13c0 2.8-2.2 5-5 5H6c-.7 0-1.4-.2-2-.5z" />
+        <path d="M6 8a6 6 0 0112 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10 21h4" strokeLinecap="round" />
       </svg>
     ),
-    title: "Cross-device Sync",
+    title: "Only the pings that matter",
     description:
-      "Access your sessions from anywhere — no LAN required. Syncs automatically across all your Apple devices.",
+      "A notification when a bot needs you or finishes. Everything else waits in Full conversation.",
   },
   {
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-5 h-5">
-        <rect x="6" y="3" width="12" height="18" rx="6" />
-        <circle cx="12" cy="8" r="2" />
-        <path d="M15 18H9" strokeLinecap="round" />
+        <rect x="5" y="2" width="14" height="20" rx="4" /><path d="M9 2h6" strokeLinecap="round" />
       </svg>
     ),
-    title: "Apple Watch",
+    title: "iPhone, Mac and Linux",
     description:
-      "Session status on your wrist via Smart Stack widget. Glanceable progress at all times.",
+      "A native app on each: iPhone with widgets and Live Activities, a Mac window, and a GTK app for Linux.",
   },
   {
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-5 h-5">
-        <rect x="5" y="4" width="14" height="16" rx="2" />
-        <path d="M9 4V2M15 4V2" strokeLinecap="round" />
-        <circle cx="12" cy="12" r="2.5" />
-        <path d="M12 9.5V7M12 17v-2.5" strokeLinecap="round" />
+        <rect x="4" y="11" width="16" height="10" rx="2" /><path d="M8 11V7a4 4 0 018 0v4" />
       </svg>
     ),
-    title: "Zero Configuration",
+    title: "Your computer, your code",
     description:
-      "One-click install, no login, no account. No analytics, no tracking. Your code never leaves your devices.",
+      "Your phone talks straight to your machine. Agents use your own logins. No account, no cloud copy of your code.",
   },
 ];
 
@@ -136,7 +125,7 @@ export default function Features() {
           viewport={{ once: true }}
           className="text-2xl font-bold text-white text-center mb-12"
         >
-          Everything you need to monitor Claude Code
+          Delegate like you'd message a teammate
         </motion.h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

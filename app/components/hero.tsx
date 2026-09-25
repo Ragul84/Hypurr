@@ -16,16 +16,6 @@ export default function Hero() {
         transition={{ duration: 0.6 }}
         className="relative z-10 flex flex-col items-center text-center"
       >
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.4, delay: 0.05 }}
-          className="mb-6 inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-xs sm:text-sm text-neutral-300"
-        >
-          <span className="text-base">🏆</span>
-          #29 Developer Tools on the App Store
-        </motion.div>
-
         <motion.img
           src="/icon.png"
           alt="Codync"
@@ -65,6 +55,12 @@ export default function Hero() {
             </svg>
             Download for macOS
           </a>
+          <a
+            href="https://github.com/leepokai/Codync/releases/latest"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-neutral-800 text-white font-semibold rounded-xl hover:bg-neutral-700 transition-colors"
+          >
+            Linux
+          </a>
         </motion.div>
 
         <motion.a
@@ -90,15 +86,15 @@ export default function Hero() {
         >
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-neutral-800 text-xs text-neutral-400">
             <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-            Live Activity
+            Claude Code
           </span>
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-neutral-800 text-xs text-neutral-400">
             <span className="w-1.5 h-1.5 rounded-full bg-neutral-400" />
-            Cross-device Sync
+            Codex
           </span>
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-neutral-800 text-xs text-neutral-400">
             <span className="w-1.5 h-1.5 rounded-full bg-neutral-500" />
-            Push Notifications
+            Cursor · Pi · 40+ more
           </span>
         </motion.div>
 
@@ -109,13 +105,10 @@ export default function Hero() {
           className="mt-8 flex flex-col items-center gap-2"
         >
           <p className="text-lg sm:text-xl text-neutral-400 max-w-md leading-relaxed">
-            Monitor your Claude Code sessions in real-time, from anywhere.
+            Your coding agents, as teammates you can message.
           </p>
-          <p className="text-sm text-neutral-500">
-            No LAN required. Zero config. No login needed.
-          </p>
-          <p className="mt-2 text-sm sm:text-base text-neutral-500 font-medium tracking-wide">
-            Now you can vibe code with Claude Code while jogging
+          <p className="text-sm text-neutral-500 max-w-md">
+            Pick a bot, say what you need, put the phone away. Codync tells you when it needs you or is done.
           </p>
         </motion.div>
       </motion.div>
