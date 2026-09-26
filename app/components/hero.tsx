@@ -47,7 +47,7 @@ export default function Hero() {
             Download for iOS
           </a>
           <a
-            href="https://github.com/leepokai/Codync/releases/latest/download/Codync-macOS.dmg"
+            href="https://github.com/leepokai/Codync/releases/latest/download/codync-macos.dmg"
             className="inline-flex items-center gap-2 px-6 py-3 bg-neutral-800 text-white font-semibold rounded-xl hover:bg-neutral-700 transition-colors"
           >
             <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
