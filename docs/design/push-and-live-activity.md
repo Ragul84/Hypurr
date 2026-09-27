@@ -54,7 +54,11 @@ An existing activity can receive background APNs updates. Automatically starting
 
 ## Worker contract
 
-Alert kinds are `done`, `needsInput`, and `failed`. The public APNs alert always has title `Codync` and a useful fallback sentence. The encrypted payload carries the private fields. `mutable-content: 1` requests extension processing. The public routing fields are `botId`, `computerId`, and `ctx`; `thread-id` is `<computerId>:<botId>`.
+Alert kinds are `done`, `needsInput`, and `failed`.
+
+Hosts submit an event's alert requests in registration order to `POST /push-batch` as `{ "notifications": [<push request>, ...] }` (1–256 entries). The Worker decrypts the tickets and sends only the last request for each physical APNs destination, environment and token kind. It returns indexed statuses; superseded tickets and HTTP 410 results are forgotten by the host on its next push operation. Superseded identities also lose their older ticket rows so they cannot reappear on the next event. This requires no new database, no plaintext notification content, and no change to the ticket encryption scheme. Live Activity updates continue using `/push` because each activity has its own token.
+
+ The public APNs alert always has title `Codync` and a useful fallback sentence. The encrypted payload carries the private fields. `mutable-content: 1` requests extension processing. The public routing fields are `botId`, `computerId`, and `ctx`; `thread-id` is `<computerId>:<botId>`.
 
 Live Activity requests carry:
 
@@ -86,7 +90,7 @@ Host delivery is currently best effort with a 10-second request timeout. There i
 
 ## Why only “Done” appeared
 
-The previous public fallback was literally `Codync / Done`. Any missing `sealed`, `ctx`, inaccessible shared key, failed authentication or extension packaging problem kept that fallback. Source inspection confirms that path; identifying which branch ran on a specific installed phone needs device logs.
+The previous public fallback was literally `Codync / Done`. Any missing `sealed`, `ctx`, inaccessible shared key, failed authentication or extension packaging problem kept that fallback. Device verification reproduced a more specific cause: five authorized device identities pointed to this phone. One current identity decrypted the completion normally; four obsolete identities produced generic fallbacks for the same event. The batched Worker path now selects the latest registration for the physical token across those identities.
 
 Registration previously accumulated random tickets, including tickets with obsolete/missing push keys. Re-registering now removes those old records for the same device. The fallback itself now says “Your task is complete. Open Codync to read the result.” Failure and input requests have distinct fallback sentences.
 
@@ -121,11 +125,11 @@ Deployment order: Worker → host → iOS. The optional encrypted subtitle remai
 | Provider credentials expire | Device ticket is retained for credential repair |
 | Worker receives private activity text / oversized alert | Rejected before APNs |
 
-Local tests cover payload generation, error classification, request validation, ticket replacement, Swift payload decoding and crypto vectors. A signed physical-device run with the deployed Worker is still required for extension execution, locked-device Keychain access, action navigation, Focus behavior, token rotation and background ActivityKit delivery.
+Local tests cover payload generation, error classification, request validation, ticket replacement, Swift payload decoding and crypto vectors. The signed device checks below cover extension execution and background ActivityKit delivery. Focus behavior, pre-first-unlock behavior, action navigation and OS-driven token rotation still need separate acceptance scenarios.
 
 ### Local verification — 2026-09-27
 
-- Host: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, and all 147 unit/integration tests passed.
+- Host: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, and all 148 unit/integration tests passed.
 - Swift: `swift test --package-path kit` passed, 51 tests including encrypted push vectors and the optional notification subtitle.
 - Relay: `npm test` and `npm run typecheck` passed, including malformed requests and activity payload checks.
 - iOS: Debug simulator build passed with both extensions embedded. The built notification extension has the expected service entry point. Signing and device Keychain access were not verified by this unsigned build.
@@ -134,9 +138,21 @@ Local tests cover payload generation, error classification, request validation, 
 
 ### Deployment and device verification — 2026-09-27
 
-- Deployed `codync-relay`, version `d29a7eb4-f22e-4e27-a393-d563a5e56ff3`; `/health` returned HTTP 200.
+- Deployed `codync-relay`, version `2ba1d27c-116c-423d-87e4-2a7749575bd3`; `/health` returned HTTP 200.
 - Built and restarted the signed Mac app and its launchd host. The running host includes the new notification implementation; its health endpoint returned success.
 - Built and installed the signed Debug iOS app on the paired iPhone 16 Pro Max. App and notification extension both resolve their shared Keychain group to `7FUM8A8H72.com.pokai.Codync`, with the matching App Group. The app uses the development APNs environment.
 - The live host contained 191 tickets across five device identities. The active phone's group shrank from ten rows to one on reconnect. Added regression coverage ensures older groups also send through only their newest stored ticket.
 - Two encrypted test alerts returned HTTP 200 from the deployed Worker/APNs path. Device logs confirm the notification service extension executed, with no recorded decryption failure for those tests.
-- Visual notification content and background ActivityKit acceptance remain under verification; APNs acceptance and extension invocation alone are not recorded as a complete device pass.
+- Debug device diagnostics read iOS-delivered notifications for the temporary verification bot and confirmed the decrypted title `Push verification`, subtitle `Task complete`, and final result body. The same inspection identified the four obsolete-identity fallbacks, leading to physical-destination deduplication in the Worker.
+- A task started from the iPhone created a real Live Activity. While the app was on the Home Screen, an APNs needs-input update changed the Dynamic Island indicator to amber. Releasing the controlled host task ended the activity and removed its host ticket. The stale-date payload passed automated checks, but its delayed visual transition was not conclusively observed on the device.
+
+
+For repeatable Debug-only acceptance, launch the app with `CODYNC_PUSH_VERIFY_BOT` set to the temporary test bot ID. The console's `CODYNC_PUSH_VERIFICATION` line reports only that bot's delivered notifications, current activities and authorization state. It does not expose keys, tickets, account IDs or other bots' notifications. Release builds do not include this diagnostic.
+
+- The deployed batch endpoint received five tickets for one physical phone and returned four superseded results plus one successful delivery. Device diagnostics confirmed exactly one new decrypted notification and no additional generic fallbacks. The user also confirmed the complete title and body were visible.
+- The updated running host executed controlled failure and success tasks. Its next delivery automatically removed obsolete identity rows, leaving one valid alert ticket in the live database.
+- Final signed iOS and macOS Debug builds passed after the batch fix.
+
+Set `CODYNC_PUSH_CLEAR_TEST_NOTIFICATIONS=1` alongside the Debug verification bot ID to remove only that bot's delivered test notifications after reporting them.
+
+- Final device diagnostics confirmed one decrypted failure (`Push verification / Task failed / The agent failed.`), one additional decrypted success, no new generic fallback, and no remaining test activity. The temporary bot was deleted and its delivered notifications were cleared.
