@@ -42,4 +42,11 @@ Use Swift Testing (`@Test`, `#expect`), Rust unit tests, and the relay’s Node 
 
 ## Commit & Pull Request Guidelines
 
-History mixes descriptive subjects with scoped Conventional Commits, such as `feat(macos): ...`. Keep subjects concise and changes focused. PRs should explain behavior changes, link relevant issues, list validation performed, and include screenshots for UI changes. Update affected documentation in the same change.
+- Conventional Commits: `type(scope): subject`. Types: `feat`, `fix`, `refactor`, `perf`, `docs`, `test`, `build`, `ci`, `chore`. Scope is the area touched: `ios`, `macos`, `kit`, `host`, `linux`, `cloud`, `relay`, `web`, `docs`.
+- Subject: imperative mood ("add", not "added"), lowercase after the colon, no trailing period, at most 72 characters (aim for 50). Say what changes for the user, not which files moved.
+- Body (after a blank line, wrapped at 72 columns) when the change isn't obvious from the subject: what and why, not how. Bullets are fine.
+- One logical change per commit. Don't mix unrelated work, and stage only your own hunks when others have uncommitted changes in the tree.
+- Breaking changes: `!` after the type/scope, or a `BREAKING CHANGE:` footer.
+- English only; no `Co-Authored-By` or other AI attribution trailers (the commit-msg hook rejects them).
+
+PRs should explain behavior changes, link relevant issues, list validation performed, and include screenshots for UI changes. Update affected documentation in the same change.

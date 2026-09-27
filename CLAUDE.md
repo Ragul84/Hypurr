@@ -76,6 +76,15 @@ Whenever you build and install/run a new build, stop the old copies so nothing s
 
 Folder layout, file naming and shared terms: [docs/architecture/file-structure.md](docs/architecture/file-structure.md). Follow it when adding or moving files.
 
+## Commit messages
+
+- Conventional Commits: `type(scope): subject`. Types: `feat`, `fix`, `refactor`, `perf`, `docs`, `test`, `build`, `ci`, `chore`. Scope is the area touched: `ios`, `macos`, `kit`, `host`, `linux`, `cloud`, `relay`, `web`, `docs`.
+- Subject: imperative mood ("add", not "added"), lowercase after the colon, no trailing period, at most 72 characters (aim for 50). Say what changes for the user, not which files moved.
+- Body (after a blank line, wrapped at 72 columns) when the change isn't obvious from the subject: what and why, not how. Bullets are fine.
+- One logical change per commit. Don't mix unrelated work, and stage only your own hunks when others have uncommitted changes in the tree.
+- Breaking changes: `!` after the type/scope, or a `BREAKING CHANGE:` footer.
+- English only; no `Co-Authored-By` or other AI attribution trailers (the commit-msg hook rejects them).
+
 ## Keeping this file short
 
 - CLAUDE.md holds only rules an agent needs on every task. Reference material (file structure, naming tables, API details, audits, how-tos) goes in `docs/` as its own file, with a one-line pointer here.
