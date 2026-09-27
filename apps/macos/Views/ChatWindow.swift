@@ -338,7 +338,7 @@ private struct ChatSplitView: View {
         }
         .codyncSheet(isPresented: Binding(get: { marketplace != nil }, set: { if !$0 { marketplace = nil } })) {
             if let store = marketplace.flatMap(accounts.store(for:)) {
-                MarketplaceView { marketplace = nil }
+                MarketplaceView()
                     .environment(store)
                 .frame(width: min(920, windowSize.width - 80), height: sheetHeight)
             }
@@ -681,7 +681,7 @@ extension ChatSplitView {
         let target = BotTarget(bot: bot, store: model)
         return [
             .init(title: bot.pinned ? "Unpin" : "Pin", icon: "pin", action: { model.setPinned(bot, !bot.pinned) }),
-            .init(title: "Mark as Read", icon: "bell.badge", action: { model.markRead(bot.id) }),
+            .init(title: "Mark as Read", icon: "bell.badge", action: { model.markAllRead(bot.id) }),
             .init(title: "Edit Profile…", icon: "square.and.pencil", divider: true,
                   action: { editing = EditTarget(request: EditorRequest(BotDraft(bot)), store: model) }),
             .init(title: "Copy conversation ID", icon: "square.on.square", divider: true, action: {
