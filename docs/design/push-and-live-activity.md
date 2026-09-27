@@ -43,7 +43,7 @@ Remote activity content contains only `status`, empty `activity`, and `startedAt
 
 1. iOS registers its APNs token with `POST /register` using `kind: alert` and its build environment.
 2. The Worker returns an AES-GCM ticket. The phone sends it with its X25519 push public key and account context to `registerDevice` on the host.
-3. Registration atomically replaces previous alert tickets for that device identity. Randomized tickets must not accumulate, retain obsolete keys or generate duplicate notifications.
+3. Registration atomically replaces previous alert tickets for that device identity. Delivery also selects only the latest stored ticket per device, so existing duplicate rows cannot fan out before that phone reconnects. Randomized tickets must not accumulate, retain obsolete keys or generate duplicate notifications.
 4. A foreground task submission starts an ActivityKit activity with `pushType: .token`. The phone registers each activity token using `kind: liveactivity`, then calls `registerActivity` for the bot.
 5. Activity registration replaces the previous ticket for this device and bot. The app retries registration up to three times and reattaches token observers after reconnect/relaunch. Cancellation stops retries.
 6. The host sends current state after registration, including terminal state if the task already finished. An idle bot with an unanswered main-chat user message waits for its actor to start rather than reporting immediate completion.
@@ -129,4 +129,14 @@ Local tests cover payload generation, error classification, request validation, 
 - Swift: `swift test --package-path kit` passed, 51 tests including encrypted push vectors and the optional notification subtitle.
 - Relay: `npm test` and `npm run typecheck` passed, including malformed requests and activity payload checks.
 - iOS: Debug simulator build passed with both extensions embedded. The built notification extension has the expected service entry point. Signing and device Keychain access were not verified by this unsigned build.
-- Design document relative links and `git diff --check` passed. No Worker deployment or phone installation was performed.
+- Design document relative links and `git diff --check` passed. This initial check preceded deployment; see the device verification below.
+
+
+### Deployment and device verification — 2026-09-27
+
+- Deployed `codync-relay`, version `d29a7eb4-f22e-4e27-a393-d563a5e56ff3`; `/health` returned HTTP 200.
+- Built and restarted the signed Mac app and its launchd host. The running host includes the new notification implementation; its health endpoint returned success.
+- Built and installed the signed Debug iOS app on the paired iPhone 16 Pro Max. App and notification extension both resolve their shared Keychain group to `7FUM8A8H72.com.pokai.Codync`, with the matching App Group. The app uses the development APNs environment.
+- The live host contained 191 tickets across five device identities. The active phone's group shrank from ten rows to one on reconnect. Added regression coverage ensures older groups also send through only their newest stored ticket.
+- Two encrypted test alerts returned HTTP 200 from the deployed Worker/APNs path. Device logs confirm the notification service extension executed, with no recorded decryption failure for those tests.
+- Visual notification content and background ActivityKit acceptance remain under verification; APNs acceptance and extension invocation alone are not recorded as a complete device pass.
