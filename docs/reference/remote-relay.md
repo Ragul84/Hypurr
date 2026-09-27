@@ -512,7 +512,7 @@ Verify pairing and approval, same-computer direct/relay connectivity, encrypted 
 
 ## 14. Environments and deployment
 
-See [environments and deployment](../guides/environments-and-deployment.md) and [cloud setup](../../cloud/README.md). Debug targets development. Main app configuration is empty and production Worker bindings include placeholders; production readiness must be established separately.
+See [environments and deployment](../guides/environments-and-deployment.md) and [cloud setup](../../cloud/README.md). Debug builds target development (`dev-api.codync.dev`); Release builds target production (`api.codync.dev`).
 
 ## Implementation clarifications
 
