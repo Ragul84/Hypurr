@@ -63,11 +63,11 @@ State 分頁的 Live Activity 頁顯示鎖定畫面形式，Dynamic Island 頁�
 - Working：顯示目前工作，有開始時間才顯示計時。
 - Needs you：顯示待回應提示；審批與文字回應在 App 處理。
 - Done：完成勾號與查看結果提示。
-- Stopped：錯誤圖示，不會誤顯示成完成。
+- Failed：錯誤圖示，不會誤顯示成完成。
 - Update delayed：ActivityKit 回報 stale 時顯示延遲提示，不繼續顯示即時計時。
 - 未知狀態：保守顯示 Waiting for update，不宣稱任務完成。
 
-既有生命週期繼續由手機送出任務時啟動、App 接收事件時更新、完成時結束。App 本地更新設定 15 分鐘 stale date；沒有更新不代表工作失敗。遠端推播沿用現有 relay／host 合約，這輪未變更後端。關閉 Live Activities 會結束目前活動並阻止之後自動啟動。
+既有生命週期繼續由手機送出任務時啟動、App 接收事件時更新、完成時結束。App 本地更新設定 15 分鐘 stale date；沒有更新不代表工作失敗。遠端推播現在也設定 15 分鐘 stale date、保留錯誤結束狀態，並支援重新註冊活動票券；完整合約與通知設計見 [Notifications and Live Activities](push-and-live-activity.md)。關閉 Live Activities 會結束目前活動並阻止之後自動啟動。
 
 Dynamic Island 固定黑底，文字採淺色；Lock Screen 卡片配合系統外觀。`ActivityCards.swift` 共用主要內容，正式 Dynamic Island 由系統 region 排版，App 裡顯示示意容器。[Apple DynamicIsland API](https://developer.apple.com/documentation/widgetkit/dynamicisland)
 

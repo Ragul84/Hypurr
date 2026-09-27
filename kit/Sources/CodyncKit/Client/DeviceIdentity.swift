@@ -1,6 +1,7 @@
 import CryptoKit
 import Foundation
 import Security
+import os
 
 /// This app install's keys for one account context (§3.2): an Ed25519 device key that hosts
 /// authorize, and an X25519 push key that opens notification contents. Private keys stay in the Keychain.
@@ -56,17 +57,27 @@ public struct DeviceIdentity: Sendable {
 
     /// For the Notification Service Extension: opens §6.7's `sealed` with the push key of
     /// `contextID`. Never creates keys; nil when anything doesn't check out.
-    public static func openPush(sealed: String, computerId: ComputerID, contextID: String) -> (title: String, body: String)? {
-        guard let raw = try? Keychain.read(service: pushService, account: contextID),
-              let key = try? Curve25519.KeyAgreement.PrivateKey(rawRepresentation: raw) else { return nil }
-        return openPush(sealed: sealed, computerId: computerId, key: key)
+    public static func openPush(sealed: String, computerId: ComputerID, contextID: String) -> PushAlert? {
+        let log = Logger(subsystem: "com.pokai.Codync.ios", category: "PushDecrypt")
+        do {
+            guard let raw = try Keychain.read(service: pushService, account: contextID) else {
+                log.error("Notification push key missing; re-register this device")
+                return nil
+            }
+            let key = try Curve25519.KeyAgreement.PrivateKey(rawRepresentation: raw)
+            let alert = openPush(sealed: sealed, computerId: computerId, key: key)
+            if alert == nil { log.error("Notification authentication or content decoding failed") }
+            return alert
+        } catch {
+            log.error("Notification key unavailable: \(error.localizedDescription)")
+            return nil
+        }
     }
 
-    static func openPush(sealed: String, computerId: ComputerID, key: Curve25519.KeyAgreement.PrivateKey) -> (title: String, body: String)? {
-        struct Alert: Decodable { var title: String; var body: String }
+    static func openPush(sealed: String, computerId: ComputerID, key: Curve25519.KeyAgreement.PrivateKey) -> PushAlert? {
         guard let plain = try? RelayCrypto.openPush(sealed: sealed, computerId: computerId, pushPrivate: key),
-              let alert = try? JSONDecoder().decode(Alert.self, from: plain) else { return nil }
-        return (alert.title, alert.body)
+              let alert = try? JSONDecoder().decode(PushAlert.self, from: plain) else { return nil }
+        return alert
     }
 }
 

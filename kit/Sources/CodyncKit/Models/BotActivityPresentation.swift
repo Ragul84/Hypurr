@@ -28,7 +28,7 @@ public struct BotActivityPresentation: Hashable, Sendable {
         case .working: "Working"
         case .needsInput: "Needs you"
         case .completed: "Done"
-        case .failed: "Stopped"
+        case .failed: "Failed"
         case .stale: "Update delayed"
         case .waiting: "Waiting for update"
         }

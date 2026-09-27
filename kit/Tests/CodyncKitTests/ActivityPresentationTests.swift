@@ -5,6 +5,7 @@ import Testing
 @Test func activityErrorAndUnknownStatusNeverLookCompleted() {
     let error = BotActivityPresentation(status: "error", activity: "", startedAt: .now)
     #expect(error.phase == .failed)
+    #expect(error.title == "Failed")
     #expect(error.symbol != "checkmark")
     #expect(!error.showsTimer)
     let unknown = BotActivityPresentation(status: "new-host-status", activity: "", startedAt: .now)
