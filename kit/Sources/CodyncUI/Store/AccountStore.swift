@@ -183,6 +183,27 @@ public final class AccountStore {
         return ticket
     }
 
+    /// An offline account computer named like one this device uses or sees online: most likely the same
+    /// machine under an earlier identity (its host keys were reset), left behind in the account.
+    public func isOlderCopy(_ computer: CloudComputer) -> Bool {
+        !computer.isOnline && cloudComputers.contains { other in
+            other.computerId != computer.computerId && other.name == computer.name
+                && (stores[other.computerId] != nil || other.isOnline)
+        }
+    }
+
+    /// Takes a computer out of the account (its grants and pending requests go with it).
+    public func removeFromAccount(_ id: ComputerID) async {
+        guard let cloud else { return }
+        do {
+            try await cloud.removeComputer(id)
+            pendingAccess[id] = nil
+            await refreshCloud()
+        } catch {
+            lastError = error.localizedDescription
+        }
+    }
+
     private func askForAccess() async {
         let waiting = cloudComputers.filter { c in
             c.isOnline && c.access != "granted" && !asked.contains(c.computerId)

@@ -293,6 +293,7 @@ final class HostController {
             let signed = try await client.claimSign(claimId: challenge.claimId, nonce: challenge.nonce, userId: userID)
             _ = try await cloud.completeClaim(challenge.claimId, signed: signed)
             await accounts.refreshCloud()
+            if store.computer.id == self.store?.computer.id { await forgetEarlierIdentities(of: store.computer.id) }
         } catch {
             accounts.lastError = error.localizedDescription
         }
@@ -304,6 +305,10 @@ final class HostController {
             autoClaimTarget
         } onChange: { [weak self] in
             Task { @MainActor in self?.watchAutoClaim() }
+        }
+        // Remember which identity is this Mac while it's in the account, so a later key reset can clean it up.
+        if let store, let userID = account.userID, store.cloud?.owner?.userId == userID {
+            UserDefaults.standard.set([store.computer.id], forKey: "claimedComputerIds")
         }
         guard let pending, !autoClaiming else { return }
         autoClaiming = true
@@ -332,6 +337,17 @@ final class HostController {
         var ids = keptOut(userID)
         if out { ids.insert(id) } else { ids.remove(id) }
         UserDefaults.standard.set(Array(ids), forKey: "keptOutOfAccount.\(userID)")
+    }
+
+    /// This Mac's host got new keys (a reset `~/.codync`, a reinstall): the identities this Mac claimed
+    /// before are dead copies of it, so they leave the account instead of showing up as a second Mac.
+    private func forgetEarlierIdentities(of current: ComputerID) async {
+        let key = "claimedComputerIds"
+        let earlier = Set(UserDefaults.standard.stringArray(forKey: key) ?? []).subtracting([current])
+        for computer in accounts.cloudComputers where earlier.contains(computer.computerId) && !computer.isOnline {
+            await accounts.removeFromAccount(computer.computerId)
+        }
+        UserDefaults.standard.set([current], forKey: key)
     }
 
     func unclaim(_ store: BotStore) async {
