@@ -18,8 +18,6 @@ struct CodyncMacApp: App {
     var body: some Scene {
         MenuBarExtra {
             MenuView()
-                .frame(width: 340)
-                .modalHost()
                 .environment(host)
                 .environment(account)
         } label: {
@@ -37,7 +35,22 @@ struct CodyncMacApp: App {
                     NSApp.activate()
                 }
         }
-        .menuBarExtraStyle(.window)
+        .menuBarExtraStyle(.menu)
+
+        Window("Pair iPhone", id: "pairing") {
+            Group {
+                if let store = host.store {
+                    PairingPanel(store: store)
+                        .id(store.computer.id)
+                } else {
+                    Text("Connect to this Mac's host before pairing your iPhone.")
+                        .padding()
+                }
+            }
+            .frame(width: 340)
+            .environment(host)
+        }
+        .windowResizability(.contentSize)
 
         Window("Codync", id: "chat") {
             ChatWindow()
@@ -50,279 +63,240 @@ struct CodyncMacApp: App {
     }
 }
 
+/// A system menu: macOS owns layout, selection, keyboard navigation and submenus.
 struct MenuView: View {
     @Environment(HostController.self) private var host
     @Environment(\.openWindow) private var openWindow
-    @State private var showPairing = false
-    @State private var showSettings = false
     @AppStorage(SharedStore.usageIconStyleKey, store: UserDefaults(suiteName: SharedStore.appGroup))
     private var usageIconStyle = UsageIconStyle.character.rawValue
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            header
-            VStack(spacing: 8) {
-                if showPairing, let store = host.store {
-                    PairingPanel(store: store)
-                        .tile()
-                        // Grows out of the QR button that opened it, and goes back into it.
-                        .transition(.scale(0.97, anchor: .topTrailing).combined(with: .opacity))
-                } else {
-                    content
-                }
+        Text(status)
+        Button("Open Codync") { open("chat") }
+            .keyboardShortcut("o")
+        if host.state == .running {
+            Button("Pair iPhone…") {
+                host.requestPairing()
+                open("pairing")
             }
-            .padding(.horizontal, 10)
-            footer
+                .disabled(host.store == nil)
         }
-        .background(Palette.background)
-        .animation(Motion.reduced(Motion.layout, reduceMotion), value: showPairing)
-        .animation(Motion.reduced(Motion.layout, reduceMotion), value: host.state)
-        .animation(Motion.reduced(Motion.layout, reduceMotion), value: host.approvals.map(\.id))
-        .animation(Motion.reduced(Motion.layout, reduceMotion), value: host.roster.isEmpty)
+        Divider()
+        hostItems
+        Divider()
+        Menu("Settings") {
+            Picker("Usage icons", selection: $usageIconStyle) {
+                Text("Character").tag(UsageIconStyle.character.rawValue)
+                Text("Original").tag(UsageIconStyle.original.rawValue)
+            }
+            Toggle("Open at login", isOn: Binding(
+                get: { host.launchAtLogin },
+                set: { host.setLaunchAtLogin($0) }
+            ))
+            Divider()
+            Button("Restart host") { host.restart() }
+            Button("Open log") { NSWorkspace.shared.open(host.logURL) }
+            Divider()
+            Button("Uninstall host service") { host.uninstall() }
+        }
+        if let version = host.version { Text("Version \(version)") }
+        Button("Quit Codync") { NSApp.terminate(nil) }
+            .keyboardShortcut("q")
     }
 
-    // MARK: header
-
-    private var header: some View {
-        HStack(spacing: 10) {
-            CodyncMark()
-                .frame(width: 28, height: 28)
-                .foregroundStyle(Palette.text)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Codync").font(.headline).foregroundStyle(Palette.text)
-                HStack(spacing: 5) {
-                    if let color = status.color {
-                        Circle().fill(color).frame(width: 6, height: 6)
-                    }
-                    Text(status.text).font(.caption).foregroundStyle(Palette.secondary)
-                }
-                .accessibilityElement(children: .combine)
-            }
-            Spacer()
-            if host.state == .running {
-                IconButton("Open Codync", systemImage: "bubble.left.and.bubble.right") {
-                    openWindow(id: "chat")
-                    NSApp.activate()
-                }
-                IconButton("Pair iPhone", systemImage: "qrcode", selected: showPairing) {
-                    showPairing.toggle()
-                }
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.top, 14)
-        .padding(.bottom, 12)
-    }
-
-    /// The header's state line. A dot only when something is going on: blue working, amber needs you, red trouble.
-    private var status: (text: String, color: Color?) {
+    private var status: String {
         switch host.state {
-        case .missingBinary: ("Host not found", Palette.danger)
-        case .notInstalled: ("Host not installed", nil)
-        case .starting: ("Connecting…", nil)
-        case .failed: ("Host problem", Palette.danger)
+        case .missingBinary: "Host not found"
+        case .notInstalled: "Host not installed"
+        case .starting: "Connecting…"
+        case .failed: "Host problem"
         case .running:
             if !host.approvals.isEmpty {
-                ("A device asks for access", Palette.warning)
+                "A device asks for access"
             } else if host.needsAttention {
-                ("A bot needs you", Palette.warning)
+                "A bot needs you"
             } else if host.working > 0 {
-                ("\(host.working) bot\(host.working == 1 ? "" : "s") working", Palette.accent)
+                "\(host.working) bot\(host.working == 1 ? "" : "s") working"
             } else {
-                ("Connected", nil)
+                "Connected"
             }
         }
     }
 
-    // MARK: content
-
-    @ViewBuilder private var content: some View {
+    @ViewBuilder private var hostItems: some View {
         switch host.state {
         case .missingBinary:
-            Notice(text: "This build of Codync doesn't include codync-host. Reinstall the app, or install the host with Homebrew:", code: "brew install leepokai/codync/codync-host")
-                .tile()
+            Text("Reinstall Codync or install the host with Homebrew.")
+            Button("Copy host install command") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString("brew install leepokai/codync/codync-host", forType: .string)
+            }
         case .notInstalled:
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Run your bots on this Mac").font(.callout.weight(.semibold)).foregroundStyle(Palette.text)
-                Text("Codync installs a small background service that runs Claude Code, Codex and other agents for your bots — even when this menu is closed.")
-                    .font(.caption)
-                    .foregroundStyle(Palette.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Button("Install host") { host.install() }
-                    .buttonStyle(.primary)
-            }
-            .tile()
+            Button("Install host") { host.install() }
         case .starting:
-            HStack(spacing: 8) {
-                Spinner(size: 12)
-                Text("Connecting…").font(.caption).foregroundStyle(Palette.secondary)
-            }
-            .frame(maxWidth: .infinity)
-            .tile()
+            Text("Starting the host…")
         case let .failed(message):
-            VStack(alignment: .leading, spacing: 10) {
-                Text(message).font(.caption).foregroundStyle(Palette.danger).textSelection(.enabled)
-                HStack {
-                    Button("Restart host") { host.restart() }
-                    Button("Open log") { NSWorkspace.shared.open(host.logURL) }
-                }
-                .buttonStyle(.secondary)
-            }
-            .tile()
+            Text(message)
+            Button("Restart host") { host.restart() }
+            Button("Open log") { NSWorkspace.shared.open(host.logURL) }
         case .running:
             if let approval = host.approvals.first {
-                ApprovalLine(approval: approval) {
+                Button("Review access request from \(approval.request.deviceName)…") {
                     host.reviewApprovals()
-                    openWindow(id: "chat")
-                    NSApp.activate()
+                    open("chat")
                 }
-                .tile()
+                Divider()
             }
             bots
             if host.screen != nil {
-                RemoteScreenSection().tile()
+                Divider()
+                RemoteScreenMenu()
             }
             if !host.usage.providers.isEmpty {
-                VStack(spacing: 12) {
-                    ForEach(host.usage.providers) { UsageBlock(provider: $0) }
+                Divider()
+                ForEach(host.usage.providers) { provider in
+                    // Buttons, not text: the menu dims a disabled item's image. They open the app.
+                    Button { open("chat") } label: {
+                        Label {
+                            Text(provider.name)
+                        } icon: {
+                            menuIcon(ProviderMascot(provider, size: 16, style: UsageIconStyle(rawValue: usageIconStyle) ?? .character),
+                                     key: "provider|\(provider.id)|\(usageIconStyle)|\((provider.tightest?.percent ?? 0) >= 90)")
+                        }
+                    }
+                    // A bar per limit, with its numbers as the item's title (what VoiceOver reads too).
+                    ForEach(provider.windows) { window in
+                        Button { open("chat") } label: {
+                            Label {
+                                Text(usageLine(window))
+                            } icon: {
+                                menuIcon(UsageBar(window: window, tint: provider.tint),
+                                         key: "bar|\(provider.id)|\(Int(window.percent.rounded()))")
+                            }
+                        }
+                    }
                 }
-                .tile()
             }
         }
     }
 
     @ViewBuilder private var bots: some View {
-        if host.roster.isEmpty {
-            HStack(spacing: 12) {
-                CharacterAvatar(shape: "cloud", color: "gray", size: 32)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("No bots yet").font(.callout.weight(.medium)).foregroundStyle(Palette.text)
-                    Text("Create one from Codync on your iPhone.").font(.caption).foregroundStyle(Palette.secondary)
-                }
-                Spacer(minLength: 0)
-            }
-            .tile()
+        let roster = host.roster.filter { !$0.bot.isGroup }
+        if roster.isEmpty {
+            Text("No bots yet")
         } else {
-            ScrollView {
-                VStack(spacing: 0) {
-                    // The menu shows what the bots are doing; group chats open in the window.
-                    ForEach(host.roster.filter { !$0.bot.isGroup }) { item in
-                        BotLine(bot: item.bot, computer: host.accounts.computers.count > 1 ? item.computer : nil) { host.stop(item) }
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                host.accounts.selection = item.ref
-                                openWindow(id: "chat")
-                                NSApp.activate()
-                            }
+            ForEach(roster) { item in
+                Menu {
+                    Text(item.bot.needsInput ? "Needs your response" : item.bot.isWorking
+                        ? (item.bot.activity.isEmpty ? "Working…" : item.bot.activity)
+                        : (item.bot.lastMessage ?? item.bot.folderName))
+                    Button("Open conversation") {
+                        host.accounts.selection = item.ref
+                        open("chat")
+                    }
+                    if item.bot.isWorking {
+                        Button("Stop task") { host.stop(item) }
+                    }
+                } label: {
+                    Label {
+                        Text(host.accounts.computers.count > 1 ? "\(item.bot.name) · \(item.computer.name)" : item.bot.name)
+                    } icon: {
+                        menuIcon(AvatarWithStatus(bot: item.bot, size: 20), key: avatarKey(item.bot))
                     }
                 }
-                .padding(4)
             }
-            // ScrollView has no intrinsic height inside a MenuBarExtra window.
-            .frame(height: min(CGFloat(host.roster.count) * 46 + 8, 320))
-            .tile(padding: 0)
         }
     }
 
-    // MARK: footer
+    private func open(_ id: String) {
+        openWindow(id: id)
+        NSApp.activate()
+    }
 
-    /// Rarely used, so quiet: settings (with Open at login) and Quit.
-    private var footer: some View {
-        HStack(spacing: 2) {
-            if let version = host.version {
-                Text("v\(version)").font(.caption2.monospacedDigit()).foregroundStyle(Palette.tertiary).padding(.leading, 6)
+    private func usageLine(_ window: UsageWindow) -> String {
+        let reset = window.resetDate.map { " · resets in \(RelativeTime.until($0))" } ?? ""
+        return "\(window.title) · \(Int(window.percent.rounded()))%\(reset)"
+    }
+
+    /// Everything the avatar image shows; the activity text changes often and isn't drawn.
+    private func avatarKey(_ bot: Bot) -> String {
+        "bot|\(bot.id)|\(bot.avatarShape)|\(bot.avatarColor)|\(bot.status)|\(bot.needsInput)|\(bot.unread > 0)"
+    }
+
+    /// Rendered icons by what they show and the appearance: a bot's status change redraws one image,
+    /// not the whole menu, and nothing is drawn again while the menu is closed and nothing changed.
+    @MainActor private static let iconCache = NSCache<NSString, NSImage>()
+
+    /// NSMenu items only take text and an image, so custom drawing goes in as a rendered image.
+    private func menuIcon(_ view: some View, key: String) -> Image {
+        // The menu follows the system appearance; this view's environment doesn't. Reading
+        // `host.menuIsDark` here redraws the menu when the system switches.
+        let dark = host.menuIsDark
+        let cacheKey = "\(key)|\(dark)" as NSString
+        if let cached = Self.iconCache.object(forKey: cacheKey) { return Image(nsImage: cached) }
+        let appearance = NSAppearance(named: dark ? .darkAqua : .aqua) ?? NSApp.effectiveAppearance
+        let renderer = ImageRenderer(content: view.environment(\.colorScheme, dark ? .dark : .light))
+        renderer.scale = NSScreen.main?.backingScaleFactor ?? 2
+        var image: NSImage?
+        appearance.performAsCurrentDrawingAppearance { image = renderer.nsImage }
+        guard let image else { return Image(systemName: "circle") }
+        Self.iconCache.setObject(image, forKey: cacheKey)
+        return Image(nsImage: image)
+    }
+}
+
+/// One usage limit's bar in the provider's color: amber from 70%, red from 90%.
+private struct UsageBar: View {
+    let window: UsageWindow
+    let tint: Color
+
+    var body: some View {
+        let color = window.percent >= 90 ? Palette.danger : window.percent >= 70 ? Palette.warning : tint
+        ZStack(alignment: .leading) {
+            Capsule().fill(Color.primary.opacity(0.12))
+            if window.percent > 0 {
+                Capsule().fill(color).frame(width: max(5, 60 * min(1, window.percent / 100)))
             }
-            Spacer()
-            // The DropdownMenu shape, but kept on IconButton so the gear hovers like its neighbours.
-            IconButton("Settings", systemImage: "gearshape", selected: showSettings) { showSettings.toggle() }
-                .codyncMenu(isPresented: $showSettings) {
-                    [
-                        MenuItem("Usage icon · Character", selected: usageIconStyle == UsageIconStyle.character.rawValue) {
-                            usageIconStyle = UsageIconStyle.character.rawValue
-                        },
-                        MenuItem("Usage icon · Original", selected: usageIconStyle == UsageIconStyle.original.rawValue) {
-                            usageIconStyle = UsageIconStyle.original.rawValue
-                        },
-                        MenuItem("Open at login", selected: host.launchAtLogin) { host.setLaunchAtLogin(!host.launchAtLogin) },
-                        MenuItem("Restart host", divider: true) { host.restart() },
-                        MenuItem("Open log") { NSWorkspace.shared.open(host.logURL) },
-                        MenuItem("Uninstall host service", divider: true) { host.uninstall() },
-                    ]
-                }
-            IconButton("Quit Codync", systemImage: "power") { NSApp.terminate(nil) }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .frame(width: 60, height: 5)
+        .frame(height: 16)
     }
 }
 
-private extension View {
-    /// A Control Center–style module: one group of related things on a raised surface.
-    func tile(padding: CGFloat = 12) -> some View {
-        self.padding(padding)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Palette.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-}
-
-/// Remote screen: see and control this Mac from the iPhone, and let bots use it.
-/// One line when all is well; it only grows to say what's missing.
-private struct RemoteScreenSection: View {
+private struct RemoteScreenMenu: View {
     @Environment(HostController.self) private var host
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let screen = host.screen ?? ScreenState()
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                Image(systemName: "display")
-                    .font(.system(size: 17, weight: .regular))
-                    .foregroundStyle(screen.enabled ? Palette.text : Palette.secondary)
-                    .frame(width: 30, height: 30)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 1) {
-                    Text("Remote screen").font(.callout.weight(.medium)).foregroundStyle(Palette.text)
-                    Text(subtitle(screen))
-                        .font(.caption)
-                        .foregroundStyle(screen.enabled && screen.viewers > 0 ? Palette.text : Palette.secondary)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 8)
-                Toggle(isOn: Binding(get: { screen.enabled }, set: { host.setRemoteScreen($0) })) { EmptyView() }
-                    .toggleStyle(.codync)
-                    .fixedSize()
-                    .accessibilityLabel("Remote screen")
-            }
+        Menu("Remote screen") {
+            Toggle("Enable remote screen", isOn: Binding(
+                get: { host.screen?.enabled == true },
+                set: { host.setRemoteScreen($0) }
+            ))
+            Text(subtitle(screen))
             if screen.enabled {
                 if host.screenAgentNeedsApproval {
-                    PermissionLine(title: "Codync Screen in Login Items") { host.openLoginItemsSettings() }
+                    Button("Allow Codync Screen in Login Items…") { host.openLoginItemsSettings() }
                 } else if screen.connected {
                     if !screen.capture {
-                        PermissionLine(title: "Screen recording") {
+                        Button("Allow Screen Recording…") {
                             open("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")
                         }
                     }
                     if !screen.input {
-                        PermissionLine(title: "Accessibility (mouse and keyboard)") {
+                        Button("Allow Accessibility…") {
                             open("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
                         }
                     }
                 }
             }
-            if let error = host.screenError {
-                Text(error).font(.caption).foregroundStyle(Palette.danger).fixedSize(horizontal: false, vertical: true)
-            }
+            if let error = host.screenError { Text(error) }
         }
-        .animation(Motion.reduced(Motion.layout, reduceMotion), value: screen)
-        .animation(Motion.reduced(Motion.layout, reduceMotion), value: host.screenError)
     }
 
     private func subtitle(_ screen: ScreenState) -> String {
         guard screen.enabled else { return "Control this Mac from your iPhone" }
-        if host.screenAgentNeedsApproval { return "Needs one more step" }
+        if host.screenAgentNeedsApproval { return "Needs approval in System Settings" }
         if !screen.connected { return "Starting Codync Screen…" }
         if !screen.capture || !screen.input { return "Needs permission" }
         if screen.viewers > 0 { return screen.viewers == 1 ? "Your iPhone is viewing" : "\(screen.viewers) viewers" }
@@ -336,125 +310,10 @@ private struct RemoteScreenSection: View {
     }
 }
 
-/// A permission that's still missing, with the way to fix it.
-private struct PermissionLine: View {
-    let title: String
-    let fix: () -> Void
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.circle.fill")
-                .foregroundStyle(Palette.warning)
-                .accessibilityHidden(true)
-            Text(title).font(.caption).foregroundStyle(Palette.text)
-            Spacer()
-            IconButton("Open System Settings", systemImage: "gearshape", action: fix)
-        }
-        .padding(.leading, 8)
-        .padding(.vertical, 2)
-        .background(Palette.warning.opacity(0.1), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-        .accessibilityElement(children: .combine)
-        .accessibilityValue("Not allowed")
-    }
-}
-
-/// One provider's limits: its character and name, then a thin bar per limit in its color.
-private struct UsageBlock: View {
-    let provider: UsageProvider
-    @AppStorage(SharedStore.usageIconStyleKey, store: UserDefaults(suiteName: SharedStore.appGroup))
-    private var usageIconStyle = UsageIconStyle.character.rawValue
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack(spacing: 6) {
-                ProviderMascot(provider, size: 15, style: UsageIconStyle(rawValue: usageIconStyle) ?? .character)
-                Text(provider.name).font(.caption.weight(.semibold)).foregroundStyle(Palette.text)
-                Spacer()
-                Text("updated \(RelativeTime.short(Date(milliseconds: provider.updatedAt)))")
-                    .font(.caption2)
-                    .foregroundStyle(Palette.tertiary)
-            }
-            ForEach(provider.windows) { w in
-                HStack(spacing: 8) {
-                    Text(w.title).font(.caption).foregroundStyle(Palette.secondary).lineLimit(1)
-                        .frame(width: 58, alignment: .leading)
-                    ThinBar(percent: w.percent, tint: provider.tint)
-                    Text("\(Int(w.percent.rounded()))%")
-                        .font(.caption.monospacedDigit().weight(.medium))
-                        .foregroundStyle(Palette.text)
-                        .frame(width: 34, alignment: .trailing)
-                    Text(w.resetDate.map { RelativeTime.until($0) } ?? "")
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(Palette.tertiary)
-                        .frame(width: 48, alignment: .trailing)
-                }
-                .help(w.resetsShort() ?? w.label)
-                .accessibilityElement(children: .combine)
-            }
-        }
-    }
-}
-
-/// 4pt track in the provider's color; amber from 70%, red from 90%. Empty stays empty.
-private struct ThinBar: View {
-    let percent: Double
-    let tint: Color
-
-    var body: some View {
-        let color = percent >= 90 ? Palette.danger : percent >= 70 ? Palette.warning : tint
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Capsule().fill(Palette.text.opacity(0.08))
-                if percent > 0 {
-                    Capsule().fill(color).frame(width: max(4, geo.size.width * min(1, percent / 100)))
-                }
-            }
-        }
-        .frame(height: 4)
-    }
-}
-
-private struct BotLine: View {
-    let bot: Bot
-    /// Shown when bots from more than one computer are listed.
-    let computer: Computer?
-    let stop: () -> Void
-    @State private var hovering = false
-
-    var body: some View {
-        HStack(spacing: 10) {
-            AvatarWithStatus(bot: bot, size: 30)
-            VStack(alignment: .leading, spacing: 1) {
-                HStack(spacing: 4) {
-                    Text(bot.name).font(.callout.weight(.medium)).foregroundStyle(Palette.text)
-                    if let computer {
-                        ComputerBadge(computer, size: 13)
-                        Text(computer.name).font(.caption2).foregroundStyle(Palette.tertiary).lineLimit(1)
-                    }
-                }
-                Text(bot.isWorking ? (bot.activity.isEmpty ? "Working…" : bot.activity) : (bot.lastMessage ?? bot.folderName))
-                    .font(.caption)
-                    .foregroundStyle(bot.needsInput ? Palette.warning : bot.isWorking ? Palette.accent : Palette.secondary)
-                    .lineLimit(1)
-            }
-            Spacer()
-            if bot.isWorking && hovering {
-                IconButton("Stop", systemImage: "stop.fill", action: stop)
-            } else {
-                Text(RelativeTime.short(Date(milliseconds: bot.lastAt))).font(.caption2).foregroundStyle(Palette.tertiary)
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(hovering ? Palette.text.opacity(0.06) : .clear, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .animation(Motion.hover, value: hovering)
-        .onHover { hovering = $0 }
-    }
-}
-
 /// A one-time pairing QR (v3) from a computer this Mac manages: its keys, a code, and how to reach it.
 struct PairingPanel: View {
     let store: BotStore
+    @Environment(HostController.self) private var host
     @State private var info: PairingInfo?
     @State private var error: String?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -507,7 +366,15 @@ struct PairingPanel: View {
         .padding(16)
         .animation(Motion.reduced(Motion.layout, reduceMotion), value: info?.pairingUrl)
         .animation(Motion.reduced(Motion.layout, reduceMotion), value: error)
-        .task(id: store.computer.id) { await load() }
+        // A new code each time "Pair iPhone…" is chosen (the window stays open between uses).
+        .task(id: "\(store.computer.id)#\(host.pairingRequest)") { await load() }
+        // And a fresh one when this code expires while it's on screen.
+        .task(id: info?.expiresAt) {
+            guard let expires = info?.expiresAt else { return }
+            let wait = Date(milliseconds: expires).timeIntervalSinceNow
+            try? await Task.sleep(for: .seconds(max(1, wait)))
+            if !Task.isCancelled { await load() }
+        }
     }
 
     private func load() async {
@@ -532,68 +399,5 @@ struct PairingPanel: View {
         let image = NSImage(size: rep.size)
         image.addRepresentation(rep)
         return image
-    }
-}
-
-/// A pending access request in the menu; the decision happens in the approval sheet.
-private struct ApprovalLine: View {
-    let approval: Approval
-    let review: () -> Void
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "person.badge.key")
-                .foregroundStyle(Palette.warning)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 1) {
-                Text("\(approval.request.deviceName) asks for access").font(.callout.weight(.medium)).foregroundStyle(Palette.text)
-                Text(approval.store.hostName).font(.caption).foregroundStyle(Palette.secondary)
-            }
-            Spacer()
-            Button("Review", action: review).buttonStyle(.secondary)
-        }
-    }
-}
-
-private struct Notice: View {
-    let text: String
-    let code: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(text).font(.caption).foregroundStyle(Palette.secondary).fixedSize(horizontal: false, vertical: true)
-            Text(code)
-                .font(.caption.monospaced())
-                .textSelection(.enabled)
-                .padding(8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Palette.codeBackground, in: RoundedRectangle(cornerRadius: 6))
-        }
-        .padding(12)
-    }
-}
-
-/// The app icon's face drawn as vectors: a 9×9 dot grid lit from the upper left,
-/// eyes as missing dots (same geometry as the app icon, without its black tile).
-private struct CodyncMark: View {
-    private static let cells = 9
-    private static let eyes: Set<[Int]> = [[3, 3], [3, 5], [4, 3], [4, 5]]
-
-    var body: some View {
-        Canvas { context, size in
-            let n = Double(Self.cells)
-            let step = size.width / n
-            for row in 0..<Self.cells {
-                for col in 0..<Self.cells where !Self.eyes.contains([row, col]) {
-                    let u = (Double(col) + 0.5) / n * 2 - 1
-                    let v = (Double(row) + 0.5) / n * 2 - 1
-                    guard hypot(u, v) <= 1.18 else { continue }
-                    let shade = 0.55 + 0.45 * min(1, max(0, 0.7 - 0.3 * u - 0.4 * v))
-                    let r = step * 0.36 * shade
-                    let c = CGPoint(x: (Double(col) + 0.5) * step, y: (Double(row) + 0.5) * step)
-                    context.fill(Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r)), with: .foreground)
-                }
-            }
-        }
     }
 }

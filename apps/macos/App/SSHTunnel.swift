@@ -124,12 +124,12 @@ enum SSH {
     }
 
     /// `type key` of each host key line (known_hosts or ssh-keyscan output); comments and revoked keys skipped.
-    static func hostKeys(_ text: String) -> Set<String> {
+    static func hostKeys(_ text: String, certAuthorities: Bool = true) -> Set<String> {
         Set(text.split(whereSeparator: \.isNewline).compactMap { line in
             var fields = line.split(whereSeparator: \.isWhitespace)
             guard let first = fields.first, !first.hasPrefix("#") else { return nil }
             if first.hasPrefix("@") {
-                guard first == "@cert-authority" else { return nil }
+                guard certAuthorities, first == "@cert-authority" else { return nil }
                 fields.removeFirst()
             }
             return fields.count >= 3 ? "\(fields[1]) \(fields[2])" : nil
@@ -456,7 +456,9 @@ final class SSHComputers {
             if !resolved.usesProxy {
                 let scan = await ProcessRunner.run(SSH.keyscan, SSH.keyscanArguments(resolved))
                 let current = SSH.hostKeys(scan.text)
-                if !current.isEmpty, current.isDisjoint(with: recorded) {
+                // Only plain host keys can be compared: a `@cert-authority` key is never what keyscan returns.
+                let pinned = await recordedKeys(resolved.knownHostsName, certAuthorities: false)
+                if !current.isEmpty, !pinned.isEmpty, current.isDisjoint(with: pinned) {
                     return .stop(.failed("The host key of \(profile.host) changed. This can mean someone is intercepting the connection. Codync won't connect until the old key is removed from known_hosts."))
                 }
             }
@@ -516,7 +518,13 @@ final class SSHComputers {
             }
             // /health is public, so the answer alone doesn't prove it came through ssh: another
             // local user could have taken the port. Only a listener ssh owns gets the token.
-            guard await Self.sshListens(pid: process.processIdentifier, port: port), process.isRunning else {
+            let listens = await Self.sshListens(pid: process.processIdentifier, port: port)
+            // Disconnected, removed or edited meanwhile: this attempt must not register its tunnel.
+            guard !Task.isCancelled else {
+                process.terminate()
+                return .stop(.idle)
+            }
+            guard listens, process.isRunning else {
                 log.error("tunnel port \(port) answered by something other than ssh")
                 process.terminate()
                 lastProblem = "Another program answered on the tunnel's local port."
@@ -534,11 +542,11 @@ final class SSHComputers {
         return .retry("Couldn't open the tunnel to \(profile.host). \(lastProblem)")
     }
 
-    private func recordedKeys(_ name: String) async -> Set<String> {
+    private func recordedKeys(_ name: String, certAuthorities: Bool = true) async -> Set<String> {
         var keys = Set<String>()
         for file in SSH.knownHostsFiles(home: home) where FileManager.default.fileExists(atPath: file) {
             let found = await ProcessRunner.run(SSH.keygen, ["-F", name, "-f", file])
-            if found.status == 0 { keys.formUnion(SSH.hostKeys(found.text)) }
+            if found.status == 0 { keys.formUnion(SSH.hostKeys(found.text, certAuthorities: certAuthorities)) }
         }
         return keys
     }

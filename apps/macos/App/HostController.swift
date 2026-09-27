@@ -3,6 +3,7 @@ import CodyncKit
 import CodyncUI
 import Foundation
 import Observation
+import os
 import ServiceManagement
 
 /// A device asking a computer this Mac manages (itself or over SSH) for access.
@@ -18,6 +19,8 @@ struct Approval: Identifiable {
         id = "\(store.computer.id)/\(request.requestId)"
     }
 }
+
+private let log = Logger(subsystem: "com.pokai.Codync", category: "Host")
 
 /// Manages the local codync-host (binary, background service) and owns the `AccountStore`
 /// the menu and the chat window share: this Mac over loopback, SSH computers through their
@@ -133,15 +136,29 @@ final class HostController {
 
     var logURL: URL { Self.dataDir.appending(path: "host.log") }
 
+    /// The menu's images are drawn for one appearance; this follows the system's so they're redrawn.
+    private(set) var menuIsDark = false
+    @ObservationIgnored private var appearanceObservation: NSKeyValueObservation?
+    /// Bumped by "Pair iPhone…": the pairing window stays open between uses, so it fetches a fresh code.
+    private(set) var pairingRequest = 0
+
+    func requestPairing() { pairingRequest += 1 }
+
     func start() {
+        menuIsDark = NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        appearanceObservation = NSApp.observe(\.effectiveAppearance) { [weak self] app, _ in
+            let dark = app.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            Task { @MainActor in self?.menuIsDark = dark }
+        }
         refresh()
         ssh.connectAll()
         watchAutoClaim()
         watchCloudDefault()
     }
 
-    /// Cloudflare is on by default, so a Mac without Tailscale is reachable away from home; turning it
-    /// off (privacy: Wi-Fi and Tailscale only) is remembered and never undone behind the user's back.
+    /// Cloudflare is on by default, so a Mac without Tailscale is reachable away from home. It's turned on
+    /// once per host identity, the first time it's seen off; after that, off stays off, whoever turned it
+    /// off (this app's switch, `codync-host cloud --disable`), and it's never undone behind the user's back.
     private func watchCloudDefault() {
         let target = withObservationTracking {
             cloudDefaultTarget
@@ -150,19 +167,38 @@ final class HostController {
         }
         guard let target, let client = target.client, !enablingCloud else { return }
         enablingCloud = true
+        Self.markCloudDefaultApplied(target.computer.id)
         Task {
-            do { _ = try await enableCloud(client, store: target) } catch { accounts.lastError = error.localizedDescription }
+            do {
+                _ = try await enableCloud(client, store: target)
+            } catch {
+                log.error("turning Cloudflare on by default failed: \(error.localizedDescription, privacy: .public)")
+            }
             enablingCloud = false
         }
     }
 
     private var enablingCloud = false
-    private static let cloudTurnedOffKey = "cloudTurnedOff"
+    /// Host identities whose Cloudflare default has been applied (or found already on).
+    private static let cloudDefaultKey = "cloudDefaultApplied"
+
+    private static func cloudDefaultApplied(_ id: ComputerID) -> Bool {
+        UserDefaults.standard.stringArray(forKey: cloudDefaultKey)?.contains(id) ?? false
+    }
+
+    private static func markCloudDefaultApplied(_ id: ComputerID) {
+        let ids = UserDefaults.standard.stringArray(forKey: cloudDefaultKey) ?? []
+        if !ids.contains(id) { UserDefaults.standard.set(ids + [id], forKey: cloudDefaultKey) }
+    }
 
     private var cloudDefaultTarget: BotStore? {
-        guard account.cloudURL != nil, let store, store.connection == .online,
-              let status = store.cloud, !status.enabled,
-              !UserDefaults.standard.bool(forKey: Self.cloudTurnedOffKey) else { return nil }
+        guard account.cloudURL != nil, let store, store.connection == .online, let status = store.cloud,
+              !Self.cloudDefaultApplied(store.computer.id) else { return nil }
+        // Already on: nothing to apply, and a later "off" is the user's.
+        if status.enabled {
+            Self.markCloudDefaultApplied(store.computer.id)
+            return nil
+        }
         return store
     }
 
@@ -281,10 +317,12 @@ final class HostController {
 
     /// §4.2 A: makes a computer this Mac manages part of the signed-in account. Its relay is turned on first,
     /// since joining the account is about reaching it from anywhere.
-    func claim(_ store: BotStore) async {
+    /// `quiet`: the automatic join, which logs a failure and retries instead of showing it.
+    @discardableResult
+    func claim(_ store: BotStore, quiet: Bool = false) async -> Bool {
         guard let cloud, let userID = account.userID, let client = store.client else {
-            accounts.lastError = "Sign in first."
-            return
+            if !quiet { accounts.lastError = "Sign in first." }
+            return false
         }
         Self.setKeptOut(store.computer.id, false, userID: userID)
         do {
@@ -294,8 +332,14 @@ final class HostController {
             _ = try await cloud.completeClaim(challenge.claimId, signed: signed)
             await accounts.refreshCloud()
             if store.computer.id == self.store?.computer.id { await forgetEarlierIdentities(of: store.computer.id) }
+            return true
         } catch {
-            accounts.lastError = error.localizedDescription
+            if quiet {
+                log.error("joining the account failed: \(error.localizedDescription, privacy: .public)")
+            } else {
+                accounts.lastError = error.localizedDescription
+            }
+            return false
         }
     }
 
@@ -313,7 +357,13 @@ final class HostController {
         guard let pending, !autoClaiming else { return }
         autoClaiming = true
         Task {
-            await claim(pending)
+            // A failed join (network hiccup) is retried with backoff for as long as it's still wanted.
+            var delay = 30.0
+            while await !claim(pending, quiet: true) {
+                try? await Task.sleep(for: .seconds(delay))
+                delay = min(delay * 2, 600)
+                guard autoClaimTarget?.computer.id == pending.computer.id else { break }
+            }
             autoClaiming = false
         }
     }
@@ -322,8 +372,9 @@ final class HostController {
 
     /// This Mac's host, online, in no account yet, for a signed-in user who hasn't removed it.
     private var autoClaimTarget: BotStore? {
+        // Only with Cloudflare on: joining needs it, and turning it back on is never done silently.
         guard let userID = account.userID, let store, store.connection == .online,
-              let status = store.cloud, status.owner == nil,
+              let status = store.cloud, status.enabled, status.owner == nil,
               !Self.keptOut(userID).contains(store.computer.id) else { return nil }
         return store
     }
@@ -362,7 +413,7 @@ final class HostController {
 
     func setCloud(_ store: BotStore, enabled: Bool) async {
         guard let client = store.client else { return }
-        if store.computer.id == self.store?.computer.id { UserDefaults.standard.set(!enabled, forKey: Self.cloudTurnedOffKey) }
+        Self.markCloudDefaultApplied(store.computer.id)
         do {
             _ = enabled ? try await enableCloud(client, store: store) : try await client.setCloud(enabled: false)
         } catch {
