@@ -1705,7 +1705,11 @@ pub fn mark_read(ui: &App) {
     if let Some(bot) = st.current.as_ref().and_then(|id| st.bots.get(id))
         && bot["unread"].as_i64().unwrap_or(0) > 0
     {
-        client::call("markRead", json!({"botId": bot["id"]}), |_| {});
+        client::call(
+            "markRead",
+            json!({"botId": bot["id"], "threadId": st.open_thread}),
+            |_| {},
+        );
     }
 }
 

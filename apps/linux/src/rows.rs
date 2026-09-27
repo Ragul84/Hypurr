@@ -576,10 +576,13 @@ pub fn thread_chip(ui: &App, st: &State, e: &Value, end: bool, indent: i32) -> O
         },
         &["footnote", "semibold"],
     ));
-    inner.append(&label(
-        &day(t["lastAt"].as_i64().unwrap_or(0)),
-        &["footnote", "tertiary"],
-    ));
+    match t["unread"].as_i64().unwrap_or(0) {
+        0 => inner.append(&label(
+            &day(t["lastAt"].as_i64().unwrap_or(0)),
+            &["footnote", "tertiary"],
+        )),
+        unread => inner.append(&label(&format!("{unread} new"), &["footnote", "semibold"])),
+    }
     let chevron = gtk::Image::from_icon_name("go-next-symbolic");
     chevron.set_pixel_size(10);
     chevron.add_css_class("tertiary");

@@ -1049,7 +1049,7 @@ pub fn bot_menu(ui: &App, parent: &gtk::Widget, point: Option<(f64, f64)>, id: &
         items.push(MenuItem::new(
             "mail-unread-symbolic",
             "Mark as Read",
-            Box::new(move || client::call("markRead", json!({"botId": id2}), |_| {})),
+            Box::new(move || client::call("markRead", json!({"botId": id2, "all": true}), |_| {})),
         ));
     }
     {
