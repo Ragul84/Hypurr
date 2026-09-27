@@ -51,7 +51,7 @@ struct RepliesView: View {
                         }
                     }
                     if let chat, chat.isWorking(in: botId, thread: rootId), !model.isOffline {
-                        WorkingIndicator(bot: chat) { showTrace = true }.padding(.top, 6)
+                        WorkingIndicator(bot: chat, thinking: model.currentThinking(botId, thread: rootId)).padding(.top, 6)
                     }
                     Color.clear.frame(height: 8)
                 }
@@ -64,9 +64,9 @@ struct RepliesView: View {
         }
         .background(Palette.background)
         .task(id: rootId) { await model.loadThread(botId, root: rootId) }
-        // Replies count as unread too: reading the thread reads them.
-        .onAppear { model.markRead(botId) }
-        .onChange(of: replies.last?.id) { _, _ in model.markRead(botId) }
+        // A thread is read on its own: having it open reads its replies.
+        .onAppear { model.markRead(botId, thread: rootId) }
+        .onChange(of: replies.last?.id) { _, _ in model.markRead(botId, thread: rootId) }
         .codyncSheet(isPresented: $showTrace) {
             TraceView(botId: botId, thread: rootId)
                 #if os(macOS)

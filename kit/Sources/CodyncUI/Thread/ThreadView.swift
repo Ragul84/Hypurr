@@ -24,6 +24,9 @@ public struct ThreadView: View {
     @State private var compactDetails = false
     @State private var calling = false
     @State private var showMenu = false
+    @State private var showRoutines = false
+    @State private var routineId: String?
+    @State private var routineRequest = UUID()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var bot: Bot? { model.bots[botId] }
@@ -101,7 +104,7 @@ public struct ThreadView: View {
                     }
                     // Offline, "working" is only what the computer last said; don't show it as live.
                     if let bot, bot.isWorking(in: botId, thread: nil), !model.isOffline {
-                        WorkingIndicator(bot: bot) { showTrace = true }
+                        WorkingIndicator(bot: bot, thinking: model.currentThinking(botId, thread: nil))
                             .padding(.top, 6)
                             .id("working")
                     }
@@ -214,6 +217,16 @@ public struct ThreadView: View {
                       message: "The conversation stays here, but the agent starts with a fresh context.") {
             [DialogAction("New session") { model.newSession(botId) }]
         }
+        .codyncSheet(isPresented: $showRoutines) {
+            ScrollView {
+                RoutinesView(botId: botId, initialId: routineId) {
+                    withAnimation(Motion.reduced(Motion.layout, reduceMotion)) { showRoutines = false }
+                }.padding(20)
+            }
+            #if os(macOS)
+                .frame(width: 440, height: 580)
+            #endif
+        }
         .deleteBotConfirmation($confirmDelete) { dismiss() }
     }
 
@@ -229,10 +242,19 @@ public struct ThreadView: View {
                 .padding(.top, 18)
                 .padding(.bottom, 6)
         case .entry(let e, let groupStart):
-            ChatRow(entry: e, groupStart: groupStart, chat: bot) {
-                showTrace = true
-            } openThread: { root in
-                withAnimation(Motion.reduced(Motion.layout, reduceMotion)) { openThread = ThreadTarget(id: root.id) }
+            if e.kind == "notice", let id = e.data.routineId {
+                Button {
+                    openRoutine(id)
+                } label: {
+                    Label(e.data.text ?? "Routine", systemImage: "clock.arrow.circlepath")
+                        .font(.footnote).foregroundStyle(Palette.secondary).padding(.vertical, 10)
+                }.buttonStyle(.plain)
+            } else {
+                ChatRow(entry: e, groupStart: groupStart, chat: bot) {
+                    showTrace = true
+                } openThread: { root in
+                    withAnimation(Motion.reduced(Motion.layout, reduceMotion)) { openThread = ThreadTarget(id: root.id) }
+                }
             }
         }
     }
@@ -275,12 +297,28 @@ public struct ThreadView: View {
 
         /// Its own view so it stays live inside the compact modal (which captures its content).
         private var detailsPanel: some View {
-            DetailsPanel(botId: botId, editing: $editingDetails, editGroup: { editingGroup = true }) {
+            DetailsPanel(botId: botId, routineId: routineId, editing: $editingDetails, editGroup: { editingGroup = true }) {
                 withAnimation(Motion.reduced(Motion.layout, reduceMotion)) { showSettings = false }
                 compactDetails = false
             }
+            .id(routineRequest)
         }
     #endif
+
+    private func openRoutine(_ id: String?) {
+        withAnimation(Motion.reduced(Motion.layout, reduceMotion)) {
+            routineId = id
+            routineRequest = UUID()
+            #if os(macOS)
+                editingDetails = false
+                openThread = nil
+                showSettings = true
+                if availableWidth < 680 { compactDetails = true }
+            #else
+                showRoutines = true
+            #endif
+        }
+    }
 
     private var menuItems: [MenuItem] {
         var items = [MenuItem("Full conversation", icon: "list.bullet.rectangle") { showTrace = true }]
@@ -304,6 +342,9 @@ public struct ThreadView: View {
             })
             items.append(MenuItem(bot.pinned ? "Unpin" : "Pin", icon: "pin") { model.setPinned(bot, !bot.pinned) })
         }
+        items.append(MenuItem("Routines", icon: "clock.arrow.circlepath") {
+            openRoutine(nil)
+        })
         items.append(MenuItem("New session", icon: "arrow.counterclockwise") { confirmNewSession = true })
         items.append(MenuItem("Delete bot", icon: "trash", destructive: true, divider: true) { confirmDelete = bot })
         return items
@@ -456,6 +497,7 @@ private struct IntroCard: View {
 /// The Mac inspector beside a conversation: the computer, the agent, and the bot's settings.
 private struct DetailsPanel: View {
     let botId: String
+    let routineId: String?
     @Binding var editing: Bool
     let editGroup: () -> Void
     let close: () -> Void
@@ -472,9 +514,11 @@ private struct DetailsPanel: View {
                     Text("Settings").font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
                     Spacer()
                 } else if bot?.isGroup == true {
+                    panelTitle("Members")
                     Spacer()
                     IconButton("Edit group", systemImage: "gearshape", action: editGroup)
                 } else {
+                    panelTitle("Details")
                     Spacer()
                     IconButton("Bot settings", systemImage: "gearshape") { setEditing(true) }
                 }
@@ -504,43 +548,99 @@ private struct DetailsPanel: View {
         withAnimation(Motion.reduced(Motion.layout, reduceMotion)) { editing = on }
     }
 
+    private func panelTitle(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(Palette.secondary)
+            .padding(.leading, 4)
+    }
+
     private var details: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                VStack(spacing: 12) {
-                    VStack(spacing: 12) {
-                        Image(systemName: "desktopcomputer")
-                            .font(.system(size: 32, weight: .light))
-                        Text(computerStatus)
-                            .font(.system(size: 12))
-                            .multilineTextAlignment(.center)
-                            .foregroundStyle(Palette.secondary)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 164)
-                    .background(Palette.surface, in: RoundedRectangle(cornerRadius: 8))
-                    Text(model.hostName)
-                        .font(.caption)
-                        .foregroundStyle(Palette.tertiary)
-                }
-                if let bot {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Agent").font(.system(size: 13, weight: .semibold))
-                        Text(model.backendName(bot.backend)).foregroundStyle(Palette.secondary)
-                        Text(bot.cwd)
-                            .font(.system(size: 12))
-                            .foregroundStyle(Palette.secondary)
-                            .textSelection(.enabled)
-                        if !bot.description.isEmpty {
-                            Text(bot.description).foregroundStyle(Palette.secondary)
-                        }
-                    }
-                    .font(.system(size: 13))
-                }
+            VStack(alignment: .leading, spacing: 28) {
+                computerSummary
+                RoutinesView(botId: botId, initialId: routineId)
+                if let bot { agentSummary(bot) }
             }
             .padding(.horizontal, 16)
-            .padding(.bottom, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 24)
         }
+    }
+
+    private var computerSummary: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 12) {
+                // Laptop, Mac mini, Linux…: the computer's own icon and color, as everywhere else.
+                ComputerBadge(model.computer, size: 32)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(model.hostName)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Palette.text)
+                        .lineLimit(2)
+                    Text("Remote screen")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Palette.secondary)
+                }
+            }
+            Label(computerStatus, systemImage: computerStatusSymbol)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Palette.text)
+                .fixedSize(horizontal: false, vertical: true)
+            if screenReady {
+                Text("View and control this Mac from your iPhone.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Palette.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, -8)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(Palette.surface, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func agentSummary(_ bot: Bot) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Agent")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Palette.text)
+            HStack {
+                Text("Runtime").foregroundStyle(Palette.secondary)
+                Spacer(minLength: 12)
+                Text(model.backendName(bot.backend)).foregroundStyle(Palette.text)
+            }
+            .font(.system(size: 12))
+            VStack(alignment: .leading, spacing: 6) {
+                Label("Working folder", systemImage: "folder")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Palette.secondary)
+                Text(bot.cwd)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(Palette.text)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+            }
+            if !bot.description.isEmpty {
+                Text(bot.description)
+                    .font(.system(size: 12))
+                    .foregroundStyle(Palette.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private var screenReady: Bool {
+        !model.isOffline && model.screen?.enabled == true
+            && model.screen?.connected == true && model.screen?.capture == true
+    }
+
+    private var computerStatusSymbol: String {
+        if model.isOffline { return "wifi.slash" }
+        guard let screen = model.screen, screen.enabled else { return "power" }
+        if !screen.connected { return "arrow.triangle.2.circlepath" }
+        if !screen.capture { return "exclamationmark.circle" }
+        return screen.agentBot == botId ? "cursorarrow.motionlines" : "checkmark.circle"
     }
 
     private var computerStatus: String {
@@ -548,7 +648,7 @@ private struct DetailsPanel: View {
         guard let screen = model.screen, screen.enabled else { return "Remote screen is off" }
         guard screen.connected else { return "Connecting to computer…" }
         guard screen.capture else { return "Screen recording permission needed" }
-        return screen.agentBot == botId ? "This bot is using your Mac" : "Ready · View this Mac from your iPhone"
+        return screen.agentBot == botId ? "This bot is using your Mac" : "Ready to connect"
     }
 }
 #endif

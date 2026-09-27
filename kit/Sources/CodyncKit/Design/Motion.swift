@@ -1,4 +1,9 @@
 import SwiftUI
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 /// Grok Bot's motion, taken from its stylesheet and motion constants so ours feels the same.
 /// With Reduce Motion on, Grok drops every duration to 0; use `Motion.reduced(_:)` for that.
@@ -23,6 +28,19 @@ public enum Motion {
 
     public static func reduced(_ animation: Animation, _ reduce: Bool) -> Animation? {
         reduce ? nil : animation
+    }
+
+    /// Runs a model change outside any view (connection state, account lists) with `layout`,
+    /// so every screen showing it cross-fades instead of jumping. Honors Reduce Motion.
+    @MainActor public static func animate(_ change: () -> Void) {
+        #if os(iOS)
+        let reduce = UIAccessibility.isReduceMotionEnabled
+        #elseif os(macOS)
+        let reduce = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        #else
+        let reduce = false
+        #endif
+        withAnimation(reduced(layout, reduce), change)
     }
 }
 

@@ -24,10 +24,9 @@ public struct MarketplaceView: View {
     @State private var writingSkill = false
     @State private var agent: Backend?
     @State private var showInstalled = false
-    /// Shown as a sheet: a close button in the header instead of the navigation bar.
-    let close: (() -> Void)?
+    @Environment(\.dismissModal) private var dismiss
 
-    public init(close: (() -> Void)? = nil) { self.close = close }
+    public init() {}
 
     private var query: String { search.trimmingCharacters(in: .whitespaces) }
 
@@ -154,18 +153,17 @@ public struct MarketplaceView: View {
                     .font(.footnote)
                     .foregroundStyle(Palette.tertiary)
             }
-            .padding(.horizontal, close == nil ? 24 : 44)
+            .padding(.horizontal, 44)
             .padding(.vertical, 20)
             .frame(maxWidth: 980)
             .frame(maxWidth: .infinity)
         }
         .background(Palette.background)
         .overlay(alignment: .topTrailing) {
-            if let close {
-                IconButton("Close", systemImage: "xmark", action: close)
-                    .keyboardShortcut(.cancelAction)
-                    .padding(8)
-            }
+            // dismissModal slides the sheet away; clearing the binding would cut it off.
+            IconButton("Close", systemImage: "xmark") { dismiss() }
+                .keyboardShortcut(.cancelAction)
+                .padding(8)
         }
     }
 
@@ -194,7 +192,7 @@ public struct MarketplaceView: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(.top, close == nil ? 8 : 28)
+        .padding(.top, 28)
     }
 
     private var searchField: some View {
@@ -238,7 +236,10 @@ public struct MarketplaceView: View {
 private struct InstalledView: View {
     let back: () -> Void
     @Environment(BotStore.self) private var model
+    @Environment(\.webAuthenticationSession) private var webAuthenticationSession
+    @Environment(\.openURL) private var openURL
     @State private var removing: Removal?
+    @State private var signingIn: String?
 
     private struct Removal: Identifiable {
         let id: String
@@ -268,11 +269,19 @@ private struct InstalledView: View {
             if !model.installedConnectors.isEmpty {
                 CardSection("Connectors") {
                     ForEach(model.installedConnectors) { c in
-                        InstalledRow(title: c.name, subtitle: c.command ?? c.url ?? c.description) {
+                        InstalledRow(title: c.name, subtitle: c.needsSignIn ? "Sign in so bots can use it" : c.command ?? c.url ?? c.description) {
                             if c.kind == "composio" {
                                 AppLogo(url: c.logo, name: c.name, size: 32)
                             } else {
                                 ServiceLogo(website: nil, name: c.name, registryName: c.registryName, size: 32)
+                            }
+                        } accessory: {
+                            if signingIn == c.id {
+                                Spinner()
+                            } else if c.needsSignIn {
+                                Button("Sign in") { signIn(c.id) }
+                                    .buttonStyle(PrimaryButtonStyle())
+                                    .controlSize(.small)
                             }
                         } remove: {
                             removing = Removal(id: c.id, name: c.name, isSkill: false)
@@ -285,6 +294,8 @@ private struct InstalledView: View {
                     ForEach(model.installedSkills) { s in
                         InstalledRow(title: s.name, subtitle: s.description) {
                             SkillGlyph().frame(width: 32, height: 32)
+                        } accessory: {
+                            EmptyView()
                         } remove: {
                             removing = Removal(id: s.id, name: s.name, isSkill: true)
                         }
@@ -307,6 +318,18 @@ private struct InstalledView: View {
                     }
                 }
             }]
+        }
+    }
+
+    private func signIn(_ id: String) {
+        signingIn = id
+        Task {
+            do {
+                try await ConnectorSignInFlow(model: model, webAuthenticationSession: webAuthenticationSession, openURL: openURL).signIn(id)
+            } catch {
+                model.lastError = error.localizedDescription
+            }
+            signingIn = nil
         }
     }
 }
@@ -348,10 +371,11 @@ private struct EmptyState: View {
     }
 }
 
-private struct InstalledRow<Icon: View>: View {
+private struct InstalledRow<Icon: View, Accessory: View>: View {
     let title: String
     let subtitle: String
     @ViewBuilder let icon: Icon
+    @ViewBuilder let accessory: Accessory
     let remove: () -> Void
 
     var body: some View {
@@ -362,6 +386,7 @@ private struct InstalledRow<Icon: View>: View {
                 Text(subtitle).font(.caption).foregroundStyle(Palette.secondary).lineLimit(1)
             }
             Spacer(minLength: 12)
+            accessory
             Button("Remove \(title)", systemImage: "trash", role: .destructive, action: remove)
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
@@ -914,6 +939,8 @@ private struct InstallConnectorSheet: View {
     let done: () -> Void
     @Environment(BotStore.self) private var model
     @Environment(\.dismissModal) private var dismiss
+    @Environment(\.webAuthenticationSession) private var webAuthenticationSession
+    @Environment(\.openURL) private var openURL
     @State private var optionId = ""
     @State private var values: [String: String] = [:]
     @State private var saving = false
@@ -961,7 +988,7 @@ private struct InstallConnectorSheet: View {
                 CardSection("Setup", footer: "Keys are saved on \(model.hostName) only.") {
                     if option.inputs.isEmpty {
                         Text(option.kind == "remote"
-                            ? "No keys needed here. If the service asks you to sign in, the agent shows how the first time it's used."
+                            ? "No keys needed here. If \(item.title) wants you to sign in, its sign-in page opens next."
                             : "No setup needed.")
                             .foregroundStyle(Palette.secondary)
                     }
@@ -1000,7 +1027,10 @@ private struct InstallConnectorSheet: View {
         error = nil
         Task {
             do {
-                try await model.installConnector(item, option: option.id, inputs: values)
+                let c = try await model.installConnector(item, option: option.id, inputs: values)
+                if c.needsSignIn {
+                    try await ConnectorSignInFlow(model: model, webAuthenticationSession: webAuthenticationSession, openURL: openURL).signIn(c.id)
+                }
                 done()
                 dismiss()
             } catch {
@@ -1014,6 +1044,8 @@ private struct InstallConnectorSheet: View {
 private struct CustomConnectorSheet: View {
     @Environment(BotStore.self) private var model
     @Environment(\.dismissModal) private var dismiss
+    @Environment(\.webAuthenticationSession) private var webAuthenticationSession
+    @Environment(\.openURL) private var openURL
     @State private var name = ""
     @State private var remote = false
     @State private var target = ""
@@ -1045,7 +1077,14 @@ private struct CustomConnectorSheet: View {
                     .font(.callout.monospaced())
                     .plainTextInput()
             }
-            if !remote {
+            if remote {
+                CardSection("Headers", footer: "Optional, one Name: value per line. Leave empty if the service has you sign in. Saved on \(model.hostName) only.") {
+                    TextField("Authorization: Bearer …", text: $envText, axis: .vertical)
+                        .lineLimit(2...6)
+                        .font(.callout.monospaced())
+                        .plainTextInput()
+                }
+            } else {
                 CardSection("Environment", footer: "One KEY=value per line. Saved on \(model.hostName) only.") {
                     TextField("API_KEY=…", text: $envText, axis: .vertical)
                         .lineLimit(2...6)
@@ -1063,14 +1102,20 @@ private struct CustomConnectorSheet: View {
     private func save() {
         saving = true
         error = nil
-        var env: [String: String] = [:]
+        var pairs: [String: String] = [:]
         for line in envText.split(separator: "\n") {
-            let parts = line.split(separator: "=", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
-            if parts.count == 2, !parts[0].isEmpty { env[parts[0]] = parts[1] }
+            let parts = line.split(separator: remote ? ":" : "=", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
+            if parts.count == 2, !parts[0].isEmpty { pairs[parts[0]] = parts[1] }
         }
         Task {
             do {
-                try await model.addConnector(name: name, command: remote ? nil : target, url: remote ? target : nil, env: env)
+                let c = try await model.addConnector(
+                    name: name, command: remote ? nil : target, url: remote ? target : nil,
+                    env: remote ? [:] : pairs, headers: remote ? pairs : [:]
+                )
+                if c.needsSignIn {
+                    try await ConnectorSignInFlow(model: model, webAuthenticationSession: webAuthenticationSession, openURL: openURL).signIn(c.id)
+                }
                 dismiss()
             } catch {
                 self.error = error.localizedDescription

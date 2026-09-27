@@ -13,6 +13,7 @@ struct ChatRow: View {
     /// Main chat only: start (or open) the thread on this message.
     var openThread: ((Entry) -> Void)?
     @Environment(BotStore.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let reply = openThread.map { open in { open(entry) } }
@@ -20,15 +21,22 @@ struct ChatRow: View {
         case "user":
             VStack(alignment: .trailing, spacing: 4) {
                 UserBubble(entry: entry, botWorking: chat?.isWorking == true, reply: reply)
+                ReactionsRow(entry: entry)
                 threadChip
             }
+            .animation(Motion.reduced(Motion.layout, reduceMotion), value: entry.data.reactions)
             .padding(.top, groupStart ? 12 : 4)
         case "agent":
             VStack(alignment: .leading, spacing: 4) {
                 if chat?.isGroup == true, groupStart { AuthorLabel(botId: entry.data.author) }
                 AgentBubble(entry: entry, openTrace: openTrace, reply: reply)
-                threadChip.padding(.leading, chat?.isGroup == true ? 34 : 0)
+                Group {
+                    ReactionsRow(entry: entry)
+                    threadChip
+                }
+                .padding(.leading, chat?.isGroup == true ? 34 : 0)
             }
+            .animation(Motion.reduced(Motion.layout, reduceMotion), value: entry.data.reactions)
             .padding(.top, groupStart ? 12 : 4)
         case "permission":
             VStack(alignment: .leading, spacing: 4) {
@@ -71,6 +79,7 @@ struct ThreadChip: View {
     let summary: ThreadSummary
     let open: () -> Void
     @Environment(BotStore.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Button(action: open) {
@@ -83,9 +92,16 @@ struct ThreadChip: View {
                 Text(summary.count == 1 ? "1 reply" : "\(summary.count) replies")
                     .font(.footnote.weight(.semibold))
                     .foregroundStyle(Palette.accent)
-                Text(RelativeTime.day(Date(milliseconds: summary.lastAt)))
-                    .font(.footnote)
-                    .foregroundStyle(Palette.tertiary)
+                if let unread = summary.unread, unread > 0 {
+                    Text("\(unread) new")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Palette.text)
+                        .transition(.opacity)
+                } else {
+                    Text(RelativeTime.day(Date(milliseconds: summary.lastAt)))
+                        .font(.footnote)
+                        .foregroundStyle(Palette.tertiary)
+                }
                 Image(systemName: "chevron.right").font(.caption2).foregroundStyle(Palette.tertiary)
             }
             .padding(.horizontal, 10)
@@ -94,7 +110,11 @@ struct ThreadChip: View {
             .contentShape(Capsule())
         }
         .buttonStyle(PressScale())
-        .accessibilityLabel("View thread, \(summary.count) \(summary.count == 1 ? "reply" : "replies")")
+        .animation(Motion.reduced(Motion.layout, reduceMotion), value: summary.unread)
+        .accessibilityLabel(
+            "View thread, \(summary.count) \(summary.count == 1 ? "reply" : "replies")"
+                + ((summary.unread ?? 0) > 0 ? ", \(summary.unread ?? 0) new" : "")
+        )
         .help("View thread")
     }
 }
@@ -104,6 +124,7 @@ struct UserBubble: View {
     let botWorking: Bool
     var reply: (() -> Void)?
     @Environment(BotStore.self) private var model
+    @State private var hovering = false
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 4) {
@@ -114,13 +135,24 @@ struct UserBubble: View {
                 .padding(.horizontal, InterfaceMetrics.value(mac: 12, mobile: 16))
                 .padding(.vertical, InterfaceMetrics.value(mac: 8, mobile: 10))
                 .background(Palette.bubbleUser, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .contextActions {
-                    var items = [MenuItem("Copy", icon: "doc.on.doc") { Pasteboard.copy(entry.data.text) }]
-                    if let reply { items.append(MenuItem("Reply in thread", icon: "bubble.left.and.bubble.right", action: reply)) }
+                .contextActions(reactions: model.reactionPick(entry)) {
+                    var items = [MenuItem("Copy", icon: "square.on.square") { Pasteboard.copy(entry.data.text) }]
+                    if let reply { items.append(MenuItem("Reply in thread", icon: "arrowshape.turn.up.left", action: reply)) }
                     return items
                 }
-            status
+            #if os(macOS)
+                HStack(spacing: 6) {
+                    if hovering, entry.data.status == nil || entry.data.status == "sent" {
+                        MessageActions(reactions: model.reactionPick(entry), reply: reply) { Pasteboard.copy(entry.data.text) }
+                    }
+                    status
+                }
+                .frame(minHeight: MessageActions.height)
+            #else
+                status
+            #endif
         }
+        .hoverTracking($hovering)
         .frame(maxWidth: .infinity, alignment: .trailing)
         .padding(.leading, 56)
     }
@@ -167,6 +199,8 @@ struct AgentBubble: View {
     let entry: Entry
     let openTrace: () -> Void
     var reply: (() -> Void)?
+    @Environment(BotStore.self) private var model
+    @State private var hovering = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -174,19 +208,27 @@ struct AgentBubble: View {
                 .padding(.horizontal, InterfaceMetrics.value(mac: 12, mobile: 16))
                 .padding(.vertical, InterfaceMetrics.value(mac: 8, mobile: 10))
                 .background(Palette.bubbleAgent, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .contextActions {
+                .contextActions(reactions: model.reactionPick(entry)) {
                     var items = [
-                        MenuItem("Copy", icon: "doc.on.doc") { Pasteboard.copy(entry.data.text) },
-                        MenuItem("Show what it did", icon: "list.bullet.rectangle", action: openTrace),
+                        MenuItem("Copy", icon: "square.on.square") { Pasteboard.copy(entry.data.text) },
+                        MenuItem("Show what it did", icon: "list.bullet", action: openTrace),
                     ]
-                    if let reply { items.insert(MenuItem("Reply in thread", icon: "bubble.left.and.bubble.right", action: reply), at: 1) }
+                    if let reply { items.insert(MenuItem("Reply in thread", icon: "arrowshape.turn.up.left", action: reply), at: 1) }
                     return items
                 }
             #if os(macOS)
-                Text(entry.date, style: .time)
-                    .font(.system(size: 10))
-                    .foregroundStyle(Palette.tertiary)
-                    .padding(.leading, 12)
+                HStack(spacing: 6) {
+                    Text(entry.date, style: .time)
+                        .font(.system(size: 10))
+                        .foregroundStyle(Palette.tertiary)
+                    if hovering {
+                        MessageActions(reactions: model.reactionPick(entry), reply: reply, trace: openTrace) {
+                            Pasteboard.copy(entry.data.text)
+                        }
+                    }
+                }
+                .padding(.leading, 12)
+                .frame(minHeight: MessageActions.height)
             #endif
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -236,33 +278,158 @@ struct NoticeRow: View {
     }
 }
 
-/// The bot's live activity line: a turning orb, what it's doing and for how long.
+/// The bot's live activity line: a turning orb, what it's doing and for how long. Tapping it
+/// unfolds what the bot is thinking right now (the whole trace stays in "Full conversation").
 struct WorkingIndicator: View {
     let bot: Bot
-    let openTrace: () -> Void
+    /// The running turn's latest thinking, if the agent shares it.
+    var thinking: String?
+    @State private var expanded = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
-            Button(action: openTrace) {
-                HStack(spacing: 8) {
-                    ThinkingOrb(state: bot.needsInput ? .listening : .working, size: 16, color: bot.needsInput ? Palette.warning : Palette.secondary)
-                    Text(bot.activity.isEmpty ? "Working…" : bot.activity)
-                        .font(.subheadline)
-                        .foregroundStyle(bot.needsInput ? Palette.warning : Palette.secondary)
-                        .lineLimit(1)
-                    if let started = bot.startedAt {
-                        Text(Date(milliseconds: started), style: .timer)
-                            .font(.footnote.monospacedDigit())
-                            .foregroundStyle(Palette.tertiary)
+            Button {
+                withAnimation(Motion.reduced(Motion.layout, reduceMotion)) { expanded.toggle() }
+            } label: {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        ThinkingOrb(state: bot.needsInput ? .listening : .working, size: 16, color: bot.needsInput ? Palette.warning : Palette.secondary)
+                        Text(bot.activity.isEmpty ? "Working…" : bot.activity)
+                            .font(.subheadline)
+                            .foregroundStyle(bot.needsInput ? Palette.warning : Palette.secondary)
+                            .lineLimit(1)
+                        if let started = bot.startedAt {
+                            Text(Date(milliseconds: started), style: .timer)
+                                .font(.footnote.monospacedDigit())
+                                .foregroundStyle(Palette.tertiary)
+                        }
+                        if thinking != nil {
+                            Image(systemName: "chevron.down")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(Palette.tertiary)
+                                .rotationEffect(.degrees(expanded ? 180 : 0))
+                        }
                     }
-                    Image(systemName: "chevron.right").font(.caption2).foregroundStyle(Palette.tertiary)
+                    if expanded, let thinking {
+                        ScrollView {
+                            Text(thinking)
+                                .font(.footnote)
+                                .foregroundStyle(Palette.secondary)
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .defaultScrollAnchor(.bottom)
+                        .frame(maxHeight: 180)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .transition(.opacity)
+                    }
                 }
                 .padding(.horizontal, InterfaceMetrics.value(mac: 12, mobile: 16))
                 .padding(.vertical, 12)
                 .background(Palette.bubbleAgent, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
             }
             .buttonStyle(.plain)
-            Spacer()
+            .disabled(thinking == nil)
+            .accessibilityHint(thinking == nil ? "" : expanded ? "Hides its thinking" : "Shows its thinking")
+            Spacer(minLength: 40)
         }
+    }
+}
+
+extension BotStore {
+    /// The latest thinking of the turn running in a chat (`thread` nil) or thread: the newest
+    /// thought since the last message.
+    func currentThinking(_ botId: String, thread: String?) -> String? {
+        for e in allEntries(botId).reversed() where e.threadId == thread {
+            if e.kind == "user" || (e.kind == "agent" && e.data.final == true) { return nil }
+            if e.kind == "thought", let text = e.data.text, !text.isEmpty { return text }
+        }
+        return nil
+    }
+}
+
+extension BotStore {
+    /// The quick-reaction row for a message.
+    func reactionPick(_ entry: Entry) -> ReactionPick {
+        ReactionPick(emoji: Self.quickReactions, chosen: entry.data.reactions ?? []) { self.react(entry, $0) }
+    }
+}
+
+/// The user's reactions under a message; tapping one takes it back.
+struct ReactionsRow: View {
+    let entry: Entry
+    @Environment(BotStore.self) private var model
+
+    var body: some View {
+        if let reactions = entry.data.reactions, !reactions.isEmpty {
+            HStack(spacing: 4) {
+                ForEach(reactions, id: \.self) { emoji in
+                    Button { model.react(entry, emoji) } label: {
+                        Text(emoji)
+                            .font(.system(size: InterfaceMetrics.value(mac: 13, mobile: 15)))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Palette.surface, in: Capsule())
+                            .contentShape(Capsule())
+                    }
+                    .buttonStyle(PressScale())
+                    .help("Remove \(emoji)")
+                    .accessibilityLabel("Remove reaction \(emoji)")
+                    .transition(.scale.combined(with: .opacity))
+                }
+            }
+        }
+    }
+}
+
+extension View {
+    /// Mac: follows the pointer over the message (bubble and its footer), animated.
+    func hoverTracking(_ hovering: Binding<Bool>) -> some View {
+        modifier(HoverTracking(hovering: hovering))
+    }
+}
+
+private struct HoverTracking: ViewModifier {
+    @Binding var hovering: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        #if os(macOS)
+            content
+                .contentShape(Rectangle())
+                .onHover { h in withAnimation(Motion.reduced(Motion.hover, reduceMotion)) { hovering = h } }
+        #else
+            content
+        #endif
+    }
+}
+
+/// Mac: a message's quick actions, in its footer beside the time while the pointer is over it
+/// (next to the bubble, never on it): reactions, reply in thread, what it did, copy.
+struct MessageActions: View {
+    static let height: CGFloat = 26
+    let reactions: ReactionPick
+    let reply: (() -> Void)?
+    var trace: (() -> Void)?
+    let copy: () -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ReactionStrip(pick: reactions)
+            Rectangle().fill(Palette.text.opacity(0.12)).frame(width: 1, height: 12).padding(.horizontal, 4)
+            if let reply { action("Reply in thread", "arrowshape.turn.up.left", reply) }
+            if let trace { action("Show what it did", "list.bullet", trace) }
+            action("Copy", "square.on.square", copy)
+        }
+        .fixedSize()
+        .transition(.opacity)
+    }
+
+    private func action(_ title: String, _ icon: String, _ run: @escaping () -> Void) -> some View {
+        Button(title, systemImage: icon, action: run)
+            .labelStyle(.iconOnly)
+            .buttonStyle(IconButtonStyle(size: Self.height))
+            .help(title)
     }
 }

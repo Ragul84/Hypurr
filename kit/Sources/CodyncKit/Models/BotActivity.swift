@@ -3,7 +3,7 @@ import ActivityKit
 import Foundation
 
 /// Live Activity for a bot working on something the user just delegated.
-/// Content state keys must match what codync-host pushes (host/src/push.rs).
+/// Content state keys must match what codync-host pushes (host/src/remote/push.rs).
 public struct BotActivityAttributes: ActivityAttributes {
     public struct ContentState: Codable, Hashable, Sendable {
         /// idle | working | needsInput | error

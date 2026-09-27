@@ -58,6 +58,7 @@ public final class BotStore {
     public private(set) var installedSkills: [InstalledSkill] = []
     /// Bots whose older history has been fully paged in.
     public private(set) var historyComplete: Set<String> = []
+    public var routineDrafts: [String: String] = [:]
     public var lastError: String?
     /// The open conversation (iOS navigation path / Mac sidebar selection).
     public var selection: String?
@@ -219,7 +220,7 @@ public final class BotStore {
     public func restartStream() {
         guard isActive, !retired else { return }
         stopTransport()
-        if connection != .online { connection = .connecting }
+        if connection != .online { setConnection(.connecting) }
         streamTask = Task { [weak self] in await self?.runStream() }
     }
 
@@ -242,11 +243,11 @@ public final class BotStore {
                 transport = try await makeTransport()
                 break
             } catch HostError.unauthorized(let message) {
-                if !Task.isCancelled, !retired { connection = .unauthorized(message) }
+                if !Task.isCancelled, !retired { setConnection(.unauthorized(message)) }
                 return
             } catch {
                 guard !Task.isCancelled, !retired else { return }
-                connection = .offline(error.localizedDescription)
+                setConnection(.offline(error.localizedDescription))
                 try? await Task.sleep(for: .seconds(backoff))
                 backoff = min(backoff * 2, 30)
                 guard !Task.isCancelled else { return }
@@ -264,9 +265,9 @@ public final class BotStore {
             guard !Task.isCancelled, !retired else { return }
             switch state {
             case let .ready(route):
-                hostRoute = route
+                setHostRoute(route)
                 if eventsTask == nil {
-                    if connection != .online { connection = .connecting }
+                    if connection != .online { setConnection(.connecting) }
                     eventsTask = Task { [weak self] in await self?.runEvents(client) }
                     // Mailbox outcomes that happened while this app wasn't listening (§10.2).
                     if let remote = transport as? any RemoteTransport {
@@ -276,27 +277,38 @@ public final class BotStore {
                 onConnected?(self)
             case .connecting:
                 stopEvents()
-                connection = .connecting
+                setConnection(.connecting)
             case let .hostOffline(lastSeen):
                 stopEvents()
-                connection = .computerOffline(lastSeen: lastSeen)
+                setConnection(.computerOffline(lastSeen: lastSeen))
                 if let remote = transport as? any RemoteTransport {
                     Task { [weak self] in await self?.reconcileQueued(remote) }
                 }
             case let .unauthorized(message):
                 stopEvents()
-                connection = .unauthorized(message)
+                setConnection(.unauthorized(message))
             case let .failed(message):
                 stopEvents()
-                connection = .offline(message)
+                setConnection(.offline(message))
             }
         }
+    }
+
+    /// Connection changes animate wherever they show (banners, headers, captions, rows).
+    private func setConnection(_ new: Connection) {
+        guard new != connection else { return }
+        Motion.animate { connection = new }
+    }
+
+    private func setHostRoute(_ new: HostRoute?) {
+        guard new != hostRoute else { return }
+        Motion.animate { hostRoute = new }
     }
 
     private func stopEvents() {
         eventsTask?.cancel()
         eventsTask = nil
-        hostRoute = nil
+        setHostRoute(nil)
     }
 
     /// The channel's side streams: merged computer info and mailbox outcomes.
@@ -349,7 +361,7 @@ public final class BotStore {
                 }
                 for try await event in client.events(since: rev, client: clientKind) {
                     guard !Task.isCancelled, !retired else { return }
-                    connection = .online
+                    setConnection(.online)
                     backoff = 1
                     apply(event)
                 }
@@ -359,16 +371,16 @@ public final class BotStore {
                 if Task.isCancelled || retired { return }
                 log.info("stream ended: \(error.localizedDescription)")
                 if case let HostError.unauthorized(message) = error {
-                    connection = .unauthorized(message)
+                    setConnection(.unauthorized(message))
                     return
                 }
                 // On the channel the link state speaks for itself; loopback has no other signal.
                 if case .loopback = route {
                     if case HostError.http(401, _) = error {
-                        connection = .offline(error.localizedDescription)
+                        setConnection(.offline(error.localizedDescription))
                         return
                     }
-                    connection = .offline(error.localizedDescription)
+                    setConnection(.offline(error.localizedDescription))
                 }
             }
             try? await Task.sleep(for: .seconds(backoff))
@@ -600,14 +612,37 @@ public final class BotStore {
         screen = try await require().setScreenEnabled(on)
     }
 
+    /// Quick reactions offered on every message (Slack's hover bar).
+    public static let quickReactions = ["👍", "❤️", "😂", "🎉", "👀", "✅"]
+
+    /// Toggles the user's reaction; shown at once, then replaced by the host's copy.
+    public func react(_ entry: Entry, _ emoji: String) {
+        guard let i = entries[entry.botId]?.firstIndex(where: { $0.id == entry.id }) else { return }
+        var reactions = entries[entry.botId]?[i].data.reactions ?? []
+        if let at = reactions.firstIndex(of: emoji) { reactions.remove(at: at) } else { reactions.append(emoji) }
+        entries[entry.botId]?[i].data.reactions = reactions
+        perform { client in
+            let e = try await client.react(entryId: entry.id, emoji: emoji)
+            self.upsert(e)
+        }
+    }
+
     public func respond(_ entry: Entry, option: String?) {
         perform { try await $0.respondPermission(entryId: entry.id, optionId: option) }
     }
 
-    public func markRead(_ botId: String) {
+    /// The main chat on screen (or the thread on `thread`) is read; the host ignores it
+    /// when nothing there is unread.
+    public func markRead(_ botId: String, thread: String? = nil) {
+        guard (bots[botId]?.unread ?? 0) > 0 else { return }
+        perform { try await $0.markRead(botId, threadId: thread) }
+    }
+
+    /// The roster's "Mark as read": the chat and all its threads.
+    public func markAllRead(_ botId: String) {
         guard (bots[botId]?.unread ?? 0) > 0 else { return }
         bots[botId]?.unread = 0
-        perform { try await $0.markRead(botId) }
+        perform { try await $0.markRead(botId, all: true) }
     }
 
     public func setPinned(_ bot: Bot, _ pinned: Bool) {
@@ -674,14 +709,36 @@ public final class BotStore {
         try await require().marketSkills()
     }
 
-    public func installConnector(_ item: MarketConnector, option: String, inputs: [String: String]) async throws {
-        try await require().installConnector(registryName: item.name, option: option, inputs: inputs)
+    @discardableResult
+    public func installConnector(_ item: MarketConnector, option: String, inputs: [String: String]) async throws -> InstalledConnector {
+        let c = try await require().installConnector(registryName: item.name, option: option, inputs: inputs)
+        await refreshPlugins()
+        return c
+    }
+
+    @discardableResult
+    public func addConnector(name: String, command: String?, url: String?, env: [String: String], headers: [String: String]) async throws -> InstalledConnector {
+        let c = try await require().addConnector(name: name, command: command, url: url, env: env, headers: headers)
+        await refreshPlugins()
+        return c
+    }
+
+    public func connectorSignIn(_ id: String) async throws -> ConnectorSignIn {
+        try await require().connectorSignIn(id)
+    }
+
+    public func finishConnectorSignIn(state: String, code: String?, error: String?) async throws {
+        try await require().finishConnectorSignIn(state: state, code: code, error: error)
         await refreshPlugins()
     }
 
-    public func addConnector(name: String, command: String?, url: String?, env: [String: String]) async throws {
-        try await require().addConnector(name: name, command: command, url: url, env: env)
-        await refreshPlugins()
+    /// Waits while the user signs in in the computer's browser (the host catches the return).
+    public func waitForSignIn(_ id: String) async throws {
+        for _ in 0..<150 {
+            try await Task.sleep(for: .seconds(2))
+            await refreshPlugins()
+            if installedConnectors.first(where: { $0.id == id })?.needsSignIn == false { return }
+        }
     }
 
     public func removeConnector(_ id: String) async throws {

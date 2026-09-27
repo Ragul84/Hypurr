@@ -160,6 +160,9 @@ public struct ConnectingIndicator: View {
         .task(id: isConnecting) {
             if isConnecting {
                 if !isVisible {
+                    // A reconnect that settles within 0.4 s never shows, so nothing flashes.
+                    try? await Task.sleep(for: .milliseconds(400))
+                    guard !Task.isCancelled else { return }
                     shownAt = .now
                     withAnimation(Motion.reduced(Motion.fade, reduceMotion)) { isVisible = true }
                 }
@@ -210,8 +213,7 @@ public extension View {
     }
 
     func codyncSheet<Item: Identifiable, Sheet: View>(item: Binding<Item?>, @ViewBuilder content: @escaping (Item) -> Sheet) -> some View {
-        let shown = Binding(get: { item.wrappedValue != nil }, set: { if !$0 { item.wrappedValue = nil } })
-        return modifier(CodyncSheet(isPresented: shown, sheet: { item.wrappedValue.map(content) }))
+        modifier(CodyncItemSheet(item: item, sheet: content))
     }
 
     /// Presents a full-window layer the content draws itself (menus, dialogs), fading in and out.
@@ -231,19 +233,37 @@ public extension View {
     }
 }
 
+/// Keeps the last item on screen while the sheet slides away after the item is cleared.
+private struct CodyncItemSheet<Item: Identifiable, Sheet: View>: ViewModifier {
+    @Binding var item: Item?
+    let sheet: (Item) -> Sheet
+    @State private var last: Item?
+
+    func body(content: Content) -> some View {
+        let shown = Binding(get: { item != nil }, set: { if !$0 { item = nil } })
+        content
+            .modifier(CodyncSheet(isPresented: shown, sheet: { (item ?? last).map(sheet) }))
+            .onChange(of: item?.id, initial: true) { if item != nil { last = item } }
+    }
+}
+
 #if os(iOS)
 private struct CodyncSheet<Sheet: View>: ViewModifier {
     @Binding var isPresented: Bool
     let sheet: () -> Sheet
+    /// Outlives `isPresented` by the slide-out, so closing from outside the sheet
+    /// (clearing the binding) animates like the grabber and `dismissModal` do.
+    @State private var covered = false
 
     func body(content: Content) -> some View {
         content
-            .fullScreenCover(isPresented: $isPresented) {
-                BottomSheet(close: { isPresented = false }, content: sheet)
+            .fullScreenCover(isPresented: $covered) {
+                BottomSheet(isPresented: $isPresented, removed: { covered = false }, content: sheet)
                     .presentationBackground(.clear)
             }
+            .onChange(of: isPresented, initial: true) { if isPresented { covered = true } }
             // Our own slide replaces the system one.
-            .transaction(value: isPresented) { $0.disablesAnimations = true }
+            .transaction(value: covered) { $0.disablesAnimations = true }
     }
 }
 
@@ -288,7 +308,8 @@ private struct FadeLayer<Layer: View>: View {
 
 /// The iPhone modal: slides up over a dim, drags down (from the grabber) to close.
 private struct BottomSheet<Content: View>: View {
-    let close: () -> Void
+    @Binding var isPresented: Bool
+    let removed: () -> Void
     @ViewBuilder let content: () -> Content
     @State private var shown = false
     @State private var drag: CGFloat = 0
@@ -319,7 +340,8 @@ private struct BottomSheet<Content: View>: View {
                 .ignoresSafeArea(.container, edges: .bottom)
             }
         }
-        .onAppear { withAnimation(Motion.reduced(Motion.layout, reduceMotion)) { shown = true } }
+        .onAppear(perform: slideIn)
+        .onChange(of: isPresented) { isPresented ? slideIn() : slideOut() }
         .accessibilityAction(.escape, animateClose)
     }
 
@@ -335,13 +357,20 @@ private struct BottomSheet<Content: View>: View {
             }
     }
 
-    private func animateClose() {
+    /// Clears the binding; `slideOut` follows from the change.
+    private func animateClose() { isPresented = false }
+
+    private func slideIn() {
+        withAnimation(Motion.reduced(Motion.layout, reduceMotion)) { shown = true }
+    }
+
+    private func slideOut() {
         withAnimation(Motion.reduced(Motion.layout, reduceMotion)) {
             shown = false
         } completion: {
             var t = Transaction()
             t.disablesAnimations = true
-            withTransaction(t) { close() }
+            withTransaction(t) { if !isPresented { removed() } }
         }
     }
 }

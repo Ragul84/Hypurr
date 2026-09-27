@@ -160,14 +160,7 @@ struct BotSettingsForm: View {
                             .plainTextInput()
                             .fieldBox()
                     }
-                    OptionRow("Model") {
-                        TextField("Default", text: Binding(get: { draft.model ?? "" }, set: { draft.model = $0.isEmpty ? nil : $0 }))
-                            .plainTextInput()
-                            .multilineTextAlignment(.trailing)
-                            .textFieldStyle(.plain)
-                            .frame(width: InterfaceMetrics.value(mac: 100, mobile: 130))
-                            .pill()
-                    }
+                    AgentModelPicker(backend: draft.backend, selection: $draft.model)
                     OptionRow("Project folder") {
                         Button { pickingFolder = true } label: {
                             HStack(spacing: 6) {
@@ -271,7 +264,7 @@ struct Field<Content: View>: View {
     }
 }
 
-private struct OptionRow<Content: View>: View {
+struct OptionRow<Content: View>: View {
     let label: String
     @ViewBuilder let content: Content
 

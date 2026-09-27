@@ -144,18 +144,37 @@ public struct MenuItem: Identifiable {
     }
 }
 
+/// A row of emoji above a message's menu (Slack's quick reactions).
+public struct ReactionPick {
+    public var emoji: [String]
+    public var chosen: [String]
+    public var toggle: (String) -> Void
+
+    public init(emoji: [String], chosen: [String], toggle: @escaping (String) -> Void) {
+        self.emoji = emoji
+        self.chosen = chosen
+        self.toggle = toggle
+    }
+}
+
 /// The floating panel of menu rows (used by every menu, popover or overlay).
 public struct MenuPanel: View {
     let items: [MenuItem]
+    var reactions: ReactionPick?
     let dismiss: () -> Void
 
-    public init(items: [MenuItem], dismiss: @escaping () -> Void) {
+    public init(items: [MenuItem], reactions: ReactionPick? = nil, dismiss: @escaping () -> Void) {
         self.items = items
+        self.reactions = reactions
         self.dismiss = dismiss
     }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 2) {
+            if let reactions {
+                ReactionStrip(pick: reactions, dismiss: dismiss)
+                    .padding(.bottom, 4)
+            }
             ForEach(items) { item in
                 if item.divider {
                     Rectangle().fill(Palette.text.opacity(0.1)).frame(height: 0.5)
@@ -170,6 +189,59 @@ public struct MenuPanel: View {
         .padding(6)
         .frame(minWidth: InterfaceMetrics.value(mac: 180, mobile: 220))
         .fixedSize()
+    }
+}
+
+/// Quick-reaction buttons; a chosen one is highlighted and tapping it takes it back.
+struct ReactionStrip: View {
+    let pick: ReactionPick
+    var dismiss: () -> Void = {}
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(pick.emoji, id: \.self) { emoji in
+                let chosen = pick.chosen.contains(emoji)
+                Button {
+                    dismiss()
+                    pick.toggle(emoji)
+                } label: {
+                    Text(emoji).font(.system(size: InterfaceMetrics.value(mac: 14, mobile: 24)))
+                }
+                .buttonStyle(ReactionButtonStyle(chosen: chosen))
+                .help(chosen ? "Remove \(emoji)" : "React \(emoji)")
+                .accessibilityLabel(chosen ? "Remove reaction \(emoji)" : "React \(emoji)")
+            }
+        }
+    }
+}
+
+/// One emoji in a reaction row: grows a little under the pointer, tinted once chosen.
+private struct ReactionButtonStyle: ButtonStyle {
+    let chosen: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        ReactionButton(configuration: configuration, chosen: chosen)
+    }
+
+    private struct ReactionButton: View {
+        let configuration: Configuration
+        let chosen: Bool
+        @State private var hovering = false
+
+        var body: some View {
+            let size = InterfaceMetrics.value(mac: 26, mobile: 40)
+            configuration.label
+                .scaleEffect(configuration.isPressed ? 0.85 : hovering ? 1.15 : 1)
+                .frame(width: size, height: size)
+                .background(
+                    Palette.text.opacity(chosen ? 0.12 : hovering ? 0.06 : 0),
+                    in: RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+                )
+                .contentShape(Rectangle())
+                .animation(Motion.press, value: configuration.isPressed)
+                .animation(Motion.hover, value: hovering)
+                .onHover { hovering = $0 }
+        }
     }
 }
 
@@ -210,13 +282,15 @@ public extension View {
     }
 
     /// Long-press (iPhone) or right-click (Mac) opens a Codync menu: the replacement for `contextMenu`.
-    func contextActions(_ items: @escaping () -> [MenuItem]) -> some View {
-        modifier(ContextActions(items: items))
+    /// `reactions` puts a quick-reaction row on top.
+    func contextActions(reactions: ReactionPick? = nil, _ items: @escaping () -> [MenuItem]) -> some View {
+        modifier(ContextActions(items: items, reactions: reactions))
     }
 }
 
 private struct ContextActions: ViewModifier {
     let items: () -> [MenuItem]
+    let reactions: ReactionPick?
     @State private var open = false
     @State private var point: CGPoint?
 
@@ -227,10 +301,15 @@ private struct ContextActions: ViewModifier {
             #else
             .onLongPressGesture(minimumDuration: 0.35) { point = nil; open = true }
             #endif
-            .modifier(AnchoredMenu(isPresented: $open, point: point, items: items))
+            .modifier(AnchoredMenu(isPresented: $open, point: point, items: items, reactions: reactions))
             .accessibilityActions {
                 ForEach(items()) { item in
                     Button(item.title, action: item.action)
+                }
+                if let reactions {
+                    ForEach(reactions.emoji, id: \.self) { emoji in
+                        Button("React \(emoji)") { reactions.toggle(emoji) }
+                    }
                 }
             }
     }
@@ -241,6 +320,7 @@ private struct AnchoredMenu: ViewModifier {
     @Binding var isPresented: Bool
     let point: CGPoint?
     let items: () -> [MenuItem]
+    var reactions: ReactionPick?
     @State private var frame: CGRect = .zero
 
     func body(content: Content) -> some View {
@@ -249,7 +329,7 @@ private struct AnchoredMenu: ViewModifier {
             .codyncOverlay(isPresented: $isPresented) { close in
                 let anchor = point.map { CGRect(x: frame.minX + $0.x, y: frame.minY + $0.y, width: 0, height: 0) } ?? frame
                 AnchoredPanel(anchor: anchor, close: close) {
-                    MenuPanel(items: items(), dismiss: close)
+                    MenuPanel(items: items(), reactions: reactions, dismiss: close)
                 }
             }
     }

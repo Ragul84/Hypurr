@@ -1,6 +1,6 @@
 import Foundation
 
-// Wire types for codync-host (see host/src/api.rs). Field names match the
+// Wire types for codync-host (see host/src/api/mod.rs). Field names match the
 // host's camelCase JSON. Timestamps are epoch milliseconds.
 
 public struct Bot: Codable, Identifiable, Hashable, Sendable {
@@ -100,6 +100,8 @@ public struct Entry: Codable, Identifiable, Hashable, Sendable {
 }
 
 public struct EntryData: Codable, Hashable, Sendable {
+    public var routineId: String?
+    public var runId: String?
     public var text: String?
     public var final: Bool?
     /// user: queued | sent | cancelled | failed · tool: pending | in_progress | completed | failed · permission: pending | answered | cancelled | expired
@@ -122,6 +124,8 @@ public struct EntryData: Codable, Hashable, Sendable {
     public var author: String?
     /// On a main-chat message that has a thread: its replies.
     public var thread: ThreadSummary?
+    /// The user's emoji reactions, oldest first.
+    public var reactions: [String]?
 
     public init(text: String? = nil, status: String? = nil, clientNonce: String? = nil) {
         self.text = text
@@ -135,6 +139,8 @@ public struct ThreadSummary: Codable, Hashable, Sendable {
     public var lastAt: Int64
     /// Who replied, first reply first: bot ids, and `user`.
     public var authors: [String]
+    /// Replies the user hasn't read (threads are read on their own).
+    public var unread: Int?
 }
 
 public struct FileDiff: Codable, Hashable, Sendable {

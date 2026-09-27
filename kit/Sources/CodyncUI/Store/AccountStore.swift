@@ -127,7 +127,7 @@ public final class AccountStore {
         persist()
         close(id)
         accessPolls.removeValue(forKey: id)?.cancel()
-        pendingAccess[id] = nil
+        setPending(id, nil)
         if selection?.computerId == id { selection = nil }
         refreshList()
     }
@@ -162,7 +162,7 @@ public final class AccountStore {
         do {
             let list = try await cloud.computers()
             guard !retired else { return }
-            cloudComputers = list
+            if list != cloudComputers { Motion.animate { cloudComputers = list } }
             if asksForAccess { await askForAccess() }
         } catch {
             lastError = error.localizedDescription
@@ -177,7 +177,7 @@ public final class AccountStore {
         }
         let ticket = try await cloud.requestAccess(id, signKey: target.signKey)
         guard !retired else { throw CancellationError() }
-        pendingAccess[id] = ticket
+        setPending(id, ticket)
         accessPolls[id]?.cancel()
         accessPolls[id] = Task { [weak self] in await self?.awaitApproval(ticket, target: target, cloud: cloud) }
         return ticket
@@ -186,10 +186,19 @@ public final class AccountStore {
     /// An offline account computer named like one this device uses or sees online: most likely the same
     /// machine under an earlier identity (its host keys were reset), left behind in the account.
     public func isOlderCopy(_ computer: CloudComputer) -> Bool {
-        !computer.isOnline && cloudComputers.contains { other in
-            other.computerId != computer.computerId && other.name == computer.name
-                && (stores[other.computerId] != nil || other.isOnline)
-        }
+        guard !computer.isOnline else { return false }
+        // The current copy may be QR-paired without being listed in the account.
+        return computers.contains { $0.id != computer.computerId && $0.name == computer.name }
+            || cloudComputers.contains { other in
+                other.computerId != computer.computerId && other.name == computer.name
+                    && (stores[other.computerId] != nil || other.isOnline)
+            }
+    }
+
+    /// Access requests appear and settle with an animation, like connection changes.
+    private func setPending(_ id: ComputerID, _ ticket: AccessTicket?) {
+        guard pendingAccess[id] != ticket else { return }
+        Motion.animate { pendingAccess[id] = ticket }
     }
 
     /// Takes a computer out of the account (its grants and pending requests go with it).
@@ -197,7 +206,7 @@ public final class AccountStore {
         guard let cloud else { return }
         do {
             try await cloud.removeComputer(id)
-            pendingAccess[id] = nil
+            setPending(id, nil)
             await refreshCloud()
         } catch {
             lastError = error.localizedDescription
@@ -223,7 +232,7 @@ public final class AccountStore {
     public func cancelAccess(_ id: ComputerID) async {
         guard let ticket = pendingAccess[id] else { return }
         accessPolls.removeValue(forKey: id)?.cancel()
-        pendingAccess[id] = nil
+        setPending(id, nil)
         do {
             try await cloud?.cancelAccess(ticket.requestId)
         } catch {
@@ -241,7 +250,7 @@ public final class AccountStore {
             case .pending:
                 continue
             case .approved:
-                pendingAccess[ticket.computerId] = nil
+                setPending(ticket.computerId, nil)
                 // Pin the key the SAS was computed with; the first hello brings its mailbox key and addresses.
                 let computer = Computer(id: ticket.computerId, name: target.name, signKey: ticket.signKey,
                                         cloud: cloud.baseURL, device: target.device)
@@ -250,7 +259,7 @@ public final class AccountStore {
                 await refreshCloud()
                 return
             case .denied, .expired, .cancelled:
-                pendingAccess[ticket.computerId] = nil
+                setPending(ticket.computerId, nil)
                 lastError = status.status == .denied ? "\(target.name) declined the request." : "The request expired. Ask again."
                 return
             }
@@ -329,7 +338,8 @@ public final class AccountStore {
     }
 
     private func refreshList() {
-        computers = attached + saved.filter { c in !attached.contains { $0.id == c.id } }
+        let merged = attached + saved.filter { c in !attached.contains { $0.id == c.id } }
+        if merged != computers { Motion.animate { computers = merged } }
         rosterChanged()
     }
 

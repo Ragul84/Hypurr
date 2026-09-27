@@ -107,6 +107,12 @@ struct Composer: View {
         .padding(.leading, InterfaceMetrics.value(mac: 14, mobile: 18))
         .padding(.trailing, 6)
         .padding(.vertical, InterfaceMetrics.value(mac: 4, mobile: 6))
+        .onChange(of: model.routineDrafts[botId]) { _, value in
+            guard thread == nil, let value else { return }
+            draft = draft.isEmpty ? value : draft + "\n" + value
+            model.routineDrafts.removeValue(forKey: botId)
+            focused = true
+        }
         .composerSurface(in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .padding(.horizontal, 16)
         .padding(.top, 6)

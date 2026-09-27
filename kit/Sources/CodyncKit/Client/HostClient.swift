@@ -26,6 +26,20 @@ public struct Empty: Codable, Sendable {
     public init() {}
 }
 
+/// A full editor update must explicitly clear a previous model override.
+struct BotUpdate: Encodable {
+    let draft: BotDraft
+    private enum CodingKeys: String, CodingKey { case model }
+
+    func encode(to encoder: Encoder) throws {
+        try draft.encode(to: encoder)
+        if draft.model == nil {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encodeNil(forKey: .model)
+        }
+    }
+}
+
 public struct HostClient: Sendable {
     public let transport: any HostTransport
 
@@ -167,7 +181,7 @@ public extension HostClient {
 
     func updateBot(_ draft: BotDraft) async throws -> Bot {
         struct Res: Decodable { var bot: Bot }
-        let res: Res = try await call("updateBot", draft)
+        let res: Res = try await call("updateBot", BotUpdate(draft: draft))
         return res.bot
     }
 
@@ -175,8 +189,17 @@ public extension HostClient {
         let _: Empty = try await call("deleteBot", ["botId": id])
     }
 
-    func markRead(_ id: String) async throws {
-        let _: Empty = try await call("markRead", ["botId": id])
+    /// The main chat, one thread (`threadId`), or everything (`all`).
+    func markRead(_ id: String, threadId: String? = nil, all: Bool = false) async throws {
+        struct Body: Encodable { var botId: String; var threadId: String?; var all: Bool }
+        let _: Empty = try await call("markRead", Body(botId: id, threadId: threadId, all: all))
+    }
+
+    /// Toggles the user's `emoji` reaction on a chat message.
+    func react(entryId: String, emoji: String) async throws -> Entry {
+        struct Res: Decodable { var entry: Entry }
+        let res: Res = try await call("react", ["entryId": entryId, "emoji": emoji])
+        return res.entry
     }
 
     /// `threadId`: reply in the thread on that main-chat message.
@@ -268,6 +291,10 @@ public extension HostClient {
     }
 
     /// Starts the agent to see whether it's signed in and how it can be (first run may download it).
+    func agentModels(_ backend: String) async throws -> AgentModels {
+        try await call("agentModels", ["backend": backend], timeout: 300)
+    }
+
     func agentAuth(_ backend: String) async throws -> AgentAuth {
         try await call("agentAuth", ["backend": backend], timeout: 300)
     }

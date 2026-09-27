@@ -1,7 +1,7 @@
 import CodyncKit
 import SwiftUI
 
-// Apps through Composio (host/src/composio.rs): set up a key once, connect
+// Apps through Composio (host/src/market/composio.rs): set up a key once, connect
 // apps with Composio's hosted sign-in, then turn them on per bot like any
 // other connector.
 

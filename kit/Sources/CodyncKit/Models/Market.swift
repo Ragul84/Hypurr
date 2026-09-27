@@ -1,6 +1,6 @@
 import Foundation
 
-// Marketplace wire types (host/src/market.rs): connectors are MCP servers,
+// Marketplace wire types (host/src/market/mod.rs): connectors are MCP servers,
 // skills are instruction folders; agents come from `Hello.backends`.
 
 public struct InstalledConnector: Codable, Hashable, Sendable, Identifiable {
@@ -16,9 +16,20 @@ public struct InstalledConnector: Codable, Hashable, Sendable, Identifiable {
     public var keys: [String]
     /// Composio apps: the app's logo.
     public var logo: String?
+    /// Remote servers: `none`, `signedOut` (waits for sign-in; bots don't get it yet) or `signedIn`.
+    public var auth: String?
+
+    public var needsSignIn: Bool { auth == "signedOut" }
 }
 
-// MARK: Composio (host/src/composio.rs): apps connected through composio.dev
+/// Where a connector's sign-in page is and who catches its return: `app` (the phone's
+/// sign-in sheet, then `finishConnectorSignIn`) or `host` (the computer's own browser).
+public struct ConnectorSignIn: Decodable, Sendable {
+    public var url: String
+    public var callback: String
+}
+
+// MARK: Composio (host/src/market/composio.rs): apps connected through composio.dev
 
 public struct ComposioStatus: Decodable, Sendable {
     public var configured: Bool
@@ -112,6 +123,7 @@ public struct MarketSkill: Codable, Hashable, Sendable, Identifiable {
 }
 
 private struct Items<T: Decodable>: Decodable { var items: [T] }
+private struct Installed: Decodable { var connector: InstalledConnector }
 
 public extension HostClient {
     func connectors() async throws -> [InstalledConnector] {
@@ -125,15 +137,30 @@ public extension HostClient {
         return res.items
     }
 
-    func installConnector(registryName: String, option: String, inputs: [String: String]) async throws {
+    @discardableResult
+    func installConnector(registryName: String, option: String, inputs: [String: String]) async throws -> InstalledConnector {
         struct Body: Encodable { var registryName: String; var option: String; var inputs: [String: String] }
-        let _: Empty = try await call("installConnector", Body(registryName: registryName, option: option, inputs: inputs), timeout: 30)
+        let res: Installed = try await call("installConnector", Body(registryName: registryName, option: option, inputs: inputs), timeout: 45)
+        return res.connector
     }
 
-    /// A connector you describe yourself: a command line, or an https URL with optional headers.
-    func addConnector(name: String, command: String?, url: String?, env: [String: String]) async throws {
-        struct Body: Encodable { var name: String; var command: String?; var url: String?; var env: [String: String] }
-        let _: Empty = try await call("installConnector", Body(name: name, command: command, url: url, env: env))
+    /// A connector you describe yourself: a command line with env, or an https URL with headers.
+    @discardableResult
+    func addConnector(name: String, command: String?, url: String?, env: [String: String], headers: [String: String]) async throws -> InstalledConnector {
+        struct Body: Encodable { var name: String; var command: String?; var url: String?; var env: [String: String]; var headers: [String: String] }
+        let res: Installed = try await call("installConnector", Body(name: name, command: command, url: url, env: env, headers: headers), timeout: 45)
+        return res.connector
+    }
+
+    func connectorSignIn(_ id: String) async throws -> ConnectorSignIn {
+        try await call("connectorSignIn", ["id": id], timeout: 60)
+    }
+
+    @discardableResult
+    func finishConnectorSignIn(state: String, code: String?, error: String?) async throws -> InstalledConnector {
+        struct Body: Encodable { var state: String; var code: String?; var error: String? }
+        let res: Installed = try await call("connectorSignInFinish", Body(state: state, code: code, error: error), timeout: 60)
+        return res.connector
     }
 
     func removeConnector(_ id: String) async throws {
