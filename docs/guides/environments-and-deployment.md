@@ -17,8 +17,7 @@ The host currently has no compiled cloud URL default. Use the Mac's **Reach from
 ## Checked-in readiness
 
 - **Development:** app configuration and Worker configuration target `https://dev-api.codync.dev`; dev Clerk issuer and D1 binding are configured in source. Exercise the live path before claiming readiness.
-- **Production:** `apps/shared/Config/main.plist` has empty cloud/Clerk values. Root Worker configuration still contains production Clerk issuer and D1 ID placeholders. Release remote access is not ready from these files alone.
-- **Production route placement:** `routes` currently follows `[[migrations]]` in `cloud/wrangler.toml`, so TOML attaches it to that migration rather than the root Worker. Wrangler reports an unexpected `routes` field. Move the production route to the root table before production deployment. The dev route is explicitly under `[env.dev]`.
+- **Production:** D1 `codync` exists with migrations applied and the root Worker routes `api.codync.dev`. Still missing: the production Clerk instance (issuer in `cloud/wrangler.toml`, `CLERK_SECRET_KEY` / `CLERK_WEBHOOK_SECRET` secrets, publishable key in `apps/shared/Config/main.plist`), `cloudURL` in `main.plist`, and the first `npm run deploy:main`. Release remote access is not ready until then.
 - **Local:** Wrangler's `local` environment supports the isolated integration test and its test issuer. It is not a real Google sign-in test.
 
 ## Deployment procedure
