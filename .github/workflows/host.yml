@@ -74,8 +74,9 @@ jobs:
     strategy:
       matrix:
         include:
-          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu, name: linux-x86_64 }
-          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu, name: linux-arm64 }
+          # musl: one static binary that runs on any distro, whatever its glibc.
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-musl, name: linux-x86_64 }
+          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-musl, name: linux-arm64 }
           - { os: macos-latest, target: aarch64-apple-darwin, name: macos-arm64 }
           - { os: macos-latest, target: x86_64-apple-darwin, name: macos-x86_64 }
     runs-on: ${{ matrix.os }}
@@ -86,6 +87,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
       - name: Build
         working-directory: host
         run: cargo build --release --target ${{ matrix.target }}
