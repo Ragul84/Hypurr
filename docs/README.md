@@ -12,6 +12,7 @@ Source review, a passing build, local integration tests and production acceptanc
 | Build, install, restart and run checks | [Development](guides/development.md) |
 | Test a phone over Cloudflare instead of LAN | [Cloudflare testing](guides/cloudflare-testing.md) |
 | Configure dev/main or deploy the services | [Environments and deployment](guides/environments-and-deployment.md) |
+| Run the host on a Linux server or cloud VM | [Linux servers](guides/linux-servers.md) |
 | Set up accounts, approvals or desktop SSH | [Accounts and SSH](guides/accounts-and-ssh.md) |
 | Change transport or cryptography | [Remote protocol](reference/remote-relay.md) and [shared vectors](reference/fixtures/README.md) |
 | Change an Apple screen or button | [UI conventions](design/ui-conventions.md) |
@@ -60,3 +61,5 @@ Service-local entry points remain in [cloud/README.md](../cloud/README.md) and [
 - Focused fixture/crypto checks passed: Swift 14 tests; Rust 12 tests across library/binary targets; Cloudflare vectors/relay 43 tests.
 - `git diff --check` passed. These checks validate the documentation move and its executable consumers, not the deployed Cloudflare path.
 - Wrangler reported a production route placement warning; see [environment readiness](guides/environments-and-deployment.md). Deployed-device acceptance remains separate.
+
+- [Routines](features/routines.md): scheduled and webhook-triggered bot work, Apple UI, execution history and reference parity.

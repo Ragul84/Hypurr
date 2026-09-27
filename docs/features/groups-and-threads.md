@@ -19,8 +19,12 @@ replies itself.
   `workingThread` (where the running turn talks). A group's `status` / `activity` are its busy
   member's (`"Alice: Writing a reply…"`); its `lastMessage` names who spoke (`"Alice: …"`).
 - Entry: `threadId`; `data.author` (the bot that wrote it; every agent-made entry has one);
-  on a root, `data.thread = {count, lastAt, authors}` (`authors`: bot ids and `"user"`, first
-  reply first), kept up to date by the host.
+  on a root, `data.thread = {count, lastAt, authors, unread}` (`authors`: bot ids and `"user"`,
+  first reply first; `unread`: replies newer than the thread was last read), kept up to date by
+  the host.
+- Read state (Slack's): the main chat and each thread are read separately. A bot's `unread`
+  badge is the sum. Reading the main chat leaves a thread's new replies unread; opening the
+  thread (or replying in it) reads them. A root doesn't turn unread when its summary changes.
 - `sync` / `events` catch-up carries recent entries of chats *and* threads. Paging:
   `history` (main chat only), `thread` (a whole thread).
 
@@ -34,10 +38,11 @@ replies itself.
 | `updateBot` | `{id, name?, members?, pinned?, hidden?}` | A group can't become a bot or the reverse. |
 | `deleteBot` | `botId` | A group's bots stay. A deleted bot leaves its groups. |
 | `stop` | `botId` | For a group: ends its room turns (main and threads) and stops members working in it. |
+| `react` | `entryId, emoji` | Toggles the user's reaction on a chat message (`data.reactions`, oldest first, at most 8). A reacted-to message never turns unread again. The bot isn't told. |
 | `respondPermission` | `entryId, optionId?` | Routed to `data.author`, so cards in a group reach the bot that asked. |
-| `markRead` | `botId` | Unread counts include thread replies. |
+| `markRead` | `botId, threadId?, all?` | The main chat, one thread (`threadId`), or everything (`all`, the roster's "Mark as read"). A no-op when nothing there is unread, so clients call it whenever a chat or thread is on screen. `send` marks its own lane read. |
 
-## How a group answers (`host/src/group.rs`, Grok Bot's design)
+## How a group answers (`host/src/chat/group.rs`, Grok Bot's design)
 
 - The user's message starts a *room turn* in its lane: up to 3 rounds, 10 replies in all.
 - Who answers each round: the members @-mentioned since the user's last message (full
@@ -52,7 +57,7 @@ replies itself.
 - Tool calls, thoughts and permission cards of a member's group turn are written to the
   group (with `author`), not to the member's own chat. One "done" push per room turn.
 
-## How a thread continues (`host/src/bot.rs`)
+## How a thread continues (`host/src/agent/bot.rs`)
 
 - In a bot's chat, a thread is its own ACP session. The first reply forks the chat's session
   (`session/fork`, e.g. Claude) so the thread starts from everything said so far; an agent
@@ -64,6 +69,6 @@ replies itself.
 ## Client checklist
 
 Roster row for groups (member avatars), a trace per lane (main chat, or one thread), author label on group replies, the thread summary
-under a root (opens the thread), "Reply in thread" on any main-chat message, a thread view
+under a root (opens the thread; "N new" while `unread > 0`), "Reply in thread" on any main-chat message (Mac: while the pointer is over a message, its footer beside the time shows quick reactions, reply, copy — never on the bubble; iPhone: long-press, reactions on top of the menu), reactions under a message (tap to take back), a thread view
 (root, replies, composer sending `threadId`), group create/edit (name, members), Stop in a
 group calls `stop` with the group id.

@@ -57,9 +57,9 @@ Cloudflare API、D1、裝置目錄、雲端授權／撤權與中繼由 Claude Co
 | Mac 已使用 ClerkKit，支援 Google 登入 | `apps/shared/AccountSession.swift`、`docs/guides/accounts-and-ssh.md` | 延伸現有登入，不另建帳號系統 |
 | iOS 已接 Clerk 帳號入口，電腦仍靠掃碼配對 | `apps/ios/App/CodyncApp.swift`、`apps/ios/Views/RootView.swift`、`PairingView.swift` | 登入入口已建立；雲端電腦清單待實作 |
 | host SQLite 位於 `~/.codync/codync.db` | `host/src/main.rs`、`host/src/store.rs` | 保留本機資料與既有 `rev` 同步機制 |
-| host 使用共用 pairing token，旋轉會使所有舊裝置失效 | `host/src/main.rs`、`host/src/api.rs` | 必須新增逐裝置授權，才能精準撤權 |
+| host 使用共用 pairing token，旋轉會使所有舊裝置失效 | `host/src/main.rs`、`host/src/api/mod.rs` | 必須新增逐裝置授權，才能精準撤權 |
 | 手機配對資料依帳號分區存入 App Group UserDefaults | `kit/Sources/CodyncKit/Client/SharedStore.swift` | 秘密搬到 Keychain，UserDefaults 僅留顯示資料與參照 |
-| 命令走 HTTP API，事件走 SSE | `host/src/api.rs`、`kit/Sources/CodyncKit/Client/HostClient.swift` | 第一版沿用；後續用 transport 抽象接中繼 |
+| 命令走 HTTP API，事件走 SSE | `host/src/api/mod.rs`、`kit/Sources/CodyncKit/Client/HostClient.swift` | 第一版沿用；後續用 transport 抽象接中繼 |
 | 已有 Cloudflare Worker 轉送 APNs，使用加密 ticket | `relay/src/index.ts`、`relay/wrangler.toml` | 保留相容性；它目前不是裝置目錄或聊天中繼 |
 | Remote screen 使用獨立 helper 與 WebRTC | `apps/screen-macos/`、`kit/Sources/CodyncUI/Screen/` | 影像傳輸與聊天中繼分開 |
 

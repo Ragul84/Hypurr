@@ -8,7 +8,7 @@ Reviewed against repository configuration on 2026-09-26. Checked-in configuratio
 | --- | --- | --- |
 | Apple app | `apps/shared/Config/dev.plist`, `main.plist` | `project.yml` copies the selected file to bundled `AccountConfig.plist`; Debug uses dev, Release uses main |
 | Account SDK | `apps/shared/AccountSession.swift` | Public Clerk configuration; development environment overrides are supported |
-| Host | `host/src/cloud.rs` | `CODYNC_CLOUD=off` or stored disable wins; then `CODYNC_CLOUD_URL`, stored URL, compiled default |
+| Host | `host/src/remote/cloud.rs` | `CODYNC_CLOUD=off` or stored disable wins; then `CODYNC_CLOUD_URL`, stored URL, compiled default |
 | Cloud Worker / D1 / DO | `cloud/wrangler.toml` | Root production, `dev`, or `local` environment |
 | APNs Worker | `relay/wrangler.toml` | Separate deployment and secrets; see [relay README](../../relay/README.md) |
 

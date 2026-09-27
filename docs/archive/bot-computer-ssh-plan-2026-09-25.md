@@ -175,7 +175,7 @@ MVP 支援既有 key／agent 驗證與 macOS 客戶端；password、互動式 MF
 
 ## 8. 目前評估依據
 
-對照 `apps/ios/Views/BotListView.swift`、`SettingsView.swift`、`kit/Sources/CodyncUI/Store/BotStore.swift`、`HostClient.swift`、`host/src/acp.rs` 與 `apps/macos/App/HostController.swift`：目前是一個 active computer 對應一個 store／client 的設計，尚無跨 computer 的 account store 或 SSH 連線管理。因此此功能不能只換手機左上角圖示或加 `computerId` 就算完成。
+對照 `apps/ios/Views/BotListView.swift`、`SettingsView.swift`、`kit/Sources/CodyncUI/Store/BotStore.swift`、`HostClient.swift`、`host/src/agent/acp.rs` 與 `apps/macos/App/HostController.swift`：目前是一個 active computer 對應一個 store／client 的設計，尚無跨 computer 的 account store 或 SSH 連線管理。因此此功能不能只換手機左上角圖示或加 `computerId` 就算完成。
 
 SSH 與 Clerk 具體 API／平台相容性應在實作階段依當時官方文件和已安裝版本核對；本文件未宣告任何 SSH 或多帳號功能已經可用。
 

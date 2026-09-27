@@ -15,7 +15,7 @@ where the harness owns the conversation.
 Codync never replays the transcript into a session. Each turn sends only the new message(s); the harness keeps
 its own context and compacts it itself.
 
-## Instruction snapshot (`host/src/context.rs`)
+## Instruction snapshot (`host/src/chat/context.rs`)
 
 - The bot's instructions are rendered once: profile (name, description, skills, phone-friendly rule) plus the
   memory section. They're stored as a snapshot in `kv` under `context.<bot>`, keyed by **session + compaction
@@ -32,7 +32,7 @@ its own context and compacts it itself.
   appended to the next message. After that turn reaches the agent, the change is recorded in
   `snapshot.announced`. The next compaction folds it into the snapshot.
 
-## Memory (`host/src/memory.rs`)
+## Memory (`host/src/chat/memory.rs`)
 
 - Facts are plain markdown, one `- (YYYY-MM-DD) fact` per line:
   - `profile.md` holds who the user is. All of it goes into the prompt, up to 100 facts.

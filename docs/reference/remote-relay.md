@@ -57,8 +57,8 @@ Shared deterministic [vectors](fixtures/remote-relay-vectors.json) and their [ge
 | --- | --- |
 | Worker API / authentication / DO | `cloud/src/api.ts`, `auth.ts`, `relay.ts` |
 | Cloud schema | `cloud/migrations/` |
-| Host identity / crypto / channel | `host/src/identity.rs`, `crypto.rs`, `channel.rs` |
-| Host cloud / relay | `host/src/cloud.rs`, `relay.rs` |
+| Host identity / crypto / channel | `host/src/remote/identity.rs`, `crypto.rs`, `channel.rs` |
+| Host cloud / relay | `host/src/remote/cloud.rs`, `relay.rs` |
 | Swift transports / identity | `kit/Sources/CodyncKit/Client/` |
 | Account and per-computer state | `kit/Sources/CodyncUI/` |
 | Apple account integration | `apps/shared/AccountSession.swift` |
@@ -178,7 +178,7 @@ codync://pair?v=3&name=<pct>&id=<computerId>&sk=<signPub>&bk=<boxPub>&code=<pair
 
 ### 4.3 授權表與 ACL（host 為權威）
 
-host 的授權裝置表（`host/src/devices.rs`）每一列：`key, name, platform, source(local|account), grant_id, scopes, lease_until`。
+host 的授權裝置表（`host/src/api/devices.rs`）每一列：`key, name, platform, source(local|account), grant_id, scopes, lease_until`。
 
 規則（**雲端只能縮短授權，不能新增**）：
 - 新增列只有兩條路：§4.1 的 `pair`（`source=local`，`grant_id=NULL`）與 §4.2 B 的 host 核准（`source=account`，`grant_id` = decision 回傳值，`key` = host 顯示給使用者的 dk）。
@@ -484,7 +484,7 @@ The route table below summarizes the contract. Executable schema and validation 
 
 ## 9. Host integration
 
-`host/src/api.rs` dispatches inner methods and enforces caller permissions. Bearer HTTP/SSE is loopback-only; remote callers use the encrypted channel. `host/src/cloud.rs` manages registration, claims, access state and grant revocation retries; `host/src/relay.rs` manages the outgoing relay connection. Inspect these implementations for current method signatures and storage keys.
+`host/src/api/mod.rs` dispatches inner methods and enforces caller permissions. Bearer HTTP/SSE is loopback-only; remote callers use the encrypted channel. `host/src/remote/cloud.rs` manages registration, claims, access state and grant revocation retries; `host/src/remote/relay.rs` manages the outgoing relay connection. Inspect these implementations for current method signatures and storage keys.
 
 `codync-host cloud` reports cloud status; `devices` lists/revokes device access; `access` handles pending approval. `reset-token` rotates the local bearer credential, not remote device grants.
 

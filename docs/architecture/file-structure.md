@@ -7,7 +7,17 @@ This is the map of the current repository. Paths below are repository-relative. 
 ```text
 Codync/
 ├── host/                      # Rust daemon and terminal client
-│   ├── src/                   # Runtime modules; tui/ contains terminal UI
+│   ├── src/
+│   │   ├── main.rs            # CLI entry, shared helpers (LockExt, http)
+│   │   ├── hub.rs, store.rs   # Shared state + event fan-out / SQLite persistence
+│   │   ├── service.rs         # Data dir, launchd/systemd install, keep-awake
+│   │   ├── usage.rs, screen.rs, mcp.rs
+│   │   ├── api/               # HTTP/SSE dispatch, caller permissions (devices.rs)
+│   │   ├── agent/             # ACP client, harness discovery, registry, sign-in, setup PTYs, bot actor
+│   │   ├── chat/              # Groups, bot-to-bot requests, prompt snapshots, memory
+│   │   ├── remote/            # Identity, wire crypto, E2E channel, cloud, relay socket, push
+│   │   ├── market/            # Marketplace, Composio, MCP OAuth
+│   │   └── tui/               # Terminal client
 │   └── tests/                 # Host integration tests and scripted ACP agents
 ├── kit/                       # Shared Swift package
 │   ├── Sources/
@@ -54,14 +64,15 @@ Codync/
 | Responsibility | Source entry points |
 |---|---|
 | CLI and background service | `host/src/main.rs`, `service.rs` |
-| API, caller permissions, event ordering | `host/src/api.rs`, `devices.rs`, `hub.rs` |
+| API, caller permissions, event ordering | `host/src/api/`, `hub.rs` |
 | SQLite transcript, bots, lanes and sessions | `host/src/store.rs` |
-| Agent process, ACP, queue and session lifecycle | `host/src/bot.rs`, `acp.rs` |
-| Group room turns / bot-to-bot requests | `host/src/group.rs` / `team.rs` |
-| Prompt snapshots and memory keeper | `host/src/context.rs`, `memory.rs` |
-| Identity, encryption and direct channel | `host/src/identity.rs`, `crypto.rs`, `channel.rs` |
-| Host cloud state and relay connection | `host/src/cloud.rs`, `relay.rs` |
-| Agent discovery, marketplace, auth terminal | `host/src/backends.rs`, `registry.rs`, `market.rs`, `composio.rs`, `term.rs` |
+| Agent process, ACP, queue and session lifecycle | `host/src/agent/bot.rs`, `acp.rs` |
+| Group room turns / bot-to-bot requests | `host/src/chat/group.rs` / `team.rs` |
+| Prompt snapshots and memory keeper | `host/src/chat/context.rs`, `memory.rs` |
+| Identity, encryption and direct channel | `host/src/remote/identity.rs`, `crypto.rs`, `channel.rs` |
+| Host cloud state and relay connection | `host/src/remote/cloud.rs`, `relay.rs` |
+| Agent discovery, sign-in, setup terminal | `host/src/agent/backends.rs`, `registry.rs`, `auth.rs`, `term.rs` |
+| Marketplace, Composio, connector OAuth | `host/src/market/` |
 | Screen bridge and built-in MCP tools | `host/src/screen.rs`, `mcp.rs` |
 | Swift transport and cloud API | `kit/Sources/CodyncKit/Client/` |
 | Account aggregation / one host mirror | `kit/Sources/CodyncUI/Store/AccountStore.swift` / `BotStore.swift` |
@@ -71,7 +82,7 @@ Codync/
 | Apple account sessions / public environment config | `apps/shared/AccountSession.swift`, `apps/shared/Config/` |
 | Mac local host / SSH lifecycle | `apps/macos/App/HostController.swift`, `SSHTunnel.swift` |
 | Cloud routes / authentication / relay | `cloud/src/index.ts`, `api.ts`, `auth.ts`, `relay.ts` |
-| Push encryption / APNs delivery / decryption | `host/src/push.rs`, `relay/src/`, `apps/ios/NotificationService/` |
+| Push encryption / APNs delivery / decryption | `host/src/remote/push.rs`, `relay/src/`, `apps/ios/NotificationService/` |
 | Widget and activity rendering | `kit/Sources/CodyncKit/Design/`, `apps/ios/Widgets/` |
 
 ## Dependency rules
@@ -98,7 +109,7 @@ Codync/
 | computer / host | User-facing paired environment / the daemon that serves it |
 | cloud / relay | Account + E2E service / context-dependent transport or APNs Worker; always name the directory when ambiguous |
 
-Use lowercase repository folders; PascalCase folders inside Swift targets. Swift files follow their main type (`UpperCamelCase.swift`), Rust uses `snake_case.rs`, and TypeScript uses `kebab-case.ts`. Prefer one main type per file; small related view siblings can share a plural file such as `ChatRows.swift`.
+Use lowercase repository folders; PascalCase folders inside Swift targets. Swift files follow their main type (`UpperCamelCase.swift`), Rust uses `snake_case.rs` (a folder module is `name/mod.rs`), and TypeScript uses `kebab-case.ts`. Prefer one main type per file; small related view siblings can share a plural file such as `ChatRows.swift`.
 
 Role suffixes: `View`, `Row`, `Card`, `Window`, `Store`, `Controller`; button styles describe the effect (`PressScale`). Keep feature vocabulary aligned across Swift, Rust, Linux and the terminal client.
 

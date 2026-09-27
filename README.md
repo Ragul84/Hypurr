@@ -50,6 +50,8 @@ codync-host pair                           # QR code in the terminal, or Setting
 
 Building the Linux app yourself needs `libgtk-4-dev libadwaita-1-dev`: `cargo install --path apps/linux`.
 
+**Linux server / cloud VM** — the host runs headless on any distro (static binary, x86_64 + arm64). Setup, remote access and limitations: [docs/guides/linux-servers.md](docs/guides/linux-servers.md).
+
 Remote access uses an encrypted channel over direct LAN/Tailscale or the Cloudflare relay. Tailscale is optional. Configure matching app/host environments and follow the [Cloudflare test guide](docs/guides/cloudflare-testing.md); development configuration exists, while production configuration still needs completion.
 
 **Agents** — install and sign in to whichever you use; Codync finds them. Claude Code, Codex and Pi run through their ACP adapters (fetched by `npx`, so Node.js is needed for those).
@@ -71,7 +73,7 @@ Remote access uses an encrypted channel over direct LAN/Tailscale or the Cloudfl
 | `codync-host devices` | list/revoke authorized remote devices |
 | `codync-host access` | review device access requests |
 
-Data lives in `~/.codync`. The local bearer token authorizes loopback helpers and SSH-forwarded callers. Remote devices use individual keys and grants over the encrypted channel; revoke a lost device through device management rather than rotating the loopback token. Host methods and caller permissions live in `host/src/api.rs`.
+Data lives in `~/.codync`. The local bearer token authorizes loopback helpers and SSH-forwarded callers. Remote devices use individual keys and grants over the encrypted channel; revoke a lost device through device management rather than rotating the loopback token. Host methods and caller permissions live in `host/src/api/mod.rs`.
 
 ## Repository
 
