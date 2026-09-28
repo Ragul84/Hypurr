@@ -1,6 +1,6 @@
 # Codync
 
-**Your coding agents, as teammates you can message.**
+**The open-source, 1:1 alternative to Grok Bot and Muse.** Your coding agents, as teammates you can message.
 
 Codync turns the coding agents on your computer — Claude Code, Codex, Cursor, Pi, OpenCode, Grok Build, Gemini, Copilot and ~40 more — into persistent *bots* you delegate to from your iPhone, Mac, Linux desktop or any terminal, the way you'd message a colleague. Pick who, say what, put the phone away. You get a notification when a bot finishes or needs your approval.
 
@@ -8,6 +8,17 @@ Codync turns the coding agents on your computer — Claude Code, Codex, Cursor, 
 
 [![Download on the App Store](https://img.shields.io/badge/App_Store-iOS-blue?logo=apple)](https://apps.apple.com/tw/app/codync/id6760984418?l=en-GB)
 [![Homebrew](https://img.shields.io/badge/Homebrew-codync-orange?logo=homebrew)](https://github.com/leepokai/homebrew-codync)
+
+## Why Codync
+
+- **Free and open source.** No subscription, no paid tier, MIT licensed. It runs on your computer with the agents and accounts you already have.
+- **A 1:1 Grok Bot / Muse alternative.** Persistent named bots, group chats, reply threads, bots asking each other for help, approval cards, per-bot memory, remote screen, voice calls and "needs you / done" notifications — the same features, without being tied to one model or one subscription.
+- **Any coding agent.** Claude Code, Codex, Cursor, Gemini, Copilot, OpenCode, Pi, Grok Build and everything else in the [ACP registry](https://agentclientprotocol.com/registry). Each bot picks its own.
+- **Rust core.** `codync-host` is one small Rust binary for macOS and Linux that drives every agent, keeps the transcripts and serves every client.
+- **Native on every platform.** SwiftUI on iPhone and Mac, GTK 4 / libadwaita on Linux, and a terminal UI for SSH. No web views, no Electron.
+- **Remote screen.** See and control your computer from the iPhone over WebRTC (hardware H.264), and let bots use the screen themselves through the built-in `computer` tool.
+- **Voice calls.** Talk to a bot hands-free from the iPhone and hear its replies read aloud.
+- **Private by default.** Phones reach the host over an end-to-end encrypted channel (direct LAN/Tailscale or the Cloudflare relay); push notifications are sealed so the relay never sees their content.
 
 ## How it works
 
