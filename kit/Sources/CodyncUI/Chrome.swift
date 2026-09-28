@@ -134,51 +134,6 @@ public struct ScreenHeader<Leading: View, Title: View, Trailing: View>: View {
     }
 }
 
-/// A small connection state shown in the center of a screen header.
-public struct ConnectingIndicator: View {
-    let isConnecting: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isVisible = false
-    @State private var shownAt = Date.distantPast
-
-    public init(isConnecting: Bool) { self.isConnecting = isConnecting }
-
-    public var body: some View {
-        Group {
-            if isVisible {
-                HStack(spacing: 6) {
-                    ThinkingOrb(state: .connecting, size: 14, color: Palette.secondary)
-                    Text("Connecting")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Palette.secondary)
-                        .lineLimit(1)
-                }
-                .transition(.opacity)
-                .accessibilityLabel("Connecting")
-            }
-        }
-        .task(id: isConnecting) {
-            if isConnecting {
-                if !isVisible {
-                    // A reconnect that settles within 0.4 s never shows, so nothing flashes.
-                    try? await Task.sleep(for: .milliseconds(400))
-                    guard !Task.isCancelled else { return }
-                    shownAt = .now
-                    withAnimation(Motion.reduced(Motion.fade, reduceMotion)) { isVisible = true }
-                }
-            } else if isVisible {
-                let remainingMilliseconds = max(0, Int((0.7 - Date.now.timeIntervalSince(shownAt)) * 1_000))
-                if remainingMilliseconds > 0 {
-                    try? await Task.sleep(for: .milliseconds(Int64(remainingMilliseconds)))
-                }
-                guard !Task.isCancelled else { return }
-                withAnimation(Motion.reduced(Motion.fade, reduceMotion)) { isVisible = false }
-            }
-        }
-        .frame(minWidth: 1, minHeight: 1)
-    }
-}
-
 /// The back button for a pushed screen.
 public struct BackButton: View {
     let action: () -> Void
@@ -450,10 +405,15 @@ private struct ModalHostModifier: ViewModifier {
             .overlay {
                 ZStack {
                     ForEach(host.entries) { entry in
-                        switch entry.chrome {
-                        case .card: ModalCard(shown: entry.shown) { entry.content }
-                        case .bare: entry.content.opacity(entry.shown ? 1 : 0).scaleEffect(entry.shown ? 1 : 0.98)
+                        Group {
+                            switch entry.chrome {
+                            case .card: ModalCard(shown: entry.shown) { entry.content }
+                            case .bare: entry.content.opacity(entry.shown ? 1 : 0).scaleEffect(entry.shown ? 1 : 0.98)
+                            }
                         }
+                        // A menu above a sheet becomes the active accessibility surface.
+                        .accessibilityHidden(entry.id != host.entries.last?.id)
+                        .disabled(entry.id != host.entries.last?.id)
                     }
                 }
             }
@@ -531,7 +491,11 @@ private struct CodyncOverlay<Layer: View>: ViewModifier {
     let layer: (_ close: @escaping () -> Void) -> Layer
 
     func body(content: Content) -> some View {
-        content.modifier(HostedPresentation(isPresented: $isPresented, chrome: .bare, layer: layer))
+        content.modifier(HostedPresentation(isPresented: $isPresented, chrome: .bare) { close in
+            layer(close)
+                .accessibilityAddTraits(.isModal)
+                .onExitCommand(perform: close)
+        })
     }
 }
 

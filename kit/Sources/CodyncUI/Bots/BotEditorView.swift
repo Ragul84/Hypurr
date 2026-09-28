@@ -13,8 +13,15 @@ public struct BotEditorView: View {
     @Environment(BotStore.self) private var model
     @Environment(\.dismissModal) private var dismiss
     @State var draft: BotDraft
+    private let computers: [(id: ComputerID, label: String)]
+    private let computer: Binding<ComputerID>?
 
-    public init(draft: BotDraft) { _draft = State(initialValue: draft) }
+    /// `computer` lets a new bot pick which computer it runs on; the caller swaps the `BotStore` to match.
+    public init(draft: BotDraft, computers: [(id: ComputerID, label: String)] = [], computer: Binding<ComputerID>? = nil) {
+        _draft = State(initialValue: draft)
+        self.computers = computers
+        self.computer = computer
+    }
     @State private var saving = false
     @State private var error: String?
 
@@ -30,10 +37,18 @@ public struct BotEditorView: View {
                         .disabled(!draft.isValid)
                 }
             }
-            BotSettingsForm(draft: $draft, error: error)
+            BotSettingsForm(draft: $draft, error: error, computers: computers, computer: computer)
         }
         .background(Palette.background)
         .onAppear { if isNew { model.fillDefaults(&draft) } }
+        .onChange(of: model.computer.id) {
+            // Folders, models and connectors belong to the old computer.
+            draft.cwd = ""
+            draft.model = nil
+            draft.connectors = nil
+            draft.skills = nil
+            model.fillDefaults(&draft)
+        }
     }
 
     private func save() {
@@ -91,7 +106,10 @@ public struct BotSettingsPanel: View {
 struct BotSettingsForm: View {
     @Binding var draft: BotDraft
     let error: String?
+    var computers: [(id: ComputerID, label: String)] = []
+    var computer: Binding<ComputerID>?
     @Environment(BotStore.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var pickingFolder = false
     @State private var pickingAvatar = false
     @State private var avatarFrame: CGRect = .zero
@@ -141,9 +159,13 @@ struct BotSettingsForm: View {
                 // Grok-style option card: no dividers, values in outlined pills.
                 VStack(alignment: .leading, spacing: InterfaceMetrics.value(mac: 12, mobile: 20)) {
                     OptionRow("Computer") {
-                        Text(model.hostName)
-                            .lineLimit(1)
-                            .foregroundStyle(Palette.secondary)
+                        if let computer {
+                            ChoicePicker(selection: computer, options: computers, fill: Palette.background)
+                        } else {
+                            Text(model.hostName)
+                                .lineLimit(1)
+                                .foregroundStyle(Palette.secondary)
+                        }
                     }
                     OptionRow("Agent") {
                         ChoicePicker(selection: $draft.backend,
@@ -161,17 +183,30 @@ struct BotSettingsForm: View {
                             .fieldBox()
                     }
                     AgentModelPicker(backend: draft.backend, selection: $draft.model)
-                    OptionRow("Project folder") {
-                        Button { pickingFolder = true } label: {
+                    OptionRow("Workspace") {
+                        DropdownMenu {
+                            [
+                                MenuItem("Personal workspace", selected: draft.cwd.isEmpty) {
+                                    withAnimation(Motion.reduced(Motion.layout, reduceMotion)) { draft.cwd = "" }
+                                },
+                                MenuItem("Choose project folder…", selected: !draft.cwd.isEmpty) {
+                                    withAnimation(Motion.reduced(Motion.layout, reduceMotion)) { pickingFolder = true }
+                                },
+                            ]
+                        } label: {
                             HStack(spacing: 6) {
-                                Text(draft.cwd.isEmpty ? "Choose" : (draft.cwd as NSString).lastPathComponent).lineLimit(1)
-                                Image(systemName: "chevron.right").font(.caption2.weight(.semibold)).foregroundStyle(Palette.secondary)
+                                Text(draft.cwd.isEmpty ? "Personal" : (draft.cwd as NSString).lastPathComponent).lineLimit(1)
+                                Image(systemName: "chevron.down").font(.caption2.weight(.semibold))
                             }
                             .pill()
                         }
-                        .buttonStyle(.plain)
-                        .help(draft.cwd)
+                        .help(draft.cwd.isEmpty ? "A persistent workspace allocated for this bot" : draft.cwd)
                     }
+                    Text(draft.cwd.isEmpty
+                         ? "This bot has its own space for files. It can work in other folders when you ask."
+                         : "This project is the default starting folder. The bot can work elsewhere when you ask.")
+                        .font(.caption)
+                        .foregroundStyle(Palette.secondary)
                     OptionRow("Permissions") {
                         ChoicePicker(selection: $draft.permission, options: [("ask", "Ask me"), ("auto", "Approve automatically")],
                                  fill: Palette.background)
@@ -332,7 +367,7 @@ extension View {
 }
 
 extension BotDraft {
-    var isValid: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty && !cwd.isEmpty }
+    var isValid: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty }
 
     /// What the host should get: no stale command unless the agent is custom.
     var normalized: BotDraft {
@@ -343,13 +378,12 @@ extension BotDraft {
 }
 
 public extension BotStore {
-    /// Picks an installed agent and the home folder for a new bot.
+    /// Picks an installed agent; empty cwd requests a personal workspace from the host.
     func fillDefaults(_ draft: inout BotDraft) {
         if hello?.backends.first(where: { $0.id == draft.backend })?.available != true,
            let first = hello?.backends.first(where: \.available) {
             draft.backend = first.id
         }
-        if draft.cwd.isEmpty, let home = hello?.home { draft.cwd = home }
     }
 
     /// Creates "New Bot" with sensible defaults and opens it (desktop compose flow).

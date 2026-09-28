@@ -51,6 +51,9 @@ public struct ComposioApp: Decodable, Hashable, Sendable, Identifiable {
     public var connection: Connection?
     public var id: String { slug }
     public var connected: Bool { connection?.status == "active" }
+    public init(slug: String, name: String) {
+        self.slug = slug; self.name = name
+    }
 }
 
 /// What connecting an app needs: a sign-in page, or fields for a key-based app.
@@ -131,10 +134,12 @@ public extension HostClient {
         return res.items
     }
 
-    /// Featured connectors, or MCP Registry search results (search can take ~30 s).
-    func marketConnectors(search: String) async throws -> [MarketConnector] {
-        let res: Items<MarketConnector> = try await call("marketConnectors", ["search": search], timeout: 60)
-        return res.items
+    /// A page of the MCP Registry (featured first), or of a search (can take ~30 s).
+    /// Pass the returned cursor to get the next page; nil means there is none.
+    func marketConnectors(search: String, cursor: String? = nil) async throws -> (items: [MarketConnector], next: String?) {
+        struct Page: Decodable { var items: [MarketConnector]; var nextCursor: String? }
+        let res: Page = try await call("marketConnectors", ["search": search, "cursor": cursor ?? ""], timeout: 60)
+        return (res.items, res.nextCursor)
     }
 
     @discardableResult
@@ -150,6 +155,12 @@ public extension HostClient {
         struct Body: Encodable { var name: String; var command: String?; var url: String?; var env: [String: String]; var headers: [String: String] }
         let res: Installed = try await call("installConnector", Body(name: name, command: command, url: url, env: env, headers: headers), timeout: 45)
         return res.connector
+    }
+
+    /// Adds every server in a pasted MCP config (`mcpServers` / `servers` JSON, or one server's entry).
+    func importConnectors(config: String) async throws -> [InstalledConnector] {
+        let res: Items<InstalledConnector> = try await call("importConnectors", ["config": config], timeout: 60)
+        return res.items
     }
 
     func connectorSignIn(_ id: String) async throws -> ConnectorSignIn {
@@ -212,5 +223,52 @@ public extension HostClient {
 
     func removeSkill(_ id: String) async throws {
         let _: Empty = try await call("removeSkill", ["id": id])
+    }
+}
+
+public struct ConnectionRequest: Codable, Hashable, Sendable {
+    public var toolkit: String?
+    public var kind: String
+    public var status: String
+    public var title: String
+    public var botId: String
+    public var registryName: String?
+    public var connectorId: String?
+    public var field: String?
+    public var location: String?
+}
+
+public struct CredentialStatus: Decodable, Sendable {
+    public var provider: String
+    public var onePasswordConnected: Bool
+}
+
+public extension HostClient {
+    func connectorInfo(_ name: String) async throws -> MarketConnector {
+        try await call("connectorInfo", ["registryName": name], timeout: 60)
+    }
+
+    func verifyConnector(_ id: String) async throws {
+        struct Verified: Decodable { var status: String }
+        let _: Verified = try await call("connectorVerify", ["id": id], timeout: 120)
+    }
+
+    func finishConnectionRequest(_ entryId: String, connectorId: String? = nil, value: String? = nil, cancel: Bool = false) async throws {
+        struct Body: Encodable { var entryId: String; var connectorId: String?; var value: String?; var cancel: Bool }
+        struct Response: Decodable { var entry: Entry }
+        let _: Response = try await call("connectorRequestFinish", Body(entryId: entryId, connectorId: connectorId, value: value, cancel: cancel), timeout: 120)
+    }
+
+    func credentialStatus() async throws -> CredentialStatus { try await call("credentialStatus", timeout: 60) }
+    func setOnePasswordToken(_ token: String) async throws -> CredentialStatus {
+        try await call("credentialSetOnePassword", ["token": token], timeout: 60)
+    }
+}
+
+public extension HostClient {
+    func updateConnectorCredentials(_ id: String, fields: [String: String]) async throws {
+        struct Body: Encodable { var id: String; var fields: [String: String] }
+        struct Result: Decodable { var status: String }
+        let _: Result = try await call("credentialUpdateConnector", Body(id: id, fields: fields), timeout: 120)
     }
 }

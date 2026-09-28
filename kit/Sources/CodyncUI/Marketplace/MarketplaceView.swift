@@ -6,14 +6,19 @@ import UIKit
 import AppKit
 #endif
 /// The Marketplace (Grok Bot's layout): one page of agents, connectors and
-/// skills for the bots on the paired computer. Installing happens on that
+/// skills for the bots on one computer (the store in the environment). Installing happens on that
 /// computer; each bot turns connectors and skills on in its settings.
 public struct MarketplaceView: View {
     @Environment(BotStore.self) private var model
     @State private var search = ""
     /// Bumped on each submitted search, so every section searches again.
     @State private var searchToken = 0
-    @State private var connectors: [MarketConnector] = []
+    @State private var connectors = MarketplacePage<MarketConnector>()
+    @State private var connectorRequest = UUID()
+    @State private var connectorQuery = ""
+    /// The registry page after the ones shown; nil at the end.
+    @State private var connectorCursor: String?
+    @State private var loadingMore = false
     @State private var skills: [MarketSkill] = []
     @State private var loadingConnectors = true
     @State private var loadingSkills = true
@@ -24,9 +29,18 @@ public struct MarketplaceView: View {
     @State private var writingSkill = false
     @State private var agent: Backend?
     @State private var showInstalled = false
+    @State private var showCredentials = false
     @Environment(\.dismissModal) private var dismiss
 
-    public init() {}
+    private let computers: [(id: ComputerID, label: String)]
+    private let computer: Binding<ComputerID>?
+
+    /// Each computer has its own marketplace; with `computer` set and more than one computer,
+    /// the header switches between them (the caller swaps the `BotStore`).
+    public init(computers: [(id: ComputerID, label: String)] = [], computer: Binding<ComputerID>? = nil) {
+        self.computers = computers
+        self.computer = computer
+    }
 
     private var query: String { search.trimmingCharacters(in: .whitespaces) }
 
@@ -65,6 +79,7 @@ public struct MarketplaceView: View {
         .codyncSheet(item: $installing) { item in
             InstallConnectorSheet(item: item) { Task { await loadConnectors() } }
         }
+        .codyncSheet(isPresented: $showCredentials) { CredentialsView() }
         .codyncSheet(isPresented: $addingConnector) { CustomConnectorSheet() }
         .codyncSheet(isPresented: $writingSkill) { NewSkillSheet() }
         .codyncSheet(item: $agent) { b in AgentSheet(initial: b) }
@@ -101,13 +116,19 @@ public struct MarketplaceView: View {
                             .foregroundStyle(Palette.secondary)
                     } else {
                         ItemGrid {
-                            ForEach(connectors) { c in
+                            ForEach(connectors.visible) { c in
                                 MarketRow(title: c.title, subtitle: c.description ?? c.name, added: c.installed) {
                                     ServiceLogo(website: c.website, name: c.title, registryName: c.name)
                                 } add: {
                                     installing = c
                                 }
                             }
+                        }
+                        if connectors.hasHiddenItems || connectorCursor != nil {
+                            Button(loadingMore ? "Loading…" : "Load more connectors") { Task { await loadMoreConnectors() } }
+                                .buttonStyle(SecondaryButtonStyle())
+                                .disabled(loadingMore)
+                                .frame(maxWidth: .infinity)
                         }
                     }
                 }
@@ -132,6 +153,10 @@ public struct MarketplaceView: View {
                         }
                     }
                 }
+                Button { withAnimation(Motion.layout) { showCredentials = true } } label: {
+                    Label("Credentials", systemImage: "lock.shield")
+                }
+                .buttonStyle(SecondaryButtonStyle())
                 MarketSection(title: "Make your own") {
                     ItemGrid {
                         MarketRow(title: "Custom connector", subtitle: "Any MCP server: a command or a URL", added: false, addLabel: "New") {
@@ -169,12 +194,39 @@ public struct MarketplaceView: View {
 
     private var header: some View {
         HStack(alignment: .center) {
-            Text("Marketplace")
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(Palette.text)
+            // Everything here lives on one computer; say which.
+            HStack(spacing: 10) {
+                ComputerBadge(model.computer, size: 32)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("Marketplace")
+                        .font(.title2.weight(.semibold))
+                        .foregroundStyle(Palette.text)
+                    if let computer, computers.count > 1 {
+                        DropdownMenu {
+                            computers.map { option in
+                                MenuItem(option.label, selected: option.id == computer.wrappedValue) { computer.wrappedValue = option.id }
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(model.hostName)
+                                Image(systemName: "chevron.down").font(.caption2.weight(.semibold))
+                            }
+                            .font(.subheadline)
+                            .foregroundStyle(Palette.secondary)
+                            .contentShape(Rectangle())
+                        }
+                        .accessibilityLabel("Computer: \(model.hostName)")
+                        .help("Switch computer")
+                    } else {
+                        Text(model.hostName)
+                            .font(.subheadline)
+                            .foregroundStyle(Palette.secondary)
+                    }
+                }
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
-                .layoutPriority(1)
+            }
+            .layoutPriority(1)
             Spacer()
             if installedCount > 0 {
                 Button { withAnimation(Motion.layout) { showInstalled = true } } label: {
@@ -220,15 +272,51 @@ public struct MarketplaceView: View {
     }
 
     private func loadConnectors() async {
+        let request = UUID()
+        connectorRequest = request
+        connectorQuery = query
         loadingConnectors = true
+        loadingMore = false
+        defer { if connectorRequest == request { loadingConnectors = false } }
         do {
-            connectors = try await model.marketConnectors(search: query)
+            let page = try await model.marketConnectors(search: connectorQuery)
+            guard !Task.isCancelled, connectorRequest == request else { return }
+            connectors.replace(with: page.items)
+            connectorCursor = page.next
+            error = nil
         } catch {
-            connectors = []
+            guard !Task.isCancelled, connectorRequest == request else { return }
+            connectors.replace(with: [])
+            connectorCursor = nil
             self.error = error.localizedDescription
         }
-        loadingConnectors = false
     }
+
+    private func loadMoreConnectors() async {
+        guard !loadingMore, !loadingConnectors else { return }
+        if connectors.hasHiddenItems {
+            withAnimation(Motion.fade) { connectors.revealMore() }
+            return
+        }
+        guard let cursor = connectorCursor else { return }
+        let request = connectorRequest
+        loadingMore = true
+        defer { if connectorRequest == request { loadingMore = false } }
+        do {
+            let page = try await model.marketConnectors(search: connectorQuery, cursor: cursor)
+            guard !Task.isCancelled, connectorRequest == request else { return }
+            withAnimation(Motion.fade) {
+                connectors.append(page.items)
+                connectors.revealMore()
+            }
+            connectorCursor = page.next
+            error = nil
+        } catch {
+            guard !Task.isCancelled, connectorRequest == request else { return }
+            self.error = error.localizedDescription
+        }
+    }
+
 }
 
 // MARK: - Installed
@@ -934,8 +1022,9 @@ struct TileIcon: View {
     }
 }
 
-private struct InstallConnectorSheet: View {
+struct InstallConnectorSheet: View {
     let item: MarketConnector
+    var requestId: String? = nil
     let done: () -> Void
     @Environment(BotStore.self) private var model
     @Environment(\.dismissModal) private var dismiss
@@ -943,6 +1032,8 @@ private struct InstallConnectorSheet: View {
     @Environment(\.openURL) private var openURL
     @State private var optionId = ""
     @State private var values: [String: String] = [:]
+    @State private var installed: InstalledConnector?
+    @State private var started = false
     @State private var saving = false
     @State private var error: String?
 
@@ -957,12 +1048,18 @@ private struct InstallConnectorSheet: View {
                     Spinner()
                 } else {
                     IconButton("Add", systemImage: "plus") { install() }
-                        .disabled(option?.inputs.contains { $0.required && (values[$0.name] ?? "").isEmpty } ?? true)
+                        .disabled(installed == nil && (option?.inputs.contains { $0.required && (values[$0.name] ?? $0.default ?? "").isEmpty } ?? true))
                 }
             }
             form
         }
         .background(Palette.background)
+        .task {
+            guard !started else { return }
+            started = true
+            if item.options.count == 1 && item.options[0].inputs.isEmpty { install() }
+        }
+        .onDisappear { values.removeAll() }
     }
 
     private var form: some View {
@@ -1027,10 +1124,23 @@ private struct InstallConnectorSheet: View {
         error = nil
         Task {
             do {
-                let c = try await model.installConnector(item, option: option.id, inputs: values)
+                guard let client = model.client else { return }
+                let c: InstalledConnector
+                if let installed { c = try await client.connectors().first(where: { $0.id == installed.id }) ?? installed }
+                else {
+                    c = try await model.installConnector(item, option: option.id, inputs: values)
+                    installed = c
+                    values.removeAll()
+                }
                 if c.needsSignIn {
                     try await ConnectorSignInFlow(model: model, webAuthenticationSession: webAuthenticationSession, openURL: openURL).signIn(c.id)
                 }
+                if let requestId {
+                    try await client.finishConnectionRequest(requestId, connectorId: c.id)
+                } else {
+                    try await client.verifyConnector(c.id)
+                }
+                await model.refreshPlugins()
                 done()
                 dismiss()
             } catch {
@@ -1042,16 +1152,25 @@ private struct InstallConnectorSheet: View {
 }
 
 private struct CustomConnectorSheet: View {
+    private enum Mode: Hashable { case command, url, config }
+
     @Environment(BotStore.self) private var model
     @Environment(\.dismissModal) private var dismiss
     @Environment(\.webAuthenticationSession) private var webAuthenticationSession
     @Environment(\.openURL) private var openURL
     @State private var name = ""
-    @State private var remote = false
+    @State private var mode = Mode.command
     @State private var target = ""
     @State private var envText = ""
+    @State private var config = ""
     @State private var saving = false
     @State private var error: String?
+
+    private var ready: Bool {
+        mode == .config
+            ? !config.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            : !name.trimmingCharacters(in: .whitespaces).isEmpty && !target.trimmingCharacters(in: .whitespaces).isEmpty
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -1060,7 +1179,7 @@ private struct CustomConnectorSheet: View {
                     Spinner()
                 } else {
                     IconButton("Add", systemImage: "plus") { save() }
-                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || target.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .disabled(!ready)
                 }
             }
             form
@@ -1068,23 +1187,38 @@ private struct CustomConnectorSheet: View {
         .background(Palette.background)
     }
 
+    private var footer: String {
+        switch mode {
+        case .command: "Runs on \(model.hostName) in the bot's project folder. Quotes work like in a shell."
+        case .url: "A remote MCP server, streamable HTTP or SSE."
+        case .config: "Paste the MCP config from a README or another app (Claude, Cursor, VS Code). Every server in it is added. Saved on \(model.hostName) only."
+        }
+    }
+
     private var form: some View {
         CardForm {
-            CardSection(footer: remote ? "A remote MCP server (streamable HTTP)." : "Runs on \(model.hostName) in the bot's project folder.") {
-                TextField("Name", text: $name)
-                SegmentedChoice(selection: $remote, options: [(id: false, label: "Command"), (id: true, label: "URL")])
-                TextField(remote ? "https://example.com/mcp" : "npx -y @scope/server", text: $target)
-                    .font(.callout.monospaced())
-                    .plainTextInput()
+            CardSection(footer: footer) {
+                SegmentedChoice(selection: $mode, options: [(id: .command, label: "Command"), (id: .url, label: "URL"), (id: .config, label: "Config")])
+                if mode == .config {
+                    TextField("{ \"mcpServers\": { … } }", text: $config, axis: .vertical)
+                        .lineLimit(6...16)
+                        .font(.callout.monospaced())
+                        .plainTextInput()
+                } else {
+                    TextField("Name", text: $name)
+                    TextField(mode == .url ? "https://example.com/mcp" : "npx -y @scope/server", text: $target)
+                        .font(.callout.monospaced())
+                        .plainTextInput()
+                }
             }
-            if remote {
+            if mode == .url {
                 CardSection("Headers", footer: "Optional, one Name: value per line. Leave empty if the service has you sign in. Saved on \(model.hostName) only.") {
                     TextField("Authorization: Bearer …", text: $envText, axis: .vertical)
                         .lineLimit(2...6)
                         .font(.callout.monospaced())
                         .plainTextInput()
                 }
-            } else {
+            } else if mode == .command {
                 CardSection("Environment", footer: "One KEY=value per line. Saved on \(model.hostName) only.") {
                     TextField("API_KEY=…", text: $envText, axis: .vertical)
                         .lineLimit(2...6)
@@ -1097,11 +1231,13 @@ private struct CustomConnectorSheet: View {
             }
         }
         .textFieldStyle(.plain)
+        .animation(Motion.layout, value: mode)
     }
 
     private func save() {
         saving = true
         error = nil
+        let remote = mode == .url
         var pairs: [String: String] = [:]
         for line in envText.split(separator: "\n") {
             let parts = line.split(separator: remote ? ":" : "=", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
@@ -1109,12 +1245,15 @@ private struct CustomConnectorSheet: View {
         }
         Task {
             do {
-                let c = try await model.addConnector(
-                    name: name, command: remote ? nil : target, url: remote ? target : nil,
-                    env: remote ? [:] : pairs, headers: remote ? pairs : [:]
-                )
-                if c.needsSignIn {
-                    try await ConnectorSignInFlow(model: model, webAuthenticationSession: webAuthenticationSession, openURL: openURL).signIn(c.id)
+                let added = mode == .config
+                    ? try await model.importConnectors(config: config)
+                    : [try await model.addConnector(
+                        name: name, command: remote ? nil : target, url: remote ? target : nil,
+                        env: remote ? [:] : pairs, headers: remote ? pairs : [:]
+                    )]
+                let signIn = ConnectorSignInFlow(model: model, webAuthenticationSession: webAuthenticationSession, openURL: openURL)
+                for c in added where c.needsSignIn {
+                    try await signIn.signIn(c.id)
                 }
                 dismiss()
             } catch {

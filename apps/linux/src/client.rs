@@ -55,7 +55,7 @@ async fn call_async(method: String, body: Value) -> Result<Value, String> {
         .post(format!("{}/api/{method}", base()))
         .bearer_auth(token)
         .json(&body)
-        .timeout(Duration::from_secs(30))
+        .timeout(Duration::from_secs(120))
         .send()
         .await
         .map_err(|_| "Can't reach the Codync host.".to_owned())?;
@@ -74,6 +74,58 @@ pub fn call(method: &str, body: Value, done: impl FnOnce(Result<Value, String>) 
     let method = method.to_owned();
     runtime().spawn(async move {
         let _ = tx.send(call_async(method, body).await).await;
+    });
+    gtk::glib::spawn_future_local(async move {
+        if let Ok(r) = rx.recv().await {
+            done(r);
+        }
+    });
+}
+
+/// Uploads `files` in 384 KiB chunks (under the channel's message limit, like the apps), then
+/// sends `body` with them attached; the result comes back on the main thread.
+pub fn send_files(
+    mut body: Value,
+    files: Vec<PathBuf>,
+    done: impl FnOnce(Result<Value, String>) + 'static,
+) {
+    const CHUNK: usize = 384 * 1024;
+    const MAX: usize = 100 * 1024 * 1024;
+    let (tx, rx) = async_channel::bounded(1);
+    runtime().spawn(async move {
+        let r = async {
+            let mut ids = Vec::new();
+            for path in &files {
+                let name = path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default();
+                let data = tokio::fs::read(path)
+                    .await
+                    .map_err(|e| format!("Can't read {name}: {e}"))?;
+                if data.len() > MAX {
+                    return Err(format!("{name} is over 100 MB."));
+                }
+                let id = uuid::Uuid::new_v4().to_string();
+                let mut offset = 0;
+                loop {
+                    let end = (offset + CHUNK).min(data.len());
+                    let chunk = gtk::glib::base64_encode(&data[offset..end]).to_string();
+                    let done = end == data.len();
+                    let chunk_body = json!({"botId": body["botId"], "uploadId": id, "name": name,
+                                            "offset": offset, "data": chunk, "done": done});
+                    call_async("upload".into(), chunk_body).await?;
+                    if done {
+                        break;
+                    }
+                    offset = end;
+                }
+                ids.push(id);
+            }
+            body["attachments"] = ids.into();
+            call_async("send".into(), body).await
+        };
+        let _ = tx.send(r.await).await;
     });
     gtk::glib::spawn_future_local(async move {
         if let Ok(r) = rx.recv().await {

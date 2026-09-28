@@ -2,13 +2,15 @@
 
 ## iPhone navigation
 
-The bot list and conversation use the system `NavigationStack` toolbar. `ToolbarItem` owns the account, computer, new-chat, call and more buttons; menus opened from these toolbar buttons (New, the computer filter) are native `Menu`s, because the bar hosts its items outside SwiftUI's layout and `.codyncMenu` can't anchor to them; the conversation uses the system back button. iOS supplies Liquid Glass, control sizing, grouping and interaction feedback.
+The bot list and conversation use the system `NavigationStack` toolbar. `ToolbarItem` owns the account button, centered computer status/filter menu, and new-chat button. Computer management is inside the centered menu. The conversation copies Grok Bot: the title pill is a native `Menu` (details and the bot's actions), the only trailing button is the computer (remote screen; it pulses while this bot operates the screen), and the call button sits in the composer as a filled waveform capsule while the box is empty. Menus opened from toolbar buttons (New, the computer filter, the title) are native `Menu`s, because the bar hosts its items outside SwiftUI's layout and `.codyncMenu` can't anchor to them; the conversation uses the system back button. iOS supplies Liquid Glass, control sizing, grouping and interaction feedback.
+
+The conversation hides the navigation bar background and the top scroll-edge effect, keeping the native glass buttons over the chat. Root error dialogs use an in-place, full-screen scrim so presenting them does not change the underlying glass controls' appearance.
 
 Do not wrap those toolbar controls in `IconButtonStyle`, hand-sized rounded backgrounds or another glass effect. The account avatar is toolbar content, with the system supplying the enclosing surface. This is the explicit exception to the custom-chrome rule below.
 
-`ConnectingIndicator` is in the toolbar center and remains visible for at least 0.7 seconds after appearing. Transient connecting state is omitted from `ConnectionBanner`, so it does not insert/remove loading content above the bot rows or composer. Actionable offline/authorization warnings remain separate. This does not remove the normal pull-to-refresh interaction.
+Connecting and reconnecting are background work. `BotStore` gives initial offline reports 1 second to recover and holds drops from online (including relay "computer offline" reports) for 5 seconds. "No access" shows immediately. Automatic read acknowledgements never open an error dialog and visible conversations are acknowledged again after reconnecting. The iOS app disconnects only in `.background`, not `.inactive`. Connection status lives only in headers and their menus. The roster header shows a small summary (`1 connected`, `1/2 connected`, `2 offline`, or `Connecting…`). Its computer menu supports multiple selections, Show only, All computers, reconnect, and management. At least one available computer stays selected; if saved exclusions would hide every computer, the list falls back to all. Filters persist on the device. Bots sort pinned first, then by recency. On iPhone, when more than one computer is shown, each computer gets a light heading (badge, name, connection, and "No bots yet" when empty) above its own bots; with one computer the list stays flat. Long-press a heading and drag it onto another computer's section to reorder computers (VoiceOver: Move up / Move down); the order is saved on the device (`AccountStore.move`). The Mac shows a flat roster. There are no connection banners. The compact Mac rail uses a computer icon for the same menu. Conversation headers show a small connection label, with the computer name available in the header menu or help text. Pull-to-refresh remains available on iPhone. Computer setup and access requests live under Manage computers.
 
-Sources: `apps/ios/Views/BotListView.swift`, `AccountSwitcherView.swift`, `kit/Sources/CodyncUI/Thread/ThreadView.swift`, `Chrome.swift`, `Bots/BotRow.swift`.
+Sources: `apps/ios/Views/BotListView.swift`, `AccountSwitcherView.swift`, `kit/Sources/CodyncUI/Thread/ThreadView.swift`, `Bots/ComputerFilterHeader.swift`, `Store/ComputerSelection.swift`, `Bots/BotRow.swift`.
 
 ## macOS menu bar
 
@@ -46,10 +48,20 @@ Provider identity and activity presentation are shared in `CodyncKit/Design`; us
 
 The [2026-09-25 audit](../archive/ui-audit-2026-09-25.md) is historical. Its old line numbers and recommendations are not the current UI policy or a list of confirmed open bugs.
 
-Model discovery keeps loading and refresh in one fixed-size slot beside the Model picker. Refresh retains the current catalog while loading, and loading does not add a separate row to the settings card.
+Model discovery keeps loading and refresh in one fixed-size slot beside the Model picker. Refresh retains the current catalog while loading, and loading does not add a separate row to the settings card. The Model label keeps its intrinsic width; the model picker takes the remaining width and truncates long names, with the full name available in its tooltip and menu.
 
 ## macOS conversation details
 
 The details inspector uses a compact device summary instead of an empty screen preview. Keep the computer name, remote-screen state, and iPhone hint together; show the hint only when screen capture is ready. Use 16-point horizontal insets, 28-point section gaps, and 12-point corner radii on flat surfaces, without borders.
 
-Routines use a short empty state with one setup action and an icon action for asking in chat. Populated lists move the add action into the section header. Agent metadata uses explicit Runtime and Working folder labels; paths remain selectable and wrap. Keep status and section headings readable in both appearances through `Palette`.
+Routines use a short empty state with one setup action and an icon action for asking in chat. Populated lists move the add action into the section header. Agent metadata uses Runtime and Workspace labels for personal bots, or Project folder for explicitly configured projects; project paths remain selectable and wrap. Personal workspace paths stay out of the default details UI. Keep status and section headings readable in both appearances through `Palette`.
+
+New bots use automatically allocated personal workspaces. Settings offer Personal or an optional project folder; see [bot workspaces](../features/bot-workspaces.md).
+
+Shared `.codyncMenu` lists scroll vertically when their content exceeds 420 points or the available space beside the trigger. Menus open toward the side with more vertical room; short lists keep their content height. Menu width is capped at 320 points and constrained to the window, and long option titles remain available through help text. This applies to Agent, Model, and other shared choice menus on macOS. On iOS, `DropdownMenu` and `ChoicePicker` present the native `Menu` instead (choices as checkmarked toggles), because an overlay anchored by global frame lands in the wrong place inside `.codyncSheet` and scroll views. Each computer has its own marketplace; its header names the computer and, with several online, switches between them. A new bot's editor on iPhone has a Computer dropdown listing every online computer, even when there is only one; switching it resets the folder, model and connectors that belonged to the old computer.
+
+## Reading conversations
+
+A visible conversation registers its own read scope while its scene is active. New chat-visible entries (including final updates to an existing message ID) and later roster unread updates acknowledge that scope through the host. Opening the view, returning to the foreground, and reconnecting also acknowledge it. Never gate a receipt on the cached unread count: entry and roster events can arrive separately. Replies acknowledge only their own thread; leaving a view or backgrounding the scene unregisters it. The host remains authoritative and broadcasts the resulting unread state to all clients.
+
+The iPhone conversation navigation title includes a compact second line with the connection label and the current connection route icon: cloud for Cloudflare, Wi-Fi for direct Wi-Fi/Tailscale. It follows the live route, not the preferred route setting; offline and reconnecting states replace the route icon. VoiceOver also reads the connection description.

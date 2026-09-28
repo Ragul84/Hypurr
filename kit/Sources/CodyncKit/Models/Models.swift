@@ -16,6 +16,8 @@ public struct Bot: Codable, Identifiable, Hashable, Sendable {
     public var backend: String
     public var command: String?
     public var cwd: String
+    /// Host-allocated personal workspace rather than a user-selected project.
+    public var managedWorkspace: Bool = false
     /// `ask` or `auto`.
     public var permission: String
     public var model: String?
@@ -49,7 +51,7 @@ public struct Bot: Codable, Identifiable, Hashable, Sendable {
         isWorking && (workingChat ?? id) == chat && workingThread == thread
     }
     public var needsInput: Bool { status == "needsInput" }
-    public var folderName: String { (cwd as NSString).lastPathComponent }
+    public var folderName: String { managedWorkspace ? "Personal workspace" : (cwd as NSString).lastPathComponent }
 }
 
 /// Just enough of a `bot` event to detect deletions.
@@ -100,6 +102,7 @@ public struct Entry: Codable, Identifiable, Hashable, Sendable {
 }
 
 public struct EntryData: Codable, Hashable, Sendable {
+    public var connectionRequest: ConnectionRequest?
     public var routineId: String?
     public var runId: String?
     public var text: String?
@@ -126,11 +129,32 @@ public struct EntryData: Codable, Hashable, Sendable {
     public var thread: ThreadSummary?
     /// The user's emoji reactions, oldest first.
     public var reactions: [String]?
+    /// Files sent with a user message.
+    public var attachments: [Attachment]?
+    /// notice: a finished voice call's length.
+    public var callSeconds: Int?
 
     public init(text: String? = nil, status: String? = nil, clientNonce: String? = nil) {
         self.text = text
         self.status = status
         self.clientNonce = clientNonce
+    }
+}
+
+/// A file sent with a message; the agent reads it on the computer.
+public struct Attachment: Codable, Hashable, Sendable, Identifiable {
+    public var id: String
+    public var name: String
+    public var size: Int64
+
+    public init(id: String, name: String, size: Int64) {
+        self.id = id
+        self.name = name
+        self.size = size
+    }
+
+    public var isImage: Bool {
+        ["png", "jpg", "jpeg", "heic", "gif", "webp", "tiff", "bmp"].contains((name as NSString).pathExtension.lowercased())
     }
 }
 
@@ -448,7 +472,7 @@ public struct BotDraft: Codable, Hashable, Sendable {
         avatarShape = bot.avatarShape
         backend = bot.backend
         command = bot.command
-        cwd = bot.cwd
+        cwd = bot.managedWorkspace ? "" : bot.cwd
         permission = bot.permission
         model = bot.model
         pinned = bot.pinned
@@ -478,6 +502,7 @@ extension Bot {
         backend = try c.decodeIfPresent(String.self, forKey: .backend) ?? "custom"
         command = try c.decodeIfPresent(String.self, forKey: .command)
         cwd = try c.decodeIfPresent(String.self, forKey: .cwd) ?? ""
+        managedWorkspace = try c.decodeIfPresent(Bool.self, forKey: .managedWorkspace) ?? false
         permission = try c.decodeIfPresent(String.self, forKey: .permission) ?? "ask"
         model = try c.decodeIfPresent(String.self, forKey: .model)
         pinned = try c.decodeIfPresent(Bool.self, forKey: .pinned) ?? false

@@ -4,30 +4,6 @@ import CodyncUI
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// A computer's name over its bots in the sidebar, with how it's reached.
-struct ComputerHeader: View {
-    let store: BotStore
-    let ssh: Bool
-
-    var body: some View {
-        HStack(spacing: 6) {
-            ComputerBadge(store.computer, size: 16)
-            Text(store.hostName).font(.system(size: 11, weight: .semibold)).lineLimit(1)
-            RouteLabel(store: store, ssh: ssh)
-            Spacer()
-            if store.connection != .online {
-                Text(store.statusText).font(.system(size: 11)).foregroundStyle(store.isOffline ? Palette.warning : Palette.tertiary)
-            }
-        }
-        .foregroundStyle(Palette.secondary)
-        .padding(.horizontal, 8)
-        .padding(.top, 10)
-        .padding(.bottom, 2)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isHeader)
-    }
-}
-
 /// How this Mac reaches a computer: itself, an SSH tunnel, direct LAN or the encrypted relay.
 struct RouteLabel: View {
     let store: BotStore

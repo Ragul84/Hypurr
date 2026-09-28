@@ -3,7 +3,7 @@
 //! the working indicator.
 
 use crate::client;
-use crate::ui::{self, App, State, folder, toast};
+use crate::ui::{self, App, State, folder_name, toast};
 use crate::{avatar, markup, orb};
 use adw::prelude::*;
 use gtk::glib::DateTime;
@@ -122,8 +122,13 @@ pub fn user_bubble(r: &Reply, e: &Value, bot_working: bool, start: bool) -> gtk:
         .margin_top(if start { 12 } else { 4 })
         .build();
     let text = e["data"]["text"].as_str().unwrap_or("");
-    let b = bubble(text, false, "bubble-user");
-    col.append(&with_menu(r, b.upcast_ref(), true, text, false));
+    for a in e["data"]["attachments"].as_array().into_iter().flatten() {
+        col.append(&file_card(a));
+    }
+    if !text.is_empty() {
+        let b = bubble(text, false, "bubble-user");
+        col.append(&with_menu(r, b.upcast_ref(), true, text, false));
+    }
     let status = match e["data"]["status"].as_str() {
         Some("sending") => "Sending…".to_owned(),
         Some("queued") if bot_working => "Waiting to send — it'll read this when it's done".into(),
@@ -138,6 +143,53 @@ pub fn user_bubble(r: &Reply, e: &Value, bot_working: bool, start: bool) -> gtk:
     }
     col.append(&s);
     col.upcast()
+}
+
+/// A message as one line of text: its text, or else its file names.
+pub fn message_text(e: &Value) -> String {
+    match e["data"]["text"].as_str().filter(|t| !t.is_empty()) {
+        Some(t) => t.to_owned(),
+        None => e["data"]["attachments"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|a| a["name"].as_str())
+            .collect::<Vec<_>>()
+            .join(", "),
+    }
+}
+
+/// A file sent with a message: its name and size.
+fn file_card(a: &Value) -> gtk::Widget {
+    let card = gtk::Box::builder()
+        .spacing(8)
+        .halign(gtk::Align::End)
+        .css_classes(["file-card"])
+        .build();
+    card.append(&gtk::Image::from_icon_name("text-x-generic-symbolic"));
+    let col = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    let name = label(a["name"].as_str().unwrap_or("File"), &[]);
+    name.set_ellipsize(gtk::pango::EllipsizeMode::Middle);
+    name.set_max_width_chars(36);
+    name.set_xalign(0.0);
+    col.append(&name);
+    let size = label(&file_size(a["size"].as_u64().unwrap_or(0)), &["time"]);
+    size.set_xalign(0.0);
+    col.append(&size);
+    card.append(&col);
+    card.upcast()
+}
+
+fn file_size(bytes: u64) -> String {
+    match bytes {
+        0..1024 => format!("{bytes} B"),
+        1024..1_048_576 => format!("{} KB", bytes / 1024),
+        _ => format!(
+            "{}.{} MB",
+            bytes / 1_048_576,
+            bytes % 1_048_576 * 10 / 1_048_576
+        ),
+    }
 }
 
 pub fn agent_bubble(r: &Reply, st: &State, e: &Value, group: bool, start: bool) -> gtk::Widget {
@@ -161,7 +213,12 @@ pub fn agent_bubble(r: &Reply, st: &State, e: &Value, group: bool, start: bool) 
 }
 
 pub fn notice(e: &Value) -> gtk::Widget {
-    let text = e["data"]["text"].as_str().unwrap_or("");
+    let mut text = e["data"]["text"].as_str().unwrap_or("").to_owned();
+    // A voice call from the phone: "Voice chat · 00:16".
+    if let Some(s) = e["data"]["callSeconds"].as_u64() {
+        text = format!("{text} · {:02}:{:02}", s / 60, s % 60);
+    }
+    let text = text.as_str();
     match e["data"]["style"].as_str() {
         Some("divider") => {
             let row = gtk::Box::builder()
@@ -271,7 +328,7 @@ pub fn permission_card(ui: &App, st: &State, e: &Value, group: bool) -> gtk::Wid
     icon.add_css_class("tertiary");
     icon.set_pixel_size(12);
     runs.append(&icon);
-    let cwd = d["cwd"].as_str().map(folder);
+    let cwd = d["cwd"].as_str().map(folder_name);
     runs.append(&label(
         &format!(
             "Runs on {host}{}",

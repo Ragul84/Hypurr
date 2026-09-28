@@ -216,7 +216,8 @@ final class ScreenCanvas: UIView, UIGestureRecognizerDelegate {
 
     /// Long-press then move: drag (select text, move windows).
     @objc private func press(_ g: UILongPressGestureRecognizer) {
-        guard interactive else { return }
+        // A drag that began while interactive still lifts the button, or it stays held on the computer.
+        guard interactive || dragging else { return }
         switch g.state {
         case .began:
             let p = point(for: g)

@@ -13,8 +13,9 @@ open the routine.
 
 The editor keeps task fields first, followed by trigger choices and their settings.
 Trigger choices use adaptive columns, selected checkmarks and short descriptions.
-Inputs use the shared palette with a visible filled surface. Interval input also
-shows its duration in words. Run timeout is under an animated Run settings
+Inputs use the shared palette with a visible filled surface. New recurring schedules
+default to cron; the frequency controls send form values to the host, which returns a five-field
+expression and an explicit IANA time zone. Run timeout is under an animated Run settings
 expansion. A fixed footer keeps Create routine / Save changes and inline errors
 visible while the form scrolls; it explains the local execution requirement.
 The layout uses the same light/dark tokens, type family and custom controls as the
@@ -119,7 +120,8 @@ All normal methods use the existing authenticated host API / authorized E2E chan
 | Method | Body |
 |---|---|
 | `routines` | `botId` |
-| `saveRoutine` | `botId`, optional `id`, `name`, `instruction`, `triggers`, optional `enabled`, `timeoutSeconds` |
+| `routineSchedule` | `triggers` + preferred `timeZone` to load, or `draft` to preview; returns hydrated form, validated triggers, summary, warning, next run |
+| `saveRoutine` | `botId`, optional `id`, `name`, `instruction`, `schedule` form or `triggers`, optional `enabled`, `timeoutSeconds` |
 | `setRoutineEnabled` | `botId`, `id`, `enabled` |
 | `deleteRoutine` | `botId`, `id` |
 | `runRoutine` | `botId`, `id` |
@@ -193,9 +195,13 @@ the routine by name. No reference routine was run, paused or deleted during this
 comparison.
 
 Codync retains that compact sidebar and the chat-based setup path, while providing
-a direct editor. Common calendar schedules use Daily / Weekdays / Weekly with a
-time control; Custom retains raw cron. Intervals use seconds, minutes, hours or
-days. Editing hydrates the original schedule, timezone and interval exactly;
+a direct editor. Calendar schedules offer minute frequencies, hourly, daily, weekdays, weekly,
+selected weekdays, monthly and custom cron. The clock uses separate hour/minute
+controls with every minute available and quick 09:00 / 12:00 / 18:00 choices.
+Selected weekdays support multiple days. The summary shows the clock time and
+zone, with the generated expression available on expansion. Switching to Custom
+starts from that expression. Monthly days 29–31 explain that shorter months are
+skipped. Existing duration intervals keep their cadence until explicitly replaced. Editing hydrates the original schedule, timezone and interval exactly;
 compound and provider-event triggers retain a lossless Keep existing triggers
 fallback. Expired one-shot timestamps are preserved when editing other fields.
 
@@ -215,3 +221,59 @@ confirmed one updated routine with `0 9 * * 1-5` and `enabled: false`. Edit with
 bot populated an unsent draft with the routine ID. The test bot and working
 directory were removed. Screenshots are in `build/routine-usability-calendar.jpeg`
 and `build/routine-usability-details.jpeg`.
+
+## Cron scheduling contract
+
+All newly configured recurring schedules in the Apple editor use `cron` and run
+through the host's existing Croner scheduler. Minute presets divide an hour evenly
+(1, 5, 10, 15, 20, 30); hourly schedules choose an exact minute. Cron generation, parsing, validation, timezone checks, descriptions and next-run
+calculation all live in `host/src/routines/editor.rs` and `schedule.rs`. The Swift
+draft is only a Codable form DTO. The editor debounces preview requests, discards
+stale responses, shows host errors and disables Save until the current draft is
+validated. Save sends the form to the host, which independently compiles and
+validates it again. Both direct trigger API calls and Bot MCP calls use the same
+host scheduler. Run timeout text is also parsed and validated by the host.
+The built-in agent instructions also select cron for recurring clock schedules.
+
+Existing elapsed-duration intervals remain readable/editable without silently
+changing their execution times. An interval anchored to creation time cannot be
+converted to a wall-clock cron without changing its cadence. One-time schedules
+retain their absolute timestamp: five-field cron has no year or run-count guard.
+Webhook/event triggers remain event-driven. These paths are intentionally not
+misrepresented as cron. The host must still be running and awake.
+
+Rust regression tests cover default cron creation, preset round trips, arbitrary
+minute selection, timezone validation, custom expression preservation, existing
+interval and expired one-shot preservation, and next occurrences across month
+boundaries. An isolated HTTP integration test previews, saves and reloads the same
+form and verifies direct saves reject invalid drafts. Swift tests cover wire DTO
+decoding and millisecond date binding; there is no Swift cron implementation.
+
+
+### macOS selection checks
+
+The calendar editor uses shared choice menus. Nested menus become the active
+accessibility surface above the editor; Escape dismisses the top overlay through
+its own close binding. This keeps menu interaction separate from closing the
+routine editor. Schedule rules remain on the host; these are presentation rules.
+
+
+Verified on the installed Mac build through Computer Use on 2026-09-27:
+
+- Opened a saved Monday/Wednesday/Friday schedule at 14:47 in Asia/Taipei.
+- Switched to Custom and observed the host-generated `47 14 * * 1,3,5`.
+- Entered minute 61; the server error appeared and Save was disabled.
+- Selected minute 23 through the scrollable menu, saved, and reopened. Both the
+  UI and API retained `23 14 * * 1,3,5` and the paused state.
+- Selected monthly day 31; the warning and October 31 next occurrence appeared.
+- Selected every 15 minutes and hourly at minute 23; both displayed host previews.
+- Verified Escape closes the top menu and preserves the editor and form values.
+- Verified the minute menu opens scrolled to the current selection. Its selection
+  stays visible instead of starting at 00.
+
+The temporary bot and paused routine were removed after checking. Screenshots:
+`build/cron-verification/calendar-fields.png` and `minute-selection.png`.
+Validation: 52 Swift tests, 12 Rust routine unit tests, the isolated HTTP editor
+integration test, Rust Clippy with warnings denied, and signed macOS/iOS Debug
+builds passed. iPhone received the updated build; its final relaunch was blocked
+by the device lock. This GUI acceptance used macOS.

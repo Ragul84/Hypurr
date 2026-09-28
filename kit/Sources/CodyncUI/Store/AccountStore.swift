@@ -155,6 +155,16 @@ public final class AccountStore {
         refreshList()
     }
 
+    /// Moves a computer (and its bots in the roster) to `target`'s place; saved on this device.
+    /// Attached computers (the Mac's own host, SSH tunnels) stay first.
+    public func move(_ id: ComputerID, to target: ComputerID) {
+        guard id != target, let from = saved.firstIndex(where: { $0.id == id }),
+              let to = saved.firstIndex(where: { $0.id == target }) else { return }
+        saved.insert(saved.remove(at: from), at: to)
+        persist()
+        refreshList()
+    }
+
     // MARK: account (§4.2 B)
 
     public func refreshCloud() async {

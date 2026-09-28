@@ -32,7 +32,7 @@ public actor ChannelTransport: RemoteTransport {
     private var restartRequested = false
     private var supervisor: Task<Void, Never>?
     private var monitor: NWPathMonitor?
-    private var sawFirstPath = false
+    private var lastInterfaces: [String]?
     /// Relay upgrades refused with 403 since the last handshake. Right after a pairing or an
     /// approval the device can reach the relay before the host's new ACL does, so a few are retried.
     private var refusals = 0
@@ -95,7 +95,8 @@ public actor ChannelTransport: RemoteTransport {
         let monitor = NWPathMonitor()
         monitor.pathUpdateHandler = { [weak self] path in
             guard path.status == .satisfied else { return }
-            Task { await self?.networkChanged() }
+            let interfaces = path.availableInterfaces.map(\.name)
+            Task { await self?.networkChanged(interfaces) }
         }
         monitor.start(queue: .global(qos: .utility))
         self.monitor = monitor
@@ -127,9 +128,11 @@ public actor ChannelTransport: RemoteTransport {
         wake()
     }
 
-    private func networkChanged() {
-        // The monitor reports the current path right away; only later ones are changes.
-        guard sawFirstPath else { sawFirstPath = true; return }
+    private func networkChanged(_ interfaces: [String]) {
+        // The monitor reports the current path right away, then every small path change
+        // (DNS, expensive/constrained flags); only a different set of interfaces is a new network.
+        defer { lastInterfaces = interfaces }
+        guard let lastInterfaces, lastInterfaces != interfaces else { return }
         reconnect()
     }
 

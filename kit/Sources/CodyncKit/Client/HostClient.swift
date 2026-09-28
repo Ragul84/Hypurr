@@ -203,11 +203,45 @@ public extension HostClient {
     }
 
     /// `threadId`: reply in the thread on that main-chat message.
-    func send(botId: String, text: String, clientNonce: String, threadId: String? = nil) async throws -> Entry {
-        struct Body: Encodable { var botId: String; var text: String; var clientNonce: String; var threadId: String? }
+    func send(botId: String, text: String, clientNonce: String, threadId: String? = nil, attachments: [String]? = nil) async throws -> Entry {
+        struct Body: Encodable { var botId: String; var text: String; var clientNonce: String; var threadId: String?; var attachments: [String]? }
         struct Res: Decodable { var entry: Entry }
-        let res: Res = try await call("send", Body(botId: botId, text: text, clientNonce: clientNonce, threadId: threadId))
+        let res: Res = try await call("send", Body(botId: botId, text: text, clientNonce: clientNonce, threadId: threadId, attachments: attachments))
         return res.entry
+    }
+
+    /// Bytes per `upload` call: base64 of it stays well under the channel's 1 MiB message.
+    static let uploadChunk = 384 * 1024
+
+    /// Sends one file in chunks for a later `send`; `id` names the upload there.
+    func upload(botId: String, id: String, name: String, data: Data) async throws {
+        struct Body: Encodable { var botId, uploadId, name, data: String; var offset: Int; var done: Bool }
+        var offset = 0
+        repeat {
+            let end = min(offset + Self.uploadChunk, data.count)
+            let chunk = data.subdata(in: offset..<end).base64EncodedString()
+            let _: Empty = try await call("upload", Body(botId: botId, uploadId: id, name: name, data: chunk, offset: offset, done: end == data.count), timeout: 60)
+            offset = end
+        } while offset < data.count
+    }
+
+    /// A sent file, fetched back in chunks.
+    func readUpload(botId: String, id: String) async throws -> Data {
+        struct Body: Encodable { var botId, uploadId: String; var offset: Int }
+        struct Res: Decodable { var data: String; var size: Int }
+        var out = Data()
+        repeat {
+            let res: Res = try await call("readUpload", Body(botId: botId, uploadId: id, offset: out.count), timeout: 60)
+            guard let chunk = Data(base64Encoded: res.data), !chunk.isEmpty else { break }
+            out.append(chunk)
+            if out.count >= res.size { break }
+        } while true
+        return out
+    }
+
+    func logCall(_ botId: String, seconds: Int) async throws {
+        struct Body: Encodable { var botId: String; var seconds: Int }
+        let _: Empty = try await call("logCall", Body(botId: botId, seconds: seconds))
     }
 
     func stop(_ botId: String) async throws {

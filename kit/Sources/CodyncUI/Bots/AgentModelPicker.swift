@@ -44,7 +44,11 @@ struct AgentModelPicker: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            OptionRow("Model") {
+            HStack(spacing: 8) {
+                Text("Model")
+                    .foregroundStyle(Palette.text)
+                    .fixedSize()
+                Spacer(minLength: 0)
                 HStack(spacing: 4) {
                     if backend != "custom" { refreshControl }
                     if backend == "custom" || (!loading && catalog?.models.isEmpty != false) {
@@ -52,10 +56,10 @@ struct AgentModelPicker: View {
                             .plainTextInput()
                             .multilineTextAlignment(.trailing)
                             .textFieldStyle(.plain)
-                            .frame(width: InterfaceMetrics.value(mac: 160, mobile: 180))
+                            .frame(minWidth: 0, maxWidth: InterfaceMetrics.value(mac: 160, mobile: 180))
                             .pill()
                     } else {
-                        ChoicePicker(selection: value, options: options, fill: Palette.background)
+                        ChoicePicker(selection: value, options: options, fill: Palette.background, fitsAvailableWidth: true)
                     }
                 }
             }

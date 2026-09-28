@@ -14,17 +14,25 @@ struct RoutineEditorView: View {
     @State private var busy = false
     @State private var error: String?
     @State private var advanced = false
+    @State private var loaded = false
+    @State private var preview: RoutineSchedulePreview?
+    @State private var previewError: String?
+    @State private var checkedSchedule: RoutineScheduleDraft?
 
     private var options: [(String, String)] {
-        var values = [("interval", "Repeat at an interval"), ("cron", "Calendar schedule"),
+        var values = [("cron", "Recurring schedule"),
                       ("once", "Run once"), ("webhook", "Webhook")]
         if routine != nil { values.insert(("keep", "Keep existing triggers"), at: 0) }
+        if schedule.original.contains(where: { $0.type == "interval" }) {
+            values.append(("interval", "Existing interval"))
+        }
         return values
     }
 
     private var canSave: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !instruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !model.isOffline && !busy
+        !instruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !model.isOffline && !busy &&
+        loaded && checkedSchedule == schedule && previewError == nil
     }
 
     var body: some View {
@@ -46,7 +54,8 @@ struct RoutineEditorView: View {
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 8)], spacing: 8) {
                             ForEach(options, id: \.0) { option in triggerChoice(option) }
                         }
-                        triggerFields
+                        if loaded { triggerFields }
+                        else { Label("Loading schedule…", systemImage: "clock").foregroundStyle(Palette.secondary) }
                     }
                     VStack(alignment: .leading, spacing: 12) {
                         Button {
@@ -72,19 +81,69 @@ struct RoutineEditorView: View {
                 .padding(20)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .disabled(busy)
+            .disabled(busy || !loaded)
             footer
         }
         .font(.system(size: InterfaceMetrics.value(mac: 13, mobile: 16)))
         .foregroundStyle(Palette.text)
         .background(Palette.background)
-        .onAppear {
+        .task {
             if let routine {
                 name = routine.name
                 instruction = routine.instruction
                 timeout = String(routine.timeoutSeconds ?? 3600)
-                schedule = RoutineScheduleDraft(triggers: routine.triggers)
             }
+            await loadSchedule()
+        }
+        .task(id: schedule) {
+            guard loaded else { return }
+            do { try await Task.sleep(for: .milliseconds(300)) }
+            catch { return }
+            await checkSchedule()
+        }
+    }
+
+    private func checkSchedule() async {
+        let requested = schedule
+        preview = nil
+        previewError = nil
+        checkedSchedule = nil
+        do {
+            guard let client = model.client else { throw URLError(.notConnectedToInternet) }
+            let result = try await client.routineSchedule(draft: requested)
+            try Task.checkCancellation()
+            guard schedule == requested else { return }
+            preview = result
+            checkedSchedule = requested
+        } catch {
+            guard !Task.isCancelled, schedule == requested else { return }
+            previewError = error.localizedDescription
+        }
+    }
+
+    private func loadSchedule() async {
+        guard let client = model.client else { error = "Connect to this computer to load the schedule."; return }
+        do {
+            let result = try await client.routineSchedule(triggers: routine?.triggers ?? [], timeZone: TimeZone.current.identifier)
+            schedule = result.draft
+            preview = result
+            checkedSchedule = result.draft
+            loaded = true
+            error = nil
+        } catch { self.error = error.localizedDescription }
+    }
+
+    private func selectFrequency(_ style: String) {
+        guard style == "custom" else { schedule.calendarStyle = style; return }
+        let requested = schedule
+        Task {
+            do {
+                guard let client = model.client else { return }
+                let result = try await client.routineSchedule(draft: requested)
+                guard requested == schedule else { return }
+                schedule.expression = result.triggers.first?.expression ?? ""
+                schedule.calendarStyle = style
+            } catch { previewError = error.localizedDescription }
         }
     }
 
@@ -121,27 +180,14 @@ struct RoutineEditorView: View {
     @ViewBuilder private var triggerFields: some View {
         switch schedule.kind {
         case "interval":
+            Text("This saved interval keeps its original cadence. Choose Recurring schedule to replace it with a clock-based schedule.")
+                .font(.caption).foregroundStyle(Palette.secondary)
             Field("Repeat every") {
                 TextField("Interval", text: $schedule.amount).routineInput()
                 SegmentedChoice(selection: $schedule.unit, options: [(1, "Seconds"), (60, "Minutes"), (3600, "Hours"), (86400, "Days")])
             }
         case "cron":
-            SegmentedChoice(selection: $schedule.calendarStyle, options: [("daily", "Daily"), ("weekdays", "Weekdays"), ("weekly", "Weekly"), ("custom", "Custom")])
-            if schedule.calendarStyle == "custom" {
-                Field("Cron expression") {
-                    TextField("0 9 * * *", text: $schedule.expression).routineInput().font(.callout.monospaced())
-                }
-                Text("For example, 0 9 * * * runs every day at 9 AM.")
-                    .font(.caption).foregroundStyle(Palette.secondary)
-            } else {
-                if schedule.calendarStyle == "weekly" {
-                    SegmentedChoice(selection: $schedule.weekday, options: [(0, "Sun"), (1, "Mon"), (2, "Tue"), (3, "Wed"), (4, "Thu"), (5, "Fri"), (6, "Sat")])
-                }
-                DatePicker("At", selection: $schedule.timeOfDay, displayedComponents: .hourAndMinute)
-                    .environment(\.timeZone, TimeZone(identifier: "GMT") ?? .current)
-                    .padding(12).background(Palette.bubbleAgent, in: RoundedRectangle(cornerRadius: 12))
-            }
-            Field("Time zone") { TextField("Asia/Taipei", text: $schedule.zone).routineInput() }
+            RoutineCalendarFields(schedule: $schedule, preview: checkedSchedule == schedule ? preview : nil, previewError: previewError, selectFrequency: selectFrequency)
         case "once":
             DatePicker("Run at", selection: $schedule.date)
                 .padding(12).background(Palette.bubbleAgent, in: RoundedRectangle(cornerRadius: 12))
@@ -163,6 +209,16 @@ struct RoutineEditorView: View {
 
     private var footer: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if previewError != nil {
+                Button("Check schedule again") { Task { await checkSchedule() } }
+                    .buttonStyle(.plain).disabled(model.isOffline)
+            }
+            if !loaded, error != nil {
+                Button("Retry loading schedule") { Task { await loadSchedule() } }.buttonStyle(.plain)
+            }
+            if schedule.kind != "cron", let previewError {
+                Text(previewError).font(.caption).foregroundStyle(Palette.danger)
+            }
             if let error {
                 Label(error, systemImage: "exclamationmark.circle")
                     .font(.callout).foregroundStyle(Palette.danger).textSelection(.enabled)
@@ -203,20 +259,13 @@ struct RoutineEditorView: View {
 
     private func save() {
         guard let client = model.client, canSave else { return }
-        guard let timeoutValue = Int(timeout), (1...86400).contains(timeoutValue) else {
-            error = "Timeout must be 1 to 86400 seconds."
-            return
-        }
-        let triggers: [RoutineTrigger]
-        do { triggers = try schedule.triggers() }
-        catch { self.error = error.localizedDescription; return }
         busy = true
         error = nil
         Task {
             defer { busy = false }
             do {
                 let result = try await client.saveRoutine(botId: botId, id: routine?.id, name: name,
-                    instruction: instruction, triggers: triggers, timeoutSeconds: timeoutValue)
+                    instruction: instruction, schedule: schedule, timeoutSeconds: timeout)
                 saved(result)
             } catch { self.error = error.localizedDescription }
         }

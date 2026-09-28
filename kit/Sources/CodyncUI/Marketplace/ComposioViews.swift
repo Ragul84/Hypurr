@@ -12,7 +12,8 @@ struct ComposioSection: View {
     let searchToken: Int
     @Environment(BotStore.self) private var model
     @State private var status: ComposioStatus?
-    @State private var apps: [ComposioApp] = []
+    @State private var apps = MarketplacePage<ComposioApp>()
+    @State private var loadRequest = UUID()
     @State private var loading = true
     @State private var error: String?
     @State private var settingUp = false
@@ -42,7 +43,7 @@ struct ComposioSection: View {
                         .foregroundStyle(Palette.secondary)
                 } else {
                     ItemGrid {
-                        ForEach(apps) { app in
+                        ForEach(apps.visible) { app in
                             MarketRow(
                                 title: app.name,
                                 subtitle: app.description ?? app.slug,
@@ -55,6 +56,13 @@ struct ComposioSection: View {
                             }
                         }
                     }
+                }
+                if !loading, apps.hasHiddenItems, status?.configured == true {
+                    Button("Load more apps") {
+                        withAnimation(Motion.fade) { apps.revealMore() }
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                    .frame(maxWidth: .infinity)
                 }
                 if let error {
                     Text(error).font(.footnote).foregroundStyle(Palette.danger)
@@ -82,17 +90,24 @@ struct ComposioSection: View {
 
     private func load() async {
         guard let client = model.client else { return }
+        let request = UUID()
+        loadRequest = request
+        let search = query
         loading = true
-        defer { loading = false }
+        defer { if loadRequest == request { loading = false } }
         do {
             let s = try await client.composioStatus()
+            let page = s.configured ? try await client.composioApps(search: search) : []
+            guard !Task.isCancelled, loadRequest == request else { return }
             status = s
-            apps = s.configured ? try await client.composioApps(search: query) : []
+            apps.replace(with: page)
             error = nil
         } catch {
+            guard !Task.isCancelled, loadRequest == request else { return }
             self.error = error.localizedDescription
         }
     }
+
 }
 
 /// An app's logo from Composio, a letter tile until it loads.
@@ -184,6 +199,7 @@ struct ComposioKeySheet: View {
 /// or a form for apps that use a key.
 struct ComposioConnectSheet: View {
     let app: ComposioApp
+    var requestId: String? = nil
     let done: () -> Void
     @Environment(BotStore.self) private var model
     @Environment(\.dismissModal) private var dismiss
@@ -275,7 +291,7 @@ struct ComposioConnectSheet: View {
         }
         .textFieldStyle(.plain)
         .task { await start() }
-        .onDisappear { if connected { done() } }
+        .onDisappear { values.removeAll(); if connected { done() } }
     }
 
     private func binding(_ name: String) -> Binding<String> {
@@ -305,6 +321,11 @@ struct ComposioConnectSheet: View {
             guard let state = try? await client.composioConnection(id) else { continue }
             switch state.status {
             case "active":
+                if let requestId {
+                    do { try await client.finishConnectionRequest(requestId, connectorId: "composio-\(app.slug)") }
+                    catch { self.error = error.localizedDescription; return }
+                }
+                values.removeAll()
                 connected = true
                 return
             case "failed", "expired":
@@ -325,6 +346,8 @@ struct ComposioConnectSheet: View {
             do {
                 let state = try await client.composioConnect(app.slug, mode: mode, fields: values.filter { !$0.value.isEmpty })
                 if state.status == "active" {
+                    if let requestId { try await client.finishConnectionRequest(requestId, connectorId: "composio-\(app.slug)") }
+                    values.removeAll()
                     connected = true
                 } else {
                     error = "\(app.name) says the connection is \(state.status)."

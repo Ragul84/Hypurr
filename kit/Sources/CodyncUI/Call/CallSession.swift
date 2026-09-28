@@ -24,6 +24,8 @@ final class CallSession {
     private(set) var heard = ""
     /// The reply being read aloud.
     private(set) var said = ""
+    /// Microphone loudness, 0…1, while listening.
+    private(set) var level: Float = 0
     var muted = false {
         didSet {
             guard muted != oldValue, phase == .listening else { return }
@@ -43,8 +45,15 @@ final class CallSession {
     private var speechDone: SpeechDone?
     private var ended = false
 
+    /// Call settings (the gear), kept across calls.
+    static let pauseKey = "callPause"
+    static let rateKey = "callRate"
+
     /// A pause this long ends what you're saying and sends it.
-    static let endOfUtterance: Duration = .milliseconds(1500)
+    private var endOfUtterance: Duration {
+        let seconds = UserDefaults.standard.double(forKey: Self.pauseKey)
+        return .milliseconds(Int((seconds > 0 ? seconds : 1.5) * 1000))
+    }
 
     init(send: @escaping (String) -> Void) {
         self.send = send
@@ -90,6 +99,8 @@ final class CallSession {
         phase = .speaking
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = Self.voice(for: text)
+        let rate = UserDefaults.standard.float(forKey: Self.rateKey)
+        utterance.rate = rate > 0 ? rate : AVSpeechUtteranceDefaultSpeechRate
         synthesizer.speak(utterance)
     }
 
@@ -114,7 +125,9 @@ final class CallSession {
         self.request = request
         let input = engine.inputNode
         input.removeTap(onBus: 0)
-        input.installTap(onBus: 0, bufferSize: 1024, format: input.outputFormat(forBus: 0), block: Self.tap(request))
+        input.installTap(onBus: 0, bufferSize: 1024, format: input.outputFormat(forBus: 0), block: Self.tap(request) { [weak self] level in
+            Task { @MainActor in self?.level = level }
+        })
         engine.prepare()
         do {
             try engine.start()
@@ -135,6 +148,7 @@ final class CallSession {
         request = nil
         if engine.isRunning { engine.stop() }
         engine.inputNode.removeTap(onBus: 0)
+        level = 0
     }
 
     fileprivate func recognized(_ text: String, final: Bool, generation: Int) {
@@ -143,7 +157,7 @@ final class CallSession {
         silence?.cancel()
         if final { return submit() }
         silence = Task {
-            try? await Task.sleep(for: Self.endOfUtterance)
+            try? await Task.sleep(for: endOfUtterance)
             guard !Task.isCancelled else { return }
             submit()
         }
@@ -169,8 +183,18 @@ final class CallSession {
 
     // MARK: audio-thread closures (built outside the main actor)
 
-    private nonisolated static func tap(_ request: SFSpeechAudioBufferRecognitionRequest) -> AVAudioNodeTapBlock {
-        { buffer, _ in request.append(buffer) }
+    private nonisolated static func tap(_ request: SFSpeechAudioBufferRecognitionRequest,
+                                        meter: @escaping @Sendable (Float) -> Void) -> AVAudioNodeTapBlock {
+        { buffer, _ in
+            request.append(buffer)
+            guard let samples = buffer.floatChannelData?[0], buffer.frameLength > 0 else { return }
+            let n = Int(buffer.frameLength)
+            var sum: Float = 0
+            for i in 0..<n { sum += samples[i] * samples[i] }
+            // -50 dB (quiet room) … 0 dB mapped to 0…1.
+            let db = 10 * log10(max(sum / Float(n), 1e-10))
+            meter(min(1, max(0, (db + 50) / 50)))
+        }
     }
 
     private nonisolated static func results(_ session: CallSession, generation: Int) -> @Sendable (SFSpeechRecognitionResult?, (any Error)?) -> Void {

@@ -47,7 +47,11 @@ struct ChatRow: View {
             }
             .padding(.top, 12)
         default:
-            NoticeRow(entry: entry).padding(.top, 10)
+            if let request = entry.data.connectionRequest {
+                ConnectionRequestCard(entry: entry, request: request).padding(.top, 12)
+            } else {
+                NoticeRow(entry: entry).padding(.top, 10)
+            }
         }
     }
 
@@ -128,18 +132,10 @@ struct UserBubble: View {
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 4) {
-            Text(entry.data.text ?? "")
-                .font(InterfaceMetrics.body)
-                .foregroundStyle(Palette.text)
-                .textSelection(.enabled)
-                .padding(.horizontal, InterfaceMetrics.value(mac: 12, mobile: 16))
-                .padding(.vertical, InterfaceMetrics.value(mac: 8, mobile: 10))
-                .background(Palette.bubbleUser, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .contextActions(reactions: model.reactionPick(entry)) {
-                    var items = [MenuItem("Copy", icon: "square.on.square") { Pasteboard.copy(entry.data.text) }]
-                    if let reply { items.append(MenuItem("Reply in thread", icon: "arrowshape.turn.up.left", action: reply)) }
-                    return items
-                }
+            if let attachments = entry.data.attachments, !attachments.isEmpty {
+                AttachmentList(attachments: attachments, botId: entry.botId)
+            }
+            if !(entry.data.text ?? "").isEmpty { text }
             #if os(macOS)
                 HStack(spacing: 6) {
                     if hovering, entry.data.status == nil || entry.data.status == "sent" {
@@ -155,6 +151,21 @@ struct UserBubble: View {
         .hoverTracking($hovering)
         .frame(maxWidth: .infinity, alignment: .trailing)
         .padding(.leading, 56)
+    }
+
+    private var text: some View {
+            Text(entry.data.text ?? "")
+                .font(InterfaceMetrics.body)
+                .foregroundStyle(Palette.text)
+                .textSelection(.enabled)
+                .padding(.horizontal, InterfaceMetrics.value(mac: 12, mobile: 16))
+                .padding(.vertical, InterfaceMetrics.value(mac: 8, mobile: 10))
+                .background(Palette.bubbleUser, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .contextActions(reactions: model.reactionPick(entry)) {
+                    var items = [MenuItem("Copy", icon: "square.on.square") { Pasteboard.copy(entry.data.text) }]
+                    if let reply { items.append(MenuItem("Reply in thread", icon: "arrowshape.turn.up.left", action: reply)) }
+                    return items
+                }
     }
 
     @ViewBuilder private var status: some View {
@@ -245,6 +256,17 @@ struct NoticeRow: View {
 
     var body: some View {
         let text = entry.data.text ?? ""
+        if let seconds = entry.data.callSeconds {
+            Label("\(text) · \(String(format: "%02d:%02d", seconds / 60, seconds % 60))", systemImage: "waveform")
+                .font(.footnote.monospacedDigit())
+                .foregroundStyle(Palette.secondary)
+                .frame(maxWidth: .infinity)
+        } else {
+            styled(text)
+        }
+    }
+
+    @ViewBuilder private func styled(_ text: String) -> some View {
         switch entry.data.style {
         case "divider":
             HStack(spacing: 10) {

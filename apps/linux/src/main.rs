@@ -3,6 +3,7 @@
 mod avatar;
 mod client;
 mod compose;
+mod connections;
 mod dialogs;
 mod markup;
 mod orb;
@@ -204,6 +205,7 @@ button.send:disabled { background: @cd_accent_dim; color: @cd_tertiary; }
 /* Compose page and editors */
 floating-sheet > sheet, dialog.floating sheet, dialog sheet { outline: none; border: none; box-shadow: 0 10px 40px rgba(0,0,0,0.45); border-radius: 18px; }
 entry.plain, entry.plain:focus-within { background: transparent; box-shadow: none; outline: none; border: none; padding: 0; min-height: 0; }
+.file-card { background: @cd_user; border-radius: 14px; padding: 8px 12px; }
 .chip { background: @cd_agent; border-radius: 999px; padding: 3px 4px 3px 8px; }
 button.chip-x { min-width: 18px; min-height: 18px; padding: 0; background: transparent; box-shadow: none; border: none; color: @cd_secondary; }
 .pick-card { background: @cd_surface; border-radius: 18px; padding: 8px; box-shadow: 0 6px 16px rgba(0,0,0,0.08); }

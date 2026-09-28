@@ -119,6 +119,7 @@ private struct ChatSplitView: View {
     @State private var hoveredFooter: String?
     @FocusState private var searchFocused: Bool
     @FocusState private var profileFocused: Bool
+    @AppStorage("hiddenComputers") private var hiddenComputers = ""
     @AppStorage("sidebarCompact") private var compact = false
     @AppStorage("desktopSidebarWidth") private var sidebarWidth = 296.0
     @State private var dragStartWidth: Double?
@@ -131,10 +132,20 @@ private struct ChatSplitView: View {
     private var accounts: AccountStore { host.accounts }
     /// Every computer with a store, in the account's order.
     private var stores: [BotStore] { accounts.computers.compactMap { accounts.store(for: $0.id) } }
-    private var onlineStores: [BotStore] { stores.filter { $0.connection == .online } }
+    private var onlineStores: [BotStore] { stores.filter { shownIDs.contains($0.computer.id) && $0.connection == .online } }
     private var selectedStore: BotStore? { accounts.selection.flatMap { accounts.store(for: $0.computerId) } }
     private var composeStore: BotStore? { composeComputer.flatMap { accounts.store(for: $0) } }
-    private var showsComputers: Bool { stores.count > 1 && !compact }
+    private var shownIDs: Set<ComputerID> {
+        Set(ComputerSelection(all: accounts.computers.map(\.id), hidden: hiddenComputers).shown)
+    }
+    private var visibleRoster: [RosterItem] {
+        let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        return accounts.roster.filter { item in
+            shownIDs.contains(item.ref.computerId) && (compact || query.isEmpty
+                || item.bot.name.localizedCaseInsensitiveContains(query)
+                || (item.bot.lastMessage?.localizedCaseInsensitiveContains(query) ?? false))
+        }
+    }
 
     private func ref(_ bot: Bot, _ store: BotStore) -> BotReference {
         BotReference(accountId: accounts.accountId, computerId: store.computer.id, botId: bot.id)
@@ -148,8 +159,9 @@ private struct ChatSplitView: View {
     var body: some View {
         HStack(spacing: 0) {
             VStack(spacing: 0) {
-                HStack {
-                    Spacer()
+                HStack(spacing: 6) {
+                    ComputerFilterHeader(accounts: accounts, hidden: $hiddenComputers) { showComputers = true }
+                    Spacer(minLength: 0)
                     IconButton("New chat", systemImage: "plus", action: compose)
                         .keyboardShortcut("n")
                         .disabled(onlineStores.isEmpty)
@@ -160,21 +172,23 @@ private struct ChatSplitView: View {
                 .opacity(compact ? 0 : 1)
                 .allowsHitTesting(!compact)
                 .accessibilityHidden(compact)
+                if compact {
+                    ComputerFilterHeader(accounts: accounts, hidden: $hiddenComputers, compact: true) { showComputers = true }
+                        .frame(width: 70)
+                }
                 ScrollView {
                     LazyVStack(spacing: 2) {
-                        ForEach(stores, id: \.computer.id) { store in
-                            let bots = filteredBots(store)
-                            if showsComputers && !(bots.isEmpty && !search.isEmpty) {
-                                ComputerHeader(store: store, ssh: host.isSSH(store.computer.id))
+                        ForEach(visibleRoster) { item in
+                            if let store = accounts.store(for: item.ref.computerId) {
+                                row(item.bot, store)
                             }
-                            ForEach(bots) { bot in row(bot, store) }
                         }
                     }
                     .padding(.horizontal, 12)
                     .padding(.top, 4)
                 }
                 .onMoveCommand { direction in
-                    let refs = stores.flatMap { store in filteredBots(store).map { ref($0, store) } }
+                    let refs = visibleRoster.map(\.ref)
                     guard direction == .up || direction == .down, !refs.isEmpty else { return }
                     let current = refs.firstIndex { $0 == accounts.selection } ?? -1
                     let next = direction == .down ? min(current + 1, refs.count - 1) : max(current - 1, 0)
@@ -186,16 +200,13 @@ private struct ChatSplitView: View {
                     if !compact {
                         VStack(spacing: 4) {
                             searchField
-                            ForEach(stores, id: \.computer.id) { store in
-                                ConnectionBanner().environment(store).padding(.horizontal, 12)
-                            }
                         }
                         .frame(width: sidebarWidth)
                         .transition(.opacity)
                     }
                 }
                 .overlay {
-                    if stores.allSatisfy({ filteredBots($0).isEmpty }) && !compact {
+                    if visibleRoster.isEmpty && !compact {
                         VStack(spacing: 8) {
                             Text(search.isEmpty ? "No bots yet" : "No matching bots")
                                 .font(.system(size: 13, weight: .medium))
@@ -338,8 +349,10 @@ private struct ChatSplitView: View {
         }
         .codyncSheet(isPresented: Binding(get: { marketplace != nil }, set: { if !$0 { marketplace = nil } })) {
             if let store = marketplace.flatMap(accounts.store(for:)) {
-                MarketplaceView()
+                MarketplaceView(computers: onlineStores.map { ($0.computer.id, $0.hostName) },
+                                computer: Binding(get: { store.computer.id }, set: { marketplace = $0 }))
                     .environment(store)
+                    .id(store.computer.id)
                 .frame(width: min(920, windowSize.width - 80), height: sheetHeight)
             }
         }
@@ -445,15 +458,6 @@ extension ChatSplitView {
                 @unknown default: break
                 }
             }
-    }
-
-    fileprivate func filteredBots(_ store: BotStore) -> [Bot] {
-        let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
-        if compact { return store.roster }
-        return store.roster.filter {
-            query.isEmpty || $0.name.localizedCaseInsensitiveContains(query)
-                || ($0.lastMessage?.localizedCaseInsensitiveContains(query) ?? false)
-        }
     }
 
     fileprivate var searchField: some View {
@@ -620,7 +624,7 @@ extension ChatSplitView {
 
     fileprivate func compose() {
         // The selected bot's computer if it's online, else this Mac, else any online one.
-        let target = [selectedStore, host.store].compactMap { $0 }.first { $0.connection == .online } ?? onlineStores.first
+        let target = [selectedStore, host.store].compactMap { $0 }.first { shownIDs.contains($0.computer.id) && $0.connection == .online } ?? onlineStores.first
         guard let target else { return }
         if !composing { previousSelection = accounts.selection }
         composeComputer = target.computer.id
@@ -657,11 +661,6 @@ extension ChatSplitView {
                 .buttonStyle(IconButtonStyle(size: 36))
             Button { showAccount.toggle() } label: {
                 profileAvatar
-                    .overlay(alignment: .bottomTrailing) {
-                        Circle().fill(host.store?.connection == .online ? Palette.switchOn : Palette.tertiary)
-                            .frame(width: 7, height: 7)
-                            .overlay(Circle().stroke(Palette.surface, lineWidth: 1.5))
-                    }
                     .frame(width: 44, height: 44)
                     .background(showAccount ? Palette.bubbleAgent : .clear, in: RoundedRectangle(cornerRadius: 12))
                     .contentShape(Rectangle())

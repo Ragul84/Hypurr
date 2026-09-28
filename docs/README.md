@@ -22,9 +22,12 @@ Source review, a passing build, local integration tests and production acceptanc
 - [Group chats and reply threads](features/groups-and-threads.md)
 - [Bot-to-bot collaboration](features/bot-collaboration.md)
 - [Context and memory](features/context-and-memory.md)
+- [Bot workspaces](features/bot-workspaces.md)
 - [Voice calls](features/voice-call.md)
+- [File attachments](features/file-attachments.md)
 - [Remote screen](features/remote-screen.md)
 - [Marketplace and agent setup](features/marketplace.md)
+- [Connector setup and credentials](features/connector-credentials.md)
 - [Widgets, Live Activities and onboarding](design/mobile-widgets.md)
 - [Notifications and background Live Activity updates](design/push-and-live-activity.md)
 

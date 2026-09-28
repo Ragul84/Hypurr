@@ -41,6 +41,10 @@ public final class BotStore {
     public private(set) var computer: Computer
     public let route: Route
     public private(set) var connection: Connection = .connecting
+    private static let dropGrace: Duration = .seconds(5)
+    private static let initialConnectionGrace: Duration = .seconds(1)
+    private var heldDrop: Connection?
+    private var dropTimer: Task<Void, Never>?
     public private(set) var hostRoute: HostRoute?
     public private(set) var client: HostClient?
     public private(set) var hello: Hello?
@@ -86,6 +90,8 @@ public final class BotStore {
     private let makeTransport: @MainActor () async throws -> any HostTransport
     private var transport: (any HostTransport)?
     private var retired = false
+    /// Files of messages not delivered yet (by client nonce), kept for a retry.
+    @ObservationIgnored private var outgoingFiles: [String: [OutgoingFile]] = [:]
 
     private var rev: Int64 = 0
     private var hostId: String?
@@ -129,7 +135,8 @@ public final class BotStore {
 
     /// Offline, but sends can wait in the relay mailbox until the computer is back.
     public var canQueue: Bool {
-        if case .computerOffline = connection { computer.boxKey != nil && transport is any RemoteTransport } else { false }
+        // Only the warning is delayed; relay delivery can queue during that grace.
+        if case .computerOffline = heldDrop ?? connection { computer.boxKey != nil && transport is any RemoteTransport } else { false }
     }
 
     public var hostName: String { hello?.name ?? computer.name }
@@ -192,6 +199,7 @@ public final class BotStore {
         setActive(false)
         retired = true
         saveTask?.cancel()
+        dropTimer?.cancel()
         onConnected = nil
         onBotUpdated = nil
         onUsageChanged = nil
@@ -229,6 +237,9 @@ public final class BotStore {
         streamTask = nil
         eventsTask?.cancel()
         eventsTask = nil
+        dropTimer?.cancel()
+        dropTimer = nil
+        heldDrop = nil
         if let remote = transport as? any RemoteTransport {
             Task { await remote.shutdown() }
         }
@@ -295,9 +306,37 @@ public final class BotStore {
     }
 
     /// Connection changes animate wherever they show (banners, headers, captions, rows).
+    /// Give initial connection failures a second to recover and online drops five seconds.
+    /// Relay presence can lag a reconnect, so "computer offline" gets the same grace.
+    /// Authorization failures still show immediately.
     private func setConnection(_ new: Connection) {
-        guard new != connection else { return }
-        Motion.animate { connection = new }
+        let transient = switch new {
+        case .connecting, .offline, .computerOffline: true
+        default: false
+        }
+        let recovering = new == .online && (connection != .online || heldDrop != nil)
+        let initialFailure = connection == .connecting && transient && new != .connecting
+        if transient && (connection == .online || initialFailure) {
+            let grace = connection == .online ? Self.dropGrace : Self.initialConnectionGrace
+            heldDrop = new
+            if dropTimer == nil {
+                dropTimer = Task { [weak self] in
+                    try? await Task.sleep(for: grace)
+                    guard !Task.isCancelled, let self, let held = self.heldDrop else { return }
+                    self.dropTimer = nil
+                    self.heldDrop = nil
+                    Motion.animate { self.connection = held }
+                }
+            }
+            return
+        }
+        dropTimer?.cancel()
+        dropTimer = nil
+        heldDrop = nil
+        if new != connection { Motion.animate { connection = new } }
+        if recovering {
+            for scope in Set(readingViews.values) { markRead(scope.botId, thread: scope.thread) }
+        }
     }
 
     private func setHostRoute(_ new: HostRoute?) {
@@ -404,6 +443,7 @@ public final class BotStore {
             bump(bot.rev)
             onBotUpdated?(bot)
             onRosterChanged?()
+            if bot.unread > 0 { acknowledgeVisibleConversations(bot.id) }
         case let .botDeleted(id, r):
             bots[id] = nil
             entries[id] = nil
@@ -413,6 +453,7 @@ public final class BotStore {
         case let .entry(e):
             upsert(e)
             bump(e.rev)
+            acknowledgeVisibleConversations(e.botId, entry: e)
         case let .usage(u):
             setUsage(u)
         case let .screen(s):
@@ -480,21 +521,26 @@ public final class BotStore {
     }
 
     /// `thread`: reply in the thread on that main-chat message.
-    public func send(_ text: String, to botId: String, thread: String? = nil) {
-        send(text, to: botId, thread: thread, nonce: UUID().uuidString)
+    public func send(_ text: String, to botId: String, thread: String? = nil, files: [OutgoingFile] = []) {
+        send(text, to: botId, thread: thread, nonce: UUID().uuidString, files: files)
     }
 
-    private func send(_ text: String, to botId: String, thread: String?, nonce: String) {
+    private func send(_ text: String, to botId: String, thread: String?, nonce: String, files: [OutgoingFile] = []) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !retired else { return }
+        guard !trimmed.isEmpty || !files.isEmpty, !retired else { return }
+        var data = EntryData(text: trimmed, status: "sending", clientNonce: nonce)
+        if !files.isEmpty {
+            data.attachments = files.map { Attachment(id: $0.id.uuidString, name: $0.name, size: Int64($0.data.count)) }
+            outgoingFiles[nonce] = files
+        }
         let local = Entry(
             id: "local-\(nonce)", seq: Int64.max, botId: botId, threadId: thread, rev: 0, kind: "user",
-            turn: 0, data: EntryData(text: trimmed, status: "sending", clientNonce: nonce),
-            createdAt: Int64(Date.now.timeIntervalSince1970 * 1000), updatedAt: 0
+            turn: 0, data: data, createdAt: Int64(Date.now.timeIntervalSince1970 * 1000), updatedAt: 0
         )
         upsert(local)
         storage.lastComputerId = computer.id
-        if canQueue, let remote = transport as? any RemoteTransport {
+        // The relay mailbox holds text only: files wait for the computer.
+        if canQueue, files.isEmpty, let remote = transport as? any RemoteTransport {
             enqueue(remote, text: trimmed, botId: botId, thread: thread, nonce: nonce)
             return
         }
@@ -504,10 +550,24 @@ public final class BotStore {
     private func deliver(_ text: String, botId: String, thread: String?, nonce: String) {
         Task {
             do {
-                let e = try await require().send(botId: botId, text: text, clientNonce: nonce, threadId: thread)
+                let client = try require()
+                var ids: [String]?
+                if let files = outgoingFiles[nonce] {
+                    // A fresh upload per attempt: a retry never appends to a half-sent file.
+                    ids = []
+                    for file in files {
+                        let id = UUID().uuidString
+                        try await client.upload(botId: botId, id: id, name: file.name, data: file.data)
+                        Self.cacheAttachment(id, file.data)
+                        ids?.append(id)
+                    }
+                }
+                let e = try await client.send(botId: botId, text: text, clientNonce: nonce, threadId: thread, attachments: ids)
+                outgoingFiles[nonce] = nil
                 upsert(e)
                 if let bot = bots[botId] { onSent?(bot) }
             } catch {
+                if outgoingFiles[nonce] != nil { lastError = "Couldn't send the files: \(error.localizedDescription)" }
                 markLocal(nonce: nonce, botId: botId, status: "failed")
             }
         }
@@ -580,14 +640,36 @@ public final class BotStore {
     }
 
     public func retry(_ entry: Entry) {
-        guard let text = entry.data.text else { return }
+        let files = entry.data.clientNonce.flatMap { outgoingFiles[$0] } ?? []
+        guard let text = entry.data.text, !text.isEmpty || !files.isEmpty else { return }
         entries[entry.botId]?.removeAll { $0.id == entry.id }
         // The same clientNonce: if the computer got it after all, it won't run twice (the host
         // skips a nonce it has). Every seal still takes a fresh ephemeral key (§6.4).
-        send(text, to: entry.botId, thread: entry.threadId, nonce: entry.data.clientNonce ?? UUID().uuidString)
+        send(text, to: entry.botId, thread: entry.threadId, nonce: entry.data.clientNonce ?? UUID().uuidString, files: files)
+    }
+
+    /// A sent file's bytes: on disk after the first fetch (sent files never change).
+    public func attachmentData(_ file: Attachment, bot botId: String) async -> Data? {
+        guard let url = Self.attachmentCache(file.id) else { return nil }
+        if let data = try? Data(contentsOf: url) { return data }
+        guard let client = try? require(), let data = try? await client.readUpload(botId: botId, id: file.id) else { return nil }
+        Self.cacheAttachment(file.id, data)
+        return data
+    }
+
+    private static func attachmentCache(_ id: String) -> URL? {
+        guard let uuid = UUID(uuidString: id) else { return nil }
+        return URL.cachesDirectory.appending(path: "codync-attachments").appending(path: uuid.uuidString)
+    }
+
+    private static func cacheAttachment(_ id: String, _ data: Data) {
+        guard let url = attachmentCache(id) else { return }
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? data.write(to: url)
     }
 
     public func discard(_ entry: Entry) {
+        if let nonce = entry.data.clientNonce { outgoingFiles[nonce] = nil }
         entries[entry.botId]?.removeAll { $0.id == entry.id }
     }
 
@@ -598,6 +680,7 @@ public final class BotStore {
     }
 
     public func stop(_ botId: String) { perform { try await $0.stop(botId) } }
+    public func logCall(_ botId: String, seconds: Int) { perform { try await $0.logCall(botId, seconds: seconds) } }
     public func newSession(_ botId: String) { perform { try await $0.newSession(botId) } }
 
     // MARK: remote screen
@@ -631,11 +714,53 @@ public final class BotStore {
         perform { try await $0.respondPermission(entryId: entry.id, optionId: option) }
     }
 
+    struct ReadingScope: Hashable {
+        let botId: String
+        let thread: String?
+    }
+
+    @ObservationIgnored private var readingViews: [UUID: ReadingScope] = [:]
+
+    /// Views register only while visible in an active scene. Multiple windows may
+    /// read the same conversation without unregistering each other.
+    func setReading(_ token: UUID, botId: String, thread: String?, active: Bool) {
+        if active {
+            let scope = ReadingScope(botId: botId, thread: thread)
+            readingViews[token] = scope
+            if connection == .online { markRead(botId, thread: thread) }
+        } else {
+            readingViews[token] = nil
+        }
+    }
+
+    private func acknowledgeVisibleConversations(_ botId: String, entry: Entry? = nil) {
+        guard connection == .online else { return }
+        for scope in Set(readingViews.values) where scope.botId == botId {
+            if let entry, (!entry.isChat || entry.threadId != scope.thread) { continue }
+            markRead(botId, thread: scope.thread)
+        }
+    }
+
     /// The main chat on screen (or the thread on `thread`) is read; the host ignores it
     /// when nothing there is unread.
     public func markRead(_ botId: String, thread: String? = nil) {
-        guard (bots[botId]?.unread ?? 0) > 0 else { return }
-        perform { try await $0.markRead(botId, threadId: thread) }
+        // Entry events may arrive before the roster's unread count. The host is
+        // authoritative and treats a redundant scoped acknowledgement as a no-op.
+        Task {
+            // Opening a cached conversation can race the foreground reconnect.
+            // This background acknowledgement must never interrupt the conversation.
+            if connection != .online || heldDrop != nil {
+                try? await Task.sleep(for: Self.initialConnectionGrace)
+            }
+            guard !Task.isCancelled, !retired, isActive, heldDrop == nil,
+                  let client = try? require() else { return }
+            do {
+                try await client.markRead(botId, threadId: thread)
+            } catch {
+                // The visible scope is acknowledged again when the link recovers.
+                log.debug("read acknowledgement deferred: \(error.localizedDescription)")
+            }
+        }
     }
 
     /// The roster's "Mark as read": the chat and all its threads.
@@ -701,8 +826,8 @@ public final class BotStore {
         if let s = try? await s { installedSkills = s }
     }
 
-    public func marketConnectors(search: String) async throws -> [MarketConnector] {
-        try await require().marketConnectors(search: search)
+    public func marketConnectors(search: String, cursor: String? = nil) async throws -> (items: [MarketConnector], next: String?) {
+        try await require().marketConnectors(search: search, cursor: cursor)
     }
 
     public func marketSkills() async throws -> [MarketSkill] {
@@ -721,6 +846,12 @@ public final class BotStore {
         let c = try await require().addConnector(name: name, command: command, url: url, env: env, headers: headers)
         await refreshPlugins()
         return c
+    }
+
+    public func importConnectors(config: String) async throws -> [InstalledConnector] {
+        let added = try await require().importConnectors(config: config)
+        await refreshPlugins()
+        return added
     }
 
     public func connectorSignIn(_ id: String) async throws -> ConnectorSignIn {
@@ -846,4 +977,19 @@ public final class BotStore {
             try? data.write(to: cacheURL, options: .atomic)
         }
     }
+}
+
+/// A file picked in the composer, sent with the next message.
+public struct OutgoingFile: Identifiable, Sendable {
+    public let id = UUID()
+    public let name: String
+    public let data: Data
+
+    public init(name: String, data: Data) {
+        self.name = name
+        self.data = data
+    }
+
+    /// Anything larger is refused by the computer.
+    public static let maxSize = 100 * 1024 * 1024
 }

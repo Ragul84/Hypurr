@@ -37,6 +37,11 @@ pub struct State {
 /// typing `@` suggests its bots.
 pub struct Composer {
     view: gtk::TextView,
+    attach_btn: gtk::Button,
+    /// Files picked or dropped for the next message, shown as chips above the box.
+    files: RefCell<Vec<std::path::PathBuf>>,
+    files_box: gtk::Box,
+    files_rev: gtk::Revealer,
     placeholder: gtk::Label,
     send_btn: gtk::Button,
     stop_btn: gtk::Button,
@@ -92,6 +97,14 @@ fn composer() -> Composer {
         .margin_top(6)
         .margin_bottom(16)
         .build();
+    let attach_btn = gtk::Button::builder()
+        .icon_name("mail-attachment-symbolic")
+        .tooltip_text("Attach files")
+        .css_classes(["icon-btn"])
+        .valign(gtk::Align::End)
+        .margin_bottom(2)
+        .build();
+    pill.append(&attach_btn);
     pill.append(&field);
     pill.append(&stop_btn);
     pill.append(&send_btn);
@@ -110,8 +123,24 @@ fn composer() -> Composer {
                 .build(),
         )
         .build();
+    let files_box = gtk::Box::builder()
+        .spacing(6)
+        .margin_start(16)
+        .margin_end(16)
+        .margin_top(6)
+        .build();
+    let files_rev = gtk::Revealer::builder()
+        .transition_type(gtk::RevealerTransitionType::SlideUp)
+        .child(
+            &gtk::ScrolledWindow::builder()
+                .vscrollbar_policy(gtk::PolicyType::Never)
+                .child(&files_box)
+                .build(),
+        )
+        .build();
     let col = gtk::Box::new(gtk::Orientation::Vertical, 0);
     col.append(&mentions_rev);
+    col.append(&files_rev);
     col.append(&pill);
     let root = gtk::Box::new(gtk::Orientation::Vertical, 0);
     root.append(
@@ -123,6 +152,10 @@ fn composer() -> Composer {
     );
     Composer {
         view,
+        attach_btn,
+        files: RefCell::default(),
+        files_box,
+        files_rev,
         placeholder,
         send_btn,
         stop_btn,
@@ -748,6 +781,99 @@ fn wire_composer(ui: &App, in_thread: bool) {
             .buffer()
             .connect_changed(move |_| update_composer(&ui2, in_thread));
     }
+    {
+        let ui2 = ui.clone();
+        c.attach_btn.connect_clicked(move |b| {
+            let ui3 = ui2.clone();
+            gtk::FileDialog::builder()
+                .title("Attach files")
+                .build()
+                .open_multiple(
+                    b.root().and_downcast_ref::<gtk::Window>(),
+                    gtk::gio::Cancellable::NONE,
+                    move |r| {
+                        let Ok(list) = r else { return };
+                        let paths = (0..list.n_items())
+                            .filter_map(|i| list.item(i).and_downcast::<gtk::gio::File>())
+                            .filter_map(|f| f.path());
+                        add_files(&ui3, in_thread, paths);
+                    },
+                );
+        });
+    }
+    {
+        // Files dropped on the box.
+        let ui2 = ui.clone();
+        let drop = gtk::DropTarget::new(
+            gtk::gdk::FileList::static_type(),
+            gtk::gdk::DragAction::COPY,
+        );
+        drop.connect_drop(move |_, v, _, _| {
+            let Ok(list) = v.get::<gtk::gdk::FileList>() else {
+                return false;
+            };
+            add_files(
+                &ui2,
+                in_thread,
+                list.files().iter().filter_map(|f| f.path()),
+            );
+            true
+        });
+        c.root.add_controller(drop);
+    }
+}
+
+/// Adds files to the next message (not in a group: it has no folder of its own).
+fn add_files(ui: &App, in_thread: bool, paths: impl Iterator<Item = std::path::PathBuf>) {
+    let group = {
+        let st = ui.state.borrow();
+        st.current
+            .as_ref()
+            .and_then(|id| st.bots.get(id))
+            .is_some_and(is_group)
+    };
+    if group {
+        toast(ui, "Files can't be sent to a group.");
+        return;
+    }
+    ui.composer(in_thread)
+        .files
+        .borrow_mut()
+        .extend(paths.filter(|p| p.is_file()));
+    show_files(ui, in_thread);
+}
+
+/// The chips for the picked files; × removes one.
+fn show_files(ui: &App, in_thread: bool) {
+    let c = ui.composer(in_thread);
+    clear(&c.files_box);
+    let files = c.files.borrow().clone();
+    for (i, path) in files.iter().enumerate() {
+        let chip = gtk::Box::builder().spacing(4).css_classes(["chip"]).build();
+        chip.append(&gtk::Image::from_icon_name("text-x-generic-symbolic"));
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        chip.append(&label(&name, &["small"]));
+        let x = gtk::Button::builder()
+            .icon_name("window-close-symbolic")
+            .tooltip_text("Remove")
+            .css_classes(["chip-x"])
+            .build();
+        let ui2 = ui.clone();
+        x.connect_clicked(move |_| {
+            let c = ui2.composer(in_thread);
+            if i < c.files.borrow().len() {
+                c.files.borrow_mut().remove(i);
+            }
+            show_files(&ui2, in_thread);
+        });
+        chip.append(&x);
+        c.files_box.append(&chip);
+    }
+    c.files_rev.set_reveal_child(!files.is_empty());
+    update_composer(ui, in_thread);
 }
 
 fn connect(ui: &App) {
@@ -1016,7 +1142,15 @@ pub fn backend_name(st: &State, id: &str) -> String {
         .to_owned()
 }
 
-pub fn folder(p: &str) -> String {
+/// Where a bot works, short: its project folder's name, or its personal workspace.
+pub fn folder(bot: &Value) -> String {
+    if bot["managedWorkspace"] == true {
+        return "personal workspace".into();
+    }
+    folder_name(bot["cwd"].as_str().unwrap_or(""))
+}
+
+pub fn folder_name(p: &str) -> String {
     std::path::Path::new(p)
         .file_name()
         .map_or_else(|| p.to_owned(), |s| s.to_string_lossy().into_owned())
@@ -1077,7 +1211,7 @@ fn preview(st: &State, b: &Value) -> gtk::Widget {
                         format!(
                             "{} · {}",
                             backend_name(st, b["backend"].as_str().unwrap_or("")),
-                            folder(b["cwd"].as_str().unwrap_or(""))
+                            folder(b)
                         )
                     }
                 },
@@ -1229,7 +1363,11 @@ fn intro(st: &State, bot: &Value) -> gtk::Box {
             &format!(
                 "{} in {}",
                 backend_name(st, bot["backend"].as_str().unwrap_or("")),
-                bot["cwd"].as_str().unwrap_or("")
+                if bot["managedWorkspace"] == true {
+                    "its personal workspace"
+                } else {
+                    bot["cwd"].as_str().unwrap_or("")
+                }
             ),
             &["footnote", "mono", "tertiary"],
         ));
@@ -1346,7 +1484,7 @@ fn render_details(ui: &App, st: &State, bot: &Value) {
                     .unwrap_or("Working…")
                     .to_owned()
             } else {
-                folder(m["cwd"].as_str().unwrap_or(""))
+                folder(m)
             };
             let s = label(&sub, &["small", "tertiary"]);
             s.set_ellipsize(gtk::pango::EllipsizeMode::End);
@@ -1531,6 +1669,9 @@ fn append_entries(
             "user" => list.append(&user_bubble(&r, e, working(chat), start)),
             "agent" => list.append(&agent_bubble(&r, st, e, group, start)),
             "permission" => list.append(&permission_card(ui, st, e, group)),
+            _ if e["data"]["connectionRequest"].is_object() => {
+                list.append(&crate::connections::card(ui, e))
+            }
             _ => list.append(&notice(e)),
         }
         let indent = if group && kind == "agent" { 34 } else { 0 };
@@ -1579,7 +1720,7 @@ fn update_composer_for(ui: &App, st: &State, chat: &Value, in_thread: bool) {
     let text = buf
         .text(&buf.start_iter(), &buf.end_iter(), false)
         .to_string();
-    let has_text = !text.trim().is_empty();
+    let has_text = !text.trim().is_empty() || !c.files.borrow().is_empty();
     let lane = if in_thread {
         st.open_thread.as_deref()
     } else {
@@ -1597,8 +1738,9 @@ fn update_composer_for(ui: &App, st: &State, chat: &Value, in_thread: bool) {
         format!("Message {name}")
     });
     c.placeholder.set_visible(text.is_empty());
-    c.stop_btn.set_visible(busy && text.is_empty());
-    c.send_btn.set_visible(!(busy && text.is_empty()));
+    c.attach_btn.set_visible(!is_group(chat));
+    c.stop_btn.set_visible(busy && !has_text);
+    c.send_btn.set_visible(!busy || has_text);
     c.send_btn.set_sensitive(has_text);
 
     // `@` suggests the group's bots.
@@ -1654,20 +1796,37 @@ fn send(ui: &App, in_thread: bool) {
     let Some(bot) = bot else {
         return;
     };
-    if text.is_empty() || (in_thread && thread.is_none()) {
+    let c = ui.composer(in_thread);
+    if (text.is_empty() && c.files.borrow().is_empty()) || (in_thread && thread.is_none()) {
         return;
     }
+    let files = c.files.take();
     buf.set_text("");
-    send_text(ui, &bot, &text, thread);
+    show_files(ui, in_thread);
+    send_text(ui, &bot, &text, thread, files);
 }
 
 /// Sends a message with a local echo that the host's copy replaces.
-pub fn send_text(ui: &App, bot: &str, text: &str, thread: Option<String>) {
+pub fn send_text(
+    ui: &App,
+    bot: &str,
+    text: &str,
+    thread: Option<String>,
+    files: Vec<std::path::PathBuf>,
+) {
     let nonce = uuid::Uuid::new_v4().to_string();
+    let attachments: Vec<Value> = files
+        .iter()
+        .map(|p| {
+            let size = std::fs::metadata(p).map_or(0, |m| m.len());
+            json!({"name": p.file_name().map(|n| n.to_string_lossy()), "size": size})
+        })
+        .collect();
     upsert(
         &mut ui.state.borrow_mut(),
         json!({"id": format!("local-{nonce}"), "seq": i64::MAX, "botId": bot, "threadId": thread, "rev": 0, "kind": "user", "turn": 0,
-               "data": {"text": text, "status": "sending", "clientNonce": nonce}, "createdAt": now_ms(), "updatedAt": 0}),
+               "data": {"text": text, "status": "sending", "clientNonce": nonce, "attachments": attachments},
+               "createdAt": now_ms(), "updatedAt": 0}),
     );
     schedule(ui);
     let mut body = json!({"botId": bot, "text": text, "clientNonce": nonce});
@@ -1675,7 +1834,10 @@ pub fn send_text(ui: &App, bot: &str, text: &str, thread: Option<String>) {
         body["threadId"] = t.into();
     }
     let (ui2, bot) = (ui.clone(), bot.to_owned());
-    client::call("send", body, move |r| {
+    let done = move |r: Result<Value, String>| {
+        if let Err(err) = &r {
+            toast(&ui2, err);
+        }
         let mut st = ui2.state.borrow_mut();
         match r {
             Ok(v) => upsert(&mut st, v["entry"].clone()),
@@ -1691,7 +1853,12 @@ pub fn send_text(ui: &App, bot: &str, text: &str, thread: Option<String>) {
         }
         drop(st);
         schedule(&ui2);
-    });
+    };
+    if files.is_empty() {
+        client::call("send", body, done);
+    } else {
+        client::send_files(body, files, done);
+    }
 }
 
 pub fn now_ms() -> i64 {

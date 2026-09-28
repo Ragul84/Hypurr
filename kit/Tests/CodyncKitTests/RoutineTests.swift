@@ -19,44 +19,20 @@ import Testing
     #expect(restored.runId == "run")
 }
 
-@Test func routineScheduleEditsKeepExactIntervalsAndCalendarTimes() throws {
-    let interval = RoutineTrigger(type: "interval", seconds: 5400)
-    let draft = RoutineScheduleDraft(triggers: [interval])
-    #expect(draft.amount == "90")
-    #expect(draft.unit == 60)
-    #expect(try draft.triggers() == [interval])
-    let weekly = RoutineTrigger(type: "cron", expression: "20 14 * * 0", timeZone: "Asia/Taipei")
-    let calendar = RoutineScheduleDraft(triggers: [weekly])
-    #expect(calendar.calendarStyle == "weekly")
-    #expect(calendar.weekday == 0)
-    #expect(try calendar.triggers() == [weekly])
-    let custom = RoutineTrigger(type: "cron", expression: "*/15 9-17 * * 1-5", timeZone: "America/New_York")
-    #expect(try RoutineScheduleDraft(triggers: [custom]).triggers() == [custom])
-    #expect(try RoutineScheduleDraft(triggers: [weekly, interval]).triggers() == [weekly, interval])
+@Test func routineScheduleResponseCarriesServerPreviewWithoutClientRules() throws {
+    let data = Data(#"{"draft":{"kind":"cron","amount":"1","unit":3600,"calendarStyle":"days","weekday":1,"selectedDays":[1,3,5],"monthDay":1,"minuteStep":15,"hour":23,"minute":47,"at":0,"expression":"47 23 * * 1,3,5","zone":"Asia/Taipei","original":[]},"triggers":[{"type":"cron","expression":"47 23 * * 1,3,5","timeZone":"Asia/Taipei"}],"summary":"Server schedule description","nextRunAt":1790470800000,"warning":null}"#.utf8)
+    let preview = try JSONDecoder().decode(RoutineSchedulePreview.self, from: data)
+    #expect(preview.summary == "Server schedule description")
+    #expect(preview.draft.selectedDays == [1, 3, 5])
+    #expect(preview.nextRunAt == 1_790_470_800_000)
+    let encoded = try JSONEncoder().encode(preview.draft)
+    #expect(try JSONDecoder().decode(RoutineScheduleDraft.self, from: encoded) == preview.draft)
 }
 
-@Test func routineScheduleConvertsUnitsAndRejectsOverflow() throws {
+@Test func routineDateControlPreservesWireMilliseconds() {
     var draft = RoutineScheduleDraft()
-    draft.amount = "2"
-    draft.unit = 3600
-    #expect(try draft.triggers().first?.seconds == 7200)
-    draft.amount = String(Int64.max)
-    #expect(throws: (any Error).self) { try draft.triggers() }
-    draft.amount = "0"
-    #expect(throws: (any Error).self) { try draft.triggers() }
-    draft.kind = "cron"
-    draft.zone = "invalid/zone"
-    #expect(throws: (any Error).self) { try draft.triggers() }
-}
-
-@Test func editingAnExpiredOneTimeRoutinePreservesItsTimestamp() throws {
-    let once = RoutineTrigger(type: "once", at: 1_779_000_000_001)
-    #expect(try RoutineScheduleDraft(triggers: [once]).triggers() == [once])
-}
-
-@Test func weekdayScheduleKeepsItsZoneAndWorkingDays() throws {
-    let weekday = RoutineTrigger(type: "cron", expression: "30 8 * * 1-5", timeZone: "America/New_York")
-    let draft = RoutineScheduleDraft(triggers: [weekday])
-    #expect(draft.calendarStyle == "weekdays")
-    #expect(try draft.triggers() == [weekday])
+    draft.at = 1_779_000_000_001
+    let date = draft.date
+    draft.date = date
+    #expect(draft.at == 1_779_000_000_001)
 }

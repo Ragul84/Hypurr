@@ -11,12 +11,18 @@ actor FakeRemote: RemoteTransport {
     private var eventSinks: [AsyncThrowingStream<Data, Error>.Continuation] = []
     private var mailboxSinks: [AsyncStream<MailboxEvent>.Continuation] = []
     private(set) var sent: [String] = []
+    private(set) var readReceipts: [Data] = []
+    private var failReadReceipts = false
+    private(set) var readAttempts = 0
+
+    func setReadFailure(_ fail: Bool) { failReadReceipts = fail }
     private(set) var enqueued: [String] = []
     var cancelResult = MailboxCancel.cancelled
 
     init(_ state: LinkState) { self.state = state }
 
     var subscribed: Bool { !eventSinks.isEmpty }
+    var eventSubscriptionCount: Int { eventSinks.count }
 
     func set(_ new: LinkState) {
         state = new
@@ -35,6 +41,11 @@ actor FakeRemote: RemoteTransport {
         switch method {
         case "hello":
             return Data(#"{"hostId":"h1","name":"Mac","version":"3.0.0","os":"macos","backends":[],"rev":0}"#.utf8)
+        case "markRead":
+            readAttempts += 1
+            if failReadReceipts { throw HostError.unreachable }
+            readReceipts.append(body)
+            return Data("{}".utf8)
         case "send":
             let b = (try JSONSerialization.jsonObject(with: body) as? [String: String]) ?? [:]
             sent.append(b["text"] ?? "")
@@ -201,6 +212,23 @@ private func botEvent(_ id: String, name: String, rev: Int) -> String {
     #expect(updates.count == 2)
 }
 
+@MainActor @Test func computersReorderAndStaySaved() async throws {
+    let (storage, suite) = context()
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    let a = randomComputer("A"), b = randomComputer("B"), c = randomComputer("C")
+    storage.computers = [a, b, c]
+    let account = AccountStore(storage: storage, clientKind: "ios", cloud: nil) { computer, route in
+        BotStore(computer: computer, route: route, clientKind: "ios", storage: storage) { FakeRemote(.ready(.direct)) }
+    }
+    account.move(a.id, to: c.id)
+    #expect(account.computers.map(\.id) == [b.id, c.id, a.id])
+    account.move(a.id, to: b.id)
+    #expect(account.computers.map(\.id) == [a.id, b.id, c.id])
+    account.move(c.id, to: b.id)
+    #expect(storage.computers.map(\.id) == [a.id, c.id, b.id])
+    account.retire()
+}
+
 @MainActor @Test func attachedComputersAreNotSaved() async throws {
     let (storage, suite) = context()
     defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
@@ -225,4 +253,123 @@ private func botEvent(_ id: String, name: String, rev: Int) -> String {
 
 extension FakeRemote {
     func setCancelResult(_ result: MailboxCancel) { cancelResult = result }
+}
+
+
+@MainActor @Test func visibleConversationAcknowledgesEntriesBeforeUnreadAndFinalUpdates() async throws {
+    let (storage, suite) = context()
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    let fake = FakeRemote(.ready(.direct))
+    let store = BotStore(computer: randomComputer("Mac"), route: .channel, clientKind: "ios", storage: storage) { fake }
+    store.setActive(true)
+    defer { store.setActive(false) }
+    #expect(await until { await fake.subscribed })
+    await fake.emit(botEvent("b1", name: "Bot", rev: 1))
+    #expect(await until { store.connection == .online })
+    await fake.emit(botEvent("b1", name: "Bot", rev: 1))
+    #expect(await until { store.bots["b1"] != nil })
+    let token = UUID()
+    store.setReading(token, botId: "b1", thread: nil, active: true)
+    #expect(await until { await fake.readReceipts.count == 1 })
+    // Streaming and final content have the same ID. The final update must be read
+    // even though the roster has not yet reported any unread messages.
+    await fake.emit(#"{"type":"entry","entry":{"id":"answer","seq":1,"botId":"b1","rev":2,"kind":"agent","turn":1,"data":{"text":"draft","final":false},"createdAt":1,"updatedAt":1}}"#)
+    #expect(await until { store.allEntries("b1").last?.rev == 2 })
+    await fake.emit(#"{"type":"entry","entry":{"id":"answer","seq":1,"botId":"b1","rev":3,"kind":"agent","turn":1,"data":{"text":"done","final":true},"createdAt":1,"updatedAt":2}}"#)
+    #expect(await until { await fake.readReceipts.count == 2 })
+    await fake.emit(#"{"type":"bot","bot":{"id":"b1","name":"Bot","rev":4,"unread":1}}"#)
+    #expect(await until { await fake.readReceipts.count == 3 })
+    store.setReading(token, botId: "b1", thread: nil, active: false)
+    await fake.emit(#"{"type":"bot","bot":{"id":"b1","name":"Bot","rev":5,"unread":2}}"#)
+    #expect(await until { store.bots["b1"]?.rev == 5 })
+    try await Task.sleep(for: .milliseconds(50))
+    #expect(await fake.readReceipts.count == 3)
+    // Returning to the foreground acknowledges without needing navigation.
+    store.setReading(token, botId: "b1", thread: nil, active: true)
+    #expect(await until { await fake.readReceipts.count == 4 })
+}
+
+@MainActor @Test func readingOneThreadDoesNotAcknowledgeOtherThreads() async throws {
+    let (storage, suite) = context()
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    let fake = FakeRemote(.ready(.direct))
+    let store = BotStore(computer: randomComputer("Mac"), route: .channel, clientKind: "mac", storage: storage) { fake }
+    store.setActive(true)
+    defer { store.setActive(false) }
+    #expect(await until { await fake.subscribed })
+    await fake.emit(botEvent("b1", name: "Bot", rev: 1))
+    #expect(await until { store.connection == .online })
+    let token = UUID()
+    store.setReading(token, botId: "b1", thread: "root-a", active: true)
+    #expect(await until { await fake.readReceipts.count == 1 })
+    await fake.emit(#"{"type":"entry","entry":{"id":"other","seq":1,"botId":"b1","threadId":"root-b","rev":2,"kind":"agent","turn":1,"data":{"text":"done","final":true},"createdAt":1,"updatedAt":1}}"#)
+    #expect(await until { store.allEntries("b1").last?.id == "other" })
+    try await Task.sleep(for: .milliseconds(50))
+    #expect(await fake.readReceipts.count == 1)
+    await fake.emit(#"{"type":"entry","entry":{"id":"own","seq":2,"botId":"b1","threadId":"root-a","rev":3,"kind":"agent","turn":1,"data":{"text":"done","final":true},"createdAt":1,"updatedAt":1}}"#)
+    #expect(await until { await fake.readReceipts.count == 2 })
+    for receipt in await fake.readReceipts {
+        let body = try #require(JSONSerialization.jsonObject(with: receipt) as? [String: Any])
+        #expect(body["threadId"] as? String == "root-a")
+        #expect(body["all"] as? Bool == false)
+    }
+}
+
+@MainActor @Test func initialOfflineReportWaitsForReconnect() async throws {
+    let (storage, suite) = context()
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    let fake = FakeRemote(.hostOffline(lastSeen: nil))
+    let store = BotStore(computer: randomComputer("Mac"), route: .channel, clientKind: "ios", storage: storage) { fake }
+    defer { store.retire() }
+    store.setActive(true)
+    try await Task.sleep(for: .milliseconds(200))
+    #expect(store.connection == .connecting)
+    #expect(store.lastError == nil)
+    await fake.set(.ready(.relay))
+    #expect(await until { await fake.subscribed })
+    await fake.emit(botEvent("b1", name: "Bot", rev: 1))
+    #expect(await until { store.connection == .online })
+    try await Task.sleep(for: .seconds(1))
+    #expect(store.connection == .online)
+}
+
+@MainActor @Test func initialUnreachableEventuallyShowsOffline() async throws {
+    let (storage, suite) = context()
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    let fake = FakeRemote(.failed("Can't reach"))
+    let store = BotStore(computer: randomComputer("Mac"), route: .channel, clientKind: "ios", storage: storage) { fake }
+    defer { store.retire() }
+    store.setActive(true)
+    try await Task.sleep(for: .milliseconds(200))
+    #expect(store.connection == .connecting)
+    #expect(await until { store.connection == .offline("Can't reach") })
+    #expect(store.lastError == nil)
+}
+
+@MainActor @Test func failedAutomaticReadDoesNotInterruptChatAndRecoversWithTheLink() async throws {
+    let (storage, suite) = context()
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    let fake = FakeRemote(.ready(.direct))
+    let store = BotStore(computer: randomComputer("Mac"), route: .channel, clientKind: "ios", storage: storage) { fake }
+    defer { store.retire() }
+    store.setActive(true)
+    #expect(await until { await fake.subscribed })
+    await fake.emit(botEvent("b1", name: "Bot", rev: 1))
+    #expect(await until { store.connection == .online })
+    await fake.setReadFailure(true)
+    store.setReading(UUID(), botId: "b1", thread: nil, active: true)
+    #expect(await until { await fake.readAttempts == 1 })
+    try await Task.sleep(for: .milliseconds(50))
+    #expect(store.lastError == nil)
+    await fake.set(.hostOffline(lastSeen: nil))
+    #expect(await until { store.hostRoute == nil })
+    #expect(store.connection == .online)
+    #expect(store.canQueue)
+    await fake.setReadFailure(false)
+    await fake.set(.ready(.relay))
+    #expect(await until { await fake.eventSubscriptionCount == 2 })
+    await fake.emit(botEvent("b2", name: "Other bot", rev: 2))
+    #expect(await until { await fake.readReceipts.count == 1 })
+    #expect(store.connection == .online)
+    #expect(store.lastError == nil)
 }

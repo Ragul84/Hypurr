@@ -36,7 +36,7 @@ struct BotTemplateView: View {
             }
             .background(Palette.surface, in: RoundedRectangle(cornerRadius: 12))
             HStack {
-                Text("Includes the working folder and agent configuration.")
+                Text("Includes workspace preferences and agent configuration.")
                     .font(.caption).foregroundStyle(Palette.secondary)
                 Spacer()
                 Button {

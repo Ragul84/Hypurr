@@ -65,8 +65,7 @@ struct RepliesView: View {
         .background(Palette.background)
         .task(id: rootId) { await model.loadThread(botId, root: rootId) }
         // A thread is read on its own: having it open reads its replies.
-        .onAppear { model.markRead(botId, thread: rootId) }
-        .onChange(of: replies.last?.id) { _, _ in model.markRead(botId, thread: rootId) }
+        .readingConversation(botId, thread: rootId)
         .codyncSheet(isPresented: $showTrace) {
             TraceView(botId: botId, thread: rootId)
                 #if os(macOS)

@@ -2,6 +2,8 @@ import CodyncKit
 import SwiftUI
 #if os(macOS)
 import AppKit
+#elseif os(iOS)
+import UIKit
 #endif
 
 // Codync's own controls. Never use the stock ones (Menu, Picker, .switch toggles,
@@ -157,11 +159,25 @@ public struct ReactionPick {
     }
 }
 
+private struct MenuAvailableSizeKey: EnvironmentKey {
+    static let defaultValue = CGSize(width: 320, height: 420)
+}
+
+private extension EnvironmentValues {
+    var menuAvailableSize: CGSize {
+        get { self[MenuAvailableSizeKey.self] }
+        set { self[MenuAvailableSizeKey.self] = newValue }
+    }
+}
+
 /// The floating panel of menu rows (used by every menu, popover or overlay).
 public struct MenuPanel: View {
     let items: [MenuItem]
     var reactions: ReactionPick?
     let dismiss: () -> Void
+    @Environment(\.menuAvailableSize) private var availableSize
+    @State private var contentHeight: CGFloat?
+    @State private var positionedSelection = false
 
     public init(items: [MenuItem], reactions: ReactionPick? = nil, dismiss: @escaping () -> Void) {
         self.items = items
@@ -170,26 +186,47 @@ public struct MenuPanel: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            if let reactions {
-                ReactionStrip(pick: reactions, dismiss: dismiss)
-                    .padding(.bottom, 4)
+        ScrollViewReader { proxy in
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 2) {
+                    if let reactions {
+                        ReactionStrip(pick: reactions, dismiss: dismiss)
+                            .padding(.bottom, 4)
+                    }
+                    ForEach(items) { item in
+                        if item.divider {
+                            Rectangle().fill(Palette.text.opacity(0.1)).frame(height: 0.5)
+                                .padding(.horizontal, 10).padding(.vertical, 4)
+                        }
+                        MenuRow(item: item) {
+                            dismiss()
+                            item.action()
+                        }
+                        .id(item.id)
+                    }
+                }
+                .padding(6)
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
             }
-            ForEach(items) { item in
-                if item.divider {
-                    Rectangle().fill(Palette.text.opacity(0.1)).frame(height: 0.5)
-                        .padding(.horizontal, 10).padding(.vertical, 4)
-                }
-                MenuRow(item: item) {
-                    dismiss()
-                    item.action()
-                }
+            .scrollBounceBehavior(.basedOnSize)
+            .frame(width: min(320, availableSize.width),
+                   height: min(contentHeight ?? estimatedHeight, availableSize.height))
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .onChange(of: contentHeight) { _, height in
+                guard height != nil, !positionedSelection,
+                      let selected = items.first(where: { $0.selected == true }) else { return }
+                positionedSelection = true
+                proxy.scrollTo(selected.id, anchor: .center)
             }
         }
-        .padding(6)
-        .frame(minWidth: InterfaceMetrics.value(mac: 180, mobile: 220))
-        .fixedSize()
     }
+
+    private var estimatedHeight: CGFloat {
+        CGFloat(items.count) * InterfaceMetrics.value(mac: 32, mobile: 46) + 12
+            + (reactions == nil ? 0 : InterfaceMetrics.value(mac: 32, mobile: 46))
+    }
+
 }
 
 /// Quick-reaction buttons; a chosen one is highlighted and tapping it takes it back.
@@ -256,7 +293,8 @@ private struct MenuRow: View {
                 if let icon = item.icon {
                     Image(systemName: icon).frame(width: 18)
                 }
-                Text(item.title).lineLimit(1)
+                // Wraps rather than truncates: a cut-off choice can't be read.
+                Text(item.title).fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 16)
                 if let selected = item.selected {
                     Image(systemName: "checkmark").font(.caption.weight(.semibold)).opacity(selected ? 1 : 0)
@@ -271,6 +309,7 @@ private struct MenuRow: View {
         }
         .buttonStyle(.plain)
         .onHover { h in withAnimation(Motion.hover) { hovering = h } }
+        .help(item.title)
         .accessibilityAddTraits(item.selected == true ? .isSelected : [])
     }
 }
@@ -341,23 +380,39 @@ struct AnchoredPanel<Panel: View>: View {
     let anchor: CGRect
     let close: () -> Void
     @ViewBuilder let panel: () -> Panel
+    #if os(macOS)
+    @FocusState private var keyboardFocused: Bool
+    #endif
 
     var body: some View {
         GeometryReader { geo in
             let space = geo.frame(in: .global)
             let a = anchor.offsetBy(dx: -space.minX, dy: -space.minY)
-            let below = a.maxY < space.height * 0.62
+            let roomBelow = max(0, space.height - a.maxY - 14)
+            let roomAbove = max(0, a.minY - 14)
+            let below = roomBelow >= roomAbove
             let leading = a.midX < space.width * 0.6
+            let horizontalInset = max(8, space.width - min(320, space.width - 16) - 8)
             ZStack(alignment: Alignment(horizontal: leading ? .leading : .trailing, vertical: below ? .top : .bottom)) {
                 Color.clear.contentShape(Rectangle()).onTapGesture(perform: close)
                 panel()
+                    .environment(\.menuAvailableSize, CGSize(
+                        width: max(1, space.width - 16),
+                        height: max(1, min(420, below ? roomBelow : roomAbove))
+                    ))
                     .background(Palette.bubbleAgent, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     .shadow(color: .black.opacity(0.25), radius: 20, y: 8)
-                    .offset(x: leading ? max(8, a.minX) : -max(8, space.width - a.maxX),
+                    .offset(x: leading ? min(max(8, a.minX), horizontalInset) : -min(max(8, space.width - a.maxX), horizontalInset),
                             y: below ? a.maxY + 6 : -(space.height - a.minY + 6))
             }
         }
         .ignoresSafeArea()
+        #if os(macOS)
+        .focusable()
+        .focusEffectDisabled()
+        .focused($keyboardFocused)
+        .onAppear { keyboardFocused = true }
+        #endif
     }
 }
 
@@ -373,10 +428,37 @@ public struct DropdownMenu<Label: View>: View {
     }
 
     public var body: some View {
+        #if os(iOS)
+        // The system menu: it anchors correctly inside sheets and scroll views, where an overlay can't.
+        Menu {
+            ForEach(items()) { item in
+                if item.divider { Divider() }
+                Self.row(item)
+            }
+        } label: { label }
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+        #else
         Button { open.toggle() } label: { label }
             .buttonStyle(.plain)
             .codyncMenu(isPresented: $open, items: items)
+        #endif
     }
+
+    #if os(iOS)
+    @ViewBuilder private static func row(_ item: MenuItem) -> some View {
+        let role: ButtonRole? = item.destructive ? .destructive : nil
+        if let selected = item.selected {
+            Toggle(isOn: Binding(get: { selected }, set: { _ in item.action() })) {
+                if let icon = item.icon { SwiftUI.Label(item.title, systemImage: icon) } else { Text(item.title) }
+            }
+        } else if let icon = item.icon {
+            Button(role: role, action: item.action) { SwiftUI.Label(item.title, systemImage: icon) }
+        } else {
+            Button(item.title, role: role, action: item.action)
+        }
+    }
+    #endif
 }
 
 /// Picks one value: shows the current choice in a pill with a chevron, opens a Codync menu.
@@ -384,11 +466,13 @@ public struct ChoicePicker<ID: Hashable>: View {
     @Binding var selection: ID
     let options: [(id: ID, label: String)]
     var fill: Color
+    var fitsAvailableWidth: Bool
 
-    public init(selection: Binding<ID>, options: [(id: ID, label: String)], fill: Color = Palette.bubbleUser) {
+    public init(selection: Binding<ID>, options: [(id: ID, label: String)], fill: Color = Palette.bubbleUser, fitsAvailableWidth: Bool = false) {
         _selection = selection
         self.options = options
         self.fill = fill
+        self.fitsAvailableWidth = fitsAvailableWidth
     }
 
     public var body: some View {
@@ -403,7 +487,8 @@ public struct ChoicePicker<ID: Hashable>: View {
             .foregroundStyle(Palette.text)
             .pill(fill: fill)
         }
-        .fixedSize()
+        .fixedSize(horizontal: !fitsAvailableWidth, vertical: true)
+        .help(options.first { $0.id == selection }?.label ?? "Choose")
     }
 }
 
@@ -644,9 +729,12 @@ public struct DialogAction: Identifiable {
 public extension View {
     /// A centered card over a dimmed screen with the actions and Cancel:
     /// the replacement for `confirmationDialog` and `alert`.
+    /// Set `inPlace` only at the navigation root to keep underlying glass unchanged.
     func codyncDialog(_ title: String, isPresented: Binding<Bool>, message: String? = nil,
-                      cancel: String? = "Cancel", actions: @escaping () -> [DialogAction]) -> some View {
-        modifier(CodyncDialog(title: title, message: message, cancel: cancel, isPresented: isPresented, actions: actions))
+                      cancel: String? = "Cancel", inPlace: Bool = false,
+                      actions: @escaping () -> [DialogAction]) -> some View {
+        modifier(CodyncDialog(title: title, message: message, cancel: cancel, inPlace: inPlace,
+                              isPresented: isPresented, actions: actions))
     }
 }
 
@@ -654,12 +742,36 @@ private struct CodyncDialog: ViewModifier {
     let title: String
     let message: String?
     let cancel: String?
+    /// Use only above the navigation container so the scrim also covers its toolbar.
+    let inPlace: Bool
     @Binding var isPresented: Bool
     let actions: () -> [DialogAction]
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
-        content.codyncOverlay(isPresented: $isPresented) { close in
-            DialogCard(title: title, message: message, cancel: cancel, actions: actions(), dismiss: close)
+        if inPlace {
+            content
+                .allowsHitTesting(!isPresented)
+                .accessibilityHidden(isPresented)
+                .overlay {
+                    if isPresented {
+                        DialogCard(title: title, message: message, cancel: cancel, actions: actions()) {
+                            isPresented = false
+                        }
+                        .transition(.opacity)
+                        #if os(iOS)
+                        .onAppear {
+                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),
+                                                             to: nil, from: nil, for: nil)
+                        }
+                        #endif
+                    }
+                }
+                .animation(Motion.reduced(Motion.fade, reduceMotion), value: isPresented)
+        } else {
+            content.codyncOverlay(isPresented: $isPresented) { close in
+                DialogCard(title: title, message: message, cancel: cancel, actions: actions(), dismiss: close)
+            }
         }
     }
 }

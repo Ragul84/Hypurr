@@ -23,6 +23,7 @@ public struct ScreenView: View {
     @State private var zoomed = false
     @State private var resetToken = 0
     @State private var tookOver = false
+    @State private var portrait = false
 
     public init(watching: String? = nil, close: (() -> Void)? = nil) {
         self.watching = watching
@@ -39,13 +40,16 @@ public struct ScreenView: View {
                 ScreenCanvasView(session: session, display: display, mode: mode, interactive: interactive,
                                  keyboard: keyboard, armed: $armed, zoomed: $zoomed, resetToken: resetToken)
                     .ignoresSafeArea(.container)
-                    .ignoresSafeArea(.keyboard)
+                    // Portrait: the screen moves above the keyboard. Landscape: the keyboard
+                    // overlays it, since shrinking there would leave the screen too small.
+                    .ignoresSafeArea(portrait ? [] : .keyboard)
                 status(session)
             } else {
                 unavailable
             }
         }
         .overlay(alignment: .top) { topBar }
+        .onGeometryChange(for: Bool.self) { $0.size.height > $0.size.width } action: { portrait = $0 }
         .safeAreaInset(edge: .bottom) {
             if keyboard && interactive {
                 ModifierBar(armed: $armed) { session?.send(["type": "key", "key": $0, "modifiers": armed]); armed = [] }
@@ -55,8 +59,14 @@ public struct ScreenView: View {
         .statusBarHidden()
         .persistentSystemOverlays(.hidden)
         .preferredColorScheme(.dark)
-        .onAppear(perform: start)
-        .onDisappear(perform: stop)
+        .onAppear {
+            OrientationLock.viewerAppeared()
+            start()
+        }
+        .onDisappear {
+            stop()
+            OrientationLock.viewerDisappeared()
+        }
         .onChange(of: screen?.available) { _, available in
             if available == true, session == nil { start() }
         }
@@ -64,8 +74,8 @@ public struct ScreenView: View {
 
     // MARK: lifecycle
 
+    /// Also runs when the screen becomes available after opening, so it leaves orientation alone.
     private func start() {
-        OrientationLock.set(.allButUpsideDown, prefer: .landscapeRight)
         guard session == nil, let client = model.client, let screen, screen.available, let d = display ?? screen.mainDisplay else { return }
         display = d
         let s = ScreenSession(client: client, display: d)
@@ -80,7 +90,6 @@ public struct ScreenView: View {
         session = nil
         if tookOver { model.screenTakeover(false) }
         tookOver = false
-        OrientationLock.set(.portrait, prefer: .portrait)
     }
 
     private func setInteractive(_ on: Bool) {
@@ -100,12 +109,16 @@ public struct ScreenView: View {
             if let agent, !interactive {
                 Label("\(agent.name) is using the computer", systemImage: "cursorarrow.motionlines")
                     .font(.caption.weight(.medium))
+                    .lineLimit(1)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(.ultraThinMaterial, in: Capsule())
                     .transition(.opacity)
             }
             Spacer()
+            // Turning the phone does nothing while iOS rotation lock is on, and a phone held
+            // upright stays in the landscape the viewer opened in until it is turned.
+            OverlayButton("Rotate", "rotate.right") { OrientationLock.toggle() }
             if session != nil {
                 if interactive {
                     OverlayButton(keyboard ? "Hide keyboard" : "Keyboard", keyboard ? "keyboard.chevron.compact.down" : "keyboard") { animate { keyboard.toggle() } }
@@ -305,23 +318,56 @@ private struct ModifierBar: View {
 @MainActor
 public enum OrientationLock {
     public static var mask: UIInterfaceOrientationMask = UIDevice.current.userInterfaceIdiom == .pad ? .all : .portrait
+    /// Open viewers: a viewer replaced in place (`.id` change) may appear before the old one disappears.
+    private static var viewers = 0
+    /// The delayed rotate from the last open or close; a newer request or a rotate tap cancels it.
+    private static var pending: Task<Void, Never>?
 
-    static func set(_ newMask: UIInterfaceOrientationMask, prefer: UIInterfaceOrientationMask) {
+    /// The first open viewer allows every orientation and turns to landscape, once per presentation.
+    static func viewerAppeared() {
+        viewers += 1
+        if viewers == 1 { set(.allButUpsideDown, prefer: .landscapeRight) }
+    }
+
+    /// The last viewer to close brings the app back to portrait.
+    static func viewerDisappeared() {
+        viewers = max(0, viewers - 1)
+        if viewers == 0 { set(.portrait, prefer: .portrait) }
+    }
+
+    private static func set(_ newMask: UIInterfaceOrientationMask, prefer: UIInterfaceOrientationMask) {
         guard UIDevice.current.userInterfaceIdiom == .phone else { return }
         mask = newMask
+        pending?.cancel()
         // Once the full-screen cover is up: every controller in the chain re-reads the mask, then rotate.
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(100))
-            for case let scene as UIWindowScene in UIApplication.shared.connectedScenes {
-                var vc = scene.keyWindow?.rootViewController
-                while let current = vc {
-                    current.setNeedsUpdateOfSupportedInterfaceOrientations()
-                    vc = current.presentedViewController
-                }
-                try? await Task.sleep(for: .milliseconds(150))
-                // Best effort: turning the phone always works once the mask allows it.
-                scene.requestGeometryUpdate(.iOS(interfaceOrientations: prefer))
-            }
+        pending = Task { @MainActor in
+            guard (try? await Task.sleep(for: .milliseconds(100))) != nil else { return }
+            let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+            scenes.forEach(reloadMask)
+            guard (try? await Task.sleep(for: .milliseconds(150))) != nil else { return }
+            // Best effort: turning the phone always works once the mask allows it.
+            for scene in scenes { scene.requestGeometryUpdate(.iOS(interfaceOrientations: prefer)) }
+        }
+    }
+
+    /// Flip between portrait and landscape inside the screen viewer. A programmatic request
+    /// works with iOS rotation lock on; the phone keeps it until it is physically turned.
+    static func toggle() {
+        guard UIDevice.current.userInterfaceIdiom == .phone, viewers > 0 else { return }
+        pending?.cancel()
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        guard let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first else { return }
+        reloadMask(scene)
+        let bounds = scene.coordinateSpace.bounds
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: bounds.width > bounds.height ? .portrait : .landscapeRight))
+    }
+
+    /// Every controller in the presentation chain re-reads `mask`.
+    private static func reloadMask(_ scene: UIWindowScene) {
+        var vc = scene.keyWindow?.rootViewController
+        while let current = vc {
+            current.setNeedsUpdateOfSupportedInterfaceOrientations()
+            vc = current.presentedViewController
         }
     }
 }

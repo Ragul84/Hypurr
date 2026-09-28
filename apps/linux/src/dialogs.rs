@@ -44,6 +44,9 @@ pub fn editor(ui: &App, bot: Option<Value>) {
         })
     })));
 
+    if d.borrow()["managedWorkspace"] == true {
+        d.borrow_mut()["cwd"] = "".into();
+    }
     let (dialog, view, header) =
         header_dialog(if is_new { "New Bot" } else { "Edit Bot" }, 560, 720);
     let save = gtk::Button::builder()
@@ -244,14 +247,14 @@ pub fn editor(ui: &App, bot: Option<Value>) {
 
     // Project folder (native folder chooser: the host runs on this computer)
     let project = adw::PreferencesGroup::builder()
-        .title("Project folder")
+        .title("Workspace (project folder optional)")
         .build();
     let folder_row = adw::ActionRow::builder()
         .title(
             d.borrow()["cwd"]
                 .as_str()
                 .filter(|s| !s.is_empty())
-                .unwrap_or("Choose a folder…"),
+                .unwrap_or("Personal workspace · allocated automatically"),
         )
         .activatable(true)
         .build();
@@ -263,6 +266,20 @@ pub fn editor(ui: &App, bot: Option<Value>) {
         .build();
     folder_row.add_suffix(&choose);
     project.add(&folder_row);
+    let personal = gtk::Button::builder()
+        .icon_name("edit-undo-symbolic")
+        .tooltip_text("Use personal workspace")
+        .css_classes(["flat"])
+        .valign(gtk::Align::Center)
+        .build();
+    folder_row.add_suffix(&personal);
+    {
+        let (draft, row) = (d.clone(), folder_row.clone());
+        personal.connect_clicked(move |_| {
+            draft.borrow_mut()["cwd"] = "".into();
+            row.set_title("Personal workspace · allocated automatically");
+        });
+    }
     {
         let (d2, row, dialog2) = (d.clone(), folder_row.clone(), dialog.clone());
         let pick = move || {
@@ -573,10 +590,7 @@ pub fn group_editor(ui: &App, group: Option<Value>) {
                     .build();
                 let bname = b["name"].as_str().unwrap_or("");
                 text.append(&label(bname, &["body13"]));
-                text.append(&label(
-                    &ui::folder(b["cwd"].as_str().unwrap_or("")),
-                    &["footnote", "tertiary"],
-                ));
+                text.append(&label(&ui::folder(b), &["footnote", "tertiary"]));
                 row.append(&text);
                 let plus = gtk::Image::from_icon_name("list-add-symbolic");
                 plus.add_css_class("tertiary");
@@ -838,11 +852,11 @@ pub fn trace(ui: &App) {
             let text = entries
                 .iter()
                 .find(|x| x["id"] == root)
-                .and_then(|x| x["data"]["text"].as_str())
-                .unwrap_or("");
+                .map(crate::rows::message_text)
+                .unwrap_or_default();
             list.append(
                 &gtk::Label::builder()
-                    .label(format!("Thread · {}", short(text, 60)))
+                    .label(format!("Thread · {}", short(&text, 60)))
                     .xalign(0.0)
                     .ellipsize(gtk::pango::EllipsizeMode::End)
                     .css_classes(["title-4"])
@@ -895,8 +909,8 @@ fn trace_lane(list: &gtk::Box, entries: &[&Value]) {
             let title = entries
                 .iter()
                 .find(|x| x["turn"] == t && x["kind"] == "user")
-                .and_then(|x| x["data"]["text"].as_str())
-                .unwrap_or("");
+                .map(|x| crate::rows::message_text(x))
+                .unwrap_or_default();
             group = adw::PreferencesGroup::builder()
                 .title(gtk::glib::markup_escape_text(
                     &title.chars().take(80).collect::<String>(),
@@ -1297,6 +1311,16 @@ fn remote_screen_group() -> adw::PreferencesGroup {
 pub fn settings(ui: &App) {
     let (dialog, view, _) = header_dialog("Computers & devices", 520, 720);
     let page = adw::PreferencesPage::new();
+    let credentials = adw::PreferencesGroup::new();
+    let button = gtk::Button::with_label("Credentials");
+    let ui2 = ui.clone();
+    button.connect_clicked(move |_| crate::connections::credentials(&ui2));
+    credentials.add(&button);
+    let marketplace = gtk::Button::with_label("Connectors");
+    let ui2 = ui.clone();
+    marketplace.connect_clicked(move |_| crate::connections::marketplace(&ui2));
+    credentials.add(&marketplace);
+    page.add(&credentials);
     let pair = adw::PreferencesGroup::builder()
         .title("Pair your iPhone")
         .description("Scan with the Codync app or the iPhone Camera.")

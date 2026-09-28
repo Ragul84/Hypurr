@@ -368,11 +368,11 @@ fn open_chat(ui: &App, id: &str) {
     ui.compose_page.previous.borrow_mut().take();
     ui::select(ui, id);
     if !text.is_empty() {
-        ui::send_text(ui, id, &text, None);
+        ui::send_text(ui, id, &text, None, vec![]);
     }
 }
 
-/// "New Bot" (or the typed name) with sensible defaults: the first available agent, home folder.
+/// "New Bot" (or the typed name) with sensible defaults: the first available agent and a personal workspace.
 fn create(ui: &App) {
     if ui.compose_page.creating.replace(true) {
         return;
@@ -390,7 +390,7 @@ fn create(ui: &App) {
         let n = uuid::Uuid::new_v4().as_u128() as usize;
         json!({
             "name": name, "description": "", "permission": "ask", "model": null, "command": null,
-            "cwd": st.hello["home"].as_str().unwrap_or(""),
+            "cwd": "",
             "avatarShape": avatar::SHAPES[n % avatar::SHAPES.len()],
             "avatarColor": avatar::COLORS[(n / 8) % avatar::COLORS.len()].0,
             "backend": backends.iter().find(|b| b["available"] == true).and_then(|b| b["id"].as_str()).unwrap_or("claude"),

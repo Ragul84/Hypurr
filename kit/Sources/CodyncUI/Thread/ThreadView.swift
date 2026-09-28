@@ -23,7 +23,6 @@ public struct ThreadView: View {
     @State private var availableWidth: CGFloat = 800
     @State private var compactDetails = false
     @State private var calling = false
-    @State private var showMenu = false
     @State private var showRoutines = false
     @State private var routineId: String?
     @State private var routineRequest = UUID()
@@ -119,9 +118,9 @@ public struct ThreadView: View {
             }
             .defaultScrollAnchor(.bottom)
             .scrollDismissesKeyboard(.interactively)
+            .conversationScrollEdges()
             .onChange(of: items.last?.id) { _, _ in
                 withAnimation(.snappy) { proxy.scrollTo("bottom", anchor: .bottom) }
-                model.markRead(botId)
             }
             .onChange(of: bot?.isWorking) { _, _ in
                 withAnimation(.snappy) { proxy.scrollTo("bottom", anchor: .bottom) }
@@ -131,46 +130,43 @@ public struct ThreadView: View {
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 6) {
                 #if os(iOS)
-                    ConnectionBanner().padding(.horizontal, 14)
+                    Composer(botId: botId, onCall: bot?.isGroup == false ? { calling = true } : nil)
+                #else
+                    Composer(botId: botId)
                 #endif
-                Composer(botId: botId)
             }
         }
         #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(.visible, for: .navigationBar)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     VStack(spacing: 0) {
                         header
-                        ConnectingIndicator(isConnecting: model.connection == .connecting)
+                        connectionSubtitle
                     }
                 }
-                if model.screen?.agentBot == botId {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        // The bot is operating the computer: watch it live (and take over from there).
-                        Button("Watch the screen", systemImage: "cursorarrow.motionlines") {
-                            model.screenRequest = ScreenRequest(watching: botId)
-                        }
-                        .symbolEffect(.pulse, options: .repeating)
-                    }
+                if model.screen != nil {
+                    ToolbarItem(placement: .topBarTrailing) { computerButton }
                 }
-                if bot?.isGroup != true {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Call", systemImage: "phone") { calling = true }
-                    }
-                }
-                ToolbarItem(placement: .topBarTrailing) { menu }
             }
-            .codyncOverlay(isPresented: $calling) { close in
-                CallView(botId: botId, close: close)
+            // Grok Bot's call: a bar floating over the chat, which stays readable and usable.
+            .overlay(alignment: .top) {
+                if calling {
+                    CallView(botId: botId) { withAnimation(Motion.reduced(Motion.layout, reduceMotion)) { calling = false } }
+                        .padding(.top, 4)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
             }
+            .animation(Motion.reduced(Motion.layout, reduceMotion), value: calling)
         #endif
         #if os(macOS)
             .safeAreaInset(edge: .top, spacing: 0) {
                 VStack(spacing: 0) {
                     HStack {
                         header
+                        connectionSubtitle
                         Spacer(minLength: 8)
                         if let bot, !bot.isGroup {
                             IconButton("Create template", systemImage: "square.and.arrow.up") {
@@ -186,7 +182,6 @@ public struct ThreadView: View {
                     .padding(.horizontal, 16)
                     .frame(height: 44)
                     Rectangle().fill(Palette.border).frame(height: 0.5)
-                    ConnectionBanner().padding(.horizontal, 16).padding(.top, model.isOffline ? 8 : 0)
                 }
                 .background(Palette.background)
             }
@@ -194,7 +189,7 @@ public struct ThreadView: View {
                 if bot?.name == "New Bot", model.chat(botId).isEmpty { editingDetails = true }
             }
         #endif
-        .onAppear { model.markRead(botId) }
+        .readingConversation(botId)
         .codyncSheet(isPresented: $showTrace) {
             TraceView(botId: botId)
                 #if os(macOS)
@@ -261,29 +256,102 @@ public struct ThreadView: View {
 
     // MARK: chrome
 
-    private var header: some View {
-        Button {
-            #if os(macOS)
-                toggleDetails()
-            #else
-                if bot?.isGroup == true { editingGroup = true } else if let bot { editing = EditorRequest(BotDraft(bot)) }
-            #endif
-        } label: {
-            HStack(spacing: 7) {
-                if let bot {
-                    if bot.isGroup { GroupAvatar(members: model.members(of: bot), size: 22) } else { CharacterAvatar(bot: bot, size: 22) }
-                }
-                Text(bot?.name ?? "")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Palette.text)
-                    .lineLimit(1)
-            }
+    private var connectionSubtitle: some View {
+        HStack(spacing: 6) {
+            Image(systemName: connectionSymbol)
+                .font(.system(size: 8, weight: .medium))
+                .frame(width: 12)
+                .accessibilityHidden(true)
+            Text(model.connectionLabel)
+                .lineLimit(1)
+                .truncationMode(.middle)
         }
-        #if os(macOS)
-            .buttonStyle(.plain)
+        .font(.system(size: 10, weight: .medium))
+        .foregroundStyle(Palette.secondary)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(model.hostName), \(connectionDescription)")
+        .help("\(model.hostName) · \(connectionDescription)")
+    }
+
+    private var connectionSymbol: String {
+        guard model.connection == .online else {
+            return model.connection == .connecting ? "arrow.triangle.2.circlepath" : "wifi.slash"
+        }
+        switch model.hostRoute {
+        case .relay: return "cloud"
+        case .direct: return "wifi"
+        case .loopback: return "desktopcomputer"
+        case nil: return "network"
+        }
+    }
+
+    private var connectionDescription: String {
+        switch model.connection {
+        case .connecting: return "Connecting"
+        case .computerOffline, .offline: return "Offline"
+        case .unauthorized: return "No access"
+        case .unpaired: return "Not paired"
+        case .online: break
+        }
+        switch model.hostRoute {
+        case .relay: return "Connected through Cloudflare"
+        case .direct: return "Connected over Wi-Fi or Tailscale"
+        case .loopback: return "Connected locally"
+        case nil: return "Connected"
+        }
+    }
+
+    private var header: some View {
+        #if os(iOS)
+            // Like Grok Bot: the title pill holds the bot's actions; the corner is the computer.
+            Menu {
+                Text("\(model.hostName) · \(model.connectionLabel)")
+                Button("Reconnect", systemImage: "arrow.clockwise") { model.restartStream() }
+                Divider()
+                Button("Details", systemImage: "info.circle", action: openDetails)
+                ForEach(menuItems) { item in
+                    if item.divider { Divider() }
+                    Button(role: item.destructive ? .destructive : nil, action: item.action) {
+                        if let icon = item.icon { Label(item.title, systemImage: icon) } else { Text(item.title) }
+                    }
+                }
+            } label: {
+                title
+            }
+            .accessibilityLabel("\(bot?.name ?? "Conversation") actions")
+        #else
+            Button(action: toggleDetails) { title }
+                .buttonStyle(.plain)
+                .accessibilityLabel("View conversation details")
+                .help("View conversation details")
         #endif
-        .accessibilityLabel("View conversation details")
-        .help("View conversation details")
+    }
+
+    #if os(iOS)
+        private func openDetails() {
+            if bot?.isGroup == true { editingGroup = true } else if let bot { editing = EditorRequest(BotDraft(bot)) }
+        }
+
+        /// Opens the computer's screen; pulses while this bot is operating it (watch, then take over).
+        private var computerButton: some View {
+            let operating = model.screen?.agentBot == botId
+            return Button("Computer", systemImage: "desktopcomputer") {
+                model.screenRequest = operating ? ScreenRequest(watching: botId) : ScreenRequest()
+            }
+            .symbolEffect(.pulse, options: .repeating, isActive: operating)
+        }
+    #endif
+
+    private var title: some View {
+        HStack(spacing: 7) {
+            if let bot {
+                if bot.isGroup { GroupAvatar(members: model.members(of: bot), size: 22) } else { CharacterAvatar(bot: bot, size: 22) }
+            }
+            Text(bot?.name ?? "")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Palette.text)
+                .lineLimit(1)
+        }
     }
 
     #if os(macOS)
@@ -348,23 +416,6 @@ public struct ThreadView: View {
         items.append(MenuItem("New session", icon: "arrow.counterclockwise") { confirmNewSession = true })
         items.append(MenuItem("Delete bot", icon: "trash", destructive: true, divider: true) { confirmDelete = bot })
         return items
-    }
-
-    private var menu: some View {
-        #if os(iOS)
-            Button("More", systemImage: "ellipsis") { showMenu = true }
-                .codyncMenu(isPresented: $showMenu) { menuItems }
-        #else
-            DropdownMenu { menuItems } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Palette.secondary)
-                    .frame(width: 28, height: 28)
-                    .contentShape(Rectangle())
-            }
-            .accessibilityLabel("More")
-            .help("More")
-        #endif
     }
 }
 
@@ -472,7 +523,7 @@ private struct IntroCard: View {
         VStack(spacing: 12) {
             CharacterAvatar(bot: bot, size: 72)
             Text(bot.name).font(.title2.weight(.semibold)).foregroundStyle(Palette.text)
-            Text("\(model.backendName(bot.backend)) in \(bot.cwd)")
+            Text(bot.managedWorkspace ? "\(model.backendName(bot.backend)) · Personal workspace" : "\(model.backendName(bot.backend)) in \(bot.cwd)")
                 .font(.footnote.monospaced())
                 .foregroundStyle(Palette.tertiary)
                 .multilineTextAlignment(.center)
@@ -583,10 +634,12 @@ private struct DetailsPanel: View {
                         .foregroundStyle(Palette.secondary)
                 }
             }
-            Label(computerStatus, systemImage: computerStatusSymbol)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(Palette.text)
-                .fixedSize(horizontal: false, vertical: true)
+            if !model.isOffline {
+                Label(computerStatus, systemImage: computerStatusSymbol)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Palette.text)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if screenReady {
                 Text("View and control this Mac from your iPhone.")
                     .font(.system(size: 11))
@@ -612,11 +665,11 @@ private struct DetailsPanel: View {
             }
             .font(.system(size: 12))
             VStack(alignment: .leading, spacing: 6) {
-                Label("Working folder", systemImage: "folder")
+                Label(bot.managedWorkspace ? "Workspace" : "Project folder", systemImage: "folder")
                     .font(.system(size: 11))
                     .foregroundStyle(Palette.secondary)
-                Text(bot.cwd)
-                    .font(.system(size: 11, design: .monospaced))
+                Text(bot.managedWorkspace ? "Personal · managed by Codync" : bot.cwd)
+                    .font(.system(size: 11))
                     .foregroundStyle(Palette.text)
                     .fixedSize(horizontal: false, vertical: true)
                     .textSelection(.enabled)
@@ -636,7 +689,6 @@ private struct DetailsPanel: View {
     }
 
     private var computerStatusSymbol: String {
-        if model.isOffline { return "wifi.slash" }
         guard let screen = model.screen, screen.enabled else { return "power" }
         if !screen.connected { return "arrow.triangle.2.circlepath" }
         if !screen.capture { return "exclamationmark.circle" }
@@ -644,7 +696,6 @@ private struct DetailsPanel: View {
     }
 
     private var computerStatus: String {
-        guard !model.isOffline else { return "Computer is offline" }
         guard let screen = model.screen, screen.enabled else { return "Remote screen is off" }
         guard screen.connected else { return "Connecting to computer…" }
         guard screen.capture else { return "Screen recording permission needed" }
@@ -652,3 +703,17 @@ private struct DetailsPanel: View {
     }
 }
 #endif
+
+private extension View {
+    @ViewBuilder func conversationScrollEdges() -> some View {
+        if #available(iOS 26, macOS 26, *) {
+            #if os(iOS)
+                scrollEdgeEffectHidden(true, for: .top)
+            #else
+                self
+            #endif
+        } else {
+            self
+        }
+    }
+}
