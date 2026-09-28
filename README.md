@@ -27,13 +27,14 @@ Codync turns the coding agents on your computer — Claude Code, Codex, Cursor, 
 ## Why Codync
 
 - **Free and open source.** No subscription, no paid tier, MIT licensed. It runs on your computer with the agents and accounts you already have.
-- **A 1:1 Grok Bot / Muse alternative.** Persistent named bots, group chats, reply threads, bots asking each other for help, approval cards, per-bot memory, remote screen, voice calls and "needs you / done" notifications — the same features, without being tied to one model or one subscription.
-- **Any coding agent.** Claude Code, Codex, Cursor, Gemini, Copilot, OpenCode, Pi, Grok Build and everything else in the [ACP registry](https://agentclientprotocol.com/registry). Each bot picks its own.
-- **Rust core.** `codync-host` is one small Rust binary for macOS and Linux that drives every agent, keeps the transcripts and serves every client.
+- **Bring any coding agent.** Claude Code, Codex, Cursor, Gemini, Copilot, OpenCode, Pi, Grok Build and ~40 more — everything in the [ACP registry](https://agentclientprotocol.com/registry). Installed agents are found automatically, the rest are fetched on first use, and every bot picks its own. Mix them freely: a Claude bot can ask a Codex bot for a review.
+- **Built in Rust.** `codync-host` is one small, fast Rust binary for macOS and Linux (static on Linux, runs on any distro) that drives every agent, keeps the transcripts and serves every client.
 - **Native on every platform.** SwiftUI on iPhone and Mac, GTK 4 / libadwaita on Linux, and a terminal UI for SSH. No web views, no Electron.
+- **A 1:1 Grok Bot / Muse alternative.** Persistent named bots, group chats, reply threads, bots asking each other for help, approval cards, per-bot memory, remote screen, voice calls and "needs you / done" notifications — the same features, without being tied to one model or one subscription.
+- **Reach your computer from anywhere, free.** The hosted Cloudflare relay is included at no cost: no Tailscale, no VPN, no port forwarding. Traffic is end-to-end encrypted between your phone and your computer, so the relay only forwards ciphertext. Same Wi-Fi or Tailscale? The phone connects directly instead.
 - **Remote screen.** See and control your computer from the iPhone over WebRTC (hardware H.264), and let bots use the screen themselves through the built-in `computer` tool.
 - **Voice calls.** Talk to a bot hands-free from the iPhone and hear its replies read aloud.
-- **Private by default.** Phones reach the host over an end-to-end encrypted channel (direct LAN/Tailscale or the Cloudflare relay); push notifications are sealed so the relay never sees their content.
+- **Private push.** Notification text is sealed to your phone's key, so the push relay never sees what your bots said.
 
 ## Platforms
 
@@ -76,20 +77,21 @@ Both install the same signed, notarized app; the host ships inside it.
 
 Open Codync in the menu bar → **Install host**. **Open Codync** opens the full window; **Pair iPhone…** shows the QR code.
 
-**Linux** — native GTK 4 / libadwaita app plus the host:
+**Linux** — the host, plus the native GTK 4 / libadwaita app:
 
 ```bash
-brew install leepokai/codync/codync-host   # or a release tarball
+brew install leepokai/codync/codync-host   # or codync-host-linux-*.tar.gz from Releases
 codync-host install                        # systemd --user service
-codync                                     # the desktop app (or codync-linux-x86_64.tar.gz / -arm64 from Releases)
 codync-host pair                           # QR code in the terminal, or Settings in the app
 ```
+
+The desktop app is `codync-linux-x86_64.tar.gz` / `codync-linux-arm64.tar.gz` from [Releases](https://github.com/leepokai/Codync/releases/latest): unpack it and run `bin/codync` (it ships a `.desktop` file and icon under `share/`).
 
 Building the Linux app yourself needs `libgtk-4-dev libadwaita-1-dev`: `cargo install --path apps/linux`.
 
 **Linux server / cloud VM** — the host runs headless on any distro (static binary, x86_64 + arm64). Setup, remote access and limitations: [docs/guides/linux-servers.md](docs/guides/linux-servers.md).
 
-Remote access uses an encrypted channel over direct LAN/Tailscale or the Cloudflare relay. Tailscale is optional. Configure matching app/host environments and follow the [Cloudflare test guide](docs/guides/cloudflare-testing.md); development configuration exists, while production configuration still needs completion.
+**Remote access** works out of the box through the free Cloudflare relay, end-to-end encrypted; the phone switches to a direct connection on the same network or over Tailscale. Details: [remote relay](docs/reference/remote-relay.md).
 
 **Agents** — install and sign in to whichever you use; Codync finds them. Claude Code, Codex and Pi run through their ACP adapters (fetched by `npx`, so Node.js is needed for those).
 
