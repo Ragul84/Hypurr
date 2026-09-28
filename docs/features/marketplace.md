@@ -5,7 +5,7 @@ The Plugins screen configures capabilities installed on the selected computer. A
 | Capability | Implementation | Behavior |
 | --- | --- | --- |
 | Agents | `host/src/agent/backends.rs`, `host/src/agent/registry.rs` | Detect installed harnesses and resolve ACP registry adapters |
-| Connectors | `host/src/market/mod.rs` | Discover MCP servers or add one manually; install per computer and enable per bot |
+| Connectors | `host/src/market/mod.rs` | Discover MCP servers or add one manually; install per computer; on for every bot unless a bot turns it off |
 | Connected apps | `host/src/market/composio.rs` | Expose connected Composio apps as connectors |
 | Skills | `host/src/market/mod.rs` | Instruction folders containing `SKILL.md`, stored under `~/.codync/skills/<id>` |
 
@@ -13,7 +13,7 @@ The Connectors shelf opens with a short featured list, then pages through the wh
 
 A custom connector is a command line (split like a shell), a URL, or a pasted MCP config (`importConnectors {config}`: the `mcpServers` / `servers` JSON from READMEs, Claude, Cursor or VS Code, or one server's entry); every server in a config is added.
 
-An enabled connector is passed to the agent as an MCP server when its session starts or resumes. Local connectors are spawned by the agent; remote ones always go through the host's stdio proxy (`codync-host mcp remote`, `host/src/mcp.rs`), so they work with agents that only speak stdio and always carry a fresh token. The proxy speaks streamable HTTP and falls back to the older HTTP+SSE transport when the first POST fails with 400/404/405, as the MCP spec suggests.
+A connector installed on the computer (or an app connected through Composio) is turned on for every existing bot, and a new bot starts with all of them on; each bot can turn one off in its settings. An enabled connector is passed to the agent as an MCP server when its session starts or resumes. Local connectors are spawned by the agent; remote ones always go through the host's stdio proxy (`codync-host mcp remote`, `host/src/mcp.rs`), so they work with agents that only speak stdio and always carry a fresh token. The proxy speaks streamable HTTP and falls back to the older HTTP+SSE transport when the first POST fails with 400/404/405, as the MCP spec suggests.
 
 ## Sign-in for remote connectors (`host/src/market/oauth.rs`)
 

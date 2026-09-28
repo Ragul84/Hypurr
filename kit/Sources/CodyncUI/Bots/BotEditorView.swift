@@ -384,6 +384,10 @@ public extension BotStore {
            let first = hello?.backends.first(where: \.available) {
             draft.backend = first.id
         }
+        // Connectors start on; left unset, the host turns on every one.
+        if draft.connectors == nil, !installedConnectors.isEmpty {
+            draft.connectors = installedConnectors.map(\.id)
+        }
     }
 
     /// Creates "New Bot" with sensible defaults and opens it (desktop compose flow).
