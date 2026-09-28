@@ -91,6 +91,9 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y musl-tools
       - name: Build
         working-directory: host
+        # Vendored C (dbus) would call libgcc's outline atomics, which a static musl link lacks.
+        env:
+          CFLAGS_aarch64_unknown_linux_musl: -mno-outline-atomics
         run: cargo build --release --target ${{ matrix.target }}
       - name: Package
         run: |
