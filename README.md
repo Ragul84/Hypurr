@@ -83,7 +83,7 @@ brew install --cask leepokai/codync/codync
 
 All three install the same signed, notarized app.
 
-Open Codync in the menu bar → **Install host**. **Open Codync** opens the full window; **Pair iPhone…** shows the QR code.
+Open Codync: it sets up the host on first launch. **Open Codync** opens the full window; **Pair iPhone…** shows the QR code.
 
 **Linux** — the host, plus the native GTK 4 / libadwaita app:
 

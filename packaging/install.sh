@@ -115,7 +115,7 @@ install_linux_app() {
 if [ $OS = macos ] && [ $HOST_ONLY = 0 ]; then
   install_mac_app
   echo
-  echo "Codync is open in the menu bar: choose Install host, then Pair iPhone…"
+  echo "Codync is open and sets up the host on its own. Pair your iPhone from the menu bar: Pair iPhone…"
 else
   install_host
   if [ $OS = linux ] && [ $HOST_ONLY = 0 ] && { [ $FORCE_APP = 1 ] || [ -n "${WAYLAND_DISPLAY:-}${DISPLAY:-}" ]; }; then

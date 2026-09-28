@@ -16,15 +16,12 @@ struct ChatWindow: View {
                 ChatSplitView().id(host.contextID)
                     .transition(.opacity)
             } else {
-                EmptyState(
-                    icon: "desktopcomputer.trianglebadge.exclamationmark",
-                    title: "Codync host isn't running",
-                    message: "Open Codync from the menu bar to install or restart it."
-                )
-                .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                hostState
+                    .transition(.opacity.combined(with: .scale(scale: 0.97)))
             }
         }
         .animation(Motion.reduced(Motion.layout, reduceMotion), value: showsChat)
+        .animation(Motion.reduced(Motion.layout, reduceMotion), value: host.state)
         .frame(minWidth: 760, minHeight: 500)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Palette.background)
@@ -38,6 +35,36 @@ struct ChatWindow: View {
             set: { if !$0, let approval = host.currentApproval { host.deferApproval(approval) } }
         )) {
             CurrentApprovalSheet()
+        }
+    }
+}
+
+/// What stands between this Mac and the chat, with the one action that fixes it.
+private extension ChatWindow {
+    @ViewBuilder var hostState: some View {
+        switch host.state {
+        case .notInstalled:
+            EmptyState(
+                icon: "desktopcomputer",
+                title: "Set up this Mac",
+                message: "Codync runs your coding agents through the host, a small background service on this Mac.",
+                action: ("Install host", host.install)
+            )
+        case .missingBinary:
+            EmptyState(
+                icon: "desktopcomputer.trianglebadge.exclamationmark",
+                title: "The host is missing",
+                message: "This copy of Codync doesn't include codync-host. Download Codync again from codync.dev or GitHub."
+            )
+        case .starting, .running:
+            EmptyState(icon: "desktopcomputer", title: "Starting the host…", message: "This takes a few seconds.")
+        case let .failed(message):
+            EmptyState(
+                icon: "desktopcomputer.trianglebadge.exclamationmark",
+                title: "The host isn't running",
+                message: message,
+                action: ("Try again", host.restart)
+            )
         }
     }
 }

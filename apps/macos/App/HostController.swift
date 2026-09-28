@@ -208,15 +208,20 @@ final class HostController {
             return
         }
         guard Self.devPort != nil || FileManager.default.fileExists(atPath: plistURL.path) else {
-            state = .notInstalled
+            // The app is the way to run the host on a Mac: set it up right away, unless the user took it out.
+            if UserDefaults.standard.bool(forKey: Self.uninstalledKey) { state = .notInstalled } else { install() }
             return
         }
         connect()
     }
 
+    /// Set by "Uninstall host service", so the next launch doesn't put the host back.
+    private static let uninstalledKey = "hostUninstalled"
+
     /// `codync-host install` also routes Claude Code's status line through the host.
     func install() {
         guard let bin = binaryURL else { return }
+        UserDefaults.standard.set(false, forKey: Self.uninstalledKey)
         state = .starting
         Task {
             let result = await Self.run(bin, ["install", "--port", "\(Self.port)"])
@@ -230,6 +235,8 @@ final class HostController {
     }
 
     func restart() {
+        // Nothing to restart when the service was never set up (a failed install).
+        guard Self.devPort != nil || FileManager.default.fileExists(atPath: plistURL.path) else { return install() }
         let uid = getuid()
         Task {
             _ = await Self.run(URL(filePath: "/bin/launchctl"), ["kickstart", "-k", "gui/\(uid)/com.pokai.codync.host"])
@@ -241,6 +248,7 @@ final class HostController {
     func uninstall() {
         guard let bin = binaryURL else { return }
         streamTask?.cancel()
+        UserDefaults.standard.set(true, forKey: Self.uninstalledKey)
         Task {
             _ = await Self.run(bin, ["uninstall"])
             if let local { accounts.detach(local.id) }
