@@ -5,8 +5,8 @@ public extension BotActivityPresentation {
         switch phase {
         case .working: .working
         case .needsInput: .listening
-        case .waiting: .connecting
-        case .completed, .failed, .stale: nil
+        case .waiting, .stale: .connecting
+        case .completed, .failed: nil
         }
     }
 
@@ -40,85 +40,45 @@ public struct BotActivityCard: View {
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 10) {
-                CharacterAvatar(shape: shape, color: color, size: 32)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(name).font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text)
-                    Text(state.title).font(.system(size: 11, weight: .medium)).foregroundStyle(state.tint)
-                }
-                .lineLimit(1)
-                Spacer(minLength: 8)
-                BotActivityIndicator(state: state)
+        HStack(spacing: 12) {
+            CharacterAvatar(shape: shape, color: color, size: 32)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name).font(.system(size: 14, weight: .semibold)).foregroundStyle(Palette.text)
+                Text(state.caption).font(.system(size: 12)).foregroundStyle(Palette.secondary)
             }
-            Text(state.detail).font(.system(size: 12)).foregroundStyle(Palette.secondary)
-                .lineLimit(2).fixedSize(horizontal: false, vertical: true)
-            if state.phase == .working, let started = state.startedAt {
-                HStack(spacing: 6) {
-                    Image(systemName: "clock")
-                    Text(started, style: .timer).monospacedDigit()
-                    Text("elapsed")
-                }
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(Palette.tertiary)
-            }
+            .lineLimit(1)
+            Spacer(minLength: 8)
+            BotActivityIndicator(state: state, size: 28)
         }
         .padding(16)
         .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(name), \(state.title). \(state.caption)")
     }
 }
 
-/// Compact trailing / minimal: errors and delayed updates never look complete.
+/// The state mark: a thinking orb while the task is live, a symbol once it has ended
+/// (errors and delayed updates never look complete).
 public struct BotActivityIndicator: View {
     let state: BotActivityPresentation
-    let minimal: Bool
+    let size: CGFloat
 
-    public init(state: BotActivityPresentation, minimal: Bool = false) {
+    public init(state: BotActivityPresentation, size: CGFloat = 20) {
         self.state = state
-        self.minimal = minimal
+        self.size = size
     }
 
     public var body: some View {
         Group {
-            if !minimal, state.showsTimer, let started = state.startedAt {
-                Text(started, style: .timer).monospacedDigit()
-                    .font(.system(size: 12, weight: .medium))
-                    .multilineTextAlignment(.trailing).frame(width: 46)
-                    .minimumScaleFactor(0.7)
-            } else if let orb = state.orbState {
-                ThinkingOrb(state: orb, size: minimal ? 22 : 20, color: state.tint, animated: false)
-                    .accessibilityHidden(false).accessibilityLabel(state.title)
+            if let orb = state.orbState {
+                ThinkingOrb(state: orb, size: size, color: state.tint, animated: false)
             } else {
-                Image(systemName: state.symbol).font(.system(size: 13, weight: .semibold))
-                    .accessibilityLabel(state.title)
+                Image(systemName: state.symbol).font(.system(size: size * 0.6, weight: .semibold))
             }
         }
+        .frame(width: size, height: size)
         .foregroundStyle(state.tint)
-    }
-}
-
-/// The content below the camera in the expanded Dynamic Island.
-public struct BotActivityDetail: View {
-    let state: BotActivityPresentation
-    public init(state: BotActivityPresentation) { self.state = state }
-
-    public var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Label {
-                Text(state.title)
-            } icon: {
-                if let orb = state.orbState {
-                    ThinkingOrb(state: orb, size: 16, color: state.tint, animated: false)
-                } else {
-                    Image(systemName: state.symbol)
-                }
-            }
-                .font(.system(size: 11, weight: .semibold)).foregroundStyle(state.tint)
-            Text(state.detail).font(.system(size: 12)).foregroundStyle(Palette.secondary)
-                .lineLimit(2)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement()
+        .accessibilityLabel(state.title)
     }
 }
 
@@ -160,19 +120,18 @@ public struct BotActivityPreview: View {
             .padding(.horizontal, 12).frame(width: 210, height: 38)
             .background(.black, in: Capsule())
         case .minimal:
-            BotActivityIndicator(state: state, minimal: true)
+            BotActivityIndicator(state: state)
                 .frame(width: 38, height: 38).background(.black, in: Circle())
         case .expanded:
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
-                    CharacterAvatar(bot: bot, size: 26, animated: false)
-                    Text(bot.name).font(.system(size: 14, weight: .semibold)).foregroundStyle(.white).lineLimit(1)
-                    Spacer()
-                    BotActivityIndicator(state: state)
+            HStack(spacing: 10) {
+                CharacterAvatar(bot: bot, size: 26, animated: false)
+                VStack(spacing: 2) {
+                    Text(bot.name).font(.system(size: 14, weight: .semibold)).foregroundStyle(.white)
+                    Text(state.caption).font(.system(size: 12)).foregroundStyle(Palette.secondary)
                 }
-                BotActivityDetail(state: state)
-                Text(state.phase == .needsInput ? "Respond in Codync ↗" : "Open conversation ↗")
-                    .font(.system(size: 12, weight: .medium)).foregroundStyle(.white)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity)
+                BotActivityIndicator(state: state, size: 28)
             }
             .padding(18).background(.black, in: RoundedRectangle(cornerRadius: 28))
         case .lockScreen: EmptyView()

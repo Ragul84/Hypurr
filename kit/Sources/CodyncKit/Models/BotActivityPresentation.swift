@@ -8,9 +8,8 @@ public struct BotActivityPresentation: Hashable, Sendable {
 
     public let phase: Phase
     public let activity: String
-    public let startedAt: Date?
 
-    public init(status: String, activity: String, startedAt: Date?, isStale: Bool = false) {
+    public init(status: String, activity: String, isStale: Bool = false) {
         let phase: Phase = switch status {
         case "working": .working
         case "needsInput": .needsInput
@@ -20,7 +19,6 @@ public struct BotActivityPresentation: Hashable, Sendable {
         }
         self.phase = isStale && (phase == .working || phase == .needsInput) ? .stale : phase
         self.activity = activity
-        self.startedAt = startedAt
     }
 
     public var title: String {
@@ -34,26 +32,19 @@ public struct BotActivityPresentation: Hashable, Sendable {
         }
     }
 
-    public var detail: String {
+    /// The one line of text beside the orb: the bot's current step while it's live, else the state.
+    public var caption: String {
         switch phase {
-        case .stale: "Open Codync to check the latest status."
-        case .waiting: "Open Codync to check this task."
-        case .completed: "Your bot has finished. Open the conversation for the result."
-        case .failed: "The task stopped with an error. Open the conversation for details."
-        case .needsInput: activity.isEmpty ? "Open the conversation to respond." : activity
-        case .working: activity.isEmpty ? "Your bot is working on the computer." : activity
+        case .working, .needsInput: activity.isEmpty ? title : activity
+        case .completed, .failed, .stale, .waiting: title
         }
     }
 
     public var symbol: String {
         switch phase {
-        case .working: "ellipsis"
-        case .needsInput: "hand.raised.fill"
         case .completed: "checkmark"
         case .failed: "exclamationmark.triangle.fill"
-        case .stale, .waiting: "clock.badge.questionmark"
+        case .working, .needsInput, .stale, .waiting: "ellipsis"
         }
     }
-
-    public var showsTimer: Bool { phase == .working && startedAt != nil }
 }

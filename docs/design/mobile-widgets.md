@@ -51,21 +51,20 @@ State 分頁的 Live Activity 頁顯示鎖定畫面形式，Dynamic Island 頁�
 
 | 形式 | 資訊與互動 |
 | --- | --- |
-| Lock Screen／橫幅 | bot 名稱、狀態、目前工作、執行時間；點擊回到對話 |
-| Compact | 左側 bot、右側計時；需要回應／完成／錯誤時改為狀態圖示 |
-| Minimal | 在更小空間顯示狀態圖示，VoiceOver 包含 bot 名稱 |
-| Expanded | bot、狀態、工作摘要、回到對話的連結；需要回應時顯示 Respond in Codync |
+| Lock Screen／橫幅 | bot 頭像與名稱、一行說明、右側 orb；點擊回到對話 |
+| Compact | 左側 bot、右側 orb；完成／錯誤時改為勾號／警告符號 |
+| Minimal | 只有 orb（或結束符號），VoiceOver 包含 bot 名稱 |
+| Expanded | bot、一行說明、orb；整塊點擊回到對話，不另放連結文字 |
 
 實際形式由 iOS 根據裝置、活動數量與互動決定；App 內的形式選單只控制設計預覽。[Apple Live Activities 設計指南](https://developer.apple.com/design/human-interface-guidelines/live-activities)
 
 所有形式共用 `BotActivityPresentation` 的狀態判斷：
 
-- Working：顯示目前工作，有開始時間才顯示計時。
-- Needs you：顯示待回應提示；審批與文字回應在 App 處理。
-- Done：完成勾號與查看結果提示。
-- Failed：錯誤圖示，不會誤顯示成完成。
-- Update delayed：ActivityKit 回報 stale 時顯示延遲提示，不繼續顯示即時計時。
-- 未知狀態：保守顯示 Waiting for update，不宣稱任務完成。
+- 狀態由 orb 表達，文字只有一行 `caption`：進行中是 bot 目前的步驟，沒有步驟或已結束時是狀態名稱。不顯示計時、固定說明句或連結文字。
+- Working：working orb。
+- Needs you：listening orb（琥珀色）；審批與文字回應在 App 處理。
+- Update delayed／未知狀態：connecting orb，不顯示舊步驟，不宣稱任務完成。
+- Done／Failed：orb 是進行中的指示，結束後改為勾號／警告符號，錯誤不會誤顯示成完成。
 
 既有生命週期繼續由手機送出任務時啟動、App 接收事件時更新、完成時結束。App 本地更新設定 15 分鐘 stale date；沒有更新不代表工作失敗。遠端推播現在也設定 15 分鐘 stale date、保留錯誤結束狀態，並支援重新註冊活動票券；完整合約與通知設計見 [Notifications and Live Activities](push-and-live-activity.md)。關閉 Live Activities 會結束目前活動並阻止之後自動啟動。
 
@@ -100,9 +99,9 @@ Bot 的角色頭像使用 `CharacterAvatar` 點陣；provider 圖示由 `Provide
 | Working／orbits | Bot 工作列、聊天工作提示、工具執行、一般安裝進度、Live Activity 工作狀態 |
 | Searching／globe | 搜尋工具執行中 |
 | Listening／wave | Bot 待回應列、聊天待回應、Live Activity／Dynamic Island Needs you |
-| Connecting／web | 電腦連線提示、帳號登入、agent 登入狀態查詢、fetch 工具、Activity 等待更新 |
+| Connecting／web | 電腦連線提示、帳號登入、agent 登入狀態查詢、fetch 工具、Activity 等待更新／更新延遲 |
 
-角色頭像識別「哪一個 bot」；orb 表達「現在做什麼」。完成、錯誤、更新延遲繼續保留明確的勾號／錯誤／時鐘符號，導航及操作按鈕保留語意圖示。所有 orb 均附於可讀狀態文字或具備外層 accessibility label。
+角色頭像識別「哪一個 bot」；orb 表達「現在做什麼」。完成、錯誤繼續保留明確的勾號／錯誤符號，導航及操作按鈕保留語意圖示。所有 orb 均附於可讀狀態文字或具備外層 accessibility label。
 
 實作採上游 0.3.1、commit `de85557ca220332586d070d8788c0e1d6e877a0d` 的幾何與 20／64 pt 預設值。小於 40 pt 使用精簡密度；其餘使用大尺寸密度。繪製端改用可套色的透明墨色，適配卡片、深淺色及 Dynamic Island。SwiftUI Canvas 不需要 WebView 或 JavaScript runtime。
 
