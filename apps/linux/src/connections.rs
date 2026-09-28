@@ -37,8 +37,20 @@ pub fn card(ui: &App, entry: &Value) -> gtk::Widget {
         .show_peek_icon(true)
         .placeholder_text("Credential or op:// reference")
         .build();
-    let secret = request["kind"] == "secret";
-    if secret {
+    let username = gtk::Entry::builder()
+        .placeholder_text("Username or email")
+        .build();
+    let login = request["kind"] == "login";
+    let secret = login || request["kind"] == "secret";
+    if login {
+        input.set_placeholder_text(Some("Password or op:// reference"));
+        body.append(&username);
+        body.append(&input);
+        body.append(&label(
+            "Saved securely on this computer. The bot types it into the sign-in page but never sees it.",
+            &["small", "secondary"],
+        ));
+    } else if secret {
         body.append(&label(
             request["field"].as_str().unwrap_or("Credential"),
             &["secondary"],
@@ -50,7 +62,9 @@ pub fn card(ui: &App, entry: &Value) -> gtk::Widget {
         ));
     }
     let actions = gtk::Box::builder().spacing(8).build();
-    let connect = gtk::Button::with_label(if secret {
+    let connect = gtk::Button::with_label(if login {
+        "Save login"
+    } else if secret {
         "Save and connect"
     } else {
         "Connect"
@@ -71,7 +85,7 @@ pub fn card(ui: &App, entry: &Value) -> gtk::Widget {
             let (ui3, button, input) = (ui2.clone(), button.clone(), input.clone());
             client::call(
                 "connectorRequestFinish",
-                json!({"entryId":e["id"],"value":value}),
+                json!({"entryId":e["id"],"value":value,"username":username.text().as_str()}),
                 move |result| {
                     button.set_sensitive(true);
                     match result {
@@ -348,6 +362,48 @@ pub fn credentials(ui: &App) {
                 let (ui, connector) = (ui2.clone(), connector.clone());
                 button.connect_clicked(move |_| edit_credentials(&ui, &connector));
             }
+        }
+    });
+    body.append(&label("Sign-ins", &["headline"]));
+    let logins = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(8)
+        .build();
+    body.append(&logins);
+    let ui2 = ui.clone();
+    client::call("credentialLogins", json!({}), move |r| {
+        let Ok(v) = r else { return };
+        for login in v["items"].as_array().into_iter().flatten() {
+            let row = gtk::Box::builder().spacing(8).build();
+            let text = format!(
+                "{} · {}",
+                login["site"].as_str().unwrap_or(""),
+                login["username"].as_str().unwrap_or("")
+            );
+            let name = label(&text, &[]);
+            name.set_hexpand(true);
+            row.append(&name);
+            let remove = gtk::Button::from_icon_name("user-trash-symbolic");
+            remove.set_tooltip_text(Some("Remove"));
+            row.append(&remove);
+            logins.append(&row);
+            let (ui, row, logins, id) = (
+                ui2.clone(),
+                row.clone(),
+                logins.clone(),
+                login["id"].clone(),
+            );
+            remove.connect_clicked(move |_| {
+                let (ui, row, logins) = (ui.clone(), row.clone(), logins.clone());
+                client::call(
+                    "credentialRemoveLogin",
+                    json!({"id":id}),
+                    move |r| match r {
+                        Ok(_) => logins.remove(&row),
+                        Err(e) => toast(&ui, &e),
+                    },
+                );
+            });
         }
     });
     let input = gtk::PasswordEntry::builder()

@@ -162,6 +162,7 @@ async fn handle(h: &Arc<Helper>, method: &str, p: &Value) -> Result<Value> {
             json!({})
         }
         "uiTree" => a11y::frontmost(&display()?).await?,
+        "focusedField" => a11y::focused_field().await?,
         "openApp" => {
             input::open_app(
                 p["name"]

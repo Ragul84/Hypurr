@@ -11,6 +11,7 @@ struct ConnectionRequestCard: View {
     @State private var app: ComposioApp?
     @State private var item: MarketConnector?
     @State private var value = ""
+    @State private var username = ""
     @State private var busy = false
     @State private var error: String?
 
@@ -20,7 +21,14 @@ struct ConnectionRequestCard: View {
                 .font(.headline)
             if let text = entry.data.text { Text(text).foregroundStyle(Palette.secondary) }
             if request.status == "pending" {
-                if request.kind == "secret" {
+                if request.kind == "login" {
+                    TextField("Username or email", text: $username)
+                        .plainTextInput()
+                    SecureField("Password or op:// reference", text: $value)
+                        .plainTextInput()
+                    Text("Saved securely on this computer. The bot types it into the sign-in page but never sees it.")
+                        .font(.caption).foregroundStyle(Palette.secondary)
+                } else if request.kind == "secret" {
                     Text("\(request.field ?? "Credential") · \(request.location ?? "")")
                         .font(.caption).foregroundStyle(Palette.secondary)
                     SecureField("Credential or op:// reference", text: $value)
@@ -29,14 +37,14 @@ struct ConnectionRequestCard: View {
                         .font(.caption).foregroundStyle(Palette.secondary)
                 }
                 HStack {
-                    Button(request.kind == "secret" ? "Save and connect" : "Connect") { connect() }
+                    Button(request.kind == "login" ? "Save login" : request.kind == "secret" ? "Save and connect" : "Connect") { connect() }
                         .buttonStyle(PrimaryButtonStyle())
-                        .disabled(busy || (request.kind == "secret" && value.isEmpty))
+                        .disabled(busy || (["secret", "login"].contains(request.kind) && value.isEmpty))
                     Button("Cancel") { cancel() }.buttonStyle(SecondaryButtonStyle()).disabled(busy)
                     if busy { Spinner() }
                 }
             } else {
-                Text(request.status == "ready" ? "Connected" : "Cancelled").foregroundStyle(Palette.secondary)
+                Text(request.status == "ready" ? (request.kind == "login" ? "Saved" : "Connected") : "Cancelled").foregroundStyle(Palette.secondary)
             }
             if let error { Text(error).font(.footnote).foregroundStyle(Palette.danger) }
         }
@@ -49,7 +57,7 @@ struct ConnectionRequestCard: View {
         .codyncSheet(item: $app) { app in
             ComposioConnectSheet(app: app, requestId: entry.id) { self.app = nil }
         }
-        .onDisappear { value = "" }
+        .onDisappear { value = ""; username = "" }
     }
 
     private func connect() {
@@ -61,6 +69,9 @@ struct ConnectionRequestCard: View {
             do {
                 if request.kind == "app", let toolkit = request.toolkit {
                     withAnimation(Motion.layout) { app = ComposioApp(slug: toolkit, name: request.title) }
+                } else if request.kind == "login" {
+                    try await client.finishConnectionRequest(entry.id, value: value, username: username)
+                    value = ""
                 } else if request.kind == "secret" {
                     try await client.finishConnectionRequest(entry.id, value: value)
                     value = ""
@@ -116,6 +127,7 @@ struct CredentialsView: View {
                     Text("Values stay hidden. Select a connection to replace its credentials.")
                         .font(.caption).foregroundStyle(Palette.secondary)
                 }
+                LoginsSection()
                 CardSection("1Password", footer: "Use a service account with read access only to a dedicated shared vault. The 1Password CLI must be installed on the computer.") {
                     Text(status?.onePasswordConnected == true ? "Connected" : "Connect a shared vault")
                     SecureField("Service account token", text: $token).plainTextInput()
@@ -153,6 +165,68 @@ struct CredentialsView: View {
     }
 }
 
+/// Website and app logins bots type through the computer tool; passwords stay hidden.
+private struct LoginsSection: View {
+    @Environment(BotStore.self) private var model
+    @State private var logins: [SavedLogin] = []
+    @State private var site = ""
+    @State private var username = ""
+    @State private var password = ""
+    @State private var busy = false
+    @State private var error: String?
+
+    var body: some View {
+        CardSection("Sign-ins", footer: "Bots type these into the matching website or app and never see the password. You can use an op:// reference.") {
+            ForEach(logins) { login in
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(login.site)
+                        if !login.username.isEmpty { Text(login.username).font(.caption).foregroundStyle(Palette.secondary) }
+                    }
+                    Spacer()
+                    IconButton("Remove", systemImage: "trash") { remove(login) }
+                }
+            }
+            TextField("Website or app, e.g. github.com", text: $site).plainTextInput()
+            TextField("Username or email", text: $username).plainTextInput()
+            SecureField("Password or op:// reference", text: $password).plainTextInput()
+            Button("Save sign-in") { save() }
+                .buttonStyle(PrimaryButtonStyle())
+                .disabled(busy || site.isEmpty || password.isEmpty)
+            if let error { Text(error).font(.footnote).foregroundStyle(Palette.danger) }
+        }
+        .task { await load() }
+        .onDisappear { password = "" }
+    }
+
+    private func load() async {
+        do { logins = try await model.client?.logins() ?? [] } catch { self.error = error.localizedDescription }
+    }
+
+    private func save() {
+        guard let client = model.client else { return }
+        busy = true
+        error = nil
+        Task {
+            defer { busy = false }
+            do {
+                try await client.saveLogin(site: site, username: username, password: password)
+                site = ""; username = ""; password = ""
+                await load()
+            } catch { self.error = error.localizedDescription }
+        }
+    }
+
+    private func remove(_ login: SavedLogin) {
+        guard let client = model.client else { return }
+        Task {
+            do {
+                try await client.removeLogin(login.id)
+                withAnimation(Motion.layout) { logins.removeAll { $0.id == login.id } }
+            } catch { self.error = error.localizedDescription }
+        }
+    }
+}
 
 private struct ConnectorCredentialEditor: View {
     let connector: InstalledConnector

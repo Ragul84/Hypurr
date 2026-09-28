@@ -67,6 +67,24 @@ MCP connection requests and runtime secret retrieval are loopback-only. Authoriz
 Control devices may submit or cancel requests. No endpoint exposes a generic
 credential getter to a device. Existing local-process trust boundaries still apply.
 
+## Website and app logins
+
+`market/logins.rs` keeps sign-ins (`site` = domain or app name, username, password
+or `op://` reference) as one vault record. Bots use `list_logins` (site and
+username only) and `request_login {site, reason}`, which becomes a login card; the
+user saves username and password there (or in Credentials → Sign-ins), and the bot
+is resumed with the login's id. The `computer` tool `type_login {login, field}`
+types it into the focused field through the screen helper and returns only a
+screenshot. Before typing, the helper's `focusedField` reports the front app, the
+page URL (macOS AX `AXWebArea`/`AXURL`, Linux AT-SPI `DocURL`) and whether the field
+is a password field. The host refuses unless the page host is the site or a
+subdomain (or, without a page, the app name equals the site), and types a password
+only into a password field. Clients manage logins with `credentialLogins`,
+`credentialSaveLogin` and `credentialRemoveLogin`; no endpoint returns a password.
+
+Terminal password prompts (sudo, ssh) are not covered: they aren't password fields
+to the accessibility API. The same-user boundary above applies.
+
 ## Optional 1Password
 
 Credentials settings accepts a service-account token and checks it using the

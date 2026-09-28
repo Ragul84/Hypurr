@@ -236,6 +236,15 @@ public struct ConnectionRequest: Codable, Hashable, Sendable {
     public var connectorId: String?
     public var field: String?
     public var location: String?
+    /// Login requests: the website's domain or the app's name.
+    public var site: String?
+}
+
+/// A saved website or app login; the password stays on the computer.
+public struct SavedLogin: Codable, Hashable, Sendable, Identifiable {
+    public var id: String
+    public var site: String
+    public var username: String
 }
 
 public struct CredentialStatus: Decodable, Sendable {
@@ -253,10 +262,24 @@ public extension HostClient {
         let _: Verified = try await call("connectorVerify", ["id": id], timeout: 120)
     }
 
-    func finishConnectionRequest(_ entryId: String, connectorId: String? = nil, value: String? = nil, cancel: Bool = false) async throws {
-        struct Body: Encodable { var entryId: String; var connectorId: String?; var value: String?; var cancel: Bool }
+    func finishConnectionRequest(_ entryId: String, connectorId: String? = nil, value: String? = nil, username: String? = nil, cancel: Bool = false) async throws {
+        struct Body: Encodable { var entryId: String; var connectorId: String?; var value: String?; var username: String?; var cancel: Bool }
         struct Response: Decodable { var entry: Entry }
-        let _: Response = try await call("connectorRequestFinish", Body(entryId: entryId, connectorId: connectorId, value: value, cancel: cancel), timeout: 120)
+        let _: Response = try await call("connectorRequestFinish", Body(entryId: entryId, connectorId: connectorId, value: value, username: username, cancel: cancel), timeout: 120)
+    }
+
+    func logins() async throws -> [SavedLogin] {
+        let res: Items<SavedLogin> = try await call("credentialLogins", timeout: 60)
+        return res.items
+    }
+
+    func saveLogin(site: String, username: String, password: String) async throws {
+        struct Response: Decodable { var login: SavedLogin }
+        let _: Response = try await call("credentialSaveLogin", ["site": site, "username": username, "password": password], timeout: 60)
+    }
+
+    func removeLogin(_ id: String) async throws {
+        let _: Empty = try await call("credentialRemoveLogin", ["id": id], timeout: 60)
     }
 
     func credentialStatus() async throws -> CredentialStatus { try await call("credentialStatus", timeout: 60) }
