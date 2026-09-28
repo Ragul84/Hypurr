@@ -18,7 +18,7 @@ jobs:
       - name: Set version
         run: |
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then VERSION=${GITHUB_REF_NAME#v}
-          else VERSION=$(awk '/MARKETING_VERSION:/ {print $2; exit}' project.yml); fi
+          else VERSION=$(awk '/MARKETING_VERSION:/ {print $2; exit}' apps/project.yml); fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - uses: dtolnay/rust-toolchain@stable
@@ -58,7 +58,7 @@ jobs:
       - name: Build
         run: |
           xcodebuild build \
-            -project Codync.xcodeproj \
+            -project apps/Codync.xcodeproj \
             -scheme macOS \
             -configuration Release \
             -destination 'generic/platform=macOS' \

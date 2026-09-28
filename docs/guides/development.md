@@ -7,8 +7,8 @@ Run commands from the repository root unless a block changes directory. See [fil
 Install Xcode and XcodeGen, then generate the project from its source:
 
 ```sh
-xcodegen generate
-xcodebuild build -project Codync.xcodeproj -scheme macOS -configuration Debug -derivedDataPath build/dd
+xcodegen generate --spec apps/project.yml
+xcodebuild build -project apps/Codync.xcodeproj -scheme macOS -configuration Debug -derivedDataPath build/dd
 ```
 
 Use the `iOS` scheme with a connected device or simulator in Xcode. CLI builds accept `-destination 'platform=iOS,id=<device-id>'`. Do not edit `project.pbxproj` directly. Keep normal simulator signing: Clerk uses Keychain, and unsigned simulator builds can fail initialization with OSStatus -34018.
@@ -55,4 +55,4 @@ Host development: `cargo run --manifest-path host/Cargo.toml -- serve`. Avoid co
 
 Follow [UI conventions](../design/ui-conventions.md) for native toolbar behavior and [widget design](../design/mobile-widgets.md) for previews. Widget images can be rendered with `python3 tools/render-widgets.py`; output is under `build/widget-previews/`.
 
-For releases, increment `CURRENT_PROJECT_VERSION` before another App Store upload. Versions are defined in `project.yml`; keep the host package version aligned with `MARKETING_VERSION`, then regenerate the Xcode project.
+For releases, increment `CURRENT_PROJECT_VERSION` before another App Store upload. Versions are defined in `apps/project.yml`; keep the host package version aligned with `MARKETING_VERSION`, then regenerate the Xcode project.

@@ -29,7 +29,7 @@ computer approves each device after comparing a 6-digit code
 
 ## Verification
 
-- Build the macOS scheme after `xcodegen generate`.
+- Build the macOS scheme after `xcodegen generate --spec apps/project.yml`.
 - Open the account menu from either sidebar layout; test arrows, Return, Escape
   and clicking outside the panel.
 - Sign in with a test Google user, verify the avatar/email, restart the app and

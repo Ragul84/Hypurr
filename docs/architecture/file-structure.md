@@ -37,6 +37,8 @@ Codync/
 │   │       └── Resources/
 │   └── Tests/                 # CodyncKitTests and CodyncUITests
 ├── apps/
+│   ├── project.yml            # XcodeGen source of truth for every Apple target
+│   ├── Codync.xcodeproj/      # Generated Xcode project
 │   ├── shared/                # AccountSession, ComputerStatus, Config/{dev,main}.plist
 │   ├── ios/                   # App/, Views/, Resources/, Widgets/, NotificationService/
 │   ├── macos/                 # App/, Views/, Resources/, LaunchAgents/
@@ -52,12 +54,10 @@ Codync/
 ├── tools/                     # Widget rendering utilities
 ├── packaging/                 # Distribution templates
 ├── web/                       # Website git submodule
-├── .github/workflows/         # CI, signing and release automation
-├── project.yml                # XcodeGen source of truth
-└── Codync.xcodeproj/           # Generated Xcode project
+└── .github/workflows/         # CI, signing and release automation
 ```
 
-`build/`, `kit/.build/`, Cargo `target/`, `node_modules/` and Wrangler local state are generated working data. They are not source modules and should not become documentation locations. Edit `project.yml` and run `xcodegen generate`; never hand-edit `project.pbxproj`.
+`build/`, `kit/.build/`, Cargo `target/`, `node_modules/` and Wrangler local state are generated working data. They are not source modules and should not become documentation locations. Edit `apps/project.yml` and run `xcodegen generate --spec apps/project.yml`; never hand-edit `project.pbxproj`.
 
 ## Where to make a change
 

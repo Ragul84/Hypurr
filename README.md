@@ -134,7 +134,7 @@ Data lives in `~/.codync`. The local bearer token authorizes loopback helpers an
 
 Build, install, restart and full checks: [development guide](docs/guides/development.md).
 
-The Xcode project is generated: `xcodegen generate`.
+The Xcode project is generated: `xcodegen generate --spec apps/project.yml`.
 
 ```bash
 cd host && cargo test            # host

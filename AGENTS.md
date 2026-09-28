@@ -12,8 +12,8 @@
 
 Run from the repository root unless a command changes directories:
 
-- `xcodegen generate`: regenerate `Codync.xcodeproj` after editing `project.yml`; never edit `project.pbxproj` directly.
-- `xcodebuild build -project Codync.xcodeproj -scheme macOS -configuration Debug`: build the Mac app. Use Xcode’s `iOS` scheme to run on a simulator or device.
+- `xcodegen generate --spec apps/project.yml`: regenerate `apps/Codync.xcodeproj` after editing `apps/project.yml`; never edit `project.pbxproj` directly.
+- `xcodebuild build -project apps/Codync.xcodeproj -scheme macOS -configuration Debug`: build the Mac app. Use Xcode’s `iOS` scheme to run on a simulator or device.
 - `cd host && cargo build`: build the host; `cargo run -- serve` starts it in the foreground.
 - `cd host && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test`: run host CI checks.
 - `cd kit && swift test`: run shared Swift tests.

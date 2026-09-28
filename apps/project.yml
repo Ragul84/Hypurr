@@ -1,4 +1,4 @@
-# Generate the Xcode project with: xcodegen generate
+# Generate the Xcode project with: xcodegen generate --spec apps/project.yml
 name: Codync
 options:
   bundleIdPrefix: com.pokai
@@ -11,7 +11,7 @@ packages:
     url: https://github.com/clerk/clerk-ios
     exactVersion: 1.5.6
   CodyncKit:
-    path: kit
+    path: ../kit
   WebRTC:
     url: https://github.com/stasel/WebRTC
     exactVersion: 153.0.0
@@ -26,7 +26,7 @@ settings:
     DEAD_CODE_STRIPPING: YES
     ENABLE_USER_SCRIPT_SANDBOXING: NO
   configs:
-    # Which Codync cloud a build talks to: apps/shared/Config/<env>.plist becomes AccountConfig.plist.
+    # Which Codync cloud a build talks to: shared/Config/<env>.plist becomes AccountConfig.plist.
     Debug:
       CODYNC_ENV: dev
     Release:
@@ -36,14 +36,14 @@ targets:
     type: application
     platform: macOS
     sources:
-      - path: apps/shared
+      - path: shared
         excludes:
           - Config
-      - path: apps/macos
+      - path: macos
         excludes:
           - LaunchAgents
       # Registered with SMAppService.agent when Remote screen is turned on.
-      - path: apps/macos/LaunchAgents/com.pokai.Codync.screen.plist
+      - path: macos/LaunchAgents/com.pokai.Codync.screen.plist
         buildPhase:
           copyFiles:
             destination: wrapper
@@ -81,7 +81,7 @@ targets:
         showEnvVars: false
         script: |
           # Debug builds use dev (dev-api.codync.dev), Release builds use main (api.codync.dev).
-          cp "$SRCROOT/apps/shared/Config/$CODYNC_ENV.plist" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/AccountConfig.plist"
+          cp "$SRCROOT/shared/Config/$CODYNC_ENV.plist" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/AccountConfig.plist"
       - name: Embed codync-host
         basedOnDependencyAnalysis: false
         showEnvVars: false
@@ -98,15 +98,15 @@ targets:
           [ "$PROFILE" = "release" ] && FLAGS="--release"
           if [ "$PROFILE" = "release" ]; then
             rustup target add aarch64-apple-darwin x86_64-apple-darwin >/dev/null 2>&1 || true
-            cargo build --release --manifest-path "$SRCROOT/host/Cargo.toml" --target aarch64-apple-darwin &&
-            cargo build --release --manifest-path "$SRCROOT/host/Cargo.toml" --target x86_64-apple-darwin &&
-            lipo -create -output "$SRCROOT/host/target/codync-host-universal" \
-              "$SRCROOT/host/target/aarch64-apple-darwin/release/codync-host" \
-              "$SRCROOT/host/target/x86_64-apple-darwin/release/codync-host" &&
-            BIN="$SRCROOT/host/target/codync-host-universal" ||
-            { cargo build --release --manifest-path "$SRCROOT/host/Cargo.toml" && BIN="$SRCROOT/host/target/release/codync-host"; }
+            cargo build --release --manifest-path "$SRCROOT/../host/Cargo.toml" --target aarch64-apple-darwin &&
+            cargo build --release --manifest-path "$SRCROOT/../host/Cargo.toml" --target x86_64-apple-darwin &&
+            lipo -create -output "$SRCROOT/../host/target/codync-host-universal" \
+              "$SRCROOT/../host/target/aarch64-apple-darwin/release/codync-host" \
+              "$SRCROOT/../host/target/x86_64-apple-darwin/release/codync-host" &&
+            BIN="$SRCROOT/../host/target/codync-host-universal" ||
+            { cargo build --release --manifest-path "$SRCROOT/../host/Cargo.toml" && BIN="$SRCROOT/../host/target/release/codync-host"; }
           else
-            cargo build --manifest-path "$SRCROOT/host/Cargo.toml" && BIN="$SRCROOT/host/target/debug/codync-host"
+            cargo build --manifest-path "$SRCROOT/../host/Cargo.toml" && BIN="$SRCROOT/../host/target/debug/codync-host"
           fi
           [ -n "$BIN" ] || { echo "error: building codync-host failed"; exit 1; }
           DEST="$TARGET_BUILD_DIR/$EXECUTABLE_FOLDER_PATH/codync-host"
@@ -120,7 +120,7 @@ targets:
     type: application
     platform: macOS
     sources:
-      - apps/screen-macos
+      - screen-macos
     dependencies:
       - package: WebRTC
     settings:
@@ -138,10 +138,10 @@ targets:
     type: application
     platform: iOS
     sources:
-      - path: apps/shared
+      - path: shared
         excludes:
           - Config
-      - path: apps/ios
+      - path: ios
         excludes:
           - Widgets
           - NotificationService
@@ -162,14 +162,14 @@ targets:
         showEnvVars: false
         script: |
           # Debug builds use dev (dev-api.codync.dev), Release builds use main (api.codync.dev).
-          cp "$SRCROOT/apps/shared/Config/$CODYNC_ENV.plist" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/AccountConfig.plist"
+          cp "$SRCROOT/shared/Config/$CODYNC_ENV.plist" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/AccountConfig.plist"
     settings:
       base:
         PRODUCT_NAME: Codync
         PRODUCT_BUNDLE_IDENTIFIER: com.pokai.Codync.ios
-        INFOPLIST_FILE: apps/ios/Resources/Info.plist
+        INFOPLIST_FILE: ios/Resources/Info.plist
         GENERATE_INFOPLIST_FILE: YES
-        CODE_SIGN_ENTITLEMENTS: apps/ios/Resources/iOS.entitlements
+        CODE_SIGN_ENTITLEMENTS: ios/Resources/iOS.entitlements
         TARGETED_DEVICE_FAMILY: "1,2"
         INFOPLIST_KEY_CFBundleDisplayName: Codync
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
@@ -190,7 +190,7 @@ targets:
     type: app-extension
     platform: iOS
     sources:
-      - apps/ios/Widgets
+      - ios/Widgets
     dependencies:
       - package: CodyncKit
         product: CodyncKit
@@ -200,9 +200,9 @@ targets:
       base:
         PRODUCT_NAME: CodyncWidgets
         PRODUCT_BUNDLE_IDENTIFIER: com.pokai.Codync.ios.LiveActivity
-        INFOPLIST_FILE: apps/ios/Widgets/Resources/Info.plist
+        INFOPLIST_FILE: ios/Widgets/Resources/Info.plist
         GENERATE_INFOPLIST_FILE: YES
-        CODE_SIGN_ENTITLEMENTS: apps/ios/Widgets/Resources/Widgets.entitlements
+        CODE_SIGN_ENTITLEMENTS: ios/Widgets/Resources/Widgets.entitlements
         INFOPLIST_KEY_CFBundleDisplayName: Codync
         TARGETED_DEVICE_FAMILY: "1,2"
         SKIP_INSTALL: YES
@@ -211,7 +211,7 @@ targets:
     type: app-extension
     platform: iOS
     sources:
-      - apps/ios/NotificationService
+      - ios/NotificationService
     dependencies:
       - package: CodyncKit
         product: CodyncKit
@@ -219,9 +219,9 @@ targets:
       base:
         PRODUCT_NAME: CodyncNotificationService
         PRODUCT_BUNDLE_IDENTIFIER: com.pokai.Codync.ios.NotificationService
-        INFOPLIST_FILE: apps/ios/NotificationService/Info.plist
+        INFOPLIST_FILE: ios/NotificationService/Info.plist
         GENERATE_INFOPLIST_FILE: YES
-        CODE_SIGN_ENTITLEMENTS: apps/ios/NotificationService/NotificationService.entitlements
+        CODE_SIGN_ENTITLEMENTS: ios/NotificationService/NotificationService.entitlements
         INFOPLIST_KEY_CFBundleDisplayName: Codync
         TARGETED_DEVICE_FAMILY: "1,2"
         SKIP_INSTALL: YES

@@ -50,12 +50,12 @@ Whenever you build and install/run a new build, stop the old copies so nothing s
 
 ## Project generation
 
-- `project.yml` + `xcodegen generate` produce `Codync.xcodeproj`. Edit `project.yml`, not the pbxproj.
+- `apps/project.yml` + `xcodegen generate --spec apps/project.yml` produce `apps/Codync.xcodeproj`. Edit `project.yml`, not the pbxproj.
 
 ## App Store Upload
 
 - **IMPORTANT**: Every time you archive and upload a new build to App Store Connect, you MUST increment `CURRENT_PROJECT_VERSION` first (App Store Connect rejects duplicate build numbers).
-- Versions live in `project.yml` (`MARKETING_VERSION`, `CURRENT_PROJECT_VERSION`); regenerate the project after changing them. Keep `host/Cargo.toml` `version` in sync with `MARKETING_VERSION`.
+- Versions live in `apps/project.yml` (`MARKETING_VERSION`, `CURRENT_PROJECT_VERSION`); regenerate the project after changing them. Keep `host/Cargo.toml` `version` in sync with `MARKETING_VERSION`.
 
 ## Versioning
 
