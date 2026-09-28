@@ -19,13 +19,14 @@ Distro and C library don't matter. From the first release built by the updated w
 Run as the user who owns the agents (not root, unless the agents are root's):
 
 ```sh
-brew install leepokai/codync/codync-host        # or download codync-host-linux-<arch>.tar.gz from GitHub Releases
-codync-host install                             # systemd --user service, restarts on crash
-sudo loginctl enable-linger "$USER"             # keep it running after you log out of SSH
+curl -fsSL https://raw.githubusercontent.com/leepokai/Codync/main/packaging/install.sh | sh -s -- --host-only
+# or: brew install leepokai/codync/codync-host
+codync-host install                    # systemd --user service, restarts on crash
+sudo loginctl enable-linger "$USER"    # keep it running after you log out of SSH
 codync-host status
 ```
 
-`install` saves the current `PATH` into the service, so install Node and the agents first. If you add an agent later and the host doesn't find it, run `codync-host install` again. `install` needs a real login session (SSH login, not `sudo su user`), otherwise `systemctl --user` can't reach the user's service manager.
+The script puts `codync-host` in `~/.local/bin` (`/usr/local/bin` as root; override with `CODYNC_BIN_DIR`), checks its SHA-256, and restarts the service on upgrade. `install` saves the current `PATH` into the service, so install Node and the agents first. If you add an agent later and the host doesn't find it, run `codync-host install` again. `install` needs a real login session (SSH login, not `sudo su user`), otherwise `systemctl --user` can't reach the user's service manager.
 
 Other commands work the same as on a desktop: `codync-host pair`, `codync-host tui`, `codync-host uninstall` (keeps data in `~/.codync`). Logs go to the journal: `journalctl --user -u codync-host -f`.
 

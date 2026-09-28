@@ -67,25 +67,34 @@ UI patterns (roster, character avatars, approval cards, trace sheet, "needs you 
 
 ## Install
 
+**One line** (macOS or Linux):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/leepokai/Codync/main/packaging/install.sh | sh
+```
+
+On a Mac it installs the app (the host ships inside it); on Linux the host, plus the desktop app when a display is present. Add `sh -s -- --host-only` for servers and headless Macs. Re-run it to upgrade.
+
 **Mac** — [download codync-macos.dmg](https://github.com/leepokai/Codync/releases/latest/download/codync-macos.dmg) and drag it to Applications, or:
 
 ```bash
 brew install --cask leepokai/codync/codync
 ```
 
-Both install the same signed, notarized app; the host ships inside it.
+All three install the same signed, notarized app.
 
 Open Codync in the menu bar → **Install host**. **Open Codync** opens the full window; **Pair iPhone…** shows the QR code.
 
 **Linux** — the host, plus the native GTK 4 / libadwaita app:
 
 ```bash
-brew install leepokai/codync/codync-host   # or codync-host-linux-*.tar.gz from Releases
-codync-host install                        # systemd --user service
-codync-host pair                           # QR code in the terminal, or Settings in the app
+curl -fsSL https://raw.githubusercontent.com/leepokai/Codync/main/packaging/install.sh | sh
+# or: brew install leepokai/codync/codync-host
+codync-host install   # systemd --user service
+codync-host pair      # QR code in the terminal, or Settings in the app
 ```
 
-The desktop app is `codync-linux-x86_64.tar.gz` / `codync-linux-arm64.tar.gz` from [Releases](https://github.com/leepokai/Codync/releases/latest): unpack it and run `bin/codync` (it ships a `.desktop` file and icon under `share/`).
+The script also installs the desktop app (`codync`, with its `.desktop` file and icon) when you're in a graphical session; it needs GTK 4 and libadwaita. By hand: unpack `codync-linux-<arch>.tar.gz` from [Releases](https://github.com/leepokai/Codync/releases/latest) and run `bin/codync`.
 
 Building the Linux app yourself needs `libgtk-4-dev libadwaita-1-dev`: `cargo install --path apps/linux`.
 
@@ -130,7 +139,7 @@ Data lives in `~/.codync`. The local bearer token authorizes loopback helpers an
 | `docs/` | [Documentation index](docs/README.md) and [file structure](docs/architecture/file-structure.md) |
 | `relay/` | Cloudflare Worker APNs relay with encrypted per-device tickets |
 | `web/` | Website (git submodule) |
-| `packaging/` | Homebrew formula template |
+| `packaging/` | Homebrew formula template and `install.sh` (the curl installer) |
 
 Build, install, restart and full checks: [development guide](docs/guides/development.md).
 

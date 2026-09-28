@@ -124,11 +124,12 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           # The host workflow may have created this release already (same tag).
+          (cd build && shasum -a 256 codync-macos.dmg > codync-macos.dmg.sha256)
           gh release create ${{ github.ref_name }} \
-            build/codync-macos.dmg \
+            build/codync-macos.dmg build/codync-macos.dmg.sha256 \
             --title "Codync ${{ github.ref_name }}" \
             --generate-notes \
-          || gh release upload ${{ github.ref_name }} build/codync-macos.dmg --clobber
+          || gh release upload ${{ github.ref_name }} build/codync-macos.dmg build/codync-macos.dmg.sha256 --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -147,7 +148,7 @@ jobs:
             desc "Message your coding agents as bots from iPhone, Mac, Linux or terminal"
             homepage "https://www.codync.dev"
 
-            depends_on macos: ">= :sonoma"
+            depends_on macos: :sonoma
 
             app "Codync.app"
             binary "#{appdir}/Codync.app/Contents/MacOS/codync-host"

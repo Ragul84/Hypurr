@@ -63,10 +63,13 @@ jobs:
           cp data/com.pokai.Codync.desktop $NAME/share/applications/
           cp data/com.pokai.Codync.svg $NAME/share/icons/hicolor/scalable/apps/
           tar czf $GITHUB_WORKSPACE/$NAME.tar.gz $NAME
+          cd $GITHUB_WORKSPACE && shasum -a 256 $NAME.tar.gz > $NAME.tar.gz.sha256
       - uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/v')
         with:
-          files: codync-linux-*.tar.gz
+          files: |
+            codync-linux-*.tar.gz
+            codync-linux-*.tar.gz.sha256
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
