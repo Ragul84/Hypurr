@@ -229,6 +229,11 @@ public extension HostClient {
         let _: Empty = try await call("registerDevice", Body(ticket: ticket, relay: relay, name: name, pushKey: pushKey, ctx: ctx))
     }
 
+    /// Stops this device's alerts; used when notifications are switched off in the app.
+    func unregisterDevice() async throws {
+        let _: Empty = try await call("unregisterDevice")
+    }
+
     func registerActivity(botId: String, ticket: String) async throws {
         let _: Empty = try await call("registerActivity", ["botId": botId, "ticket": ticket])
     }
