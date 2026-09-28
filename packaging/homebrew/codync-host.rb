@@ -2,8 +2,8 @@
 # The `homebrew` job in .github/workflows/host.yml fills in the version and the four
 # sha256 values (in this order: mac arm, mac intel, linux arm, linux intel) on every `v*` tag.
 class CodyncHost < Formula
-  desc "Runs your coding-agent bots (Claude Code, Codex, OpenCode…) for the Codync app"
-  homepage "https://github.com/leepokai/Codync"
+  desc "Host that runs coding agents (Claude Code, Codex, Cursor…) as Codync bots"
+  homepage "https://www.codync.dev"
   version "2.0.0"
   license "MIT"
 
