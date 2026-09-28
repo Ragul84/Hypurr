@@ -30,8 +30,8 @@
 
 既有 Usage limits 保留 Small／Medium 的跨 provider 用量摘要。Bots 與 Usage limits 另支援 Lock Screen 的圓形、矩形與行內形式；行內放在時鐘上方日期列。
 
-- Provider usage 可在系統「編輯 Widget」選擇 Claude 或 Codex。
-- Claude 使用既有暖色；Codex 使用藍色；90% 以上顯示警示色。
+- Provider usage 可在系統「編輯 Widget」選擇任何電腦回報過用量的 provider（清單來自 `SharedStore.Context.usageProviders`，Claude 與 Codex 永遠列出）；App 的 Widget 頁用同一份清單，超過三個時改用選單。
+- Claude 使用既有暖色；Codex 使用藍色；其他 provider 用 accent 墨色；90% 以上顯示警示色。
 - 採平面深淺色表面、小型圖示、11–13 pt 標籤；大字只用於主要數值。
 - App 的 Usage 卡片同步縮小字級、圖示、內距，並使用同一款刻度條。
 - 底部的 State 分頁以頂部切換呈現 Widget／Live Activity／Dynamic Island 三頁；用量上限從右上角圖示開成 sheet。Computers & settings 不再放這些入口。
