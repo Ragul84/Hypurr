@@ -1,13 +1,28 @@
+<div align="center">
+
+<img src="apps/linux/data/com.pokai.Codync.svg" width="128" alt="Codync icon">
+
 # Codync
 
-**The open-source, 1:1 alternative to Grok Bot and Muse.** Your coding agents, as teammates you can message.
+**The open-source, 1:1 alternative to Grok Bot and Muse.**<br>
+Your coding agents, as teammates you can message.
+
+[![App Store](https://img.shields.io/badge/App_Store-iOS-0D96F6?logo=apple&logoColor=white)](https://apps.apple.com/tw/app/codync/id6760984418?l=en-GB)
+[![Homebrew](https://img.shields.io/badge/Homebrew-codync-FBB040?logo=homebrew&logoColor=white)](https://github.com/leepokai/homebrew-codync)
+[![Release](https://img.shields.io/github/v/release/leepokai/Codync?color=black)](https://github.com/leepokai/Codync/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+<br>
+![iOS](https://img.shields.io/badge/iOS-18+-black?logo=apple)
+![macOS](https://img.shields.io/badge/macOS-14+-black?logo=apple)
+![Linux](https://img.shields.io/badge/Linux-x86__64%20%7C%20arm64-black?logo=linux&logoColor=white)
+![Rust](https://img.shields.io/badge/host-Rust-B7410E?logo=rust)
+![Swift](https://img.shields.io/badge/apps-SwiftUI-F05138?logo=swift&logoColor=white)
+
+</div>
 
 Codync turns the coding agents on your computer — Claude Code, Codex, Cursor, Pi, OpenCode, Grok Build, Gemini, Copilot and ~40 more — into persistent *bots* you delegate to from your iPhone, Mac, Linux desktop or any terminal, the way you'd message a colleague. Pick who, say what, put the phone away. You get a notification when a bot finishes or needs your approval.
 
 > Why bots? On a phone, "find the right working session, then pick an environment" is too slow. With bots you already know who to hand the intent to: open the chat, type, done.
-
-[![Download on the App Store](https://img.shields.io/badge/App_Store-iOS-blue?logo=apple)](https://apps.apple.com/tw/app/codync/id6760984418?l=en-GB)
-[![Homebrew](https://img.shields.io/badge/Homebrew-codync-orange?logo=homebrew)](https://github.com/leepokai/homebrew-codync)
 
 ## Why Codync
 
@@ -19,6 +34,17 @@ Codync turns the coding agents on your computer — Claude Code, Codex, Cursor, 
 - **Remote screen.** See and control your computer from the iPhone over WebRTC (hardware H.264), and let bots use the screen themselves through the built-in `computer` tool.
 - **Voice calls.** Talk to a bot hands-free from the iPhone and hear its replies read aloud.
 - **Private by default.** Phones reach the host over an end-to-end encrypted channel (direct LAN/Tailscale or the Cloudflare relay); push notifications are sealed so the relay never sees their content.
+
+## Platforms
+
+| | Platform | App | Highlights |
+|---|---|---|---|
+| 📱 | **iPhone** | Native SwiftUI | Chat with bots, approvals, push notifications, Live Activity, widgets, remote screen, voice calls |
+| 💻 | **macOS** | Native SwiftUI, menu bar + window | Runs the host, chat window, usage in the menu bar, iPhone pairing |
+| 🐧 | **Linux** | Native GTK 4 / libadwaita | Runs the host (desktop or headless server), chat app |
+| ⌨️ | **Terminal** | `codync-host tui` | Message your bots from any terminal, over SSH too |
+
+The host (`codync-host`, Rust) runs on macOS and Linux; every client talks to it, so all your bots and chats are the same everywhere.
 
 ## How it works
 
