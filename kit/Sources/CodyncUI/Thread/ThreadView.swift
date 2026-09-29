@@ -185,9 +185,6 @@ public struct ThreadView: View {
                 }
                 .background(Palette.background)
             }
-            .onAppear {
-                if bot?.name == "New Bot", model.chat(botId).isEmpty { editingDetails = true }
-            }
         #endif
         .readingConversation(botId)
         .codyncSheet(isPresented: $showTrace) {

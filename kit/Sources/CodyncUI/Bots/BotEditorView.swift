@@ -145,8 +145,11 @@ struct BotSettingsForm: View {
                 }
                 .frame(maxWidth: .infinity)
 
-                Field("Name") {
-                    TextField("Name", text: $draft.name).fieldBox()
+                // A new bot is named from its first conversations (Grok Bot's flow); rename it any time after.
+                if draft.id != nil {
+                    Field("Name") {
+                        TextField("Name", text: $draft.name).fieldBox()
+                    }
                 }
                 Field("Standing instructions") {
                     TextField("e.g. Reviews PRs. Never pushes without asking.", text: $draft.description, axis: .vertical)
@@ -374,7 +377,8 @@ extension View {
 }
 
 extension BotDraft {
-    var isValid: Bool { !name.trimmingCharacters(in: .whitespaces).isEmpty }
+    /// A new bot may go without a name: the host names it after its first conversations.
+    var isValid: Bool { id == nil || !name.trimmingCharacters(in: .whitespaces).isEmpty }
 
     /// What the host should get: no stale command unless the agent is custom.
     var normalized: BotDraft {
@@ -397,9 +401,9 @@ public extension BotStore {
         }
     }
 
-    /// Creates "New Bot" with sensible defaults and opens it (desktop compose flow).
+    /// Creates an unnamed bot with sensible defaults and opens it (desktop compose flow).
     func createDefaultBot() async throws -> Bot {
-        var draft = BotDraft(name: "New Bot")
+        var draft = BotDraft()
         fillDefaults(&draft)
         let bot = try await save(draft)
         selection = bot.id

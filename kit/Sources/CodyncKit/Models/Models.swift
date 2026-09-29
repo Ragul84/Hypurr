@@ -29,6 +29,8 @@ public struct Bot: Codable, Identifiable, Hashable, Sendable {
     public var skills: [String]
     /// The bot can see and operate the computer's desktop (the built-in `computer` tools).
     public var computer: Bool
+    /// Created without a name: the host names it after its first few conversations.
+    public var autoName: Bool = false
     public var createdAt: Int64
 
     // Runtime, filled in by the host.
@@ -511,6 +513,7 @@ extension Bot {
         connectors = try c.decodeIfPresent([String].self, forKey: .connectors) ?? []
         skills = try c.decodeIfPresent([String].self, forKey: .skills) ?? []
         computer = try c.decodeIfPresent(Bool.self, forKey: .computer) ?? false
+        autoName = try c.decodeIfPresent(Bool.self, forKey: .autoName) ?? false
         createdAt = try c.decodeIfPresent(Int64.self, forKey: .createdAt) ?? 0
         rev = try c.decodeIfPresent(Int64.self, forKey: .rev) ?? 0
         status = try c.decodeIfPresent(String.self, forKey: .status) ?? "idle"

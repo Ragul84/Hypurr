@@ -46,6 +46,12 @@ its own context and compacts it itself.
   - Other harnesses get the instructions inline, in `~/.codync/memory-keeper`.
 - **Episodes:** every 6 remembered exchanges (pending turns in `memory.episode.<bot>`), the keeper writes one
   `[episode]` journal sentence.
+- **Automatic names** (`chat/naming.rs`): a bot created without a name is called "New Bot" with `autoName` set;
+  clients don't ask for a name when creating one. From its 3rd remembered exchange the keeper shows the last 6
+  (`naming.turns.<bot>`) to the same one-shot agent and asks for a 1–4 word name in the user's language, retrying
+  after each exchange until the purpose is clear. The name goes through `updateBot`, so the agent gets it as a
+  profile update. The description is never touched (it holds standing instructions). Renaming the bot yourself
+  clears `autoName` for good.
 - The agent is told where its memory folder is so it can grep older facts. Facts learned mid-session reach its
   prompt at the next compaction or session.
 - **API:** `memory`, `forgetMemory`, `clearMemory`. The Memory card in bot settings lists and removes facts.

@@ -84,6 +84,8 @@ pub fn editor(ui: &App, bot: Option<Value>) {
         .title("Name")
         .text(d.borrow()["name"].as_str().unwrap_or(""))
         .build();
+    // A new bot is named from its first conversations (Grok Bot's flow); rename it any time after.
+    name.set_visible(!is_new);
     profile.add(&name);
     let shapes = gtk::FlowBox::builder()
         .selection_mode(gtk::SelectionMode::None)

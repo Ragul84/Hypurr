@@ -5,7 +5,7 @@
 use crate::client;
 use crate::rows::{hline, icon_button, label};
 use crate::ui::{self, App, flat_header};
-use crate::{avatar, dialogs};
+use crate::avatar;
 use adw::prelude::*;
 use serde_json::{Value, json};
 use std::cell::{Cell, RefCell};
@@ -372,18 +372,14 @@ fn open_chat(ui: &App, id: &str) {
     }
 }
 
-/// "New Bot" (or the typed name) with sensible defaults: the first available agent and a personal workspace.
+/// A bot with the typed name, or none (the host names it after its first conversations), with
+/// sensible defaults: the first available agent and a personal workspace.
 fn create(ui: &App) {
     if ui.compose_page.creating.replace(true) {
         return;
     }
     render(ui);
-    let typed = ui.compose_page.to.text().trim().to_owned();
-    let name = if typed.is_empty() {
-        "New Bot".to_owned()
-    } else {
-        typed
-    };
+    let name = ui.compose_page.to.text().trim().to_owned();
     let body = {
         let st = ui.state.borrow();
         let backends = st.hello["backends"].as_array().cloned().unwrap_or_default();
@@ -406,10 +402,6 @@ fn create(ui: &App) {
                 ui2.state.borrow_mut().bots.insert(id.clone(), bot.clone());
                 if ui2.compose_page.recipients.borrow().is_empty() {
                     open_chat(&ui2, &id);
-                    // A fresh "New Bot" opens on its settings, like the Mac's details panel.
-                    if bot["name"] == "New Bot" {
-                        dialogs::editor(&ui2, Some(bot));
-                    }
                 } else {
                     choose(&ui2, &bot);
                 }
