@@ -187,8 +187,8 @@ private struct ChatSplitView: View {
         HStack(spacing: 0) {
             VStack(spacing: 0) {
                 HStack(spacing: 6) {
-                    ComputerFilterHeader(accounts: accounts, hidden: $hiddenComputers) { showComputers = true }
                     Spacer(minLength: 0)
+                    ComputerFilterHeader(accounts: accounts, hidden: $hiddenComputers) { showComputers = true }
                     IconButton("New chat", systemImage: "plus", action: compose)
                         .keyboardShortcut("n")
                         .disabled(onlineStores.isEmpty)
