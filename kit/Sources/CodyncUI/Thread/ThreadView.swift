@@ -104,6 +104,9 @@ public struct ThreadView: View {
                     ForEach(items) { item in
                         row(item)
                             .id(item.id)
+                            .transition(item.id == items.last?.id
+                                ? .asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity), removal: .opacity)
+                                : .identity)
                     }
                     // Offline, "working" is only what the computer last said; don't show it as live.
                     if let bot, bot.isWorking(in: botId, thread: nil), !model.isOffline {
@@ -115,6 +118,7 @@ public struct ThreadView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
+                .animation(Motion.reduced(Motion.conversation, reduceMotion), value: items.last?.id)
                 #if os(macOS)
                     .frame(maxWidth: 820)
                     .frame(maxWidth: .infinity)
@@ -129,11 +133,21 @@ public struct ThreadView: View {
             #endif
             .onChange(of: items.last?.id) { _, _ in
                 guard isAtBottom || items.last?.isUserMessage == true else { return }
-                proxy.scrollTo("bottom", anchor: .bottom)
+                withAnimation(Motion.reduced(Motion.conversation, reduceMotion)) {
+                    proxy.scrollTo("bottom", anchor: .bottom)
+                }
+            }
+            .onChange(of: items.last?.textContent) { _, _ in
+                guard isAtBottom else { return }
+                withAnimation(Motion.reduced(Motion.conversation, reduceMotion)) {
+                    proxy.scrollTo("bottom", anchor: .bottom)
+                }
             }
             .onChange(of: bot?.isWorking) { _, _ in
                 guard isAtBottom else { return }
-                proxy.scrollTo("bottom", anchor: .bottom)
+                withAnimation(Motion.reduced(Motion.conversation, reduceMotion)) {
+                    proxy.scrollTo("bottom", anchor: .bottom)
+                }
             }
         }
         .background(Palette.background)
@@ -448,7 +462,9 @@ struct ChatItem: Identifiable {
         var out: [ChatItem] = []
         var lastDate: Date?
         var lastAuthor: String?
-        for e in entries where e.isChat {
+        // Agent text is streamed as a stable entry with final=false, then updated in place.
+        // Render that same row while it is generating so the completed answer never pops in later.
+        for e in entries where e.isChat || (e.kind == "agent" && e.data.final == false && !(e.data.text ?? "").isEmpty) {
             let date = e.date
             let id = e.kind == "user" ? e.data.clientNonce.map { "user-\($0)" } ?? e.id : e.id
             if lastDate.map({ date.timeIntervalSince($0) > 3600 }) ?? true {
@@ -466,6 +482,10 @@ struct ChatItem: Identifiable {
 
     var isUserMessage: Bool {
         if case let .entry(entry, _) = kind { entry.kind == "user" } else { false }
+    }
+
+    var textContent: String? {
+        if case let .entry(entry, _) = kind { entry.data.text } else { nil }
     }
 }
 

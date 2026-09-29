@@ -20,6 +20,8 @@ public enum Motion {
     /// Size and layout changes (panels growing, cards resizing): the critically damped
     /// `.3s` spring Grok writes as a `linear()` curve.
     public static let layout = Animation.spring(duration: 0.3, bounce: 0)
+    /// A slightly slower, critically damped spring for a new chat message and its scroll.
+    public static let conversation = Animation.spring(duration: 0.42, bounce: 0)
     /// Tiles moving into place: `{type: "spring", stiffness: 1000, damping: 63}`.
     public static let tile = Animation.interpolatingSpring(mass: 1, stiffness: 1000, damping: 63)
 
