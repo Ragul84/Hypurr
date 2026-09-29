@@ -52,10 +52,14 @@ extension View {
     }
 
     /// Mac: Return sends, Shift-Return adds a new line. iPhone keeps Return as a new line.
+    /// While an input method (Zhuyin, Pinyin, Japanese…) is composing, Return picks the candidate instead.
     @ViewBuilder func sendOnReturn(_ send: @escaping () -> Void) -> some View {
         #if os(macOS)
         onKeyPress(.return, phases: .down) { press in
             guard !press.modifiers.contains(.shift) else { return .ignored }
+            if let editor = NSApp.keyWindow?.firstResponder as? NSTextView, editor.hasMarkedText() {
+                return .ignored
+            }
             send()
             return .handled
         }
