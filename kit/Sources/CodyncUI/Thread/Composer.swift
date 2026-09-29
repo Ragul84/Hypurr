@@ -12,6 +12,7 @@ struct Composer: View {
     /// Starts a voice call; while the box is empty it takes the send button's place.
     var onCall: (() -> Void)?
     @Environment(BotStore.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var draft = ""
     /// Files going out with the next message.
     @State private var files: [OutgoingFile] = []
@@ -380,9 +381,10 @@ struct Composer: View {
 
     private func submit() {
         guard canSend else { return }
-        model.send(draft, to: botId, thread: thread, files: files)
-        draft = ""
-        files = []
+        withAnimation(Motion.reduced(Motion.conversation, reduceMotion)) {
+            model.send(draft, to: botId, thread: thread, files: files)
+            draft = ""
+            files = []
+        }
     }
 }
-
