@@ -51,9 +51,7 @@ struct RoutineEditorView: View {
                     }
                     VStack(alignment: .leading, spacing: 14) {
                         Text("When to run").font(.subheadline.weight(.semibold))
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 8)], spacing: 8) {
-                            ForEach(options, id: \.0) { option in triggerChoice(option) }
-                        }
+                        triggerChoices
                         if loaded { triggerFields }
                         else { Label("Loading schedule…", systemImage: "clock").foregroundStyle(Palette.secondary) }
                     }
@@ -77,6 +75,9 @@ struct RoutineEditorView: View {
                                 .font(.caption).foregroundStyle(Palette.secondary)
                         }
                     }
+                    #if os(iOS)
+                    executionNote
+                    #endif
                 }
                 .padding(20)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -147,6 +148,18 @@ struct RoutineEditorView: View {
         }
     }
 
+    @ViewBuilder private var triggerChoices: some View {
+        #if os(iOS)
+        VStack(spacing: 8) {
+            ForEach(options, id: \.0) { option in triggerChoice(option) }
+        }
+        #else
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 8)], spacing: 8) {
+            ForEach(options, id: \.0) { option in triggerChoice(option) }
+        }
+        #endif
+    }
+
     private func triggerChoice(_ option: (String, String)) -> some View {
         let selected = schedule.kind == option.0
         let symbols = ["interval": "arrow.clockwise", "cron": "calendar",
@@ -164,6 +177,7 @@ struct RoutineEditorView: View {
                     Text(option.1).font(.subheadline.weight(.medium))
                     Text(details[option.0] ?? "").font(.caption).foregroundStyle(selected ? Palette.text.opacity(0.75) : Palette.secondary)
                 }
+                .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 Image(systemName: "checkmark").font(.caption.weight(.semibold)).opacity(selected ? 1 : 0)
             }
@@ -227,13 +241,29 @@ struct RoutineEditorView: View {
                 Label("Connect to this computer to save your routine.", systemImage: "wifi.slash")
                     .font(.caption).foregroundStyle(Palette.danger)
             }
+            #if os(iOS)
+            if loaded, !model.isOffline,
+               name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+               instruction.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text("Enter a name and instruction above to save.")
+                    .font(.caption).foregroundStyle(Palette.secondary)
+            }
+            saveButton
+            #else
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 16) { executionNote; Spacer(minLength: 0); saveButton }
                 VStack(alignment: .leading, spacing: 12) { executionNote; saveButton }
             }
+            #endif
         }
         .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        #if os(iOS)
+        .padding(.bottom, 16)
+        .background(Palette.background)
+        #else
         .background(Palette.bubbleAgent)
+        #endif
     }
 
     private var executionNote: some View {
@@ -249,8 +279,11 @@ struct RoutineEditorView: View {
             HStack(spacing: 8) {
                 if busy { Spinner() }
                 Text(busy ? "Saving…" : routine == nil ? "Create routine" : "Save changes")
-                    .fixedSize(horizontal: true, vertical: false)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            #if os(iOS)
+            .frame(maxWidth: .infinity, minHeight: 26)
+            #endif
         }
         .buttonStyle(.primary)
         .disabled(!canSave)
