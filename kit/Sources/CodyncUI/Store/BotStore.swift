@@ -582,16 +582,31 @@ public final class BotStore {
                 try await remote.enqueue(botId: botId, text: text, clientNonce: nonce, threadId: thread)
                 if let bot = bots[botId] { onSent?(bot) }
             } catch MailboxError.hostOnline {
-                // It came back meanwhile: send it the normal way once the link is up.
+                // Presence can race the stream state. Wait for the host's events channel
+                // before trying the normal API, instead of turning that race into a failure.
                 markLocal(nonce: nonce, botId: botId, status: "sending")
-                try? await Task.sleep(for: .seconds(2))
-                deliver(text, botId: botId, thread: thread, nonce: nonce)
+                await deliverWhenOnline(text, botId: botId, thread: thread, nonce: nonce)
             } catch {
                 lastError = error.localizedDescription
                 markLocal(nonce: nonce, botId: botId, status: "failed")
             }
             saveCache()
         }
+    }
+
+    private func deliverWhenOnline(_ text: String, botId: String, thread: String?, nonce: String) async {
+        let deadline = ContinuousClock.now + .seconds(30)
+        while !retired, connection != .online, ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(200))
+        }
+        guard !retired else { return }
+        guard connection == .online else {
+            lastError = "The computer came online, but the message couldn't be sent. Retry it when the connection is ready."
+            markLocal(nonce: nonce, botId: botId, status: "failed")
+            saveCache()
+            return
+        }
+        deliver(text, botId: botId, thread: thread, nonce: nonce)
     }
 
     /// Takes a waiting message back out of the mailbox, unless the computer already has it.
@@ -626,7 +641,14 @@ public final class BotStore {
     private func reconcileQueued(_ remote: any RemoteTransport) async {
         let waiting = entries.values.flatMap { $0 }.filter { $0.data.status == "waiting" }
         guard !waiting.isEmpty else { return }
-        let held = Dictionary(await remote.listQueued().map { ($0.nonce, $0.state) }, uniquingKeysWith: { a, _ in a })
+        let heldItems: [QueuedItem]
+        do {
+            heldItems = try await remote.listQueued()
+        } catch {
+            log.debug("mailbox reconciliation deferred: \(error.localizedDescription)")
+            return
+        }
+        let held = Dictionary(heldItems.map { ($0.nonce, $0.state) }, uniquingKeysWith: { a, _ in a })
         guard !retired else { return }
         for e in waiting {
             guard let nonce = e.data.clientNonce else { continue }
@@ -671,12 +693,14 @@ public final class BotStore {
     public func discard(_ entry: Entry) {
         if let nonce = entry.data.clientNonce { outgoingFiles[nonce] = nil }
         entries[entry.botId]?.removeAll { $0.id == entry.id }
+        scheduleSave()
     }
 
     private func markLocal(nonce: String, botId: String, status: String) {
         guard var list = entries[botId], let i = list.firstIndex(where: { $0.id == "local-\(nonce)" }) else { return }
         list[i].data.status = status
         entries[botId] = list
+        scheduleSave()
     }
 
     public func stop(_ botId: String) { perform { try await $0.stop(botId) } }
@@ -966,11 +990,11 @@ public final class BotStore {
 
     public func saveCache() {
         guard !retired else { return }
-        // Keep the newest 200 entries per bot; older ones page in from the host. Messages waiting
-        // in the mailbox stay too, so they can still be seen and cancelled after a relaunch.
+        // Keep the newest 200 entries per bot; older ones page in from the host. Local queued and
+        // failed messages stay visible so they can be cancelled or retried after a relaunch.
         let kept = entries.values.flatMap { list in
             list.filter { !$0.id.hasPrefix("local-") }.suffix(200)
-                + list.filter { $0.id.hasPrefix("local-") && ["waiting", "delivering"].contains($0.data.status) }
+                + list.filter { $0.id.hasPrefix("local-") && ["waiting", "delivering", "failed"].contains($0.data.status) }
         }
         let cache = Cache(stamp: "\(Self.appBuild)/\(hello?.version ?? "")", hostId: hostId, rev: rev, bots: Array(bots.values), entries: kept)
         if let data = try? JSONEncoder().encode(cache) {

@@ -43,7 +43,7 @@ public actor ChannelTransport: RemoteTransport {
     private var streamIds: [UUID: UInt32] = [:]
     private var puts: [String: CheckedContinuation<Void, Error>] = [:]
     private var cancels: [String: CheckedContinuation<MailboxCancel, Never>] = [:]
-    private var lists: [UUID: CheckedContinuation<[QueuedItem], Never>] = [:]
+    private var lists: [UUID: CheckedContinuation<[QueuedItem], Error>] = [:]
     private var waiters: [UUID: CheckedContinuation<Void, Never>] = [:]
 
     private var stateObservers: [UUID: AsyncStream<LinkState>.Continuation] = [:]
@@ -624,7 +624,10 @@ public actor ChannelTransport: RemoteTransport {
         case "mbox.gone":
             if let nonce = wire.nonce { cancels.removeValue(forKey: nonce)?.resume(returning: wire.state == "delivering" ? .delivering : .unknown) }
         case "mbox.items":
-            if let key = lists.keys.first { lists.removeValue(forKey: key)?.resume(returning: wire.items ?? []) }
+            if let key = lists.keys.first, let continuation = lists.removeValue(forKey: key) {
+                if let items = wire.items { continuation.resume(returning: items) }
+                else { continuation.resume(throwing: HostError.unreachable) }
+            }
         case "mbox.delivered":
             if let nonce = wire.nonce { broadcast(.delivered(nonce: nonce)) }
         case "mbox.failed":
@@ -912,10 +915,10 @@ public actor ChannelTransport: RemoteTransport {
         cancels.removeValue(forKey: nonce)?.resume(returning: .unknown)
     }
 
-    public func listQueued() async -> [QueuedItem] {
-        guard let link = try? relaySocket() else { return [] }
+    public func listQueued() async throws -> [QueuedItem] {
+        let link = try relaySocket()
         let key = UUID()
-        return await withCheckedContinuation { c in
+        return try await withCheckedThrowingContinuation { (c: CheckedContinuation<[QueuedItem], Error>) in
             lists[key] = c
             link.outbox.yield(#"{"t":"mbox.list"}"#)
             Task {
@@ -926,7 +929,7 @@ public actor ChannelTransport: RemoteTransport {
     }
 
     private func expireList(_ key: UUID) {
-        lists.removeValue(forKey: key)?.resume(returning: [])
+        lists.removeValue(forKey: key)?.resume(throwing: HostError.unreachable)
     }
 }
 
