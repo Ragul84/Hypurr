@@ -146,7 +146,7 @@ completion reporting. Most automation modules it imports are absent. Its rendere
 and private cloud are not source-complete references.
 
 Remaining differences from the reference: provider subscription provisioning,
-cloud execution/delivery while the host is offline, inactivity auto-pause, and Linux/TUI routine panels. The Apple UI
+cloud execution/delivery while the host is offline, inactivity auto-pause, and a Linux routine panel (the TUI edits routines with a typed schedule: cron, `every 2h`, a date, or `webhook`). The Apple UI
 uses Codync's shared native controls. This is not a verified complete one-to-one
 reconstruction of every Grok Bot routine behavior.
 
