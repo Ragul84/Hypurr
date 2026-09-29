@@ -36,7 +36,7 @@ public protocol RemoteTransport: HostTransport {
     func computerUpdates() -> AsyncStream<Computer>
     func enqueue(botId: String, text: String, clientNonce: String, threadId: String?) async throws
     func cancelQueued(clientNonce: String) async -> MailboxCancel
-    func listQueued() async -> [QueuedItem]
+    func listQueued() async throws -> [QueuedItem]
     func mailboxEvents() -> AsyncStream<MailboxEvent>
     /// Stops for good: closes sockets and ends every stream.
     func shutdown() async

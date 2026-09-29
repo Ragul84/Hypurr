@@ -29,6 +29,7 @@ public struct ThreadView: View {
     @State private var showRoutines = false
     @State private var routineId: String?
     @State private var routineRequest = UUID()
+    @State private var isAtBottom = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var bot: Bot? { model.bots[botId] }
@@ -103,6 +104,9 @@ public struct ThreadView: View {
                     ForEach(items) { item in
                         row(item)
                             .id(item.id)
+                            .transition(item.id == items.last?.id
+                                ? .asymmetric(insertion: .move(edge: .bottom).combined(with: .opacity), removal: .opacity)
+                                : .identity)
                     }
                     // Offline, "working" is only what the computer last said; don't show it as live.
                     if let bot, bot.isWorking(in: botId, thread: nil), !model.isOffline {
@@ -114,22 +118,36 @@ public struct ThreadView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
+                .animation(Motion.reduced(Motion.conversation, reduceMotion), value: items.last?.id)
                 #if os(macOS)
                     .frame(maxWidth: 820)
                     .frame(maxWidth: .infinity)
                 #endif
             }
-            .defaultScrollAnchor(.bottom)
+            .conversationInitialBottomAnchor()
             .scrollDismissesKeyboard(.interactively)
             .conversationScrollEdges()
+            .conversationBottomObserver($isAtBottom)
             #if os(iOS)
                 .simultaneousGesture(TapGesture().onEnded { dismissChatKeyboard() })
             #endif
             .onChange(of: items.last?.id) { _, _ in
-                proxy.scrollTo("bottom", anchor: .bottom)
+                guard isAtBottom || items.last?.isUserMessage == true else { return }
+                withAnimation(Motion.reduced(Motion.conversation, reduceMotion)) {
+                    proxy.scrollTo("bottom", anchor: .bottom)
+                }
+            }
+            .onChange(of: items.last?.textContent) { _, _ in
+                guard isAtBottom else { return }
+                withAnimation(Motion.reduced(Motion.conversation, reduceMotion)) {
+                    proxy.scrollTo("bottom", anchor: .bottom)
+                }
             }
             .onChange(of: bot?.isWorking) { _, _ in
-                proxy.scrollTo("bottom", anchor: .bottom)
+                guard isAtBottom else { return }
+                withAnimation(Motion.reduced(Motion.conversation, reduceMotion)) {
+                    proxy.scrollTo("bottom", anchor: .bottom)
+                }
             }
         }
         .background(Palette.background)
@@ -444,19 +462,30 @@ struct ChatItem: Identifiable {
         var out: [ChatItem] = []
         var lastDate: Date?
         var lastAuthor: String?
-        for e in entries where e.isChat {
+        // Agent text is streamed as a stable entry with final=false, then updated in place.
+        // Render that same row while it is generating so the completed answer never pops in later.
+        for e in entries where e.isChat || (e.kind == "agent" && e.data.final == false && !(e.data.text ?? "").isEmpty) {
             let date = e.date
+            let id = e.kind == "user" ? e.data.clientNonce.map { "user-\($0)" } ?? e.id : e.id
             if lastDate.map({ date.timeIntervalSince($0) > 3600 }) ?? true {
-                out.append(ChatItem(id: "sep-\(e.id)", kind: .separator(date)))
+                out.append(ChatItem(id: "sep-\(id)", kind: .separator(date)))
                 lastAuthor = nil
             }
             // In a group each bot is its own author.
             let author = e.kind == "user" ? "user" : e.kind == "agent" ? "agent:\(e.data.author ?? "")" : e.kind
-            out.append(ChatItem(id: e.id, kind: .entry(e, groupStart: author != lastAuthor)))
+            out.append(ChatItem(id: id, kind: .entry(e, groupStart: author != lastAuthor)))
             lastAuthor = (author == "user" || e.kind == "agent") ? author : nil
             lastDate = date
         }
         return out
+    }
+
+    var isUserMessage: Bool {
+        if case let .entry(entry, _) = kind { entry.kind == "user" } else { false }
+    }
+
+    var textContent: String? {
+        if case let .entry(entry, _) = kind { entry.data.text } else { nil }
     }
 }
 
@@ -714,6 +743,26 @@ private struct DetailsPanel: View {
 #endif
 
 private extension View {
+    @ViewBuilder func conversationInitialBottomAnchor() -> some View {
+        if #available(iOS 18, macOS 15, *) {
+            defaultScrollAnchor(.bottom, for: .initialOffset)
+        } else {
+            defaultScrollAnchor(.bottom)
+        }
+    }
+
+    @ViewBuilder func conversationBottomObserver(_ isAtBottom: Binding<Bool>) -> some View {
+        if #available(iOS 18, macOS 15, *) {
+            onScrollGeometryChange(for: Bool.self) { geometry in
+                geometry.contentSize.height - geometry.visibleRect.maxY < 48
+            } action: { _, isAtBottomNow in
+                isAtBottom.wrappedValue = isAtBottomNow
+            }
+        } else {
+            self
+        }
+    }
+
     @ViewBuilder func conversationScrollEdges() -> some View {
         if #available(iOS 26, macOS 26, *) {
             #if os(iOS)

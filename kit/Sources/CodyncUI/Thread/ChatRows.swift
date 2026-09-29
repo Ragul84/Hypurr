@@ -172,8 +172,10 @@ struct UserBubble: View {
         switch entry.data.status {
         case "sending":
             Text("Sending…").font(.caption2).foregroundStyle(Palette.tertiary)
-        case "queued" where botWorking:
-            Text("Waiting to send — it'll read this when it's done").font(.caption2).foregroundStyle(Palette.tertiary)
+        case "queued":
+            Text(botWorking ? "Queued until this response finishes" : "Queued")
+                .font(.caption2)
+                .foregroundStyle(Palette.tertiary)
         case "failed":
             HStack(spacing: 10) {
                 Text("Failed to send").foregroundStyle(Palette.danger)
@@ -215,7 +217,7 @@ struct AgentBubble: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            MarkdownText(entry.data.text ?? "")
+            MarkdownText(entry.data.text ?? "", streaming: entry.data.final == false)
                 .padding(.horizontal, InterfaceMetrics.value(mac: 12, mobile: 16))
                 .padding(.vertical, InterfaceMetrics.value(mac: 8, mobile: 10))
                 .background(Palette.bubbleAgent, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
