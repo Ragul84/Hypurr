@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Codync — Your coding agents, as teammates",
+  title: "Codync: message your coding agents from your phone",
   description:
     "Message Claude Code, Codex, Cursor, Pi and more as persistent bots from your iPhone, Mac or Linux desktop. Approve actions and get notified when they're done.",
   icons: {
@@ -32,7 +32,7 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
     >
-      <body className="min-h-full flex flex-col bg-black text-neutral-200">
+      <body className="min-h-full flex flex-col bg-neutral-950 text-neutral-200">
         {children}
       </body>
     </html>

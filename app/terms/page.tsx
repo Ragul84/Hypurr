@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Terms() {
   return (
     <main className="flex-1 flex flex-col items-center px-6 py-16">
@@ -44,14 +46,14 @@ export default function Terms() {
 
         <div className="pt-4">
           <p className="text-neutral-400">
-            <a href="/privacy" className="text-white underline">Privacy Policy</a>
+            <Link href="/privacy" className="text-white underline">Privacy Policy</Link>
           </p>
         </div>
 
         <div className="pt-4">
-          <a href="/" className="text-sm text-neutral-500 hover:text-neutral-300 transition-colors">
+          <Link href="/" className="text-sm text-neutral-500 hover:text-neutral-300 transition-colors">
             &larr; Back to home
-          </a>
+          </Link>
         </div>
       </article>
     </main>

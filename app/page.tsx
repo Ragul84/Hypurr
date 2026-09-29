@@ -1,46 +1,70 @@
+import Image from "next/image";
+import Link from "next/link";
+import { GithubLogo } from "@phosphor-icons/react/ssr";
 import Hero from "./components/hero";
-import Features from "./components/features";
+import { Answers, Features } from "./components/features";
+import Install from "./components/install";
+import { DMG, GITHUB } from "./links";
 
 export default function Home() {
   return (
-    <main className="flex-1 flex flex-col">
-      <Hero />
-      <Features />
+    <>
+      <header className="sticky top-0 z-20 bg-neutral-950/80 backdrop-blur-md">
+        <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
+          <Link href="/" className="flex items-center gap-2.5 font-semibold text-neutral-50">
+            <Image src="/icon.png" alt="" width={28} height={28} className="rounded-[7px]" />
+            Codync
+          </Link>
+          <div className="flex items-center gap-2">
+            <a href="#install" className="hidden rounded-full px-4 py-2 text-sm text-neutral-400 transition hover:text-neutral-100 sm:block">
+              Install
+            </a>
+            <a
+              href={GITHUB}
+              aria-label="Codync on GitHub"
+              title="GitHub"
+              className="rounded-full p-2 text-neutral-400 transition hover:text-neutral-100"
+            >
+              <GithubLogo size={20} />
+            </a>
+            <a
+              href={DMG}
+              className="rounded-full bg-neutral-50 px-4 py-2 text-sm font-medium text-neutral-950 transition hover:bg-white active:scale-[0.98]"
+            >
+              Download for Mac
+            </a>
+          </div>
+        </nav>
+      </header>
 
-      <section className="px-6 pb-20">
-        <div className="max-w-4xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="p-5 rounded-2xl border border-neutral-800 bg-neutral-900/30">
-            <div className="text-xs text-neutral-500 mb-2">1</div>
-            <h3 className="font-semibold text-white text-sm mb-1.5">Install on your computer</h3>
-            <p className="text-sm text-neutral-400 leading-relaxed">Mac: <code className="text-neutral-300 break-all">brew install --cask leepokai/codync/codync</code> or the download above, then open Codync; it starts the host itself. Linux: the <a href="https://github.com/leepokai/Codync#install" className="underline hover:text-neutral-300">install script</a>, then <code className="text-neutral-300">codync-host install</code>.</p>
-          </div>
-          <div className="p-5 rounded-2xl border border-neutral-800 bg-neutral-900/30">
-            <div className="text-xs text-neutral-500 mb-2">2</div>
-            <h3 className="font-semibold text-white text-sm mb-1.5">Pair your phone</h3>
-            <p className="text-sm text-neutral-400 leading-relaxed">Scan the code from Pair iPhone… in the Mac menu bar, the Linux app or <code className="text-neutral-300">codync-host pair</code>. It reaches your computer from anywhere, end-to-end encrypted.</p>
-          </div>
-          <div className="p-5 rounded-2xl border border-neutral-800 bg-neutral-900/30">
-            <div className="text-xs text-neutral-500 mb-2">3</div>
-            <h3 className="font-semibold text-white text-sm mb-1.5">Create bots and message them</h3>
-            <p className="text-sm text-neutral-400 leading-relaxed">A reviewer on one repo, a fixer on another — each keeps its own conversation and approvals.</p>
+      <main className="flex-1">
+        <Hero />
+        <Answers />
+        <Features />
+        <Install />
+      </main>
+
+      <footer className="px-4 py-12 sm:px-6">
+        <div className="mx-auto flex max-w-6xl flex-col gap-6 text-sm text-neutral-500 sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            Free and open source.{" "}
+            <a href={GITHUB} className="text-neutral-300 underline underline-offset-4 hover:text-white">
+              Code on GitHub
+            </a>
+          </p>
+          <div className="flex gap-6">
+            <Link href="/terms" className="transition hover:text-neutral-300">
+              Terms
+            </Link>
+            <Link href="/privacy" className="transition hover:text-neutral-300">
+              Privacy
+            </Link>
+            <a href={`${GITHUB}/issues`} className="transition hover:text-neutral-300">
+              Contact
+            </a>
           </div>
         </div>
-      </section>
-
-      <footer className="flex justify-center gap-6 px-6 py-10 text-sm text-neutral-500 border-t border-neutral-900">
-        <a href="/terms" className="hover:text-neutral-300 transition-colors">
-          Terms of Use
-        </a>
-        <a href="/privacy" className="hover:text-neutral-300 transition-colors">
-          Privacy Policy
-        </a>
-        <a href="https://github.com/leepokai/Codync/issues" className="hover:text-neutral-300 transition-colors">
-          Contact
-        </a>
-        <a href="https://github.com/leepokai/Codync" className="hover:text-neutral-300 transition-colors">
-          GitHub
-        </a>
       </footer>
-    </main>
+    </>
   );
 }

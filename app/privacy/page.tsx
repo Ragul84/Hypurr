@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Privacy() {
   return (
     <main className="flex-1 flex flex-col items-center px-6 py-16">
@@ -53,14 +55,14 @@ export default function Privacy() {
 
         <div className="pt-4">
           <p className="text-neutral-400">
-            <a href="/terms" className="text-white underline">Terms of Use</a>
+            <Link href="/terms" className="text-white underline">Terms of Use</Link>
           </p>
         </div>
 
         <div className="pt-4">
-          <a href="/" className="text-sm text-neutral-500 hover:text-neutral-300 transition-colors">
+          <Link href="/" className="text-sm text-neutral-500 hover:text-neutral-300 transition-colors">
             &larr; Back to home
-          </a>
+          </Link>
         </div>
       </article>
     </main>
