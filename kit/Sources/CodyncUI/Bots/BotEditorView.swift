@@ -34,7 +34,7 @@ public struct BotEditorView: View {
                     Spinner()
                 } else {
                     IconButton(isNew ? "Create" : "Save", systemImage: "checkmark") { save() }
-                        .disabled(!draft.isValid)
+                        .disabled(!draft.isValid || saving || model.connection != .online)
                 }
             }
             BotSettingsForm(draft: $draft, error: error, computers: computers, computer: computer)
@@ -52,6 +52,7 @@ public struct BotEditorView: View {
     }
 
     private func save() {
+        guard draft.isValid, !saving, model.connection == .online else { return }
         saving = true
         error = nil
         Task {
@@ -160,12 +161,18 @@ struct BotSettingsForm: View {
                 VStack(alignment: .leading, spacing: InterfaceMetrics.value(mac: 12, mobile: 20)) {
                     OptionRow("Computer") {
                         if let computer {
-                            ChoicePicker(selection: computer, options: computers, fill: Palette.background)
+                            ChoicePicker(selection: computer, options: computers, fill: Palette.background,
+                                         fitsAvailableWidth: true)
+                                .accessibilityLabel("Computer")
                         } else {
                             Text(model.hostName)
                                 .lineLimit(1)
                                 .foregroundStyle(Palette.secondary)
                         }
+                    }
+                    if computer != nil, model.connection != .online {
+                        Text("Connect this computer to create the bot, or choose another computer.")
+                            .font(.caption).foregroundStyle(Palette.warning)
                     }
                     OptionRow("Agent") {
                         ChoicePicker(selection: $draft.backend,
