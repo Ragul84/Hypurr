@@ -1,148 +1,99 @@
-"use client";
+import { BellRinging, LockKey } from "@phosphor-icons/react/ssr";
+import Phone from "./phone";
+import Reveal from "./reveal";
 
-import { useRef } from "react";
-import { motion, useMotionValue, useTransform } from "framer-motion";
+const agents = ["Claude Code", "Codex", "Cursor", "Gemini", "Copilot", "OpenCode", "Pi", "Grok Build"];
 
-const features = [
-  {
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-5 h-5">
-        <rect x="5" y="2" width="14" height="20" rx="4" />
-        <path d="M9 2h6" strokeLinecap="round" />
-        <circle cx="12" cy="5" r="1.5" fill="currentColor" stroke="none" />
-      </svg>
-    ),
-    title: "Dynamic Island",
-    description:
-      "Live session status on your Lock Screen and Dynamic Island. See what Claude is doing without opening the app.",
-  },
-  {
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-5 h-5">
-        <rect x="2" y="4" width="20" height="14" rx="2" />
-        <path d="M8 22h8M12 18v4" strokeLinecap="round" />
-        <circle cx="12" cy="7" r="1" fill="currentColor" stroke="none" />
-      </svg>
-    ),
-    title: "Menu Bar App",
-    description:
-      "macOS menu bar app with instant session overview. Click to see all active Claude Code sessions.",
-  },
-  {
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-5 h-5">
-        <path d="M12 3v3M12 18v3M3 12h3M18 12h3" strokeLinecap="round" />
-        <path d="M5.6 5.6l2.2 2.2M16.2 16.2l2.2 2.2M5.6 18.4l2.2-2.2M16.2 7.8l2.2-2.2" strokeLinecap="round" />
-        <circle cx="12" cy="12" r="4" />
-      </svg>
-    ),
-    title: "Always-on Push",
-    description:
-      "Live Activity stays updated even when the app is closed. Never miss a status change.",
-  },
-  {
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-5 h-5">
-        <path d="M4 16.5C2.8 15.3 2 13.7 2 12c0-3.3 2.7-6 6-6 .3 0 .7 0 1 .1C10.1 4.2 12 3 14.2 3c3 0 5.5 2.3 5.8 5.2C22 9 23 10.8 23 13c0 2.8-2.2 5-5 5H6c-.7 0-1.4-.2-2-.5z" />
-      </svg>
-    ),
-    title: "Cross-device Sync",
-    description:
-      "Access your sessions from anywhere — no LAN required. Syncs automatically across all your Apple devices.",
-  },
-  {
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-5 h-5">
-        <rect x="6" y="3" width="12" height="18" rx="6" />
-        <circle cx="12" cy="8" r="2" />
-        <path d="M15 18H9" strokeLinecap="round" />
-      </svg>
-    ),
-    title: "Apple Watch",
-    description:
-      "Session status on your wrist via Smart Stack widget. Glanceable progress at all times.",
-  },
-  {
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-5 h-5">
-        <rect x="5" y="4" width="14" height="16" rx="2" />
-        <path d="M9 4V2M15 4V2" strokeLinecap="round" />
-        <circle cx="12" cy="12" r="2.5" />
-        <path d="M12 9.5V7M12 17v-2.5" strokeLinecap="round" />
-      </svg>
-    ),
-    title: "Zero Configuration",
-    description:
-      "One-click install, no login, no account. No analytics, no tracking. Your code never leaves your devices.",
-  },
-];
-
-function FeatureCard({ feature, index }: { feature: (typeof features)[number]; index: number }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
-
-  function handleMouse(e: React.MouseEvent) {
-    const rect = ref.current?.getBoundingClientRect();
-    if (!rect) return;
-    mouseX.set(e.clientX - rect.left);
-    mouseY.set(e.clientY - rect.top);
-  }
-
+// Radius rule for the page: buttons and chips are pills, panels are rounded-3xl, code is rounded-xl.
+export function Answers() {
   return (
-    <motion.div
-      ref={ref}
-      key={feature.title}
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-30px" }}
-      transition={{ duration: 0.5, delay: index * 0.08, ease: [0.21, 0.47, 0.32, 0.98] }}
-      onMouseMove={handleMouse}
-      className="group relative p-5 rounded-2xl border border-neutral-800 bg-neutral-900/30 hover:bg-neutral-900/60 hover:border-neutral-700 transition-all duration-300 overflow-hidden"
-    >
-      {/* Spotlight glow on hover */}
-      <motion.div
-        className="pointer-events-none absolute -inset-px rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-        style={{
-          background: useTransform(
-            [mouseX, mouseY],
-            ([x, y]) =>
-              `radial-gradient(300px circle at ${x}px ${y}px, rgba(255,255,255,0.04), transparent 60%)`
-          ),
-        }}
-      />
-      <div className="relative z-10">
-        <div className="w-9 h-9 rounded-lg bg-neutral-800/80 border border-neutral-700/50 flex items-center justify-center text-neutral-300 mb-3 group-hover:text-white group-hover:border-neutral-600 transition-colors">
-          {feature.icon}
-        </div>
-        <h3 className="font-semibold text-white text-sm mb-1.5">
-          {feature.title}
-        </h3>
-        <p className="text-sm text-neutral-400 leading-relaxed">
-          {feature.description}
-        </p>
+    <section className="px-4 py-20 sm:px-6 md:py-28">
+      <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-12 md:grid-cols-[1fr_1.1fr] md:gap-20">
+        <Reveal className="order-2 mx-auto w-full max-w-[17rem] md:order-1 md:max-w-[20rem]">
+          <Phone src="/screens/answer.webp" alt="Scout's reply: it added weeklyTotals to src/pace.js with a test, and all tests pass" />
+        </Reveal>
+        <Reveal className="order-1 md:order-2" delay={0.05}>
+          <h2 className="text-3xl font-semibold tracking-tight text-neutral-50 md:text-4xl">
+            The answer, without the noise.
+          </h2>
+          <p className="mt-5 max-w-[32rem] text-lg leading-relaxed text-neutral-400">
+            Each bot keeps one ongoing chat. You see its final reply for every turn; tool calls, thoughts and plans
+            wait in the full conversation when you want them.
+          </p>
+        </Reveal>
       </div>
-    </motion.div>
+    </section>
   );
 }
 
-export default function Features() {
+export function Features() {
   return (
-    <section className="px-6 py-20">
-      <div className="max-w-4xl mx-auto">
-        <motion.h2
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          className="text-2xl font-bold text-white text-center mb-12"
-        >
-          Everything you need to monitor Claude Code
-        </motion.h2>
+    <section className="px-4 py-20 sm:px-6 md:py-28">
+      <div className="mx-auto max-w-6xl">
+        <Reveal>
+          <h2 className="max-w-[36rem] text-3xl font-semibold tracking-tight text-neutral-50 md:text-4xl">
+            A team of bots on your own computer.
+          </h2>
+        </Reveal>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {features.map((feature, i) => (
-            <FeatureCard key={feature.title} feature={feature} index={i} />
-          ))}
+        <div className="mt-12 grid grid-cols-1 gap-4 md:grid-cols-3 md:grid-rows-[auto_auto]">
+          <Reveal className="md:col-span-2 md:row-span-2">
+            <div className="flex h-full flex-col overflow-hidden rounded-3xl bg-gradient-to-br from-orange-500/15 via-neutral-900 to-neutral-900 md:flex-row">
+              <div className="p-8 md:w-1/2 md:p-10">
+                <h3 className="text-xl font-semibold text-neutral-50">Put bots in a room</h3>
+                <p className="mt-3 leading-relaxed text-neutral-400">
+                  Start a group chat and every member answers in its own session. They read each other, disagree
+                  and hand work back. Mention one with @ to ask just that bot.
+                </p>
+              </div>
+              <div className="relative h-80 md:h-auto md:w-1/2">
+                <div className="absolute inset-x-8 top-0 md:inset-x-6 md:top-10">
+                  <Phone src="/screens/group.webp" alt="Ship room group chat: Reviewer flags two issues and asks Scout, who adds a guard" />
+                </div>
+              </div>
+            </div>
+          </Reveal>
+
+          <Reveal delay={0.05}>
+            <div className="h-full rounded-3xl bg-neutral-900 p-8">
+              <BellRinging size={26} className="text-orange-400" />
+              <h3 className="mt-5 text-xl font-semibold text-neutral-50">Only the pings that matter</h3>
+              <p className="mt-3 leading-relaxed text-neutral-400">
+                A notification when a bot needs you or finishes. Commands and edits arrive as cards: allow once,
+                always allow or deny.
+              </p>
+            </div>
+          </Reveal>
+
+          <Reveal delay={0.1}>
+            <div className="h-full rounded-3xl bg-orange-500/10 p-8">
+              <LockKey size={26} className="text-orange-400" />
+              <h3 className="mt-5 text-xl font-semibold text-neutral-50">Your code stays home</h3>
+              <p className="mt-3 leading-relaxed text-neutral-400">
+                Agents run on your machine with your own logins. The phone reaches it end-to-end encrypted.
+              </p>
+            </div>
+          </Reveal>
+
+          <Reveal className="md:col-span-3" delay={0.05}>
+            <div className="flex flex-col gap-6 rounded-3xl bg-neutral-900 p-8 md:flex-row md:items-center md:justify-between md:p-10">
+              <div className="max-w-[26rem]">
+                <h3 className="text-xl font-semibold text-neutral-50">Every agent you already use</h3>
+                <p className="mt-3 leading-relaxed text-neutral-400">
+                  Installed agents are found automatically. Anything else in the ACP registry is fetched on first
+                  use, and each bot picks its own.
+                </p>
+              </div>
+              <ul className="flex max-w-[34rem] flex-wrap gap-2">
+                {agents.map((a) => (
+                  <li key={a} className="rounded-full bg-neutral-800 px-4 py-2 text-sm text-neutral-200">
+                    {a}
+                  </li>
+                ))}
+                <li className="rounded-full px-4 py-2 text-sm text-neutral-500">and about 40 more</li>
+              </ul>
+            </div>
+          </Reveal>
         </div>
       </div>
     </section>

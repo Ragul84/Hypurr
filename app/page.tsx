@@ -1,63 +1,70 @@
+import Image from "next/image";
+import Link from "next/link";
+import { GithubLogo } from "@phosphor-icons/react/ssr";
 import Hero from "./components/hero";
-import DeviceShowcase from "./components/device-showcase";
-import VisualDemos from "./components/visual-demos";
-import DemoVideo from "./components/demo-video";
+import { Answers, Features } from "./components/features";
+import Install from "./components/install";
+import { DMG, GITHUB } from "./links";
 
 export default function Home() {
   return (
-    <main className="flex-1 flex flex-col">
-      {/* Hero */}
-      <Hero />
-
-      {/* Device Showcase */}
-      <DeviceShowcase />
-
-      {/* Demo Video */}
-      <DemoVideo />
-
-      {/* Visual Feature Demos */}
-      <VisualDemos />
-
-      {/* CTA */}
-      <section className="flex flex-col items-center gap-8 px-6 py-20">
-        <div className="flex flex-col items-center gap-4">
-          <div className="flex flex-col sm:flex-row items-center gap-3">
-            <a
-              href="https://apps.apple.com/tw/app/codync/id6760984418?l=en-GB"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-white text-black font-semibold rounded-xl hover:bg-neutral-200 transition-colors"
-            >
-              Download for iOS
+    <>
+      <header className="sticky top-0 z-20 bg-neutral-950/80 backdrop-blur-md">
+        <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
+          <Link href="/" className="flex items-center gap-2.5 font-semibold text-neutral-50">
+            <Image src="/icon.png" alt="" width={28} height={28} className="rounded-[7px]" />
+            Codync
+          </Link>
+          <div className="flex items-center gap-2">
+            <a href="#install" className="hidden rounded-full px-4 py-2 text-sm text-neutral-400 transition hover:text-neutral-100 sm:block">
+              Install
             </a>
             <a
-              href="https://github.com/leepokai/Codync/releases/latest/download/Codync-macOS.dmg"
-              className="inline-flex items-center gap-2 px-6 py-3 bg-neutral-800 text-white font-semibold rounded-xl hover:bg-neutral-700 transition-colors"
+              href={GITHUB}
+              aria-label="Codync on GitHub"
+              title="GitHub"
+              className="rounded-full p-2 text-neutral-400 transition hover:text-neutral-100"
             >
-              Download for macOS
+              <GithubLogo size={20} />
+            </a>
+            <a
+              href={DMG}
+              className="rounded-full bg-neutral-50 px-4 py-2 text-sm font-medium text-neutral-950 transition hover:bg-white active:scale-[0.98]"
+            >
+              Download for Mac
             </a>
           </div>
-          <p className="text-sm text-neutral-500">
-            Free &amp; open source. No account needed — just download and go.
-          </p>
-        </div>
-      </section>
+        </nav>
+      </header>
 
-      {/* Footer */}
-      <footer className="flex justify-center gap-6 px-6 py-10 text-sm text-neutral-500 border-t border-neutral-900">
-        <a href="/terms" className="hover:text-neutral-300 transition-colors">
-          Terms of Use
-        </a>
-        <a href="/privacy" className="hover:text-neutral-300 transition-colors">
-          Privacy Policy
-        </a>
-        <a href="mailto:kevin2005ha@gmail.com" className="hover:text-neutral-300 transition-colors">
-          Contact
-        </a>
-        <a href="https://github.com/leepokai/Codync" className="hover:text-neutral-300 transition-colors">
-          GitHub
-        </a>
+      <main className="flex-1">
+        <Hero />
+        <Answers />
+        <Features />
+        <Install />
+      </main>
+
+      <footer className="px-4 py-12 sm:px-6">
+        <div className="mx-auto flex max-w-6xl flex-col gap-6 text-sm text-neutral-500 sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            Free and open source.{" "}
+            <a href={GITHUB} className="text-neutral-300 underline underline-offset-4 hover:text-white">
+              Code on GitHub
+            </a>
+          </p>
+          <div className="flex gap-6">
+            <Link href="/terms" className="transition hover:text-neutral-300">
+              Terms
+            </Link>
+            <Link href="/privacy" className="transition hover:text-neutral-300">
+              Privacy
+            </Link>
+            <a href={`${GITHUB}/issues`} className="transition hover:text-neutral-300">
+              Contact
+            </a>
+          </div>
+        </div>
       </footer>
-    </main>
+    </>
   );
 }

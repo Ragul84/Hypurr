@@ -1,139 +1,72 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
+import { AppleLogo, DeviceMobile } from "@phosphor-icons/react";
+import Phone from "./phone";
+import { APP_STORE, DMG } from "../links";
+
+const ease = [0.16, 1, 0.3, 1] as const;
 
 export default function Hero() {
+  const reduce = useReducedMotion();
+  const rise = (delay: number) =>
+    reduce
+      ? {}
+      : { initial: { opacity: 0, y: 20 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.7, delay, ease } };
+
   return (
-    <section className="relative flex flex-col items-center justify-center px-6 pt-32 pb-16 overflow-hidden">
-      {/* Radial glow */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="w-[600px] h-[600px] rounded-full bg-white/[0.03] blur-[100px]" />
+    <section className="px-4 pt-12 pb-20 sm:px-6 md:pt-20 md:pb-28">
+      <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-14 md:grid-cols-[1.1fr_1fr] md:gap-8">
+        <div>
+          <motion.h1
+            {...rise(0)}
+            className="text-4xl font-semibold leading-[1.05] tracking-tighter text-neutral-50 sm:text-5xl lg:text-6xl"
+          >
+            Message your coding agents like teammates.
+          </motion.h1>
+          <motion.p {...rise(0.08)} className="mt-6 max-w-[34rem] text-lg leading-relaxed text-neutral-400">
+            Codync runs Claude Code, Codex and 40+ agents as named bots on your computer. Reply and approve from
+            your iPhone.
+          </motion.p>
+          <motion.div {...rise(0.16)} className="mt-9 flex flex-col gap-3 sm:flex-row">
+            <a
+              href={DMG}
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-neutral-50 px-6 py-3 font-medium text-neutral-950 transition hover:bg-white active:scale-[0.98]"
+            >
+              <AppleLogo size={18} weight="fill" />
+              Download for Mac
+            </a>
+            <a
+              href={APP_STORE}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-neutral-800 px-6 py-3 font-medium text-neutral-100 transition hover:bg-neutral-700 active:scale-[0.98]"
+            >
+              <DeviceMobile size={18} />
+              Get the iPhone app
+            </a>
+          </motion.div>
+        </div>
+
+        <div className="relative mx-auto w-full max-w-[26rem] md:max-w-none">
+          <motion.div
+            {...(reduce
+              ? {}
+              : { initial: { opacity: 0, y: 40 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.9, delay: 0.1, ease } })}
+            className="relative w-[58%]"
+          >
+            <Phone src="/screens/roster.webp" alt="The Codync bot list: Pacer needs approval, the other bots have replied" eager />
+          </motion.div>
+          <motion.div
+            {...(reduce
+              ? {}
+              : { initial: { opacity: 0, y: 60 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.9, delay: 0.25, ease } })}
+            className="absolute top-[10%] right-0 z-10 w-[58%]"
+          >
+            <Phone src="/screens/approval.webp" alt="An approval card asking to edit src/pace.js with Allow once, Always allow and Deny" eager />
+          </motion.div>
+        </div>
       </div>
-
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="relative z-10 flex flex-col items-center text-center"
-      >
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.4, delay: 0.05 }}
-          className="mb-6 flex flex-col sm:flex-row items-center gap-3"
-        >
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.06] border border-white/[0.08] text-xs sm:text-sm text-neutral-300">
-            <span className="text-base">🏆</span>
-            #29 Developer Tools on the App Store
-          </div>
-          <a
-            href="https://www.producthunt.com/products/codync?embed=true&utm_source=badge-featured&utm_medium=badge&utm_campaign=badge-codync"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <img
-              src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1111671&theme=dark&t=1774969906397"
-              alt="Codync on Product Hunt"
-              width={200}
-              height={43}
-            />
-          </a>
-        </motion.div>
-
-        <motion.img
-          src="/icon.png"
-          alt="Codync"
-          className="w-24 h-24 rounded-[22px] shadow-2xl shadow-white/5"
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-        />
-
-        <h1 className="mt-8 text-5xl sm:text-6xl font-bold tracking-tight text-white">
-          Codync
-        </h1>
-
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.35 }}
-          className="mt-8 flex flex-col sm:flex-row items-center gap-3"
-        >
-          <a
-            href="https://apps.apple.com/tw/app/codync/id6760984418?l=en-GB"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-white text-black font-semibold rounded-xl hover:bg-neutral-200 transition-colors"
-          >
-            <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-              <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
-            </svg>
-            Download for iOS
-          </a>
-          <a
-            href="https://github.com/leepokai/Codync/releases/latest/download/Codync-macOS.dmg"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-neutral-800 text-white font-semibold rounded-xl hover:bg-neutral-700 transition-colors"
-          >
-            <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-              <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
-            </svg>
-            Download for macOS
-          </a>
-        </motion.div>
-
-        <motion.a
-          href="https://github.com/leepokai/Codync"
-          target="_blank"
-          rel="noopener noreferrer"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.38 }}
-          className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-full border border-neutral-700 text-sm text-neutral-300 hover:text-white hover:border-neutral-500 transition-colors"
-        >
-          <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4">
-            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.3 3.44 9.8 8.21 11.39.6.11.82-.26.82-.58v-2.03c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.73.08-.73 1.21.08 1.85 1.24 1.85 1.24 1.07 1.84 2.81 1.31 3.5 1 .11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.33-5.47-5.93 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.12-3.18 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 016.02 0c2.3-1.55 3.3-1.23 3.3-1.23.66 1.66.25 2.88.12 3.18.77.84 1.24 1.91 1.24 3.22 0 4.61-2.81 5.63-5.48 5.92.43.37.81 1.1.81 2.22v3.29c0 .32.22.7.82.58C20.56 21.8 24 17.3 24 12c0-6.63-5.37-12-12-12z" />
-          </svg>
-          Free &amp; Open Source on GitHub
-        </motion.a>
-
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4 }}
-          className="mt-4 flex items-center gap-3"
-        >
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-neutral-800 text-xs text-neutral-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-            Live Activity
-          </span>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-neutral-800 text-xs text-neutral-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-neutral-400" />
-            Cross-device Sync
-          </span>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-neutral-800 text-xs text-neutral-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-neutral-500" />
-            Push Notifications
-          </span>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.45 }}
-          className="mt-8 flex flex-col items-center gap-2"
-        >
-          <p className="text-lg sm:text-xl text-neutral-400 max-w-md leading-relaxed">
-            Monitor your Claude Code sessions in real-time, from anywhere.
-          </p>
-          <p className="text-sm text-neutral-500">
-            No LAN required. Zero config. No login needed.
-          </p>
-          <p className="mt-2 text-sm sm:text-base text-neutral-500 font-medium tracking-wide">
-            Now you can vibe code with Claude Code while jogging
-          </p>
-        </motion.div>
-
-      </motion.div>
     </section>
   );
 }
