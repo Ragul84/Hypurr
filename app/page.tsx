@@ -12,12 +12,12 @@ export default function Home() {
           <div className="p-5 rounded-2xl border border-neutral-800 bg-neutral-900/30">
             <div className="text-xs text-neutral-500 mb-2">1</div>
             <h3 className="font-semibold text-white text-sm mb-1.5">Install on your computer</h3>
-            <p className="text-sm text-neutral-400 leading-relaxed">Mac: brew install --cask leepokai/codync/codync, then Install host from the menu bar. Linux: codync-host install.</p>
+            <p className="text-sm text-neutral-400 leading-relaxed">Mac: <code className="text-neutral-300 break-all">brew install --cask leepokai/codync/codync</code> or the download above, then open Codync; it starts the host itself. Linux: the <a href="https://github.com/leepokai/Codync#install" className="underline hover:text-neutral-300">install script</a>, then <code className="text-neutral-300">codync-host install</code>.</p>
           </div>
           <div className="p-5 rounded-2xl border border-neutral-800 bg-neutral-900/30">
             <div className="text-xs text-neutral-500 mb-2">2</div>
             <h3 className="font-semibold text-white text-sm mb-1.5">Pair your phone</h3>
-            <p className="text-sm text-neutral-400 leading-relaxed">Scan the code from the Mac menu bar, the Linux app or codync-host pair. Tailscale lets you reach it from anywhere.</p>
+            <p className="text-sm text-neutral-400 leading-relaxed">Scan the code from Pair iPhone… in the Mac menu bar, the Linux app or <code className="text-neutral-300">codync-host pair</code>. It reaches your computer from anywhere, end-to-end encrypted.</p>
           </div>
           <div className="p-5 rounded-2xl border border-neutral-800 bg-neutral-900/30">
             <div className="text-xs text-neutral-500 mb-2">3</div>
