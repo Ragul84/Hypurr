@@ -134,6 +134,10 @@ private struct ChatSplitView: View {
     @State private var contextPoint = CGPoint.zero
     @State private var newSessionBot: BotTarget?
     @State private var composing = false
+    @State private var newMenu = false
+    @State private var railNewMenu = false
+    /// The computer a new group chat is being set up on.
+    @State private var newGroupComputer: ComputerID?
     /// The computer a new chat goes to.
     @State private var composeComputer: ComputerID?
     @State private var previousSelection: BotReference?
@@ -189,8 +193,8 @@ private struct ChatSplitView: View {
                 HStack(spacing: 6) {
                     Spacer(minLength: 0)
                     ComputerFilterHeader(accounts: accounts, hidden: $hiddenComputers) { showComputers = true }
-                    IconButton("New chat", systemImage: "plus", action: compose)
-                        .keyboardShortcut("n")
+                    IconButton("New", systemImage: "plus") { newMenu.toggle() }
+                        .codyncMenu(isPresented: $newMenu, items: newItems)
                         .disabled(onlineStores.isEmpty)
                 }
                 .padding(.leading, compact ? 0 : 80)
@@ -383,6 +387,13 @@ private struct ChatSplitView: View {
                 .frame(width: min(920, windowSize.width - 80), height: sheetHeight)
             }
         }
+        .codyncSheet(isPresented: Binding(get: { newGroupComputer != nil }, set: { if !$0 { newGroupComputer = nil } })) {
+            if let store = newGroupComputer.flatMap(accounts.store(for:)) {
+                GroupEditorView()
+                    .environment(store)
+                    .frame(width: 520, height: min(680, sheetHeight))
+            }
+        }
         .codyncSheet(isPresented: $showComputers) {
             ComputersView()
                 .frame(width: 620, height: sheetHeight)
@@ -392,6 +403,10 @@ private struct ChatSplitView: View {
         }
         .background {
             collapseButton.hidden()
+            Button("New chat", action: compose)
+                .keyboardShortcut("n")
+                .disabled(onlineStores.isEmpty)
+                .hidden()
             Button("Search bots") {
                 compact = false
                 searchFocused = true
@@ -649,6 +664,18 @@ extension ChatSplitView {
         .background(Palette.surface)
     }
 
+    /// The "+" menu: a chat with one or more bots, or a group chat set up with a name and purpose.
+    fileprivate func newItems() -> [MenuItem] {
+        [MenuItem("New chat", icon: "square.and.pencil", action: compose),
+         MenuItem("New group chat", icon: "person.2", action: newGroup)]
+    }
+
+    /// A group chat gathers bots of one computer: the selected bot's if it's online, else this Mac's.
+    fileprivate func newGroup() {
+        let target = [selectedStore, host.store].compactMap { $0 }.first { shownIDs.contains($0.computer.id) && $0.connection == .online } ?? onlineStores.first
+        newGroupComputer = target?.computer.id
+    }
+
     fileprivate func compose() {
         // The selected bot's computer if it's online, else this Mac, else any online one.
         let target = [selectedStore, host.store].compactMap { $0 }.first { shownIDs.contains($0.computer.id) && $0.connection == .online } ?? onlineStores.first
@@ -675,11 +702,12 @@ extension ChatSplitView {
     /// The compact rail keeps the same destinations as the expanded footer.
     fileprivate var railActions: some View {
         VStack(spacing: 4) {
-            Button("New chat", systemImage: "plus", action: compose)
+            Button("New", systemImage: "plus") { railNewMenu.toggle() }
                 .disabled(onlineStores.isEmpty)
-                .help("New chat")
+                .help("New")
                 .labelStyle(.iconOnly)
                 .buttonStyle(IconButtonStyle(size: 36))
+                .codyncMenu(isPresented: $railNewMenu, items: newItems)
             Button("Marketplace", systemImage: "square.grid.2x2") {
                 marketplace = (selectedStore ?? host.store ?? onlineStores.first)?.computer.id
             }
