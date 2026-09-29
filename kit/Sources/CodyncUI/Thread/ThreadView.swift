@@ -1,5 +1,8 @@
 import CodyncKit
 import SwiftUI
+#if os(iOS)
+    import UIKit
+#endif
 
 /// One endless conversation with a bot or a group chat. Only deliberate messages show
 /// here; tool calls and thinking live in the "Full conversation" sheet. Any message can
@@ -119,11 +122,14 @@ public struct ThreadView: View {
             .defaultScrollAnchor(.bottom)
             .scrollDismissesKeyboard(.interactively)
             .conversationScrollEdges()
+            #if os(iOS)
+                .simultaneousGesture(TapGesture().onEnded { dismissChatKeyboard() })
+            #endif
             .onChange(of: items.last?.id) { _, _ in
-                withAnimation(.snappy) { proxy.scrollTo("bottom", anchor: .bottom) }
+                proxy.scrollTo("bottom", anchor: .bottom)
             }
             .onChange(of: bot?.isWorking) { _, _ in
-                withAnimation(.snappy) { proxy.scrollTo("bottom", anchor: .bottom) }
+                proxy.scrollTo("bottom", anchor: .bottom)
             }
         }
         .background(Palette.background)
@@ -221,6 +227,12 @@ public struct ThreadView: View {
         }
         .deleteBotConfirmation($confirmDelete) { dismiss() }
     }
+
+    #if os(iOS)
+        private func dismissChatKeyboard() {
+            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+        }
+    #endif
 
     // MARK: rows
 
