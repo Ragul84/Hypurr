@@ -29,6 +29,7 @@ public struct ThreadView: View {
     @State private var showRoutines = false
     @State private var routineId: String?
     @State private var routineRequest = UUID()
+    @State private var isAtBottom = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var bot: Bot? { model.bots[botId] }
@@ -119,16 +120,19 @@ public struct ThreadView: View {
                     .frame(maxWidth: .infinity)
                 #endif
             }
-            .defaultScrollAnchor(.bottom)
+            .conversationInitialBottomAnchor()
             .scrollDismissesKeyboard(.interactively)
             .conversationScrollEdges()
+            .conversationBottomObserver($isAtBottom)
             #if os(iOS)
                 .simultaneousGesture(TapGesture().onEnded { dismissChatKeyboard() })
             #endif
             .onChange(of: items.last?.id) { _, _ in
+                guard isAtBottom || items.last?.isUserMessage == true else { return }
                 proxy.scrollTo("bottom", anchor: .bottom)
             }
             .onChange(of: bot?.isWorking) { _, _ in
+                guard isAtBottom else { return }
                 proxy.scrollTo("bottom", anchor: .bottom)
             }
         }
@@ -446,17 +450,22 @@ struct ChatItem: Identifiable {
         var lastAuthor: String?
         for e in entries where e.isChat {
             let date = e.date
+            let id = e.kind == "user" ? e.data.clientNonce.map { "user-\($0)" } ?? e.id : e.id
             if lastDate.map({ date.timeIntervalSince($0) > 3600 }) ?? true {
-                out.append(ChatItem(id: "sep-\(e.id)", kind: .separator(date)))
+                out.append(ChatItem(id: "sep-\(id)", kind: .separator(date)))
                 lastAuthor = nil
             }
             // In a group each bot is its own author.
             let author = e.kind == "user" ? "user" : e.kind == "agent" ? "agent:\(e.data.author ?? "")" : e.kind
-            out.append(ChatItem(id: e.id, kind: .entry(e, groupStart: author != lastAuthor)))
+            out.append(ChatItem(id: id, kind: .entry(e, groupStart: author != lastAuthor)))
             lastAuthor = (author == "user" || e.kind == "agent") ? author : nil
             lastDate = date
         }
         return out
+    }
+
+    var isUserMessage: Bool {
+        if case let .entry(entry, _) = kind { entry.kind == "user" } else { false }
     }
 }
 
@@ -714,6 +723,26 @@ private struct DetailsPanel: View {
 #endif
 
 private extension View {
+    @ViewBuilder func conversationInitialBottomAnchor() -> some View {
+        if #available(iOS 18, macOS 15, *) {
+            defaultScrollAnchor(.bottom, for: .initialOffset)
+        } else {
+            defaultScrollAnchor(.bottom)
+        }
+    }
+
+    @ViewBuilder func conversationBottomObserver(_ isAtBottom: Binding<Bool>) -> some View {
+        if #available(iOS 18, macOS 15, *) {
+            onScrollGeometryChange(for: Bool.self) { geometry in
+                geometry.contentSize.height - geometry.visibleRect.maxY < 48
+            } action: { _, isAtBottomNow in
+                isAtBottom.wrappedValue = isAtBottomNow
+            }
+        } else {
+            self
+        }
+    }
+
     @ViewBuilder func conversationScrollEdges() -> some View {
         if #available(iOS 26, macOS 26, *) {
             #if os(iOS)

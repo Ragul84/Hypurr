@@ -329,7 +329,7 @@ private func waitFor(_ states: AsyncStream<LinkState>, _ match: (LinkState) -> B
     async let listed = t.listQueued()
     #expect(try await relay.raw()["t"] as? String == "mbox.list")
     await relay.push(["t": "mbox.items", "items": [["nonce": nonce, "exp": 1, "state": "queued"]]])
-    #expect(await listed.map(\.nonce) == [nonce])
+    #expect(try await listed.map(\.nonce) == [nonce])
 
     async let cancelled = t.cancelQueued(clientNonce: nonce)
     #expect(try await relay.raw()["t"] as? String == "mbox.cancel")
