@@ -5,7 +5,9 @@ import SwiftUI
 /// bots or creates a new one, with ⌘1…⌘9 shortcuts, and the message box underneath.
 /// Picked bots become chips in the To: field; one opens its chat, several start a
 /// group chat with them (or open the one they already share). Whatever you typed is sent.
+/// `group` is "New group chat": the same page, but it only gathers bots and needs two.
 public struct NewChatView: View {
+    let group: Bool
     let close: () -> Void
     @Environment(BotStore.self) private var model
     @State private var query = ""
@@ -14,13 +16,16 @@ public struct NewChatView: View {
     @State private var creating = false
     @FocusState private var toFocused: Bool
 
-    public init(close: @escaping () -> Void) { self.close = close }
+    public init(group: Bool = false, close: @escaping () -> Void) {
+        self.group = group
+        self.close = close
+    }
 
     /// Bots not picked yet; a group can only be opened on its own, so groups go once someone's picked.
     private var matches: [Bot] {
         let q = query.trimmingCharacters(in: .whitespaces)
         return model.roster.filter {
-            !recipients.contains($0.id) && !($0.isGroup && !recipients.isEmpty)
+            !recipients.contains($0.id) && !($0.isGroup && (group || !recipients.isEmpty))
                 && (q.isEmpty || $0.name.localizedCaseInsensitiveContains(q))
         }
     }
@@ -38,7 +43,7 @@ public struct NewChatView: View {
                                 BotChip(bot: bot) { remove(bot.id) }
                                     .transition(.scale(scale: 0.85).combined(with: .opacity))
                             }
-                            TextField(recipients.isEmpty ? "Search or create bots" : "Add another bot", text: $query)
+                            TextField(toPrompt, text: $query)
                                 .textFieldStyle(.plain)
                                 .focused($toFocused)
                                 .frame(minWidth: 200)
@@ -119,8 +124,14 @@ public struct NewChatView: View {
         }
     }
 
+    private var toPrompt: String {
+        if group { return recipients.count < 2 ? "Add bots to the group" : "Add another bot" }
+        return recipients.isEmpty ? "Search or create bots" : "Add another bot"
+    }
+
     private var placeholder: String {
         switch picked.count {
+        case _ where group: picked.count < 2 ? "Pick at least two bots" : "Message the group"
         case 0: "Message Bot"
         case 1: "Message \(picked[0].name)"
         default: "Message \(picked.map(\.name).joined(separator: ", "))"
@@ -155,7 +166,9 @@ public struct NewChatView: View {
     private func start() {
         switch recipients.count {
         case 0: return
-        case 1: open(recipients[0])
+        case 1:
+            guard !group else { return }
+            open(recipients[0])
         default:
             let names = picked.map(\.name).joined(separator: ", ")
             Task {
@@ -188,7 +201,7 @@ public struct NewChatView: View {
                     d.name = name
                     bot = try await model.save(d)
                 }
-                if recipients.isEmpty {
+                if recipients.isEmpty && !group {
                     open(bot.id)
                 } else {
                     // `createDefaultBot` selected it; stay here and add it to the others.

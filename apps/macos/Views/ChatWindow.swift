@@ -136,8 +136,8 @@ private struct ChatSplitView: View {
     @State private var composing = false
     @State private var newMenu = false
     @State private var railNewMenu = false
-    /// The computer a new group chat is being set up on.
-    @State private var newGroupComputer: ComputerID?
+    /// The compose page gathers a group chat ("New group chat") rather than any chat.
+    @State private var composingGroup = false
     /// The computer a new chat goes to.
     @State private var composeComputer: ComputerID?
     @State private var previousSelection: BotReference?
@@ -272,12 +272,12 @@ private struct ChatSplitView: View {
                     VStack(spacing: 0) {
                         if onlineStores.count > 1 { computerPicker }
                         // The To: row takes the title bar's place instead of sitting under an empty one.
-                        NewChatView {
+                        NewChatView(group: composingGroup) {
                             composing = false
                             if accounts.selection == nil { accounts.selection = previousSelection }
                         }
                         .environment(store)
-                        .id(store.computer.id)
+                        .id("\(store.computer.id)-\(composingGroup)")
                     }
                     .ignoresSafeArea(.container, edges: .top)
 
@@ -298,7 +298,7 @@ private struct ChatSplitView: View {
                             .foregroundStyle(Palette.secondary)
                             .multilineTextAlignment(.center)
                             .frame(maxWidth: 420)
-                        Button("New Bot", action: compose)
+                        Button("New Bot") { compose() }
                             .buttonStyle(.primary)
                             .disabled(onlineStores.isEmpty)
                     }
@@ -387,13 +387,6 @@ private struct ChatSplitView: View {
                 .frame(width: min(920, windowSize.width - 80), height: sheetHeight)
             }
         }
-        .codyncSheet(isPresented: Binding(get: { newGroupComputer != nil }, set: { if !$0 { newGroupComputer = nil } })) {
-            if let store = newGroupComputer.flatMap(accounts.store(for:)) {
-                GroupEditorView()
-                    .environment(store)
-                    .frame(width: 520, height: min(680, sheetHeight))
-            }
-        }
         .codyncSheet(isPresented: $showComputers) {
             ComputersView()
                 .frame(width: 620, height: sheetHeight)
@@ -403,7 +396,7 @@ private struct ChatSplitView: View {
         }
         .background {
             collapseButton.hidden()
-            Button("New chat", action: compose)
+            Button("New chat") { compose() }
                 .keyboardShortcut("n")
                 .disabled(onlineStores.isEmpty)
                 .hidden()
@@ -447,10 +440,10 @@ private struct ChatSplitView: View {
         }
         #if DEBUG
             .onAppear {
-                // Screenshot/UI checks: CODYNC_DEBUG_OPEN=compose | plugins | computers | <bot name>
+                // Screenshot/UI checks: CODYNC_DEBUG_OPEN=compose | group | plugins | computers | <bot name>
                 let target = ProcessInfo.processInfo.environment["CODYNC_DEBUG_OPEN"]
-                if target == "compose" {
-                    compose()
+                if target == "compose" || target == "group" {
+                    compose(group: target == "group")
                 } else if target == "plugins" {
                     marketplace = host.store?.computer.id
                 } else if target == "computers" {
@@ -664,19 +657,14 @@ extension ChatSplitView {
         .background(Palette.surface)
     }
 
-    /// The "+" menu: a chat with one or more bots, or a group chat set up with a name and purpose.
+    /// The "+" menu: a chat with one or more bots, or a group chat. Both use the To: page.
     fileprivate func newItems() -> [MenuItem] {
-        [MenuItem("New chat", icon: "square.and.pencil", action: compose),
-         MenuItem("New group chat", icon: "person.2", action: newGroup)]
+        [MenuItem("New chat", icon: "square.and.pencil") { compose() },
+         MenuItem("New group chat", icon: "person.2") { compose(group: true) }]
     }
 
-    /// A group chat gathers bots of one computer: the selected bot's if it's online, else this Mac's.
-    fileprivate func newGroup() {
-        let target = [selectedStore, host.store].compactMap { $0 }.first { shownIDs.contains($0.computer.id) && $0.connection == .online } ?? onlineStores.first
-        newGroupComputer = target?.computer.id
-    }
-
-    fileprivate func compose() {
+    fileprivate func compose(group: Bool = false) {
+        composingGroup = group
         // The selected bot's computer if it's online, else this Mac, else any online one.
         let target = [selectedStore, host.store].compactMap { $0 }.first { shownIDs.contains($0.computer.id) && $0.connection == .online } ?? onlineStores.first
         guard let target else { return }
