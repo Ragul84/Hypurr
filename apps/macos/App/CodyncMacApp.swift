@@ -18,6 +18,8 @@ struct CodyncMacApp: App {
     var body: some Scene {
         MenuBarExtra {
             MenuView()
+                // The macOS 27 SDK drops menu item images unless the label asks for them.
+                .labelStyle(.titleAndIcon)
                 .environment(host)
                 .environment(account)
         } label: {
