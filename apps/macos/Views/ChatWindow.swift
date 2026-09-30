@@ -6,22 +6,47 @@ import SwiftUI
 /// (Grok Bot's desktop layout), sharing its views with the iPhone app.
 struct ChatWindow: View {
     @Environment(HostController.self) private var host
+    @Environment(AccountSession.self) private var account
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("macAccountOnboardingCompleted") private var accountOnboardingCompleted = false
 
     private var showsChat: Bool { host.state == .running || !host.accounts.computers.isEmpty }
 
     var body: some View {
         ZStack {
-            if showsChat {
-                ChatSplitView().id(host.contextID)
+            if account.isSignedIn || accountOnboardingCompleted {
+                if showsChat {
+                    ChatSplitView().id(host.contextID)
+                        .transition(.opacity)
+                } else {
+                    hostState
+                        .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                }
+            } else if !account.isReady {
+                AccountRestoreView(onContinue: { accountOnboardingCompleted = true })
                     .transition(.opacity)
             } else {
-                hostState
-                    .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                AccountWelcomeView(
+                    isConfigured: account.isConfigured,
+                    isBusy: account.isBusy,
+                    errorMessage: account.errorMessage,
+                    onContinue: { accountOnboardingCompleted = true },
+                    onSignIn: { provider in
+                        Task { await account.signIn(provider: provider) }
+                    }
+                )
+                .transition(.opacity)
             }
         }
         .animation(Motion.reduced(Motion.layout, reduceMotion), value: showsChat)
         .animation(Motion.reduced(Motion.layout, reduceMotion), value: host.state)
+        .animation(Motion.reduced(Motion.fade, reduceMotion), value: accountOnboardingCompleted)
+        .onChange(of: account.isSignedIn) { _, signedIn in
+            if signedIn { accountOnboardingCompleted = true }
+        }
+        .task {
+            if account.isSignedIn { accountOnboardingCompleted = true }
+        }
         .frame(minWidth: 760, minHeight: 500)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Palette.background)
@@ -35,6 +60,222 @@ struct ChatWindow: View {
             set: { if !$0, let approval = host.currentApproval { host.deferApproval(approval) } }
         )) {
             CurrentApprovalSheet()
+        }
+    }
+}
+
+/// Keep first-run sign-in choices behind Clerk's persisted-session restoration on launch.
+private struct AccountRestoreView: View {
+    let onContinue: () -> Void
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Spinner(size: 24)
+            Text("Checking for a saved account…")
+                .font(.callout)
+                .foregroundStyle(Palette.secondary)
+            Button("Continue on this Mac", action: onContinue)
+                .buttonStyle(.plain)
+                .foregroundStyle(Palette.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// First-run account choice. Existing Clerk sessions skip this screen as soon as Clerk restores them.
+private struct AccountWelcomeView: View {
+    let isConfigured: Bool
+    let isBusy: Bool
+    let errorMessage: String?
+    let onContinue: () -> Void
+    let onSignIn: (AccountSession.SignInProvider) -> Void
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var beat = 0
+
+    var body: some View {
+        GeometryReader { geometry in
+            ScrollView {
+                content
+                    .frame(minHeight: geometry.size.height)
+                    .frame(maxWidth: 480)
+                    .frame(maxWidth: .infinity)
+            }
+            .scrollBounceBehavior(.basedOnSize)
+        }
+        .background(Palette.background)
+        .task {
+            if reduceMotion { beat = 4; return }
+            for next in 1...4 {
+                try? await Task.sleep(for: .milliseconds(next == 1 ? 150 : 280))
+                withAnimation(.spring(duration: 0.6, bounce: 0.25)) { beat = next }
+            }
+        }
+    }
+
+    private var content: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Spacer(minLength: 24)
+
+            WelcomeCrew(shown: beat >= 1)
+                .frame(maxWidth: .infinity)
+
+            Spacer(minLength: 24)
+
+            WelcomeChatGlimpse(shown: beat >= 2)
+                .padding(.bottom, 24)
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Your coding agents,\nas teammates.")
+                    .font(.system(size: 34, weight: .semibold))
+                    .tracking(-0.6)
+                    .foregroundStyle(Palette.text)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Give each one a name and a project. They work on your computer while you're away.")
+                    .font(.body)
+                    .foregroundStyle(Palette.secondary)
+            }
+            .opacity(beat >= 3 ? 1 : 0)
+            .offset(y: beat >= 3 ? 0 : 14)
+
+            Spacer(minLength: 32)
+
+            VStack(spacing: 10) {
+                Button("Continue on this Mac", action: onContinue)
+                    .font(.headline)
+                    .frame(maxWidth: .infinity, minHeight: 50)
+                    .buttonStyle(.primary)
+
+                Button { onSignIn(.apple) } label: {
+                    ZStack {
+                        HStack(spacing: 10) {
+                            Image(systemName: "apple.logo").font(.system(size: 20))
+                            Text("Continue with Apple")
+                        }
+                        .opacity(isBusy ? 0 : 1)
+                        if isBusy { Spinner(size: 18) }
+                    }
+                    .font(.headline)
+                    .frame(maxWidth: .infinity, minHeight: 50)
+                }
+                .buttonStyle(.primary)
+                .disabled(!isConfigured || isBusy)
+
+                Button { onSignIn(.google) } label: {
+                    ZStack {
+                        HStack(spacing: 10) {
+                            Image("google")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 20, height: 20)
+                            Text("Continue with Google")
+                        }
+                        .opacity(isBusy ? 0 : 1)
+                        if isBusy { Spinner(size: 18) }
+                    }
+                    .font(.headline)
+                    .frame(maxWidth: .infinity, minHeight: 50)
+                }
+                .buttonStyle(.secondary)
+                .disabled(!isConfigured || isBusy)
+
+                if !isConfigured {
+                    Text("Sign-in isn't configured in this build. You can still use Codync on this Mac.")
+                        .font(.footnote)
+                        .foregroundStyle(Palette.tertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(.footnote)
+                        .foregroundStyle(Palette.warning)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .opacity(beat >= 4 ? 1 : 0)
+            .offset(y: beat >= 4 ? 0 : 14)
+        }
+        .padding(.horizontal, 24)
+        .padding(.bottom, 12)
+    }
+}
+
+/// The animated bot group from the first iPhone onboarding screen.
+private struct WelcomeCrew: View {
+    let shown: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private let members: [(shape: String, color: String, size: CGFloat, x: CGFloat, y: CGFloat, mood: CharacterAvatar.Mood)] = [
+        ("blob", "blue", 92, 0, 0, .working),
+        ("squircle", "orange", 64, -104, -34, .idle),
+        ("teardrop", "violet", 58, 100, -46, .working),
+        ("hex", "green", 48, -76, 64, .idle),
+        ("cloud", "magenta", 52, 84, 58, .needsInput),
+    ]
+
+    var body: some View {
+        TimelineView(.animation(paused: reduceMotion || !shown)) { context in
+            let time = context.date.timeIntervalSinceReferenceDate
+            ZStack {
+                ForEach(members.indices, id: \.self) { index in
+                    let member = members[index]
+                    CharacterAvatar(shape: member.shape, color: member.color, size: member.size, mood: member.mood)
+                        .offset(x: member.x, y: member.y + (reduceMotion ? 0 : sin(time * 1.3 + Double(index) * 1.7) * 5))
+                        .scaleEffect(shown ? 1 : 0.3)
+                        .opacity(shown ? 1 : 0)
+                        .animation(.spring(duration: 0.7, bounce: 0.4).delay(Double(index) * 0.07), value: shown)
+                }
+            }
+        }
+        .frame(height: 170)
+        .accessibilityHidden(true)
+    }
+}
+
+/// A short animated user and bot exchange, matching the iPhone onboarding preview.
+private struct WelcomeChatGlimpse: View {
+    let shown: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var replied = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Fix the flaky login test")
+                .font(.subheadline)
+                .foregroundStyle(Palette.text)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 9)
+                .background(Palette.bubbleUser, in: RoundedRectangle(cornerRadius: 18))
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .opacity(shown ? 1 : 0)
+                .offset(y: shown ? 0 : 14)
+
+            HStack(alignment: .bottom, spacing: 8) {
+                CharacterAvatar(shape: "blob", color: "blue", size: 28, mood: replied ? .idle : .working)
+                if replied {
+                    Text("Done. It raced the session refresh; tests pass on fix/login.")
+                        .font(.subheadline)
+                        .foregroundStyle(Palette.text)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 9)
+                        .background(Palette.bubbleAgent, in: RoundedRectangle(cornerRadius: 18))
+                        .transition(.opacity.combined(with: .scale(scale: 0.92, anchor: .bottomLeading)))
+                } else {
+                    Text("Working…")
+                        .font(.subheadline)
+                        .foregroundStyle(Palette.tertiary)
+                        .transition(.opacity)
+                }
+            }
+            .opacity(shown ? 1 : 0)
+            .offset(y: shown ? 0 : 14)
+        }
+        .accessibilityElement(children: .combine)
+        .onChange(of: shown) { _, isShown in
+            guard isShown else { return }
+            Task {
+                try? await Task.sleep(for: .seconds(reduceMotion ? 0 : 1.6))
+                withAnimation(Motion.reduced(.spring(duration: 0.45, bounce: 0.2), reduceMotion)) { replied = true }
+            }
         }
     }
 }
@@ -327,12 +568,22 @@ private struct ChatSplitView: View {
                         email: account.email,
                         busy: account.isBusy,
                         errorMessage: account.errorMessage,
-                        onAuthenticate: {
+                        onSignIn: { provider in
                             dismissAccountMenu()
                             Task {
-                                if account.isSignedIn { await host.signOut() }
-                                else { await account.signIn() }
-                                if account.errorMessage != nil { showAccount = true }
+                                await account.signIn(provider: provider)
+                                if account.errorMessage != nil {
+                                    withAnimation(Motion.fade) { showAccount = true }
+                                }
+                            }
+                        },
+                        onSignOut: {
+                            dismissAccountMenu()
+                            Task {
+                                await host.signOut()
+                                if account.errorMessage != nil {
+                                    withAnimation(Motion.fade) { showAccount = true }
+                                }
                             }
                         },
                         compact: compact,
@@ -779,7 +1030,8 @@ private struct SidebarAccountPanel: View {
     let email: String?
     let busy: Bool
     let errorMessage: String?
-    let onAuthenticate: () -> Void
+    let onSignIn: (AccountSession.SignInProvider) -> Void
+    let onSignOut: () -> Void
     let compact: Bool
     let usage: Double?
     let approvals: Int
@@ -796,6 +1048,7 @@ private struct SidebarAccountPanel: View {
     private struct Item {
         let title: String
         let icon: String
+        var assetIcon: String? = nil
         var detail: String? = nil
         var chevron = false
         var disabled = false
@@ -827,12 +1080,22 @@ private struct SidebarAccountPanel: View {
                 Item(title: "Get Codync for mobile", icon: "iphone", action: { open("https://apps.apple.com/app/id6760984418") }),
                 Item(title: "Support", icon: "book.closed", chevron: true, action: { navigate("support") }),
                 Item(title: "Settings", icon: "gearshape", action: { navigate("settings") }),
-                Item(title: compact ? "Expand sidebar" : "Collapse sidebar", icon: "sidebar.left", action: onToggleSidebar),
-                Item(title: busy ? "Please wait…" : signedIn ? "Log out" : "Continue with Google",
-                     icon: signedIn ? "rectangle.portrait.and.arrow.right" : "person.crop.circle.badge.plus",
-                     disabled: busy, action: onAuthenticate)
-            ]
+                Item(title: compact ? "Expand sidebar" : "Collapse sidebar", icon: "sidebar.left", action: onToggleSidebar)
+            ] + authenticationItems
         }
+    }
+
+    private var authenticationItems: [Item] {
+        if signedIn {
+            return [Item(title: busy ? "Please wait…" : "Sign out",
+                         icon: "rectangle.portrait.and.arrow.right", disabled: busy, action: onSignOut)]
+        }
+        return [
+            Item(title: "Continue with Apple", icon: "apple.logo", disabled: busy,
+                 action: { onSignIn(.apple) }),
+            Item(title: "Continue with Google", icon: "person.crop.circle.badge.plus", assetIcon: "google", disabled: busy,
+                 action: { onSignIn(.google) })
+        ]
     }
 
     var body: some View {
@@ -870,7 +1133,7 @@ private struct SidebarAccountPanel: View {
     @ViewBuilder private func menuRow(_ item: Item, index: Int) -> some View {
         if index == (page == "main" ? 5 : 1) { divider }
         if page == "main" && index == 6 { accountIdentity }
-        AccountPanelRow(title: item.title, icon: item.icon, detail: item.detail,
+        AccountPanelRow(title: item.title, icon: item.icon, assetIcon: item.assetIcon, detail: item.detail,
                         chevron: item.chevron, keyboardFocused: highlighted == index, action: item.action)
             .disabled(item.disabled)
             .onHover { if $0 { highlighted = index } }
@@ -920,6 +1183,7 @@ private struct SidebarAccountPanel: View {
 private struct AccountPanelRow: View {
     let title: String
     let icon: String
+    var assetIcon: String? = nil
     let detail: String?
     let chevron: Bool
     let keyboardFocused: Bool
@@ -930,7 +1194,11 @@ private struct AccountPanelRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
-                Image(systemName: icon).font(.system(size: 14, weight: .regular)).frame(width: 20)
+                if let assetIcon {
+                    Image(assetIcon).resizable().scaledToFit().frame(width: 16, height: 16).frame(width: 20)
+                } else {
+                    Image(systemName: icon).font(.system(size: 14, weight: .regular)).frame(width: 20)
+                }
                 Text(title).font(.system(size: 12)).lineLimit(1)
                 Spacer(minLength: 8)
                 if let detail { Text(detail).font(.system(size: 13)).foregroundStyle(Palette.secondary) }

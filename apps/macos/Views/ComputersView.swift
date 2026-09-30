@@ -358,7 +358,7 @@ private struct ManagedComputerCard: View {
             }]
         }
         .codyncDialog("Let account devices in without a code?", isPresented: $confirmAutoApproval,
-                      message: "Any device signed in to your account gets full control of \(store.hostName): its files, terminals and bots, with no check here. If someone gets into your Google account, or Codync's cloud is ever compromised, they could add their own device and you'd have no chance to stop it. Devices paired with a QR code aren't affected.") {
+                      message: "Any device signed in to your account gets full control of \(store.hostName): its files, terminals and bots, with no check here. If someone gets into your account, or Codync's cloud is ever compromised, they could add their own device and you'd have no chance to stop it. Devices paired with a QR code aren't affected.") {
             [DialogAction("Skip the check", destructive: true) { setApproval(.auto) }]
         }
         .codyncDialog("Remove \(store.hostName) from the account?", isPresented: $confirmUnclaim,
