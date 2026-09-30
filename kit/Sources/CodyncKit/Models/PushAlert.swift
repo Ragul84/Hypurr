@@ -7,4 +7,7 @@ public struct PushAlert: Decodable, Sendable {
     public let body: String
     /// The member bot speaking, when the alert is for a group chat.
     public let from: String?
+    /// The chat, its first members and the speaker: names and avatars only, sent with the alert
+    /// so a bot the phone hasn't seen yet still shows its face.
+    public let faces: [Bot]?
 }
