@@ -68,6 +68,19 @@ Unlock the phone when required. Build, install, launch, and visual inspection ar
 | APNs relay | `cd relay && npm ci && npm test && npm run typecheck` | Separate package from `cloud/` |
 | Linux desktop | `cd apps/linux && cargo test` | GTK 4 and libadwaita development packages |
 
+### Screen helpers
+
+Enable the repository's staged-file checks once per checkout:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+When a screen helper changes, the pre-commit hook checks Linux Rust formatting
+and parses the macOS Swift sources (on macOS). The platform builds remain in
+GitHub Actions: Linux requires GStreamer development packages, and macOS builds
+the `Screen` Xcode target against WebRTC.
+
 Host development: `cargo run --manifest-path host/Cargo.toml -- serve`. Avoid competing with an installed host on port 19222; isolated tests should use a temporary `CODYNC_HOME` and another port. Stop test hosts when finished.
 
 ## Visual checks
