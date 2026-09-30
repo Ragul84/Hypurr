@@ -86,7 +86,7 @@ public struct ThreadView: View {
 
     @ViewBuilder private var conversation: some View {
         let thread = model.chat(botId)
-        let items = ChatItem.build(thread)
+        let items = ChatItem.build(thread, streaming: bot?.isWorking(in: botId, thread: nil) == true && !model.isOffline)
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
@@ -458,13 +458,15 @@ struct ChatItem: Identifiable {
     let kind: Kind
 
     /// Chat-visible entries plus time separators (gaps > 1 h) and author grouping.
-    static func build(_ entries: [Entry]) -> [ChatItem] {
+    /// `streaming`: a turn is running in this chat, so the text being generated right now
+    /// (the lane's last entry, still `final == false`) shows in place and never pops in later.
+    /// Earlier segments of the turn, tool calls in between, and a room pass stay trace-only.
+    static func build(_ entries: [Entry], streaming: Bool = false) -> [ChatItem] {
         var out: [ChatItem] = []
         var lastDate: Date?
         var lastAuthor: String?
-        // Agent text is streamed as a stable entry with final=false, then updated in place.
-        // Render that same row while it is generating so the completed answer never pops in later.
-        for e in entries where e.isChat || (e.kind == "agent" && e.data.final == false && !(e.data.text ?? "").isEmpty) {
+        let live = streaming ? entries.last.flatMap { $0.kind == "agent" && $0.data.final == false ? $0.id : nil } : nil
+        for e in entries where e.isChat || (e.id == live && !(e.data.text ?? "").isEmpty && e.data.text != "(pass)") {
             let date = e.date
             let id = e.kind == "user" ? e.data.clientNonce.map { "user-\($0)" } ?? e.id : e.id
             if lastDate.map({ date.timeIntervalSince($0) > 3600 }) ?? true {

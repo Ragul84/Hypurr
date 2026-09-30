@@ -45,7 +45,7 @@ struct RepliesView: View {
                         }
                         .padding(.vertical, 12)
                     }
-                    ForEach(ChatItem.build(replies)) { item in
+                    ForEach(ChatItem.build(replies, streaming: chat?.isWorking(in: botId, thread: rootId) == true && !model.isOffline)) { item in
                         if case let .entry(e, groupStart) = item.kind {
                             ChatRow(entry: e, groupStart: groupStart, chat: chat) { showTrace = true }
                         }
