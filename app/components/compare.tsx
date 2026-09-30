@@ -17,9 +17,9 @@ const same = [
 
 const different = [
   ["Free and open source", "MIT licensed. No subscription, no paid tier, no account required."],
-  ["Any coding agent", "Claude Code, Codex, Cursor, Gemini, Copilot and 40+ more, with the logins you already have. Mix them in one room."],
-  ["Runs on your computer", "Bots, transcripts and memory live on your Mac or Linux machine. The phone reaches it end-to-end encrypted."],
-  ["Native everywhere", "iPhone, Mac, Linux desktop and a terminal UI over SSH. No web views."],
+  ["Any coding agent, over ACP", "Speaks the Agent Client Protocol, so Claude Code, Codex, Cursor, Gemini, Copilot and 40+ more just work, with the logins you already have. Mix them in one room."],
+  ["Built in Rust", "One small, fast binary hosts every bot on macOS or Linux. Bots, transcripts and memory stay on your computer; the phone reaches it end-to-end encrypted."],
+  ["Native everywhere", "SwiftUI on iPhone and Mac, GTK on Linux, a terminal UI over SSH. No web views, no Electron."],
 ];
 
 export default function Compare() {
