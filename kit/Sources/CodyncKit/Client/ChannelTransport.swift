@@ -24,6 +24,12 @@ public actor ChannelTransport: RemoteTransport {
     private let directBudget: Duration
     private let watchesNetwork: Bool
 
+    /// The screen follows the active signaling route; direct-only connections never request TURN.
+    public func screenRelayRequired() async throws -> Bool {
+        try await ready(within: 20)
+        return link?.route == .relay
+    }
+
     private var state: LinkState = .connecting
     private var lastSeen: Date?
     private var link: Link?
