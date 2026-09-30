@@ -84,6 +84,12 @@ on a real device before release. Build success and enabled dashboard settings do
 not prove that an Apple authorization completed successfully.
 
 QR pairing does not require matching email addresses or even a signed-in computer.
+The iPhone's scan step always offers **Skip**, including when signed out or when
+the account has no computers. Skipping finishes onboarding and opens the main
+tabs; this choice survives relaunches and account changes. The empty Bots screen
+offers **Computers** to pair later. Skipping while adding a computer from settings
+only closes that pairing sheet. It does not grant access to a computer or change
+the account approval flow. **Start over** resets the onboarding choice.
 
 On the Mac, open Codync in the menu bar and choose **Pair iPhone**, then scan the
 code on the phone (or paste its `codync://pair` link). The host approves the phone's
