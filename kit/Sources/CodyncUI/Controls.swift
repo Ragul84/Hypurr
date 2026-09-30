@@ -6,9 +6,13 @@ import AppKit
 import UIKit
 #endif
 
-// Codync's own controls. Never use the stock ones (Menu, Picker, .switch toggles,
+// Codync's own controls. Never use the stock ones (Picker, .switch toggles,
 // Form/List styling, confirmationDialog/alert, ProgressView, DisclosureGroup,
-// .bordered buttons, contextMenu/swipeActions): build from these instead.
+// .bordered buttons, swipeActions): build from these instead.
+// Menus are the one exception on iOS: `DropdownMenu`/`ChoicePicker` open the system
+// `Menu` and `.contextActions` the system `contextMenu`. A hand-built overlay anchored
+// by global frame lands in the wrong place there (sheets, scroll views, the composer),
+// so `.codyncMenu` is macOS-only.
 // Anything with a background fill gets no border line.
 
 // MARK: - Switch
@@ -315,12 +319,14 @@ private struct MenuRow: View {
 }
 
 public extension View {
-    /// Shows a Codync menu under (or above) this view while `isPresented` is true.
+    /// Mac only: shows a Codync menu under (or above) this view while `isPresented` is true.
+    /// iOS menus are the system ones (`DropdownMenu`, `.contextActions`).
+    @available(iOS, unavailable, message: "iOS menus are the system Menu: use DropdownMenu")
     func codyncMenu(isPresented: Binding<Bool>, items: @escaping () -> [MenuItem]) -> some View {
         modifier(AnchoredMenu(isPresented: isPresented, point: nil, items: items))
     }
 
-    /// Long-press (iPhone) or right-click (Mac) opens a Codync menu: the replacement for `contextMenu`.
+    /// Right-click (Mac) opens a Codync menu; long-press (iPhone) the system context menu.
     /// `reactions` puts a quick-reaction row on top.
     func contextActions(reactions: ReactionPick? = nil, _ items: @escaping () -> [MenuItem]) -> some View {
         modifier(ContextActions(items: items, reactions: reactions))
@@ -330,16 +336,31 @@ public extension View {
 private struct ContextActions: ViewModifier {
     let items: () -> [MenuItem]
     let reactions: ReactionPick?
+    #if os(macOS)
     @State private var open = false
     @State private var point: CGPoint?
+    #endif
 
     func body(content: Content) -> some View {
+        #if os(iOS)
+        content.contextMenu {
+            if let reactions {
+                ControlGroup {
+                    ForEach(reactions.emoji, id: \.self) { emoji in
+                        let chosen = reactions.chosen.contains(emoji)
+                        Toggle(isOn: Binding(get: { chosen }, set: { _ in reactions.toggle(emoji) })) { Text(emoji) }
+                    }
+                }
+                .controlGroupStyle(.palette)
+            }
+            ForEach(items()) { item in
+                if item.divider { Divider() }
+                systemMenuRow(item)
+            }
+        }
+        #else
         content
-            #if os(macOS)
             .overlay { SecondaryClickCapture { point = $0; open = true } }
-            #else
-            .onLongPressGesture(minimumDuration: 0.35) { point = nil; open = true }
-            #endif
             .modifier(AnchoredMenu(isPresented: $open, point: point, items: items, reactions: reactions))
             .accessibilityActions {
                 ForEach(items()) { item in
@@ -351,8 +372,25 @@ private struct ContextActions: ViewModifier {
                     }
                 }
             }
+        #endif
     }
 }
+
+#if os(iOS)
+/// A `MenuItem` inside a system `Menu` or `contextMenu`: choices as checkmarked toggles.
+@ViewBuilder private func systemMenuRow(_ item: MenuItem) -> some View {
+    let role: ButtonRole? = item.destructive ? .destructive : nil
+    if let selected = item.selected {
+        Toggle(isOn: Binding(get: { selected }, set: { _ in item.action() })) {
+            if let icon = item.icon { SwiftUI.Label(item.title, systemImage: icon) } else { Text(item.title) }
+        }
+    } else if let icon = item.icon {
+        Button(role: role, action: item.action) { SwiftUI.Label(item.title, systemImage: icon) }
+    } else {
+        Button(item.title, role: role, action: item.action)
+    }
+}
+#endif
 
 /// Presents `MenuPanel` next to the view (or at `point` inside it, for right-clicks).
 private struct AnchoredMenu: ViewModifier {
@@ -433,7 +471,7 @@ public struct DropdownMenu<Label: View>: View {
         Menu {
             ForEach(items()) { item in
                 if item.divider { Divider() }
-                Self.row(item)
+                systemMenuRow(item)
             }
         } label: { label }
             .buttonStyle(.plain)
@@ -444,21 +482,6 @@ public struct DropdownMenu<Label: View>: View {
             .codyncMenu(isPresented: $open, items: items)
         #endif
     }
-
-    #if os(iOS)
-    @ViewBuilder private static func row(_ item: MenuItem) -> some View {
-        let role: ButtonRole? = item.destructive ? .destructive : nil
-        if let selected = item.selected {
-            Toggle(isOn: Binding(get: { selected }, set: { _ in item.action() })) {
-                if let icon = item.icon { SwiftUI.Label(item.title, systemImage: icon) } else { Text(item.title) }
-            }
-        } else if let icon = item.icon {
-            Button(role: role, action: item.action) { SwiftUI.Label(item.title, systemImage: icon) }
-        } else {
-            Button(item.title, role: role, action: item.action)
-        }
-    }
-    #endif
 }
 
 /// Picks one value: shows the current choice in a pill with a chevron, opens a Codync menu.
