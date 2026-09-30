@@ -1,8 +1,14 @@
-import { BellRinging, LockKey } from "@phosphor-icons/react/ssr";
+import { AppleLogo, BellRinging, LinuxLogo, LockKey, Terminal } from "@phosphor-icons/react/ssr";
 import Phone from "./phone";
 import Reveal from "./reveal";
 
 const agents = ["Claude Code", "Codex", "Cursor", "Gemini", "Copilot", "OpenCode", "Pi", "Grok Build"];
+
+const platforms = [
+  { icon: AppleLogo, title: "Mac", body: "A menu bar app with a native chat window. Pairs your phone and installs the host itself." },
+  { icon: LinuxLogo, title: "Linux", body: "A GTK 4 / libadwaita app for the desktop, or just the host on a headless server or cloud VM." },
+  { icon: Terminal, title: "Terminal", body: "A full terminal UI in the same binary, for SSH sessions and machines with no display." },
+];
 
 // Radius rule for the page: buttons and chips are pills, panels are rounded-3xl, code is rounded-xl.
 export function Answers() {
@@ -91,6 +97,25 @@ export function Features() {
                   </li>
                 ))}
                 <li className="rounded-full px-4 py-2 text-sm text-neutral-500">and about 40 more</li>
+              </ul>
+            </div>
+          </Reveal>
+
+          <Reveal className="md:col-span-3" delay={0.05}>
+            <div className="rounded-3xl bg-neutral-900 p-8 md:p-10">
+              <h3 className="text-xl font-semibold text-neutral-50">Mac and Linux, both first-class</h3>
+              <p className="mt-3 max-w-[40rem] leading-relaxed text-neutral-400">
+                One Rust host runs on either, on your desk or on a server. Every client talks to the same host, so your
+                bots and chats are the same everywhere.
+              </p>
+              <ul className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-3">
+                {platforms.map(({ icon: Icon, title, body }) => (
+                  <li key={title}>
+                    <Icon size={24} weight="fill" className="text-neutral-50" />
+                    <p className="mt-3 font-medium text-neutral-50">{title}</p>
+                    <p className="mt-1 text-sm leading-relaxed text-neutral-400">{body}</p>
+                  </li>
+                ))}
               </ul>
             </div>
           </Reveal>

@@ -18,7 +18,8 @@ const same = [
 const different = [
   ["Free and open source", "MIT licensed. No subscription, no paid tier, no account required."],
   ["Any coding agent, over ACP", "Speaks the Agent Client Protocol, so Claude Code, Codex, Cursor, Gemini, Copilot and 40+ more just work, with the logins you already have. Mix them in one room."],
-  ["Built in Rust", "One small, fast binary hosts every bot on macOS or Linux. Bots, transcripts and memory stay on your computer; the phone reaches it end-to-end encrypted."],
+  ["Built in Rust", "One small, fast binary hosts every bot. Bots, transcripts and memory stay on your computer; the phone reaches it end-to-end encrypted."],
+  ["Mac and Linux, both first-class", "The same host runs on macOS and Linux (a static binary, any distro), on a desktop or a headless server. Each gets a native app: SwiftUI on the Mac, GTK 4 on Linux."],
   ["Native everywhere", "SwiftUI on iPhone and Mac, GTK on Linux, a terminal UI over SSH. No web views, no Electron."],
 ];
 
