@@ -534,8 +534,10 @@ final class HostController {
             Task { [weak accounts] in
                 do {
                     try await cloud.registerDevice(name: Host.current().localizedName ?? "Mac", platform: "macos")
-                } catch {
+                } catch let error as CloudError {
                     accounts?.lastError = error.localizedDescription
+                } catch {
+                    // Transient (network, token not ready): the next launch registers again.
                 }
                 await accounts?.refreshCloud()
             }
