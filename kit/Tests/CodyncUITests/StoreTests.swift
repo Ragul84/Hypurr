@@ -14,6 +14,8 @@ actor FakeRemote: RemoteTransport {
     private(set) var readReceipts: [Data] = []
     private var failReadReceipts = false
     private(set) var readAttempts = 0
+    private(set) var shutdownCount = 0
+    private var isShutdown = false
 
     func setReadFailure(_ fail: Bool) { failReadReceipts = fail }
     private(set) var enqueued: [String] = []
@@ -38,6 +40,7 @@ actor FakeRemote: RemoteTransport {
     }
 
     private func respond(_ method: String, _ body: Data) throws -> Data {
+        guard !isShutdown else { throw HostError.unreachable }
         switch method {
         case "hello":
             return Data(#"{"hostId":"h1","name":"Mac","version":"3.0.0","os":"macos","backends":[],"rev":0}"#.utf8)
@@ -62,6 +65,7 @@ actor FakeRemote: RemoteTransport {
 
     private func addEvents(_ c: AsyncThrowingStream<Data, Error>.Continuation) { eventSinks.append(c) }
     private func addState(_ c: AsyncStream<LinkState>.Continuation) {
+        isShutdown = false
         c.yield(state)
         stateSinks.append(c)
     }
@@ -86,6 +90,8 @@ actor FakeRemote: RemoteTransport {
     }
 
     func shutdown() async {
+        shutdownCount += 1
+        isShutdown = true
         for s in eventSinks { s.finish() }
         for s in stateSinks { s.finish() }
         eventSinks = []
@@ -123,6 +129,88 @@ private func until(_ condition: @MainActor () async -> Bool) async -> Bool {
 
 private func botEvent(_ id: String, name: String, rev: Int) -> String {
     #"{"type":"bot","bot":{"id":"\#(id)","name":"\#(name)","rev":\#(rev),"lastAt":\#(rev)}}"#
+}
+
+@MainActor @Test func voiceCallSendsAndReceivesInBackgroundWithoutViewUpdates() async throws {
+    let (storage, suite) = context()
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    let fake = FakeRemote(.ready(.direct))
+    let store = BotStore(computer: randomComputer("Mac"), route: .channel, clientKind: "ios", storage: storage) { fake }
+    defer { store.retire() }
+    store.setActive(true)
+    #expect(await until { await fake.subscribed })
+    await fake.emit(botEvent("b1", name: "Bot", rev: 1))
+    #expect(await until { store.connection == .online })
+
+    let call = UUID()
+    var spoken: [String] = []
+    store.beginVoiceCall(call, botId: "b1", speak: { spoken.append($0) }, end: {})
+    store.setActive(false)
+    // Allow shutdown to run if backgrounding incorrectly scheduled one.
+    try await Task.sleep(for: .milliseconds(30))
+    store.send("spoken while backgrounded", to: "b1")
+    #expect(await until { store.chat("b1").first?.id == "e1" })
+    #expect(await fake.sent == ["spoken while backgrounded"])
+    #expect(await fake.shutdownCount == 0)
+
+    let reply = #"{"type":"entry","entry":{"id":"reply","seq":2,"botId":"b1","rev":2,"kind":"agent","turn":1,"data":{"text":"The answer","final":true},"createdAt":1,"updatedAt":1}}"#
+    await fake.emit(reply)
+    #expect(await until { spoken == ["The answer"] })
+    await fake.emit(reply) // Event replays must not read the same reply twice.
+    await fake.emit(#"{"type":"entry","entry":{"id":"thread","seq":3,"botId":"b1","threadId":"root","rev":3,"kind":"agent","turn":1,"data":{"text":"Thread answer","final":true},"createdAt":1,"updatedAt":1}}"#)
+    await fake.emit(#"{"type":"entry","entry":{"id":"other","seq":4,"botId":"b2","rev":4,"kind":"agent","turn":1,"data":{"text":"Other bot","final":true},"createdAt":1,"updatedAt":1}}"#)
+    #expect(await until { store.chat("b2").last?.id == "other" })
+    #expect(spoken == ["The answer"])
+
+    store.setActive(true)
+    #expect(await fake.shutdownCount == 0)
+    store.endVoiceCall(call)
+    #expect(await fake.shutdownCount == 0) // Foreground keeps the ordinary connection.
+    store.setActive(false)
+    #expect(await until { await fake.shutdownCount == 1 })
+}
+
+@MainActor @Test func lastVoiceCallEndingDisconnectsBackgroundStore() async throws {
+    let (storage, suite) = context()
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    let fake = FakeRemote(.ready(.relay))
+    let store = BotStore(computer: randomComputer("Mac"), route: .channel, clientKind: "ios", storage: storage) { fake }
+    defer { store.retire() }
+    store.setActive(true)
+    #expect(await until { await fake.subscribed })
+    await fake.emit(botEvent("b1", name: "Bot", rev: 1))
+    #expect(await until { store.connection == .online })
+    let first = UUID(), second = UUID()
+    store.beginVoiceCall(first, botId: "b1", speak: { _ in }, end: {})
+    store.beginVoiceCall(second, botId: "b1", speak: { _ in }, end: {})
+    store.setActive(false)
+    store.endVoiceCall(first)
+    try await Task.sleep(for: .milliseconds(30))
+    #expect(await fake.shutdownCount == 0)
+    store.endVoiceCall(second)
+    #expect(await until { await fake.shutdownCount == 1 })
+}
+
+@MainActor @Test func retiringStoreEndsVoiceCallAndPreventsLaterSends() async throws {
+    let (storage, suite) = context()
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    let fake = FakeRemote(.ready(.direct))
+    let store = BotStore(computer: randomComputer("Mac"), route: .channel, clientKind: "ios", storage: storage) { fake }
+    store.setActive(true)
+    #expect(await until { await fake.subscribed })
+    await fake.emit(botEvent("b1", name: "Bot", rev: 1))
+    #expect(await until { store.connection == .online })
+    let call = UUID()
+    var ended = false
+    store.beginVoiceCall(call, botId: "b1", speak: { _ in Issue.record("Retired call received speech") }, end: { ended = true })
+    store.setActive(false)
+    store.retire()
+    #expect(ended)
+    #expect(await until { await fake.shutdownCount == 1 })
+    store.send("must not send", to: "b1")
+    store.beginVoiceCall(UUID(), botId: "b1", speak: { _ in }, end: {})
+    #expect(store.chat("b1").isEmpty)
+    #expect(await fake.sent.isEmpty)
 }
 
 @MainActor @Test func offlineSendsWaitInTheMailbox() async throws {

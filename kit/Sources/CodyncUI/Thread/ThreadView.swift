@@ -26,6 +26,8 @@ public struct ThreadView: View {
     @State private var availableWidth: CGFloat = 800
     @State private var compactDetails = false
     @State private var calling = false
+    @State private var callSpeaking = false
+    @State private var interruptCall: (() -> Void)?
     @State private var showRoutines = false
     @State private var routineId: String?
     @State private var routineRequest = UUID()
@@ -154,7 +156,9 @@ public struct ThreadView: View {
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 6) {
                 #if os(iOS)
-                    Composer(botId: botId, onCall: bot?.isGroup == false ? { calling = true } : nil)
+                    Composer(botId: botId,
+                             onCall: !calling && bot?.isGroup == false ? { calling = true } : nil,
+                             onInterrupt: callSpeaking ? interruptCall : nil)
                 #else
                     Composer(botId: botId)
                 #endif
@@ -178,7 +182,9 @@ public struct ThreadView: View {
             // Grok Bot's call: a bar floating over the chat, which stays readable and usable.
             .overlay(alignment: .top) {
                 if calling {
-                    CallView(botId: botId) { withAnimation(Motion.reduced(Motion.layout, reduceMotion)) { calling = false } }
+                    CallView(botId: botId, isSpeaking: $callSpeaking, interrupt: $interruptCall) {
+                        withAnimation(Motion.reduced(Motion.layout, reduceMotion)) { calling = false }
+                    }
                         .padding(.top, 4)
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }

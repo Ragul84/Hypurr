@@ -19,7 +19,11 @@ final class CallSession {
         case failed(String)
     }
 
-    private(set) var phase: Phase = .starting
+    private(set) var phase: Phase = .starting {
+        didSet { onActivityChanged?(!ended && (phase == .listening || phase == .speaking)) }
+    }
+    /// Keep the transport attached while audio is active, even without a visible UI update.
+    @ObservationIgnored var onActivityChanged: ((Bool) -> Void)?
     /// What you're saying right now (live caption).
     private(set) var heard = ""
     /// The reply being read aloud.
@@ -72,6 +76,7 @@ final class CallSession {
         guard let recognizer, recognizer.isAvailable else {
             return fail("Speech recognition isn't available for this language right now.")
         }
+        guard !ended else { return }
         do {
             let audio = AVAudioSession.sharedInstance()
             try audio.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetoothHFP])
@@ -79,12 +84,12 @@ final class CallSession {
         } catch {
             return fail("Couldn't start audio: \(error.localizedDescription)")
         }
-        guard !ended else { return }
         listen()
     }
 
     func end() {
         ended = true
+        onActivityChanged?(false)
         stopListening()
         synthesizer.stopSpeaking(at: .immediate)
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)

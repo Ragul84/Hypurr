@@ -1,6 +1,9 @@
 import CodyncKit
 import Foundation
 import Observation
+import os
+
+private let log = Logger(subsystem: "com.pokai.Codync", category: "Account")
 
 /// One bot across an account context's computers, for lists that mix them.
 public struct RosterItem: Identifiable, Sendable {
@@ -174,8 +177,12 @@ public final class AccountStore {
             guard !retired else { return }
             if list != cloudComputers { Motion.animate { cloudComputers = list } }
             if asksForAccess { await askForAccess() }
-        } catch {
+        } catch let error as CloudError {
             lastError = error.localizedDescription
+        } catch {
+            // Runs on every launch and foreground: a dropped connection or a token not ready yet
+            // fixes itself on the next refresh, so only the cloud's own answers reach the dialog.
+            log.info("cloud refresh failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 

@@ -98,6 +98,13 @@ public final class BotStore {
     private var streamTask: Task<Void, Never>?
     private var eventsTask: Task<Void, Never>?
     private var isActive = true
+    private struct VoiceCall {
+        let botId: String
+        let startRev: Int64
+        let speak: @MainActor (String) -> Void
+        let end: @MainActor () -> Void
+    }
+    @ObservationIgnored private var voiceCalls: [UUID: VoiceCall] = [:]
     private var saveTask: Task<Void, Never>?
     private var rewound = false
 
@@ -196,8 +203,11 @@ public final class BotStore {
     /// Permanently detach a store (account switch, computer removed). Late async
     /// callbacks still hold it, but it writes nothing and calls no hooks anymore.
     public func retire() {
+        let calls = Array(voiceCalls.values)
+        voiceCalls.removeAll()
         setActive(false)
         retired = true
+        for call in calls { call.end() }
         saveTask?.cancel()
         dropTimer?.cancel()
         onConnected = nil
@@ -217,8 +227,9 @@ public final class BotStore {
         guard !retired else { return }
         isActive = active
         if active {
-            restartStream()
-        } else {
+            // Returning to the foreground must not interrupt a live call's sends.
+            if voiceCalls.isEmpty || streamTask == nil { restartStream() }
+        } else if voiceCalls.isEmpty {
             // Disconnect so the host knows we're gone and sends pushes instead.
             stopTransport()
             saveCache()
@@ -226,10 +237,26 @@ public final class BotStore {
     }
 
     public func restartStream() {
-        guard isActive, !retired else { return }
+        guard isActive || !voiceCalls.isEmpty, !retired else { return }
         stopTransport()
         if connection != .online { setConnection(.connecting) }
         streamTask = Task { [weak self] in await self?.runStream() }
+    }
+
+    /// Audio owns this subscription, so background calls don't depend on SwiftUI updates.
+    func beginVoiceCall(_ id: UUID, botId: String, speak: @escaping @MainActor (String) -> Void,
+                        end: @escaping @MainActor () -> Void) {
+        guard !retired, voiceCalls[id] == nil else { return }
+        voiceCalls[id] = VoiceCall(botId: botId, startRev: rev, speak: speak, end: end)
+        if streamTask == nil { restartStream() }
+    }
+
+    func endVoiceCall(_ id: UUID) {
+        guard voiceCalls.removeValue(forKey: id) != nil else { return }
+        if !isActive && voiceCalls.isEmpty {
+            stopTransport()
+            saveCache()
+        }
     }
 
     private func stopTransport() {
@@ -439,11 +466,17 @@ public final class BotStore {
             screen = newScreen
             if hostRev < rev { rev = 0 }
         case let .bot(bot):
+            let neededInput = bots[bot.id]?.needsInput == true
             bots[bot.id] = bot
             bump(bot.rev)
             onBotUpdated?(bot)
             onRosterChanged?()
             if bot.unread > 0 { acknowledgeVisibleConversations(bot.id) }
+            if bot.needsInput && !neededInput {
+                for call in Array(voiceCalls.values) where call.botId == bot.id {
+                    call.speak("\(bot.name) needs your approval in the chat.")
+                }
+            }
         case let .botDeleted(id, r):
             bots[id] = nil
             entries[id] = nil
@@ -451,9 +484,15 @@ public final class BotStore {
             if selection == id { selection = nil }
             onRosterChanged?()
         case let .entry(e):
+            let wasFinal = entries[e.botId]?.first(where: { $0.id == e.id })?.data.final == true
             upsert(e)
             bump(e.rev)
             acknowledgeVisibleConversations(e.botId, entry: e)
+            if e.kind == "agent", e.threadId == nil, e.data.final == true, !wasFinal, let text = e.data.text {
+                for call in Array(voiceCalls.values) where call.botId == e.botId && e.rev > call.startRev {
+                    call.speak(text)
+                }
+            }
         case let .usage(u):
             setUsage(u)
         case let .screen(s):

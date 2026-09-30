@@ -8,16 +8,17 @@ import SwiftUI
 /// read aloud, and the chat gets a "Voice chat · 00:16" line when the call ends.
 struct CallView: View {
     let botId: String
+    @Binding var isSpeaking: Bool
+    @Binding var interrupt: (() -> Void)?
     let close: () -> Void
     @Environment(BotStore.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var session: CallSession?
+    @State private var callID = UUID()
     @State private var startedAt = Date.now
     @State private var settings = false
 
     private var bot: Bot? { model.bots[botId] }
-    /// The newest final reply; each new one is read aloud.
-    private var lastReply: Entry? { model.chat(botId).last { $0.kind == "agent" && $0.data.final == true } }
     private var color: Color { bot.map { AvatarPalette.color($0.avatarColor) } ?? Palette.accent }
 
     var body: some View {
@@ -38,19 +39,29 @@ struct CallView: View {
         .animation(Motion.reduced(Motion.fade, reduceMotion), value: session?.phase)
         .onAppear {
             let session = CallSession { [model, botId] in model.send($0, to: botId) }
+            session.onActivityChanged = { [weak session, model, botId, callID] active in
+                if active {
+                    model.beginVoiceCall(callID, botId: botId,
+                                         speak: { [weak session] in session?.speak($0) },
+                                         end: { [weak session] in session?.end() })
+                } else {
+                    model.endVoiceCall(callID)
+                }
+            }
             self.session = session
             startedAt = .now
             Task { await session.start() }
         }
         .onDisappear {
             session?.end()
+            isSpeaking = false
+            interrupt = nil
+            model.endVoiceCall(callID)
             model.logCall(botId, seconds: Int(Date.now.timeIntervalSince(startedAt)))
         }
-        .onChange(of: lastReply?.id) { _, _ in
-            if let text = lastReply?.data.text { session?.speak(text) }
-        }
-        .onChange(of: bot?.needsInput) { _, needs in
-            if needs == true { session?.speak("\(bot?.name ?? "The bot") needs your approval in the chat.") }
+        .onChange(of: session?.phase) { _, phase in
+            isSpeaking = phase == .speaking
+            interrupt = phase == .speaking ? { session?.interrupt() } : nil
         }
         .codyncSheet(isPresented: $settings) { CallSettingsView() }
     }
@@ -139,17 +150,18 @@ private struct CallLevelDots: View {
                     let x = CGFloat(i) * spacing + spacing / 2
                     let wave = (sin(Double(i) * 0.55 - t * 6) + 1) / 2
                     let amount: Double = if speaking {
-                        0.35 + 0.65 * wave
+                        0.5 + 0.5 * wave
                     } else if level > 0.05 {
-                        Double(level) * (0.4 + 0.6 * wave)
+                        max(0.2, Double(level)) * (0.45 + 0.55 * wave)
                     } else if working {
                         0.25 * ((sin(t * 2.4) + 1) / 2)
                     } else {
-                        0
+                        0.08
                     }
-                    let height = 3 + CGFloat(amount) * (size.height - 3)
-                    let rect = CGRect(x: x - 1.5, y: (size.height - height) / 2, width: 3, height: height)
-                    canvas.fill(Path(roundedRect: rect, cornerRadius: 1.5), with: .color(color.opacity(0.3 + 0.7 * amount)))
+                    let height = 4 + CGFloat(amount) * (size.height - 4)
+                    let rect = CGRect(x: x - 1.25, y: (size.height - height) / 2, width: 2.5, height: height)
+                    let tint = speaking ? Palette.accent : color
+                    canvas.fill(Path(roundedRect: rect, cornerRadius: 1.25), with: .color(tint.opacity(0.5 + 0.5 * amount)))
                 }
             }
         }

@@ -8,7 +8,104 @@ The footer displays **Account**, never the Mac user's local name.
 
 Both Apple apps use `apps/shared/AccountSession.swift`. Public keys and cloud URLs come from `apps/shared/Config/<env>.plist`, copied into the bundle as `AccountConfig.plist` by `project.yml`. Debug selects dev; Release selects main. See [environments](environments-and-deployment.md).
 
-Confirm Google sign-in, Native API and the native app registrations in the intended Clerk instance. macOS uses `com.pokai.Codync`, iOS uses `com.pokai.Codync.ios`, with their matching `://callback` URLs. Dashboard configuration and actual OAuth consent must be verified independently of the checked-in plist. Do not bundle Clerk secret keys.
+Confirm Apple and Google sign-in, Native API and the native app registrations in the intended Clerk instance. macOS uses `com.pokai.Codync`, iOS uses `com.pokai.Codync.ios`, with their matching `://callback` URLs. Dashboard configuration and actual OAuth consent must be verified independently of the checked-in plist. Do not bundle Clerk secret keys.
+
+### macOS Sign in with Apple
+
+The sidebar account menu offers **Continue with Apple** and **Continue with
+Google** with the same row styling in both sidebar layouts. Both actions are
+disabled while authentication is in progress; cancellation stays silent and
+errors reopen the account menu. Signed-in accounts retain the existing Log out
+action.
+
+On macOS, `AccountSession.signIn(provider: .apple)` uses
+`clerk.auth.signInWithOAuth(provider: .apple)` in a system authentication browser.
+This uses Clerk's Apple Services ID and does not require the native Sign in with
+Apple entitlement on the independently distributed Mac app. iOS continues using
+Clerk's native Apple authorization.
+
+The production Services ID `com.pokai.Codync.signin` is associated with primary
+App ID `com.pokai.Codync.ios` in Apple Developer. Keep that association: Apple's
+web and native authorization must represent the same identity rather than being
+joined by email. The Mac's `com.pokai.Codync://callback` must also remain allowed
+in Clerk. See [Apple's web configuration guide](https://developer.apple.com/help/account/capabilities/configure-sign-in-with-apple-for-the-web/)
+and [Clerk's Apple OAuth guide](https://clerk.com/docs/guides/configure/auth-strategies/social-connections/apple).
+
+To check cross-device discovery, use **Release** on both devices (the same Clerk
+production instance), select the same Apple Account, and verify that Clerk has
+one user ID. Debug uses the separate development instance; its shared Apple OAuth
+credentials do not validate production identity matching. Then verify that the
+Mac joins the account and the phone requests access with the existing approval
+flow. Hide My Email does not change the device approval requirement.
+
+Verified on 2026-09-30: the Mac Debug build completed Apple OAuth and displayed
+the signed-in private relay address and Log out action. The Apple and Google
+rows use the same font and sizing, and both disable during the pending flow.
+The iOS simulator build also passed after introducing the platform-specific
+Apple authentication route. The Mac Release build passed as well. Production
+cross-device identity matching still needs an Apple sign-in on that build.
+
+### iOS Sign in with Apple
+
+The welcome, pairing and account screens offer **Continue with Apple** alongside
+Google, with matching headline typography and button sizing. Apple's native
+authorization is presented by Clerk. Adding another account lets the user choose
+either provider. `AccountSession.signIn(provider: .apple)` calls
+`clerk.auth.signInWithApple()`; Clerk owns Apple's credential exchange, new-user
+transfer, session activation and persistence. Cancellation is silent and
+incomplete sign-in/sign-up results remain explicit errors.
+
+Enable Apple for sign-up and sign-in in both Clerk environments, and register
+`7FUM8A8H72.com.pokai.Codync.ios` under Native applications. Enable the App ID's
+`APPLE_ID_AUTH` capability as a primary App ID and retain
+`com.apple.developer.applesignin: [Default]` in `iOS.entitlements`. Regenerate
+provisioning profiles after adding this entitlement. Native setup is described
+in [Clerk's Apple sign-in guide](https://clerk.com/docs/ios/guides/configure/auth-strategies/sign-in-with-apple).
+
+On 2026-09-30, Apple sign-up/sign-in was enabled in Codync's development and
+production Clerk instances. Production's connection required custom credentials:
+Services ID `com.pokai.Codync.signin`, primary App ID `com.pokai.Codync.ios`,
+domain `clerk.codync.dev` and return URL
+`https://clerk.codync.dev/v1/oauth_callback`. The Sign in with Apple key is stored
+privately outside the repository and supplied only to Clerk. Never add its P8
+contents to app resources, logs or documentation.
+
+Apple Private Email Relay also has the production Clerk sender domain
+`clkmail.codync.dev` and sender
+`bounces+115655512@clkmail.codync.dev` registered as email sources. Registration
+does not replace an actual delivery test to an Apple relay address.
+
+Account storage and computer approval still use the Clerk user ID, regardless of
+login provider. Apple **Hide My Email** can create a different Clerk user from an
+existing Google account; do not merge users by unverified email or assume both
+providers reach the same computers. Test new-user registration with Hide My Email,
+returning-user login, cancellation, restoration, account switching and sign-out
+on a real device before release. Build success and enabled dashboard settings do
+not prove that an Apple authorization completed successfully.
+
+QR pairing does not require matching email addresses or even a signed-in computer.
+The iPhone's scan step always offers **Skip**, including when signed out or when
+the account has no computers. Skipping finishes onboarding and opens the main
+tabs; this choice survives relaunches and account changes. The empty Bots screen
+offers **Computers** to pair later. Skipping while adding a computer from settings
+only closes that pairing sheet. It does not grant access to a computer or change
+the account approval flow. **Start over** resets the onboarding choice.
+
+On the Mac, open Codync in the menu bar and choose **Pair iPhone**, then scan the
+code on the phone (or paste its `codync://pair` link). The host approves the phone's
+device key; the phone saves the computer in its current account context. This
+works when the phone uses Apple Hide My Email and the Mac uses Google. Automatic
+account discovery, in contrast, requires the same Clerk user ID on both devices.
+
+On 2026-09-30, the production dashboard confirmed a successful Apple registration
+with a private relay address. The subsequent native `/v1/devices` and
+`/v1/computers` requests failed with 401 because the Worker's `CLERK_SECRET_KEY`
+contained the dashboard's abbreviated value. The complete key was verified
+against production JWKS and stored in the Worker. Relaunching the Release build
+on the physical iPhone restored the Apple session, and both endpoints returned
+200 without warnings. The cloud API regression tests
+cover native device registration and computer listing with both an absent email
+claim and an Apple relay address.
 
 ## Flow
 
@@ -32,12 +129,12 @@ computer approves each device after comparing a 6-digit code
 - Build the macOS scheme after `xcodegen generate --spec apps/project.yml`.
 - Open the account menu from either sidebar layout; test arrows, Return, Escape
   and clicking outside the panel.
-- Sign in with a test Google user, verify the avatar/email, restart the app and
+- Sign in with Apple and Google test users, verify the avatar/email, restart the app and
   verify session restoration, then log out and verify the anonymous state.
 - Cancel the browser flow and verify no error; retry with networking unavailable
   and verify that the application stays usable.
 
-Dashboard creation and the end-to-end Google flow require the user's browser
+Dashboard creation and the end-to-end Apple/Google flows require the user's browser
 consent; compilation alone does not verify those steps.
 
 References:
