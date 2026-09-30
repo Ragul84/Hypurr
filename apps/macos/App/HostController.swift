@@ -1,6 +1,7 @@
 import AppKit
 import CodyncKit
 import CodyncUI
+import CryptoKit
 import Foundation
 import Observation
 import os
@@ -66,6 +67,9 @@ final class HostController {
     private var streamTask: Task<Void, Never>?
     /// Set once the service was moved onto this app's host because it ran another version.
     private var replacedStaleHost = false
+    private var expectedBinaryHash: String?
+    private var installingHost = false
+    private var preparingForUpdate = false
 
     init(account: AccountSession) {
         #if DEBUG
@@ -205,8 +209,14 @@ final class HostController {
     }
 
     func refresh() {
+        guard !preparingForUpdate else { return }
         guard binaryURL != nil else {
             state = .missingBinary
+            return
+        }
+        if Self.devPort == nil, UserDefaults.standard.bool(forKey: Self.updateRestartKey),
+           FileManager.default.fileExists(atPath: plistURL.path) {
+            install()
             return
         }
         guard Self.devPort != nil || FileManager.default.fileExists(atPath: plistURL.path) else {
@@ -219,13 +229,17 @@ final class HostController {
 
     /// Set by "Uninstall host service", so the next launch doesn't put the host back.
     private static let uninstalledKey = "hostUninstalled"
+    private static let updateRestartKey = "hostRestartAfterAppUpdate"
 
     /// `codync-host install` also routes Claude Code's status line through the host.
     func install() {
-        guard let bin = binaryURL else { return }
+        guard !preparingForUpdate, !installingHost, let bin = binaryURL else { return }
+        installingHost = true
+        streamTask?.cancel()
         UserDefaults.standard.set(false, forKey: Self.uninstalledKey)
         state = .starting
         Task {
+            defer { installingHost = false }
             let result = await Self.run(bin, ["install", "--port", "\(Self.port)"])
             if result.status != 0 {
                 state = .failed(result.output.isEmpty ? "Install failed" : result.output)
@@ -237,14 +251,14 @@ final class HostController {
     }
 
     func restart() {
-        // Nothing to restart when the service was never set up (a failed install).
-        guard Self.devPort != nil || FileManager.default.fileExists(atPath: plistURL.path) else { return install() }
-        let uid = getuid()
-        Task {
-            _ = await Self.run(URL(filePath: "/bin/launchctl"), ["kickstart", "-k", "gui/\(uid)/com.pokai.codync.host"])
-            try? await Task.sleep(for: .seconds(1))
-            connect()
+        guard Self.devPort == nil else {
+            state = .failed("Restart the manually started development host in its terminal.")
+            return
         }
+        // Reinstall also updates the executable path and waits for the old host
+        // to release its data lock. A kickstart could restart another app's copy.
+        replacedStaleHost = false
+        install()
     }
 
     func uninstall() {
@@ -269,9 +283,11 @@ final class HostController {
 
     /// Remote screen: starts/stops Codync Screen and tells the host (which only accepts this from the Mac itself).
     func setRemoteScreen(_ on: Bool) {
+        guard !preparingForUpdate else { return }
         Task {
             do {
                 if on { try screenAgent.register() } else { try await screenAgent.unregister() }
+                UserDefaults.standard.set(on ? Self.helperStamp : nil, forKey: Self.helperStampKey)
                 try await store?.setScreenEnabled(on)
                 screenError = nil
             } catch {
@@ -285,14 +301,78 @@ final class HostController {
         SMAppService.openSystemSettingsLoginItems()
     }
 
-    /// Keeps Codync Screen registered while the host has Remote screen on (e.g. after the app moved).
-    private func syncScreenAgent() {
-        guard screen?.enabled == true, screenAgent.status != .enabled else {
+    /// Keeps Codync Screen registered while the host has Remote screen on (e.g. after the app moved),
+    /// and registers it again when this app ships a different helper binary (an update or a rebuild):
+    /// launchd keeps running the old helper, and a new binary under the old registration fails to start.
+    private func syncScreenAgent() async {
+        guard !preparingForUpdate else { return }
+        guard screen?.enabled == true else {
             screenAgentNeedsApproval = false
             return
         }
+        let stamp = Self.helperStamp
+        let stale = UserDefaults.standard.string(forKey: Self.helperStampKey) != stamp
+        guard stale || screenAgent.status != .enabled else {
+            screenAgentNeedsApproval = false
+            return
+        }
+        if stale, screenAgent.status == .enabled {
+            log.info("Codync Screen changed; registering it again")
+            // Stops the old helper along with its job.
+            try? await screenAgent.unregister()
+        }
         try? screenAgent.register()
+        if screenAgent.status == .enabled { UserDefaults.standard.set(stamp, forKey: Self.helperStampKey) }
         screenAgentNeedsApproval = screenAgent.status == .requiresApproval
+    }
+
+    private static let helperStampKey = "screenHelperStamp"
+
+    /// Identifies the helper binary inside this app: its path and modification date.
+    private static var helperStamp: String {
+        let url = Bundle.main.bundleURL.appending(path: "Contents/Library/LoginItems/CodyncScreen.app/Contents/MacOS/CodyncScreen")
+        let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+        return "\(url.path)@\(modified?.timeIntervalSince1970 ?? 0)"
+    }
+
+    func isIdleForUpdate() async -> Bool {
+        guard !installingHost, !preparingForUpdate, Self.devPort == nil else { return false }
+        if !FileManager.default.fileExists(atPath: plistURL.path) { return true }
+        guard let health = await HostHealth.fetch(Self.baseURL) else { return false }
+        return health.busy == false
+    }
+
+    func prepareForUpdate() async throws {
+        guard Self.devPort == nil else { return }
+        guard !installingHost else {
+            throw NSError(domain: "Codync.Update", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "The host is being installed. Try again when it finishes."])
+        }
+        preparingForUpdate = true
+        // Persist before stopping: Sparkle can install on Quit and relaunch later.
+        if FileManager.default.fileExists(atPath: plistURL.path) {
+            UserDefaults.standard.set(true, forKey: Self.updateRestartKey)
+        }
+        streamTask?.cancel()
+        if screenAgent.status == .enabled {
+            try await screenAgent.unregister()
+            UserDefaults.standard.removeObject(forKey: Self.helperStampKey)
+        }
+        guard let bin = binaryURL else {
+            throw NSError(domain: "Codync.Update", code: 2,
+                          userInfo: [NSLocalizedDescriptionKey: "The bundled host is missing."])
+        }
+        let result = await Self.run(bin, ["stop"])
+        guard result.status == 0 else {
+            throw NSError(domain: "Codync.Update", code: 3,
+                          userInfo: [NSLocalizedDescriptionKey: result.output.isEmpty ? "The old host could not be stopped." : result.output])
+        }
+    }
+
+    func resumeAfterCancelledUpdate() {
+        guard preparingForUpdate else { return }
+        preparingForUpdate = false
+        if FileManager.default.fileExists(atPath: plistURL.path) { install() } else { refresh() }
     }
 
     func stop(_ item: RosterItem) {
@@ -471,15 +551,28 @@ final class HostController {
 
     /// Watches the host's health; the BotStore handles the event stream itself.
     private func connect() {
+        guard !preparingForUpdate else { return }
         streamTask?.cancel()
         streamTask = Task { [weak self] in
+            if let bin = self?.binaryURL {
+                let hash = await Task.detached {
+                    (try? Data(contentsOf: bin)).map { data in
+                        SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+                    }
+                }.value
+                guard !Task.isCancelled else { return }
+                self?.expectedBinaryHash = hash
+            }
             var failures = 0
             while !Task.isCancelled {
                 guard let self else { return }
                 if await self.attachLocal() {
                     failures = 0
                     self.state = .running
-                    self.syncScreenAgent()
+                    if Self.devPort == nil {
+                        UserDefaults.standard.removeObject(forKey: Self.updateRestartKey)
+                    }
+                    await self.syncScreenAgent()
                 } else {
                     failures += 1
                     if failures > 5 { self.state = .failed("The host isn't responding. See the log for details.") }
@@ -495,12 +588,22 @@ final class HostController {
         guard let token = readToken(), let health = await HostHealth.fetch(Self.baseURL), let id = health.computerId else {
             return false
         }
-        // An upgrade (Homebrew, a new DMG) replaced the app while the old host kept running.
-        if Self.devPort == nil, !replacedStaleHost, let running = health.version,
-           running != Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
-            log.info("Host \(running, privacy: .public) differs from the app's; reinstalling the service")
-            replacedStaleHost = true
-            install()
+        // A rebuild can change the host without changing the release version.
+        // Legacy hosts have no fingerprint and are replaced once as well.
+        if Self.devPort == nil {
+            guard let expectedBinaryHash, let bin = binaryURL else { return false }
+            let matches = health.binaryHash == expectedBinaryHash
+                && health.binaryPath == bin.resolvingSymlinksInPath().path
+            if !matches {
+                if !replacedStaleHost {
+                    log.info("Host binary differs from this app's; reinstalling the service")
+                    replacedStaleHost = true
+                    install()
+                }
+                return false
+            }
+        }
+        if Task.isCancelled {
             return false
         }
         if local?.id == id, localToken == token, store != nil { return true }

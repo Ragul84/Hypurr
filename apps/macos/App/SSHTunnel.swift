@@ -285,6 +285,9 @@ struct HostHealth: Decodable {
     var hostId: String?
     var computerId: ComputerID?
     var version: String?
+    var binaryPath: String?
+    var binaryHash: String?
+    var busy: Bool?
 
     static func fetch(_ baseURL: URL, timeout: TimeInterval = 2) async -> HostHealth? {
         var request = URLRequest(url: baseURL.appending(path: "health"))
