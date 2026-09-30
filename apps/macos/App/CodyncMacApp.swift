@@ -5,6 +5,8 @@ import SwiftUI
 
 @main
 struct CodyncMacApp: App {
+    @NSApplicationDelegateAdaptor(CodyncAppDelegate.self) private var appDelegate
+    @State private var updates = UpdatesManager()
     @State private var host: HostController
     @State private var account: AccountSession
     @Environment(\.openWindow) private var openWindow
@@ -22,11 +24,14 @@ struct CodyncMacApp: App {
                 .labelStyle(.titleAndIcon)
                 .environment(host)
                 .environment(account)
+                .environment(updates)
         } label: {
             // The Codync mark; a dot joins it when a bot needs you.
             Image(host.needsAttention ? "MenuBarIconAlert" : "MenuBarIcon")
                 .task {
                     host.start()
+                    appDelegate.updates = updates
+                    updates.start(host: host)
                     openWindow(id: "chat")
                 }
                 .onChange(of: account.userID) { _, userID in host.switchAccount(to: userID) }
@@ -67,6 +72,7 @@ struct CodyncMacApp: App {
 
 /// A system menu: macOS owns layout, selection, keyboard navigation and submenus.
 struct MenuView: View {
+    @Environment(UpdatesManager.self) private var updates
     @Environment(HostController.self) private var host
     @Environment(\.openWindow) private var openWindow
     @AppStorage(SharedStore.usageIconStyleKey, store: UserDefaults(suiteName: SharedStore.appGroup))
@@ -95,6 +101,30 @@ struct MenuView: View {
                 get: { host.launchAtLogin },
                 set: { host.setLaunchAtLogin($0) }
             ))
+            Divider()
+            Menu("Updates") {
+                Button(updates.availableVersion.map { "Update to \($0)…" } ?? "Check for Updates…") {
+                    updates.checkForUpdates()
+                }
+                .disabled(!updates.canCheckForUpdates && !updates.hasStagedUpdate)
+                Toggle("Automatically check for updates", isOn: Binding(
+                    get: { updates.automaticallyChecksForUpdates },
+                    set: { updates.automaticallyChecksForUpdates = $0 }
+                ))
+                .disabled(!updates.isSupported)
+                Toggle("Automatically download and install", isOn: Binding(
+                    get: { updates.automaticallyDownloadsUpdates },
+                    set: { updates.automaticallyDownloadsUpdates = $0 }
+                ))
+                .disabled(!updates.isSupported)
+                if !updates.isSupported { Text("Updates are available in release builds.") }
+                if let date = updates.lastUpdateCheckDate { Text("Last checked: \(date.formatted())") }
+                if let error = updates.errorMessage {
+                    Text(error)
+                    Button("Retry installing update") { updates.retryInstallation() }
+                        .disabled(updates.preparingInstallation)
+                }
+            }
             Divider()
             Button("Restart host") { host.restart() }
             Button("Open log") { NSWorkspace.shared.open(host.logURL) }

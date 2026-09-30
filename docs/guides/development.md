@@ -1,5 +1,7 @@
 # Development and validation
 
+For release updates, automatic installation and host rollback, see [updates](updates.md).
+
 Run commands from the repository root unless a block changes directory. See [file structure](../architecture/file-structure.md) for ownership and [environment configuration](environments-and-deployment.md) before testing cloud access.
 
 ## Apple apps
@@ -21,7 +23,24 @@ pkill -x Codync
 open build/dd/Build/Products/Debug/Codync.app
 ```
 
-`pkill` can return nonzero when no process exists. If the development launch agent is installed, restart the embedded host and inspect other host processes for stale binaries:
+`pkill` can return nonzero when no process exists.
+
+The Mac app compares the running host's executable path and SHA-256 fingerprint
+with its bundled host, so reopening a rebuild replaces the service even when the
+version number has not changed. **Restart host** reinstalls the service from this
+app and waits for the old host's data lock to be released. If a manually started
+host still owns that data directory, installation fails instead of reporting a
+successful restart; stop that host in its terminal and retry. Hosts attached using
+`CODYNC_PORT` are managed manually.
+
+On SIGTERM the host stops its bots without waiting for open SSE or WebSocket
+connections. ACP adapters run in separate process groups; stopping an adapter
+also kills tools and MCP servers that remain in its group. Processes that detach
+into their own sessions and unrelated hosts using other data directories are
+outside this cleanup.
+
+For a manual restart of the installed launch agent, and to inspect other host
+processes for stale binaries:
 
 ```sh
 launchctl kickstart -k gui/$(id -u)/com.pokai.codync.host

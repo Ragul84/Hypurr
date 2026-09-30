@@ -14,6 +14,10 @@ Sources: `apps/ios/Views/BotListView.swift`, `AccountSwitcherView.swift`, `kit/S
 
 ## macOS menu bar
 
+Release update controls live in the native Settings → Updates menu. Sparkle's
+standard update/install windows are a native system-integration exception; keep
+signature errors, progress and relaunch in its supported user driver.
+
 Use `MenuBarExtra` with `.menuBarExtraStyle(.menu)`. Its commands, submenus, checkmarked toggles, usage-icon picker, separators and keyboard navigation use system styling. Do not add custom cards, hover backgrounds, icon buttons or a window-style menu panel here.
 
 The menu retains host installation/restart, bot conversation/stop actions, approval review, usage limits, remote-screen permissions, launch-at-login and quit. Pairing opens a separate titled window because its QR needs a persistent scanning surface. The chat window retains its own UI conventions.

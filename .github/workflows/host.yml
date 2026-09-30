@@ -3,10 +3,10 @@ name: codync-host
 on:
   push:
     branches: [main, v2]
-    paths: ["host/**", "apps/linux/**", "docs/reference/fixtures/remote-relay-vectors.json", ".github/workflows/host.yml"]
+    paths: ["host/**", "apps/linux/**", "packaging/updates/**", "docs/reference/fixtures/remote-relay-vectors.json", ".github/workflows/host.yml"]
     tags: ["v*"]  # one version tag ships the Mac app, the host and the Linux app
   pull_request:
-    paths: ["host/**", "apps/linux/**", "docs/reference/fixtures/remote-relay-vectors.json"]
+    paths: ["host/**", "apps/linux/**", "packaging/updates/**", "docs/reference/fixtures/remote-relay-vectors.json"]
 
 jobs:
   test:
@@ -97,7 +97,10 @@ jobs:
         # Vendored C (dbus) would call libgcc's outline atomics, which a static musl link lacks.
         env:
           CFLAGS_aarch64_unknown_linux_musl: -mno-outline-atomics
-        run: cargo build --release --target ${{ matrix.target }}
+        run: |
+          VERSION=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml", "rb"))["package"]["version"])')
+          test "v$VERSION" = "$GITHUB_REF_NAME" || { echo 'Host version must match release tag'; exit 1; }
+          cargo build --release --target ${{ matrix.target }}
       - name: Package
         run: |
           NAME=codync-host-${{ matrix.name }}
@@ -106,11 +109,22 @@ jobs:
           cp LICENSE $NAME/
           tar czf $NAME.tar.gz $NAME
           shasum -a 256 $NAME.tar.gz > $NAME.tar.gz.sha256
+      - name: Sign host update manifest
+        env:
+          HOST_UPDATE_SIGNING_KEY: ${{ secrets.HOST_UPDATE_SIGNING_KEY }}
+        run: |
+          python3 -m venv "$RUNNER_TEMP/update-signing"
+          "$RUNNER_TEMP/update-signing/bin/pip" install 'cryptography>=44,<47'
+          "$RUNNER_TEMP/update-signing/bin/python" packaging/updates/sign-host-release.py \
+            "codync-host-${{ matrix.name }}.tar.gz" \
+            --version "$GITHUB_REF_NAME" --platform "${{ matrix.name }}"
       - uses: softprops/action-gh-release@v2
         with:
           files: |
             codync-host-*.tar.gz
             codync-host-*.tar.gz.sha256
+            codync-host-*.update.json
+            codync-host-*.update.json.sig
 
   homebrew:
     # Keeps `brew install leepokai/codync/codync-host` (Linux, headless Macs) in step with releases.

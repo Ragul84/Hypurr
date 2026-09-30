@@ -1310,6 +1310,166 @@ fn remote_screen_group() -> adw::PreferencesGroup {
     group
 }
 
+fn host_updates_group(ui: &App) -> adw::PreferencesGroup {
+    let group = adw::PreferencesGroup::builder()
+        .title("Host updates")
+        .description("Automatic updates wait until this computer's bots are idle.")
+        .build();
+    let status = adw::ActionRow::builder()
+        .title("Checking update settings…")
+        .build();
+    let check = gtk::Button::builder()
+        .label("Check for updates")
+        .valign(gtk::Align::Center)
+        .build();
+    let install = gtk::Button::builder()
+        .label("Install update")
+        .valign(gtk::Align::Center)
+        .sensitive(false)
+        .build();
+    let automatic = adw::SwitchRow::builder()
+        .title("Automatically update the host")
+        .sensitive(false)
+        .build();
+    status.add_suffix(&check);
+    status.add_suffix(&install);
+    group.add(&status);
+    group.add(&automatic);
+    let syncing = std::rc::Rc::new(std::cell::Cell::new(false));
+    let render = {
+        let (status, install, automatic, syncing) = (
+            status.clone(),
+            install.clone(),
+            automatic.clone(),
+            syncing.clone(),
+        );
+        move |value: &Value| {
+            let standalone = value["method"] == "standalone";
+            let version = value["state"]["availableVersion"].as_str();
+            status.set_title(
+                &version.map_or_else(|| "Host updates".to_owned(), |v| format!("Version {v}")),
+            );
+            let description =
+                match value["method"].as_str() {
+                    Some("homebrew") => "Update with brew upgrade leepokai/codync/codync-host",
+                    Some("development") => "Rebuild this development installation to update it.",
+                    Some("appBundle") => "Update the Codync Mac app to update its bundled host.",
+                    _ => value["state"]["error"].as_str().unwrap_or_else(|| {
+                        match value["state"]["phase"].as_str() {
+                            Some("complete") => "Update installed and host restarted.",
+                            Some("installing" | "checking" | "scheduled") => "Updating the host…",
+                            Some("upToDate") => "The host is up to date.",
+                            _ => "Checks signed releases for this computer.",
+                        }
+                    }),
+                };
+            status.set_subtitle(description);
+            install.set_sensitive(
+                standalone
+                    && version.is_some()
+                    && !matches!(
+                        value["state"]["phase"].as_str(),
+                        Some("installing" | "checking" | "scheduled" | "complete")
+                    ),
+            );
+            syncing.set(true);
+            automatic.set_active(value["automatic"] == true);
+            automatic.set_sensitive(standalone);
+            syncing.set(false);
+        }
+    };
+    {
+        let (render, status) = (render.clone(), status.clone());
+        client::call(
+            "hostUpdateStatus",
+            client::empty(),
+            move |result| match result {
+                Ok(value) => render(&value),
+                Err(error) => status.set_subtitle(&error),
+            },
+        );
+    }
+    {
+        let (render, ui) = (render.clone(), ui.clone());
+        check.connect_clicked(move |button| {
+            button.set_sensitive(false);
+            let (button, render, ui) = (button.clone(), render.clone(), ui.clone());
+            client::call("checkHostUpdate", client::empty(), move |result| {
+                button.set_sensitive(true);
+                match result {
+                    Ok(value) => render(&value),
+                    Err(error) => ui::toast(&ui, &error),
+                }
+            });
+        });
+    }
+    {
+        let (render, ui) = (render.clone(), ui.clone());
+        automatic.connect_active_notify(move |row| {
+            if syncing.get() {
+                return;
+            }
+            let (row, render, ui, syncing) =
+                (row.clone(), render.clone(), ui.clone(), syncing.clone());
+            let enabled = row.is_active();
+            client::call(
+                "setHostAutomaticUpdates",
+                json!({"enabled": enabled}),
+                move |result| match result {
+                    Ok(value) => render(&value),
+                    Err(error) => {
+                        syncing.set(true);
+                        row.set_active(!enabled);
+                        syncing.set(false);
+                        ui::toast(&ui, &error);
+                    }
+                },
+            );
+        });
+    }
+    {
+        let (ui, status, group) = (ui.clone(), status.clone(), group.downgrade());
+        install.connect_clicked(move |button| {
+            button.set_sensitive(false);
+            let (ui, status, button, render, group) = (
+                ui.clone(),
+                status.clone(),
+                button.clone(),
+                render.clone(),
+                group.clone(),
+            );
+            client::call(
+                "installHostUpdate",
+                json!({"force": false}),
+                move |result| match result {
+                    Ok(_) => {
+                        status.set_subtitle("Updating the host; reconnecting when it is ready…");
+                        let mut attempts = 0;
+                        gtk::glib::timeout_add_seconds_local(3, move || {
+                            attempts += 1;
+                            if group.upgrade().is_none() || attempts > 120 {
+                                return gtk::glib::ControlFlow::Break;
+                            }
+                            let render = render.clone();
+                            client::call("hostUpdateStatus", client::empty(), move |result| {
+                                if let Ok(value) = result {
+                                    render(&value);
+                                }
+                            });
+                            gtk::glib::ControlFlow::Continue
+                        });
+                    }
+                    Err(error) => {
+                        button.set_sensitive(true);
+                        ui::toast(&ui, &error);
+                    }
+                },
+            );
+        });
+    }
+    group
+}
+
 pub fn settings(ui: &App) {
     let (dialog, view, _) = header_dialog("Computers & devices", 520, 720);
     let page = adw::PreferencesPage::new();
@@ -1419,6 +1579,7 @@ pub fn settings(ui: &App) {
     }
     page.add(&agents);
 
+    page.add(&host_updates_group(ui));
     let about = adw::PreferencesGroup::new();
     about.add(
         &adw::ActionRow::builder()
