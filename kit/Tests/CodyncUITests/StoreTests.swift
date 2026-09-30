@@ -79,7 +79,7 @@ actor FakeRemote: RemoteTransport {
 
     func enqueue(botId: String, text: String, clientNonce: String, threadId: String?) async throws { enqueued.append(clientNonce) }
     func cancelQueued(clientNonce: String) async -> MailboxCancel { cancelResult }
-    func listQueued() async -> [QueuedItem] { enqueued.map { QueuedItem(nonce: $0, exp: nil, state: "queued") } }
+    func listQueued() async throws -> [QueuedItem] { enqueued.map { QueuedItem(nonce: $0, exp: nil, state: "queued") } }
 
     nonisolated func mailboxEvents() -> AsyncStream<MailboxEvent> {
         AsyncStream { c in Task { await self.addMailbox(c) } }
