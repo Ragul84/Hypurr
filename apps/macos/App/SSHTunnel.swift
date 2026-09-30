@@ -74,11 +74,25 @@ enum SSH {
         return args + ["--", p.host]
     }
 
+    /// Where `codync-host` lives when `sh -l` doesn't see it: Homebrew on Apple Silicon is only on PATH
+    /// through `~/.zprofile`, install.sh uses `~/.local/bin`, and the Mac app keeps the host in its bundle.
+    static let remotePath = "$PATH:/opt/homebrew/bin:/usr/local/bin:/home/linuxbrew/.linuxbrew/bin:$HOME/.local/bin:/Applications/Codync.app/Contents/MacOS"
+
     /// The remote command is fixed; only the validated port number goes into it.
     static func infoArguments(_ p: SSHProfile, home: String) -> [String] {
         ["-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "ForwardAgent=no", "-o", "ForwardX11=no"]
             + hostKeyOptions(home: home) + targetOptions(p)
-            + ["--", p.host, "sh -lc 'codync-host info --json --port \(p.remotePort)'"]
+            + ["--", p.host, "sh -lc 'PATH=\"\(remotePath)\" codync-host info --json --port \(p.remotePort)'"]
+    }
+
+    /// The far side rejected our key (BatchMode never prompts, so a password or passphrase can't help).
+    static func authRefused(_ stderr: String) -> Bool {
+        stderr.contains("Permission denied") || stderr.contains("Too many authentication failures")
+    }
+
+    /// Tunnels a crashed or force-quit Codync left running: only Codync's tunnels carry this known_hosts file.
+    static func killOrphanTunnels() async {
+        _ = await ProcessRunner.run(URL(filePath: "/usr/bin/pkill"), ["-f", "--", #"^/usr/bin/ssh -N .*\.codync/ssh_known_hosts"#])
     }
 
     static func tunnelArguments(_ p: SSHProfile, localPort: Int, home: String) -> [String] {
@@ -157,7 +171,9 @@ enum SSH {
         assert(resolveArguments(p) == ["-G", "-p", "2222", "-l", "kevin", "--", "box"])
         assert(Array(tunnelArguments(p, localPort: 50000, home: home).suffix(8))
             == ["-L", "127.0.0.1:50000:127.0.0.1:19222", "-p", "2222", "-l", "kevin", "--", "box"])
-        assert(infoArguments(p, home: home).last == "sh -lc 'codync-host info --json --port 19222'")
+        assert(infoArguments(p, home: home).last?.hasSuffix(" codync-host info --json --port 19222'") == true)
+        assert(authRefused("kevin@box: Permission denied (publickey)."))
+        assert(!authRefused("ssh: connect to host box port 22: Connection refused"))
         assert(tunnelArguments(p, localPort: 1, home: home).contains("ExitOnForwardFailure=yes"))
         assert(validate(p) == nil)
         assert(validate(SSHProfile(host: "-oProxyCommand=x", name: "")) != nil)
@@ -328,7 +344,12 @@ final class SSHComputers {
     func status(of id: UUID) -> Status { status[id] ?? .idle }
 
     func connectAll() {
-        for p in profiles where tasks[p.id] == nil && tunnels[p.id] == nil { connect(p.id) }
+        Task { [weak self] in
+            // Before this copy has tunnels of its own, so only leftovers from an earlier copy match.
+            if self?.tunnels.isEmpty == true, self?.tasks.isEmpty == true { await SSH.killOrphanTunnels() }
+            guard let self else { return }
+            for p in profiles where tasks[p.id] == nil && tunnels[p.id] == nil { connect(p.id) }
+        }
     }
 
     func add(_ profile: SSHProfile) {
@@ -453,6 +474,7 @@ final class SSHComputers {
         let result = await ProcessRunner.run(SSH.ssh, SSH.infoArguments(profile, home: home))
         guard !Task.isCancelled else { return .stop(.idle) }
         if result.status == 255 {
+            if SSH.authRefused(result.stderr) { return .stop(.failed(Self.signInRefused(profile))) }
             if !resolved.usesProxy {
                 let scan = await ProcessRunner.run(SSH.keyscan, SSH.keyscanArguments(resolved))
                 let current = SSH.hostKeys(scan.text)
@@ -539,7 +561,12 @@ final class SSHComputers {
             onAttach?(attachment)
             return .attached
         }
+        if SSH.authRefused(lastProblem) { return .stop(.failed(Self.signInRefused(profile))) }
         return .retry("Couldn't open the tunnel to \(profile.host). \(lastProblem)")
+    }
+
+    private static func signInRefused(_ profile: SSHProfile) -> String {
+        "\(profile.host) refused the key. Codync signs in with an SSH key (ssh-agent or the key file) and can't type a password or passphrase; make `ssh \(profile.host)` work in Terminal without prompting, then connect again."
     }
 
     private func recordedKeys(_ name: String, certAuthorities: Bool = true) async -> Set<String> {
