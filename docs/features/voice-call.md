@@ -22,8 +22,51 @@ The bot is the same agent on the computer; the call only changes how you talk to
   every client shows as "Voice chat · 00:16".
 - The host receives recognized text; the Cloudflare transport sees encrypted channel frames.
   Codync does not forward microphone audio to the host. Speech recognition may use Apple services
-  when on-device recognition is unavailable. `UIBackgroundModes: audio` keeps the call alive with
-  the screen locked.
+  when on-device recognition is unavailable. `UIBackgroundModes: audio` permits
+  background microphone capture and speech playback during an active call.
+- While a call is listening or speaking, it retains the computer's transport across
+  foreground/background transitions. Ending or failing the last call releases that
+  connection when backgrounded, restoring normal push delivery. Removing the computer
+  or switching accounts ends its calls and closes the transport.
+- Final replies and approval notices are delivered from the store's incoming events
+  directly to the audio session, rather than waiting for a SwiftUI view update.
+  Replayed final replies, other bots and thread replies are not read into this call.
+
+## Background verification
+
+Store regression tests cover sending a recognized utterance after backgrounding,
+delivering a final reply without view updates, returning to the foreground without
+restarting an active call's connection, ending the last call, and retiring the
+store. They do not simulate iOS audio or background scheduling.
+
+On a physical iPhone, start a voice call with a connected bot, return to the Home
+Screen, then speak a request. Verify that it sends successfully and the reply is
+read aloud while Codync remains backgrounded. Also start a long reply in Codync,
+return Home during playback, and verify that speech continues. End the call and
+confirm that ordinary background notification behavior resumes. For App Review,
+the recording must capture both the physical device and the audible reply.
+
+## App Review recording
+
+The 2.2.1 (22) review requested a screen recording on a **physical device** for
+Guideline 2.5.4. Record these steps using a connected computer and a bot:
+
+1. Open its conversation and tap the waveform button with an empty composer.
+2. Allow microphone and Speech Recognition access. Speak a short request and
+   show the recognized message and the bot's spoken reply.
+3. While a long reply is being read, return to the Home Screen. Keep recording
+   long enough to demonstrate audible playback continuing in the background.
+4. Return to Codync and end the call.
+
+Ensure the resulting file contains the audible reply. If the screen recorder
+cannot capture the call audio, record the physical phone externally with another
+device so both its screen and speaker are audible. Include the recording and
+these navigation steps in App Review Information for future submissions.
+
+Simulator recordings are useful for UI checks but are not the physical-device
+evidence Apple requested. A `simctl io ... recordVideo` probe on 2026-09-30
+produced an H.264 video track with no audio track. Transport regression tests
+verify background reply delivery and retirement, not iOS audio behavior.
 
 ## Design: realtime voice with your own key (not implemented)
 

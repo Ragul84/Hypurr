@@ -11,6 +11,8 @@ struct Composer: View {
     var thread: String?
     /// Starts a voice call; while the box is empty it takes the send button's place.
     var onCall: (() -> Void)?
+    /// Interrupts the bot while it is speaking in a voice call.
+    var onInterrupt: (() -> Void)?
     @Environment(BotStore.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var draft = ""
@@ -158,7 +160,19 @@ struct Composer: View {
                 .padding(.vertical, fieldPadding)
                 .sendOnReturn(submit)
             Group {
-            if working && draft.isEmpty {
+            if let onInterrupt, draft.isEmpty, files.isEmpty {
+                Button(action: onInterrupt) {
+                    Image(systemName: "stop.fill")
+                        .font(.system(size: 12, weight: .bold))
+                        .frame(width: InterfaceMetrics.value(mac: 28, mobile: 34), height: InterfaceMetrics.value(mac: 28, mobile: 34))
+                        .background(Palette.danger, in: Circle())
+                        .foregroundStyle(.white)
+                        .contentTransition(.symbolEffect(.replace))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Interrupt")
+                .help("Interrupt")
+            } else if working && draft.isEmpty {
                 Button {
                     model.stop(botId)
                 } label: {
@@ -197,6 +211,7 @@ struct Composer: View {
                 .help("Send")
             }
             }
+            .animation(Motion.layout, value: onInterrupt != nil)
             .padding(.bottom, max(0, (lineHeight + 2 * fieldPadding - buttonSize) / 2))
             .animation(Motion.layout, value: isEmpty)
         }
