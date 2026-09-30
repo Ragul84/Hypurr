@@ -64,6 +64,8 @@ final class HostController {
     private var deferred: Set<String> = []
 
     private var streamTask: Task<Void, Never>?
+    /// Set once the service was moved onto this app's host because it ran another version.
+    private var replacedStaleHost = false
 
     init(account: AccountSession) {
         #if DEBUG
@@ -491,6 +493,14 @@ final class HostController {
     /// Attaches the local host once it answers, and again when its token or identity changed.
     private func attachLocal() async -> Bool {
         guard let token = readToken(), let health = await HostHealth.fetch(Self.baseURL), let id = health.computerId else {
+            return false
+        }
+        // An upgrade (Homebrew, a new DMG) replaced the app while the old host kept running.
+        if Self.devPort == nil, !replacedStaleHost, let running = health.version,
+           running != Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
+            log.info("Host \(running, privacy: .public) differs from the app's; reinstalling the service")
+            replacedStaleHost = true
+            install()
             return false
         }
         if local?.id == id, localToken == token, store != nil { return true }

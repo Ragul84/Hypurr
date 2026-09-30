@@ -35,15 +35,22 @@ its own context and compacts it itself.
 ## Memory (`host/src/chat/memory.rs`)
 
 - Facts are plain markdown, one `- (YYYY-MM-DD) fact` per line:
-  - `profile.md` holds who the user is. All of it goes into the prompt, up to 100 facts.
+  - `profile.md` holds who the user is. All of it goes into the prompt, up to 100 facts. When it grows past
+    100, the keeper consolidates it to at most 60 (merging duplicates, dropping superseded facts); every fact it
+    drops moves to the log, so nothing is lost.
   - `log/YYYY-MM.md` holds dated history, including `[note]` and `[episode]` lines. The newest 30 go into the
     prompt, within 4,000 characters.
-- **Keeper:** after a turn ends normally, if the user's message is memorable (not "thanks"/"ok"), a one-shot
-  agent of the bot's own harness extracts facts using Grok Bot's extraction prompt
-  (`profile:` / `log:` / `note:` / `remove:`).
+- **Keeper:** after a turn ends normally, if the user's message is memorable (not "thanks"/"ok"), the exchange
+  is queued (`memory.unprocessed.<bot>`, so a restart keeps it). Once the bot has been quiet for 5 minutes, or 8
+  exchanges are queued, a one-shot agent of the bot's own harness extracts facts from all of them at once using
+  Grok Bot's extraction prompt (`profile:` / `log:` / `note:` / `remove:`). Running per exchange would buy
+  nothing: the frozen prompt only picks up new facts at the next compaction or session.
   - On Claude it runs with a replaced system prompt, no tools, no settings, `persistSession: false` and the
     `haiku` model.
   - Other harnesses get the instructions inline, in `~/.codync/memory-keeper`.
+- **History search:** the built-in `memory` MCP server (`codync-host mcp memory`) gives the bot
+  `search_history`, a substring search (every word must appear) over its own chat: the user's messages and its
+  final replies, main chat and threads. Whatever the keeper didn't write down can still be found.
 - **Episodes:** every 6 remembered exchanges (pending turns in `memory.episode.<bot>`), the keeper writes one
   `[episode]` journal sentence.
 - **Automatic names** (`chat/naming.rs`): a bot created without a name is called "New Bot" with `autoName` set;
@@ -73,7 +80,8 @@ its own context and compacts it itself.
   afterwards.
 - A session a harness has deleted (for example, one cleaned up after a month) can't be resumed. The bot
   starts fresh, but its memory remains.
-- User-level memory shared across bots, project memory and the daily memory "dreaming" pass from Grok Bot
-  are not implemented.
+- User-level memory shared across bots and project memory are not implemented. Consolidation runs only when the
+  profile outgrows the prompt, not as Grok Bot's daily "dreaming" pass.
+- `search_history` covers the bot's own chat, not group chats it took part in.
 
 Reply threads have separate session/context lanes; see [groups and threads](groups-and-threads.md). Group/delegated requests do not become user facts in the memory keeper.
