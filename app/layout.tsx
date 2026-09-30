@@ -15,9 +15,13 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Codync: the open-source Grok Bot / Muse alternative for any coding agent",
   description:
-    "A free, open-source 1:1 alternative to Grok Bot and Muse. Message Claude Code, Codex, Cursor and 40+ coding agents as persistent bots from your iPhone, Mac or Linux desktop. Group chats, threads, approvals, memory, remote screen and voice, on your own computer.",
+    "A free, open-source 1:1 alternative to Grok Bot and Muse. Message Claude Code, Codex, Cursor and 40+ coding agents as persistent bots from your iPhone, Mac or Linux desktop. Group chats, threads, approvals, memory, remote screen and voice, on your own computer. Native on iPhone, Mac and Linux, with a terminal UI over SSH.",
+  metadataBase: new URL("https://www.codync.dev"),
   icons: {
-    icon: "/icon.png",
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon.png", sizes: "512x512", type: "image/png" },
+    ],
     apple: "/apple-touch-icon.png",
   },
 };

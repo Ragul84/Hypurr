@@ -29,7 +29,8 @@ export default function Hero() {
           </motion.h1>
           <motion.p {...rise(0.1)} className="mt-6 max-w-[34rem] text-lg leading-relaxed text-neutral-400">
             Codync runs Claude Code, Codex and 40+ agents as named bots on your computer. Reply and approve from
-            your iPhone. Free, MIT licensed, and every feature of Grok Bot and Muse, 1:1.
+            your iPhone, Mac, Linux desktop or a terminal over SSH. Free, MIT licensed, and every feature of Grok
+            Bot and Muse, 1:1.
           </motion.p>
           <motion.div {...rise(0.18)} className="mt-9 flex flex-col gap-3 sm:flex-row">
             <a
