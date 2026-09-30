@@ -60,7 +60,7 @@ export default function Install() {
               href={APP_STORE}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-4 inline-flex items-center gap-2 rounded-full bg-neutral-800 px-5 py-2.5 text-sm font-medium text-neutral-100 transition hover:bg-neutral-700 active:scale-[0.98]"
+              className="mt-4 inline-flex items-center gap-2 rounded-full border border-neutral-500 px-5 py-2.5 text-sm font-medium text-neutral-50 transition hover:border-neutral-200 active:scale-[0.98]"
             >
               <DeviceMobile size={16} />
               Get the iPhone app

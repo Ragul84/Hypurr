@@ -44,7 +44,7 @@ export default function Hero() {
               href={APP_STORE}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-neutral-800 px-6 py-3 font-medium text-neutral-100 transition hover:bg-neutral-700 active:scale-[0.98]"
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-neutral-500 px-6 py-3 font-medium text-neutral-50 transition hover:border-neutral-200 active:scale-[0.98]"
             >
               <DeviceMobile size={18} />
               Get the iPhone app
