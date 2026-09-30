@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Codync: message your coding agents from your phone",
+  title: "Codync: the open-source Grok Bot / Muse alternative for any coding agent",
   description:
-    "Message Claude Code, Codex, Cursor, Pi and more as persistent bots from your iPhone, Mac or Linux desktop. Approve actions and get notified when they're done.",
+    "A free, open-source 1:1 alternative to Grok Bot and Muse. Message Claude Code, Codex, Cursor and 40+ coding agents as persistent bots from your iPhone, Mac or Linux desktop. Group chats, threads, approvals, memory, remote screen and voice, on your own computer.",
   icons: {
     icon: "/icon.png",
     apple: "/apple-touch-icon.png",

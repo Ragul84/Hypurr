@@ -3,6 +3,7 @@ import Link from "next/link";
 import { GithubLogo } from "@phosphor-icons/react/ssr";
 import Hero from "./components/hero";
 import { Answers, Features } from "./components/features";
+import Compare from "./components/compare";
 import Install from "./components/install";
 import { DMG, GITHUB } from "./links";
 
@@ -39,6 +40,7 @@ export default function Home() {
 
       <main className="flex-1">
         <Hero />
+        <Compare />
         <Answers />
         <Features />
         <Install />
