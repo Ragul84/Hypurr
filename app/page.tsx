@@ -5,6 +5,7 @@ import Hero from "./components/hero";
 import { Answers, Features } from "./components/features";
 import Compare from "./components/compare";
 import Install from "./components/install";
+import Privacy from "./components/privacy";
 import Surfaces from "./components/surfaces";
 import { DMG, GITHUB } from "./links";
 
@@ -45,6 +46,7 @@ export default function Home() {
         <Answers />
         <Features />
         <Surfaces />
+        <Privacy />
         <Install />
       </main>
 
