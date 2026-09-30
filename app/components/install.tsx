@@ -1,7 +1,7 @@
 import { AppleLogo, DeviceMobile, LinuxLogo } from "@phosphor-icons/react/ssr";
 import CopyCommand from "./copy-command";
 import Reveal from "./reveal";
-import { APP_STORE, DMG } from "../links";
+import { APP_STORE, DMG, IOS_LIVE } from "../links";
 
 const INSTALL_SH = "curl -fsSL https://raw.githubusercontent.com/leepokai/Codync/main/packaging/install.sh | sh";
 
@@ -56,15 +56,22 @@ export default function Install() {
               Get the app, then scan the code from <span className="text-neutral-200">Pair iPhone…</span> in the Mac
               menu bar, the Linux app or <code className="font-mono text-neutral-200">codync-host pair</code>.
             </p>
-            <a
-              href={APP_STORE}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-4 inline-flex items-center gap-2 rounded-full border border-neutral-500 px-5 py-2.5 text-sm font-medium text-neutral-50 transition hover:border-neutral-200 active:scale-[0.98]"
-            >
-              <DeviceMobile size={16} />
-              Get the iPhone app
-            </a>
+            {IOS_LIVE ? (
+              <a
+                href={APP_STORE}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 inline-flex items-center gap-2 rounded-full border border-neutral-500 px-5 py-2.5 text-sm font-medium text-neutral-50 transition hover:border-neutral-200 active:scale-[0.98]"
+              >
+                <DeviceMobile size={16} />
+                Get the iPhone app
+              </a>
+            ) : (
+              <p className="mt-4 inline-flex items-center gap-2 rounded-full border border-neutral-800 px-5 py-2.5 text-sm font-medium text-neutral-500">
+                <DeviceMobile size={16} />
+                Coming soon: the new iPhone app is in App Store review
+              </p>
+            )}
           </Reveal>
         </div>
       </div>
