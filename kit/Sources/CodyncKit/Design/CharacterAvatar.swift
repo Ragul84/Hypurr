@@ -175,7 +175,8 @@ public struct CharacterShape: Shape {
     }
 }
 
-/// A group chat's face: its first two bots, one tucked behind the other.
+/// A group chat's face, clustered like iMessage: two bots tucked diagonally,
+/// three in a triangle, four in a 2×2 grid; past four the last cell counts the rest.
 public struct GroupAvatar: View {
     let members: [Bot]
     let size: CGFloat
@@ -188,23 +189,43 @@ public struct GroupAvatar: View {
     }
 
     public var body: some View {
-        let small = size * 0.66
         ZStack {
-            if members.isEmpty {
+            switch members.count {
+            case 0:
                 Image(systemName: "person.2")
                     .font(.system(size: size * 0.4))
                     .foregroundStyle(.secondary)
-            } else if members.count == 1 {
+            case 1:
                 CharacterAvatar(bot: members[0], size: size, animated: animated)
-            } else {
-                CharacterAvatar(bot: members[1], size: small, animated: animated)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                CharacterAvatar(bot: members[0], size: small, animated: animated)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            case 2:
+                place(members[1], size * 0.66, .topTrailing)
+                place(members[0], size * 0.66, .bottomLeading)
+            case 3:
+                place(members[0], size * 0.55, .top)
+                place(members[1], size * 0.55, .bottomLeading)
+                place(members[2], size * 0.55, .bottomTrailing)
+            default:
+                place(members[0], size * 0.5, .topLeading)
+                place(members[1], size * 0.5, .topTrailing)
+                place(members[2], size * 0.5, .bottomLeading)
+                if members.count == 4 {
+                    place(members[3], size * 0.5, .bottomTrailing)
+                } else {
+                    Text("+\(members.count - 3)")
+                        .font(.system(size: size * 0.24, weight: .bold, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .frame(width: size * 0.5, height: size * 0.5)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                }
             }
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)
+    }
+
+    private func place(_ bot: Bot, _ side: CGFloat, _ corner: Alignment) -> some View {
+        CharacterAvatar(bot: bot, size: side, animated: animated)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: corner)
     }
 }
 
