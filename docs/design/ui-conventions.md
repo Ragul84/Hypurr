@@ -32,7 +32,7 @@ Other custom screens use `Chrome.swift` and `Controls.swift`:
 | Header outside the native bot navigation flow | `ModalHeader`, `ScreenHeader` |
 | Icon action | `IconButton` |
 | Tab selection | `TabBar` |
-| Menu / confirmation | `.codyncMenu`, `.codyncDialog` |
+| Menu / confirmation | `.codyncMenu` (macOS), `DropdownMenu` / `.contextActions` (system menus on iOS), `.codyncDialog` |
 | Toggle | `ToggleStyle.codync` |
 | Form-like content | `CardForm`, `CardSection` |
 
@@ -60,7 +60,7 @@ On iPhone, the routine editor uses a single column of trigger choices so titles 
 
 New bots use automatically allocated personal workspaces. Settings offer Personal or an optional project folder; see [bot workspaces](../features/bot-workspaces.md).
 
-Shared `.codyncMenu` lists scroll vertically when their content exceeds 420 points or the available space beside the trigger. Menus open toward the side with more vertical room; short lists keep their content height. Menu width is capped at 320 points and constrained to the window, and long option titles remain available through help text. This applies to Agent, Model, and other shared choice menus on macOS. On iOS, `DropdownMenu` and `ChoicePicker` present the native `Menu` instead (choices as checkmarked toggles), because an overlay anchored by global frame lands in the wrong place inside `.codyncSheet` and scroll views. Each computer has its own marketplace; its header names the computer and, with several online, switches between them. A new bot's editor on iPhone has a Computer dropdown listing every computer in the current account, including computers hidden by the roster filter and offline computers. It remains a dropdown with one computer. Offline choices stay selectable and are labeled; creation waits until the selected computer is online. Switching computers resets the folder, model and connectors that belonged to the old computer.
+Shared `.codyncMenu` lists scroll vertically when their content exceeds 420 points or the available space beside the trigger. Menus open toward the side with more vertical room; short lists keep their content height. Menu width is capped at 320 points and constrained to the window, and long option titles remain available through help text. This applies to Agent, Model, and other shared choice menus on macOS. On iOS every menu is the system one: `DropdownMenu` and `ChoicePicker` present the native `Menu` (choices as checkmarked toggles) and `.contextActions` the native `contextMenu` (reactions as a palette row), because an overlay anchored by global frame lands in the wrong place inside `.codyncSheet`, scroll views and the composer (the + menu opened mid-screen on iPhone, 2026-09-30). `.codyncMenu` is macOS-only and does not compile on iOS. Each computer has its own marketplace; its header names the computer and, with several online, switches between them. A new bot's editor on iPhone has a Computer dropdown listing every computer in the current account, including computers hidden by the roster filter and offline computers. It remains a dropdown with one computer. Offline choices stay selectable and are labeled; creation waits until the selected computer is online. Switching computers resets the folder, model and connectors that belonged to the old computer.
 
 ## Reading conversations
 

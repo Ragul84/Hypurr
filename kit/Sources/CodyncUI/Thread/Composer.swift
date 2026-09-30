@@ -16,7 +16,6 @@ struct Composer: View {
     @State private var draft = ""
     /// Files going out with the next message.
     @State private var files: [OutgoingFile] = []
-    @State private var addMenu = false
     @State private var pickingFiles = false
     @State private var pickingPhotos = false
     @State private var photoItems: [PhotosPickerItem] = []
@@ -212,36 +211,34 @@ struct Composer: View {
         }
     }
 
-    /// Photos or files (iPhone), files (Mac); dropping files on the box works too.
-    private var addButton: some View {
-        Button {
-            #if os(iOS)
-                addMenu = true
-            #else
-                pickingFiles = true
-            #endif
-        } label: {
-            Image(systemName: "plus")
-                .font(.system(size: InterfaceMetrics.value(mac: 13, mobile: 18), weight: .medium))
-                .foregroundStyle(Palette.text)
-                .frame(width: buttonSize + 2 * InterfaceMetrics.value(mac: 4, mobile: 6),
-                       height: buttonSize + 2 * InterfaceMetrics.value(mac: 4, mobile: 6))
-                .composerSurface(in: Circle())
-                .contentShape(Circle())
-        }
-        .buttonStyle(PressScale())
-        .accessibilityLabel("Add files")
-        .help("Add files")
-        .codyncMenu(isPresented: $addMenu) {
-            var items = [MenuItem("Photos", icon: "photo.on.rectangle") { pickingPhotos = true },
-                         MenuItem("Files", icon: "folder") { pickingFiles = true }]
-            #if os(iOS)
+    /// Photos or files (iPhone, a system menu), files (Mac); dropping files on the box works too.
+    @ViewBuilder private var addButton: some View {
+        #if os(iOS)
+            DropdownMenu {
+                var items = [MenuItem("Photos", icon: "photo.on.rectangle") { pickingPhotos = true },
+                             MenuItem("Files", icon: "folder") { pickingFiles = true }]
                 if UIPasteboard.general.hasImages || UIPasteboard.general.hasURLs {
                     items.append(MenuItem("Paste", icon: "doc.on.clipboard") { pasteFiles() })
                 }
-            #endif
-            return items
-        }
+                return items
+            } label: { addLabel }
+                .accessibilityLabel("Add files")
+        #else
+            Button { pickingFiles = true } label: { addLabel }
+                .buttonStyle(PressScale())
+                .accessibilityLabel("Add files")
+                .help("Add files")
+        #endif
+    }
+
+    private var addLabel: some View {
+        Image(systemName: "plus")
+            .font(.system(size: InterfaceMetrics.value(mac: 13, mobile: 18), weight: .medium))
+            .foregroundStyle(Palette.text)
+            .frame(width: buttonSize + 2 * InterfaceMetrics.value(mac: 4, mobile: 6),
+                   height: buttonSize + 2 * InterfaceMetrics.value(mac: 4, mobile: 6))
+            .composerSurface(in: Circle())
+            .contentShape(Circle())
     }
 
     #if os(iOS)
