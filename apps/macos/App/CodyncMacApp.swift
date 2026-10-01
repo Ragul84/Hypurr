@@ -64,6 +64,7 @@ struct CodyncMacApp: App {
                 .modalHost()
                 .environment(host)
                 .environment(account)
+                .environment(updates)
         }
         .defaultSize(width: 1100, height: 760)
         .windowStyle(.hiddenTitleBar)

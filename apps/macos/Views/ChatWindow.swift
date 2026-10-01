@@ -369,6 +369,7 @@ private struct EditTarget: Identifiable {
 private struct ChatSplitView: View {
     @Environment(HostController.self) private var host
     @Environment(AccountSession.self) private var account
+    @Environment(UpdatesManager.self) private var updates
     @State private var editing: EditTarget?
     @State private var confirmDelete: BotTarget?
     @State private var contextBot: BotTarget?
@@ -567,7 +568,7 @@ private struct ChatSplitView: View {
                         signedIn: account.isSignedIn,
                         email: account.email,
                         busy: account.isBusy,
-                        errorMessage: account.errorMessage,
+                        errorMessage: account.errorMessage ?? updates.errorMessage,
                         onSignIn: { provider in
                             dismissAccountMenu()
                             Task {
@@ -587,11 +588,13 @@ private struct ChatSplitView: View {
                             }
                         },
                         compact: compact,
-                        usage: stores.flatMap(\.usage.providers).flatMap(\.windows).map(\.percent).max(),
                         approvals: host.approvals.count,
+                        updateVersion: updates.availableVersion,
+                        canUpdate: updates.canCheckForUpdates || updates.hasStagedUpdate,
                         onDismiss: dismissAccountMenu,
                         onUsage: { dismissAccountMenu(); showUsage = true },
                         onComputers: { dismissAccountMenu(); showComputers = true },
+                        onUpdate: { dismissAccountMenu(); updates.checkForUpdates() },
                         onToggleSidebar: {
                             dismissAccountMenu()
                             compact.toggle()
@@ -1007,7 +1010,7 @@ private struct UsageSheet: View {
                             Label { Text(store.hostName) } icon: { ComputerBadge(store.computer, size: 16) }
                                 .font(.headline)
                         }
-                        UsageStrip(usage: store.usage)
+                        UsageLimits(usage: store.usage)
                     }
                 }
             }
@@ -1033,11 +1036,14 @@ private struct SidebarAccountPanel: View {
     let onSignIn: (AccountSession.SignInProvider) -> Void
     let onSignOut: () -> Void
     let compact: Bool
-    let usage: Double?
     let approvals: Int
+    /// A release Sparkle found, waiting to be installed.
+    let updateVersion: String?
+    let canUpdate: Bool
     let onDismiss: () -> Void
     let onUsage: () -> Void
     let onComputers: () -> Void
+    let onUpdate: () -> Void
     let onToggleSidebar: () -> Void
     let onSearch: () -> Void
     @State private var page = "main"
@@ -1073,13 +1079,15 @@ private struct SidebarAccountPanel: View {
             ]
         default:
             return [
-                Item(title: "Usage", icon: "gauge.with.dots.needle.33percent",
-                     detail: usage.map { "\(Int($0.rounded()))%" }, chevron: true, action: onUsage),
+                Item(title: "Usage", icon: "gauge.with.dots.needle.33percent", chevron: true, action: onUsage),
                 Item(title: "Computers & devices", icon: "desktopcomputer",
                      detail: approvals > 0 ? "\(approvals)" : nil, chevron: true, action: onComputers),
                 Item(title: "Get Codync for mobile", icon: "iphone", action: { open("https://apps.apple.com/app/id6760984418") }),
                 Item(title: "Support", icon: "book.closed", chevron: true, action: { navigate("support") }),
                 Item(title: "Settings", icon: "gearshape", action: { navigate("settings") }),
+                Item(title: updateVersion.map { "Update to \($0)" } ?? "Check for updates", icon: "arrow.down.circle",
+                     detail: updateVersion == nil ? Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String : nil,
+                     disabled: !canUpdate, action: onUpdate),
                 Item(title: compact ? "Expand sidebar" : "Collapse sidebar", icon: "sidebar.left", action: onToggleSidebar)
             ] + authenticationItems
         }
@@ -1131,8 +1139,8 @@ private struct SidebarAccountPanel: View {
     }
 
     @ViewBuilder private func menuRow(_ item: Item, index: Int) -> some View {
-        if index == (page == "main" ? 5 : 1) { divider }
-        if page == "main" && index == 6 { accountIdentity }
+        if index == (page == "main" ? 6 : 1) { divider }
+        if page == "main" && index == 7 { accountIdentity }
         AccountPanelRow(title: item.title, icon: item.icon, assetIcon: item.assetIcon, detail: item.detail,
                         chevron: item.chevron, keyboardFocused: highlighted == index, action: item.action)
             .disabled(item.disabled)

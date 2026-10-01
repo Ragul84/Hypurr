@@ -77,6 +77,10 @@ final class UpdatesManager: NSObject, SPUUpdaterDelegate, @preconcurrency SPUSta
     }
 
     func checkForUpdates() {
+        if let pendingInstall {
+            prepareAndContinue(pendingInstall)
+            return
+        }
         if let install = automaticInstall {
             automaticInstall = nil
             idleTask?.cancel()

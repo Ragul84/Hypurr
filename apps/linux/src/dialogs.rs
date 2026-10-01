@@ -1174,16 +1174,6 @@ pub fn bot_menu(ui: &App, parent: &gtk::Widget, point: Option<(f64, f64)>, id: &
 
 /// The sidebar's Account panel: usage, this computer and its devices, the mobile app, help.
 pub fn account_menu(ui: &App, anchor: &gtk::Button) {
-    let usage = {
-        let st = ui.state.borrow();
-        st.usage["providers"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .flat_map(|p| p["windows"].as_array().into_iter().flatten())
-            .filter_map(|w| w["percent"].as_f64())
-            .fold(None, |m: Option<f64>, p| Some(m.map_or(p, |m| m.max(p))))
-    };
     let open = |url: &'static str| -> Box<dyn Fn()> {
         Box::new(move || {
             gtk::UriLauncher::new(url).launch(
@@ -1193,19 +1183,25 @@ pub fn account_menu(ui: &App, anchor: &gtk::Button) {
             );
         })
     };
-    let (ui2, ui3) = (ui.clone(), ui.clone());
+    let (ui2, ui3, ui4) = (ui.clone(), ui.clone(), ui.clone());
     let items = vec![
         MenuItem::new(
             "power-profile-balanced-symbolic",
             "Usage",
             Box::new(move || usage_sheet(&ui2)),
         )
-        .detail(usage.map(|u| format!("{u:.0}%")))
         .chevron(),
         MenuItem::new(
             "computer-symbolic",
             "Computers & devices",
             Box::new(move || settings(&ui3)),
+        )
+        .chevron(),
+        // Host updates (check, install, automatic) live in Computers & devices.
+        MenuItem::new(
+            "software-update-available-symbolic",
+            "Check for updates",
+            Box::new(move || settings(&ui4)),
         )
         .chevron(),
         MenuItem::new(

@@ -1,49 +1,38 @@
 import CodyncKit
 import SwiftUI
 
-/// Compact usage chips at the top of the roster.
-public struct UsageStrip: View {
+/// Every limit as a bar under its provider, the way the menu bar lists them.
+public struct UsageLimits: View {
     let usage: Usage
+    @AppStorage(SharedStore.usageIconStyleKey, store: UserDefaults(suiteName: SharedStore.appGroup))
+    private var usageIconStyle = UsageIconStyle.character.rawValue
 
     public init(usage: Usage) { self.usage = usage }
 
     public var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(usage.providers) { p in
-                    ForEach(p.windows.prefix(2)) { w in
-                        HStack(spacing: 6) {
-                            AgentIcon(registry: p.registry, size: 14)
-                            UsageRing(percent: w.percent)
-                            VStack(alignment: .leading, spacing: 0) {
-                                Text(w.title).font(.caption2).foregroundStyle(Palette.tertiary)
-                                Text("\(Int(w.percent.rounded()))%").font(.caption.bold().monospacedDigit()).foregroundStyle(Palette.text)
-                            }
+        VStack(alignment: .leading, spacing: 18) {
+            ForEach(usage.providers) { provider in
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        ProviderMascot(provider, size: 18, style: UsageIconStyle(rawValue: usageIconStyle) ?? .character)
+                        Text(provider.name).font(.system(size: 13, weight: .semibold)).foregroundStyle(Palette.text)
+                    }
+                    ForEach(provider.windows) { window in
+                        HStack(spacing: 10) {
+                            Text(window.title).foregroundStyle(Palette.text)
+                                .frame(width: 64, alignment: .leading)
+                            UsageBar(percent: window.percent, tint: provider.tint)
+                            Text("\(Int(window.percent.rounded()))%").monospacedDigit().foregroundStyle(Palette.text)
+                                .frame(width: 36, alignment: .trailing)
+                            Text(window.resetDescription ?? "").foregroundStyle(Palette.secondary)
+                                .frame(width: 130, alignment: .trailing)
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 6)
-                        .background(Palette.surface, in: Capsule())
+                        .font(.system(size: 12))
+                        .lineLimit(1)
+                        .accessibilityElement(children: .combine)
                     }
                 }
             }
         }
-    }
-}
-
-/// A small capacity ring: the replacement for the circular `Gauge`.
-private struct UsageRing: View {
-    let percent: Double
-
-    var body: some View {
-        ZStack {
-            Circle().stroke(Palette.text.opacity(0.1), lineWidth: 2.5)
-            Circle()
-                .trim(from: 0, to: min(max(percent, 0), 100) / 100)
-                .stroke(Palette.usageTint(percent), style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-        }
-        .frame(width: 16, height: 16)
-        .frame(width: 22, height: 22)
-        .accessibilityHidden(true)
     }
 }
