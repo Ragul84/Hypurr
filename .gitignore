@@ -18,3 +18,6 @@ Package.resolved
 
 # /brag launch video renders
 brag-output*/
+
+# Launch video projects
+videos/
