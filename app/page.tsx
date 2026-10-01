@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { GithubLogo } from "@phosphor-icons/react/ssr";
 import Hero from "./components/hero";
+import Film from "./components/film";
 import { Answers, Features } from "./components/features";
 import Compare from "./components/compare";
 import Install from "./components/install";
@@ -43,6 +44,7 @@ export default function Home() {
 
       <main className="flex-1">
         <Hero />
+        <Film />
         <Compare />
         <Answers />
         <Features />
