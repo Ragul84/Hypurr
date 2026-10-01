@@ -21,9 +21,9 @@ jobs:
           else VERSION=$(awk '/MARKETING_VERSION:/ {print $2; exit}' apps/project.yml); fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - name: Install Rust (rust-toolchain.toml)
+        run: rustup toolchain install
+      - run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
 
       - name: Install Apple certificate and provisioning profile
         env:
