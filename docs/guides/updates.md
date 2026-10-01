@@ -4,7 +4,8 @@
 
 Release builds use Sparkle 2.10.0. Open **Settings → Updates** in the menu bar
 to check for a release, enable scheduled checks, or opt into automatic downloads
-and installation. Debug builds disable the production updater.
+and installation. The chat window's account menu has the same **Check for
+updates** action. Debug builds disable the production updater.
 
 The app checks daily. Automatic installation waits until the app is inactive,
 there has been no keyboard/mouse input for ten minutes, and the local host reports
@@ -38,7 +39,9 @@ update to interrupt bots. Stop a manually launched host before replacing it.
 Automatic updates require an installed background service and are off by default.
 They check daily while idle; failures are reported in update status.
 
-The Linux app exposes these controls under **Computers & devices → Host updates**.
+The Linux app exposes these controls under **Computers & devices → Host updates**
+(also reached from the account menu's **Check for updates**); the TUI's action
+list (`^k`) has **Check for updates**, which reports the result in the status line.
 The API operations (`hostUpdateStatus`, `checkHostUpdate`, `installHostUpdate`,
 `setHostAutomaticUpdates`) require a local connection, including an SSH tunnel.
 

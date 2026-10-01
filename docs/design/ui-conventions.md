@@ -14,15 +14,19 @@ Sources: `apps/ios/Views/BotListView.swift`, `AccountSwitcherView.swift`, `kit/S
 
 ## macOS menu bar
 
-Release update controls live in the native Settings → Updates menu. Sparkle's
-standard update/install windows are a native system-integration exception; keep
+Release update controls live in the native Settings → Updates menu; the chat
+window's account menu repeats the one action (**Check for updates**, which becomes
+**Update to <version>** once a release is found). GTK's account menu opens Host
+updates in Computers & devices and the TUI action list has **Check for updates**.
+Sparkle's standard update/install windows are a native system-integration exception; keep
 signature errors, progress and relaunch in its supported user driver.
 
 Use `MenuBarExtra` with `.menuBarExtraStyle(.menu)`. Its commands, submenus, checkmarked toggles, usage-icon picker, separators and keyboard navigation use system styling. Do not add custom cards, hover backgrounds, icon buttons or a window-style menu panel here.
 
 The menu retains host installation/restart, bot conversation/stop actions, approval review, usage limits, remote-screen permissions, launch-at-login and quit. Pairing opens a separate titled window because its QR needs a persistent scanning surface. The chat window retains its own UI conventions.
 
-Usage limits appear directly in the top-level menu, grouped by provider with native section headers. Show each window's percentage, reset time when available, and the provider's last update; do not hide them in submenus.
+Usage limits appear directly in the top-level menu, grouped by provider with native section headers. Show each window's percentage, reset time when available, and the provider's last update; do not hide them in submenus. The account menu's
+Usage row shows no number; its sheet lists the same per-provider bars (`UsageLimits`).
 
 Source: `apps/macos/App/CodyncMacApp.swift`.
 

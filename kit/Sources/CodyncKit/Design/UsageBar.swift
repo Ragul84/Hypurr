@@ -31,10 +31,13 @@ public extension Palette {
 public struct UsageBar: View {
     let percent: Double
     let height: CGFloat
+    let tint: Color?
 
-    public init(percent: Double, height: CGFloat = 6) {
+    /// `tint` is the provider's color below 70%; amber and red still take over above.
+    public init(percent: Double, height: CGFloat = 6, tint: Color? = nil) {
         self.percent = percent
         self.height = height
+        self.tint = tint
     }
 
     public var body: some View {
@@ -42,7 +45,7 @@ public struct UsageBar: View {
             ZStack(alignment: .leading) {
                 Capsule().fill(Palette.bubbleAgent)
                 Capsule()
-                    .fill(Palette.usageFill(percent))
+                    .fill(percent < 70 ? tint ?? Palette.usageFill(percent) : Palette.usageFill(percent))
                     .frame(width: geo.size.width * min(1, max(0.02, percent / 100)))
             }
         }

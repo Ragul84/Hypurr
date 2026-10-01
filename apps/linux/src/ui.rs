@@ -2036,7 +2036,6 @@ pub fn toast(ui: &App, text: &str) {
 pub struct MenuItem {
     icon: &'static str,
     title: String,
-    detail: Option<String>,
     chevron: bool,
     destructive: bool,
     divider: bool,
@@ -2048,16 +2047,11 @@ impl MenuItem {
         Self {
             icon,
             title: title.to_owned(),
-            detail: None,
             chevron: false,
             destructive: false,
             divider: false,
             action,
         }
-    }
-    pub fn detail(mut self, d: Option<String>) -> Self {
-        self.detail = d;
-        self
     }
     pub fn chevron(mut self) -> Self {
         self.chevron = true;
@@ -2101,9 +2095,6 @@ pub fn popup_menu(parent: &impl IsA<gtk::Widget>, point: Option<(f64, f64)>, ite
         let t = label(&item.title, &[]);
         t.set_hexpand(true);
         row.append(&t);
-        if let Some(d) = &item.detail {
-            row.append(&label(d, &["body13", "secondary"]));
-        }
         if item.chevron {
             let c = gtk::Image::from_icon_name("go-next-symbolic");
             c.set_pixel_size(11);
