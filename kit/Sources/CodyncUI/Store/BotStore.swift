@@ -45,6 +45,10 @@ public final class BotStore {
     private static let initialConnectionGrace: Duration = .seconds(1)
     private var heldDrop: Connection?
     private var dropTimer: Task<Void, Never>?
+    /// How long an action waits for a reconnect before it gives up.
+    private static let actionPatience: Duration = .seconds(20)
+    /// Actions waiting for the link to come back.
+    private var waiting = 0
     public private(set) var hostRoute: HostRoute?
     public private(set) var client: HostClient?
     public private(set) var hello: Hello?
@@ -145,6 +149,10 @@ public final class BotStore {
         // Only the warning is delayed; relay delivery can queue during that grace.
         if case .computerOffline = heldDrop ?? connection { computer.boxKey != nil && transport is any RemoteTransport } else { false }
     }
+
+    /// What headers show: a reconnect the grace period keeps quiet reads "Connecting…"
+    /// as soon as an action is waiting on it.
+    public var shownConnection: Connection { waiting > 0 && connection == .online ? .connecting : connection }
 
     public var hostName: String { hello?.name ?? computer.name }
 
@@ -554,9 +562,55 @@ public final class BotStore {
 
     // MARK: actions
 
-    private func require() throws -> HostClient {
-        guard !retired, let client, connection == .online else { throw HostError.unreachable }
-        return client
+    /// The client while the link is really up: not during a reconnect the grace period keeps
+    /// quiet, nor right after coming back to the foreground, when the old link is already gone.
+    private var live: HostClient? {
+        connection == .online && heldDrop == nil && eventsTask != nil && !retired ? client : nil
+    }
+
+    /// The client once the link is up. A reconnect in progress is waited out (headers show it,
+    /// see `shownConnection`), and an unreachable computer gets one fresh attempt first. A computer
+    /// that is off or refusing this device throws at once; so does a reconnect that outlasts `deadline`.
+    private func ready(until deadline: ContinuousClock.Instant = .now + BotStore.actionPatience) async throws -> HostClient {
+        var counted = false
+        var retried = false
+        defer { if counted { Motion.animate { waiting -= 1 } } }
+        while !retired {
+            if let live { return live }
+            switch connection {
+            case .online, .connecting: break
+            case .offline where !retried:
+                // The link retries on a backoff of up to 30 s: with someone waiting, try now.
+                retried = true
+                restartStream()
+            case .offline, .unpaired: throw HostError.unreachable
+            // The relay reports when it comes back, so there is no attempt of ours to wait for.
+            case let .computerOffline(lastSeen): throw HostError.computerOffline(lastSeen: lastSeen)
+            case let .unauthorized(message): throw HostError.unauthorized(message)
+            }
+            guard ContinuousClock.now < deadline else { break }
+            if !counted {
+                counted = true
+                Motion.animate { waiting += 1 }
+            }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        throw HostError.unreachable
+    }
+
+    /// Runs `op` once the link is up. With `replay`, only for calls the computer can safely get
+    /// twice, a call the link dropped under is tried again after the reconnect.
+    private func withLink<T>(replay: Bool = false, _ op: @MainActor (HostClient) async throws -> T) async throws -> T {
+        let deadline = ContinuousClock.now + Self.actionPatience
+        while true {
+            let client = try await ready(until: deadline)
+            do {
+                return try await op(client)
+            } catch let error as HostError where replay && error.isTransient && ContinuousClock.now < deadline {
+                log.info("retrying after: \(error.localizedDescription)")
+                try await Task.sleep(for: .milliseconds(500))
+            }
+        }
     }
 
     /// `thread`: reply in the thread on that main-chat message.
@@ -589,19 +643,21 @@ public final class BotStore {
     private func deliver(_ text: String, botId: String, thread: String?, nonce: String) {
         Task {
             do {
-                let client = try require()
-                var ids: [String]?
-                if let files = outgoingFiles[nonce] {
-                    // A fresh upload per attempt: a retry never appends to a half-sent file.
-                    ids = []
-                    for file in files {
-                        let id = UUID().uuidString
-                        try await client.upload(botId: botId, id: id, name: file.name, data: file.data)
-                        Self.cacheAttachment(id, file.data)
-                        ids?.append(id)
+                // Safe to repeat: the computer skips a nonce it already has.
+                let e = try await withLink(replay: true) { client in
+                    var ids: [String]?
+                    if let files = self.outgoingFiles[nonce] {
+                        // A fresh upload per attempt: a retry never appends to a half-sent file.
+                        ids = []
+                        for file in files {
+                            let id = UUID().uuidString
+                            try await client.upload(botId: botId, id: id, name: file.name, data: file.data)
+                            Self.cacheAttachment(id, file.data)
+                            ids?.append(id)
+                        }
                     }
+                    return try await client.send(botId: botId, text: text, clientNonce: nonce, threadId: thread, attachments: ids)
                 }
-                let e = try await client.send(botId: botId, text: text, clientNonce: nonce, threadId: thread, attachments: ids)
                 outgoingFiles[nonce] = nil
                 upsert(e)
                 if let bot = bots[botId] { onSent?(bot) }
@@ -626,7 +682,8 @@ public final class BotStore {
                 markLocal(nonce: nonce, botId: botId, status: "sending")
                 await deliverWhenOnline(text, botId: botId, thread: thread, nonce: nonce)
             } catch {
-                lastError = error.localizedDescription
+                // A dropped relay link: the message's own "Failed to send" and Resend say enough.
+                if (error as? HostError)?.isTransient != true { lastError = error.localizedDescription }
                 markLocal(nonce: nonce, botId: botId, status: "failed")
             }
             saveCache()
@@ -713,7 +770,7 @@ public final class BotStore {
     public func attachmentData(_ file: Attachment, bot botId: String) async -> Data? {
         guard let url = Self.attachmentCache(file.id) else { return nil }
         if let data = try? Data(contentsOf: url) { return data }
-        guard let client = try? require(), let data = try? await client.readUpload(botId: botId, id: file.id) else { return nil }
+        guard let client = live, let data = try? await client.readUpload(botId: botId, id: file.id) else { return nil }
         Self.cacheAttachment(file.id, data)
         return data
     }
@@ -742,7 +799,7 @@ public final class BotStore {
         scheduleSave()
     }
 
-    public func stop(_ botId: String) { perform { try await $0.stop(botId) } }
+    public func stop(_ botId: String) { perform(replay: true) { try await $0.stop(botId) } }
     public func logCall(_ botId: String, seconds: Int) { perform { try await $0.logCall(botId, seconds: seconds) } }
     public func newSession(_ botId: String) { perform { try await $0.newSession(botId) } }
 
@@ -750,12 +807,12 @@ public final class BotStore {
 
     /// Takes control from bots (they can still look) or hands it back.
     public func screenTakeover(_ on: Bool) {
-        perform { [weak self] in self?.screen = try await $0.screenTakeover(on) }
+        perform(replay: true) { [weak self] in self?.screen = try await $0.screenTakeover(on) }
     }
 
     /// Only the computer itself may turn remote screen on (the Mac menu).
     public func setScreenEnabled(_ on: Bool) async throws {
-        screen = try await require().setScreenEnabled(on)
+        screen = try await ready().setScreenEnabled(on)
     }
 
     /// Quick reactions offered on every message (Slack's hover bar).
@@ -773,8 +830,23 @@ public final class BotStore {
         }
     }
 
+    /// Permission cards whose answer is on its way, with the chosen option: the card shows
+    /// a spinner on it and takes no second answer.
+    public private(set) var answering: [String: String] = [:]
+
     public func respond(_ entry: Entry, option: String?) {
-        perform { try await $0.respondPermission(entryId: entry.id, optionId: option) }
+        guard answering[entry.id] == nil else { return }
+        Motion.animate { answering[entry.id] = option ?? "" }
+        Task {
+            do {
+                try await withLink(replay: true) { try await $0.respondPermission(entryId: entry.id, optionId: option) }
+                // The card's own update follows on the events stream; hold the spinner until then.
+                try? await Task.sleep(for: .seconds(2))
+            } catch {
+                lastError = error.localizedDescription
+            }
+            Motion.animate { answering[entry.id] = nil }
+        }
     }
 
     struct ReadingScope: Hashable {
@@ -812,11 +884,10 @@ public final class BotStore {
         Task {
             // Opening a cached conversation can race the foreground reconnect.
             // This background acknowledgement must never interrupt the conversation.
-            if connection != .online || heldDrop != nil {
+            if live == nil {
                 try? await Task.sleep(for: Self.initialConnectionGrace)
             }
-            guard !Task.isCancelled, !retired, isActive, heldDrop == nil,
-                  let client = try? require() else { return }
+            guard !Task.isCancelled, isActive, let client = live else { return }
             do {
                 try await client.markRead(botId, threadId: thread)
             } catch {
@@ -830,39 +901,39 @@ public final class BotStore {
     public func markAllRead(_ botId: String) {
         guard (bots[botId]?.unread ?? 0) > 0 else { return }
         bots[botId]?.unread = 0
-        perform { try await $0.markRead(botId, all: true) }
+        perform(replay: true) { try await $0.markRead(botId, all: true) }
     }
 
     public func setPinned(_ bot: Bot, _ pinned: Bool) {
         var d = BotDraft(bot)
         d.pinned = pinned
         bots[bot.id]?.pinned = pinned
-        perform { _ = try await $0.updateBot(d) }
+        perform(replay: true) { _ = try await $0.updateBot(d) }
     }
 
     public func setHidden(_ bot: Bot, _ hidden: Bool) {
         var d = BotDraft(bot)
         d.hidden = hidden
         bots[bot.id]?.hidden = hidden
-        perform { _ = try await $0.updateBot(d) }
+        perform(replay: true) { _ = try await $0.updateBot(d) }
     }
 
     public func delete(_ bot: Bot) {
         bots[bot.id] = nil
         entries[bot.id] = nil
-        perform { try await $0.deleteBot(bot.id) }
+        perform(replay: true) { try await $0.deleteBot(bot.id) }
     }
 
     /// Creates a group chat (or opens the one these bots already share) and selects it.
     public func createGroup(name: String, description: String = "", members: [String]) async throws -> Bot {
-        let group = try await require().createGroup(GroupDraft(name: name, description: description, members: members))
+        let group = try await ready().createGroup(GroupDraft(name: name, description: description, members: members))
         bots[group.id] = group
         selection = group.id
         return group
     }
 
     public func updateGroup(_ draft: GroupDraft) async throws {
-        let group = try await require().updateGroup(draft)
+        let group = try await ready().updateGroup(draft)
         bots[group.id] = group
     }
 
@@ -873,7 +944,7 @@ public final class BotStore {
     }
 
     public func save(_ draft: BotDraft) async throws -> Bot {
-        let client = try require()
+        let client = try await ready()
         let bot = draft.id == nil ? try await client.createBot(draft) : try await client.updateBot(draft)
         bots[bot.id] = bot
         return bot
@@ -890,39 +961,39 @@ public final class BotStore {
     }
 
     public func marketConnectors(search: String, cursor: String? = nil) async throws -> (items: [MarketConnector], next: String?) {
-        try await require().marketConnectors(search: search, cursor: cursor)
+        try await ready().marketConnectors(search: search, cursor: cursor)
     }
 
     public func marketSkills() async throws -> [MarketSkill] {
-        try await require().marketSkills()
+        try await ready().marketSkills()
     }
 
     @discardableResult
     public func installConnector(_ item: MarketConnector, option: String, inputs: [String: String]) async throws -> InstalledConnector {
-        let c = try await require().installConnector(registryName: item.name, option: option, inputs: inputs)
+        let c = try await ready().installConnector(registryName: item.name, option: option, inputs: inputs)
         await refreshPlugins()
         return c
     }
 
     @discardableResult
     public func addConnector(name: String, command: String?, url: String?, env: [String: String], headers: [String: String]) async throws -> InstalledConnector {
-        let c = try await require().addConnector(name: name, command: command, url: url, env: env, headers: headers)
+        let c = try await ready().addConnector(name: name, command: command, url: url, env: env, headers: headers)
         await refreshPlugins()
         return c
     }
 
     public func importConnectors(config: String) async throws -> [InstalledConnector] {
-        let added = try await require().importConnectors(config: config)
+        let added = try await ready().importConnectors(config: config)
         await refreshPlugins()
         return added
     }
 
     public func connectorSignIn(_ id: String) async throws -> ConnectorSignIn {
-        try await require().connectorSignIn(id)
+        try await ready().connectorSignIn(id)
     }
 
     public func finishConnectorSignIn(state: String, code: String?, error: String?) async throws {
-        try await require().finishConnectorSignIn(state: state, code: code, error: error)
+        try await ready().finishConnectorSignIn(state: state, code: code, error: error)
         await refreshPlugins()
     }
 
@@ -936,22 +1007,22 @@ public final class BotStore {
     }
 
     public func removeConnector(_ id: String) async throws {
-        try await require().removeConnector(id)
+        try await ready().removeConnector(id)
         await refreshPlugins()
     }
 
     public func installSkill(source: String) async throws {
-        try await require().installSkill(source: source)
+        try await ready().installSkill(source: source)
         await refreshPlugins()
     }
 
     public func addSkill(name: String, description: String, instructions: String) async throws {
-        try await require().addSkill(name: name, description: description, instructions: instructions)
+        try await ready().addSkill(name: name, description: description, instructions: instructions)
         await refreshPlugins()
     }
 
     public func removeSkill(_ id: String) async throws {
-        try await require().removeSkill(id)
+        try await ready().removeSkill(id)
         await refreshPlugins()
     }
 
@@ -962,7 +1033,7 @@ public final class BotStore {
     }
 
     public func listDirs(_ path: String?) async throws -> DirListing {
-        try await require().listDirs(path)
+        try await ready().listDirs(path)
     }
 
     public func refreshUsage() async {
@@ -978,10 +1049,11 @@ public final class BotStore {
         for e in older { upsert(e) }
     }
 
-    private func perform(_ op: @escaping @MainActor (HostClient) async throws -> Void) {
+    /// Fire-and-forget actions; only what waiting and retrying couldn't settle reaches the dialog.
+    private func perform(replay: Bool = false, _ op: @escaping @MainActor (HostClient) async throws -> Void) {
         Task {
             do {
-                try await op(try require())
+                try await withLink(replay: replay, op)
             } catch {
                 lastError = error.localizedDescription
             }

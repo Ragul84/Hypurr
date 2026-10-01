@@ -21,6 +21,10 @@ public struct CloudError: LocalizedError, Sendable, Equatable {
         default: message ?? "Codync cloud error (\(code))"
         }
     }
+
+    /// A busy or failing cloud, or a session token that wasn't fresh yet: trying again later
+    /// settles it, so background work (launch, foreground refresh) keeps it out of the error dialog.
+    public var isTransient: Bool { status >= 500 || status == 429 || status == 401 }
 }
 
 /// The user-facing `/v1` API (§8.4): account, devices, computers, access requests, claims.

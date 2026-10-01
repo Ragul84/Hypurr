@@ -21,7 +21,7 @@ public struct ComputerFilterHeader: View {
     }
 
     private var stores: [BotStore] { selection.shown.compactMap { accounts.store(for: $0) } }
-    private var summary: String { ConnectionSummary(connections: stores.map(\.connection)).text }
+    private var summary: String { ConnectionSummary(connections: stores.map(\.shownConnection)).text }
 
     public var body: some View {
         #if os(iOS)
@@ -102,7 +102,7 @@ public struct ComputerFilterHeader: View {
 
 public extension BotStore {
     var connectionLabel: String {
-        switch connection {
+        switch shownConnection {
         case .online: "Connected"
         case .connecting: "Connecting…"
         case .computerOffline, .offline: "Offline"
