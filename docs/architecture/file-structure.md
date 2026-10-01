@@ -53,6 +53,7 @@ Codync/
 ├── docs/                      # Architecture, guides, reference, features, design, archive
 ├── tools/                     # Widget rendering utilities
 ├── packaging/                 # Distribution templates
+├── marketing/app-store-screenshots/ # App Store screenshot editor (bun dev; Export bundle → out/)
 ├── web/                       # Website git submodule
 └── .github/workflows/         # CI, signing and release automation
 ```
