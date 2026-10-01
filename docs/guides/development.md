@@ -60,7 +60,7 @@ Unlock the phone when required. Build, install, launch, and visual inspection ar
 
 | Component | Commands | Requirements |
 | --- | --- | --- |
-| Host | `cd host && cargo build` | Rust toolchain supporting edition 2024 |
+| Host | `cd host && cargo build` | rustup; `rust-toolchain.toml` pins the version CI uses (a Homebrew `rust` ahead of rustup on PATH ignores it) |
 | Host checks | `cd host && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test` | Local agent credentials are unnecessary for unit tests |
 | Shared Swift | `swift test --package-path kit` | Swift 6 / Xcode |
 | Cloud | `cd cloud && npm ci && npm test && npm run typecheck` | Node and npm; CI uses Node 24 |
