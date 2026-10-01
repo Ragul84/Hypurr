@@ -9,8 +9,8 @@ Updated: 2026-09-27. This describes the implemented notification contract and it
 | A task is sent from this iPhone | No alert | Start one activity for this bot |
 | Working | No alert for each tool call | Bot identity and working orb |
 | Input or permission needed | Bot name, “Response needed”, request summary; “Review request” action | Needs you; keep the activity alive |
-| Completed | Bot name, “Task complete”, final reply preview; “Open conversation” action | Done, then dismiss after 60 seconds |
-| Failed | Bot name, “Task failed”, failure summary; “Open conversation” action | Error state, then dismiss after 60 seconds |
+| Completed (sent once the last queued message is answered) | Bot name, “Task complete”, final reply preview; “Open conversation” action | Done, then dismiss after 60 seconds |
+| Failed (an error, or the turn stopped short: output/step limit, refusal) | Bot name, “Task failed”, failure summary; “Open conversation” action | Error state, then dismiss after 60 seconds |
 | No fresh update for 15 minutes | No synthetic failure alert | Update delayed; never infer completion |
 
 The encrypted title is limited to 80 characters and the body to 400 characters. The body is an excerpt of the agent's final answer, not a newly generated summary. System notification previews, text truncation, Focus, sounds and delivery timing remain controlled by iOS. There is no invented completion percentage or per-tool notification stream.
