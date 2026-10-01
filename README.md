@@ -18,6 +18,8 @@ Your coding agents, as teammates you can message.
 ![Rust](https://img.shields.io/badge/host-Rust-B7410E?logo=rust)
 ![Swift](https://img.shields.io/badge/apps-SwiftUI-F05138?logo=swift&logoColor=white)
 
+<a href="https://youtu.be/awhZJPjJaPc"><img src="docs/screenshots/launch-film.jpg" width="760" alt="Watch the Codync launch film on YouTube (1:26)"></a>
+
 </div>
 
 Codync turns the coding agents on your computer — Claude Code, Codex, Cursor, Pi, OpenCode, Grok Build, Gemini, Copilot and ~40 more — into persistent *bots* you delegate to from your iPhone, Mac, Linux desktop or any terminal, the way you'd message a colleague. Pick who, say what, put the phone away. You get a notification when a bot finishes or needs your approval.
