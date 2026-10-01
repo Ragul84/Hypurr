@@ -15,6 +15,18 @@ Connections prepared through the cloud use a **4 Mbps / 30 fps** encoding limit 
 
 A cloud outage or missing TURN configuration produces an explicit error. A successful chat relay connection alone does not prove that media or input works.
 
+## Phone orientation
+
+Opening the iPhone viewer enables portrait and both landscape orientations without
+requesting a forced turn. UIKit chooses the orientation based on how the phone is
+held and the system rotation lock. The Rotate button remains available for an
+explicit override. Closing the last viewer restores the app's portrait layout.
+The video fits the available bounds, and touch coordinates use the resized viewport.
+
+The iPad already supports all orientations. macOS, Linux GTK and the TUI do not
+use the iPhone viewer or its orientation policy; the capture helpers stream the
+computer display without choosing the phone's orientation.
+
 ## Boundaries
 
 - `host/src/screen.rs` coordinates access to the local helper and owns viewer sessions. Another device cannot renegotiate or close a session it does not own.
@@ -49,6 +61,9 @@ Run cloud tests/type checking, host formatting/Clippy/tests, Swift package tests
 Live acceptance requires the configured Worker and fresh host/helper/phone builds:
 
 - Check screen-recording and input permissions, capture, click/type/scroll, clipboard, display changes and closing the viewer.
+- Open the iPhone viewer while upright and while already held sideways, then rotate
+  in both directions. Check video fitting and direct taps after each turn. Repeat
+  with rotation lock on and with the Rotate button; closing returns to portrait.
 - Repeat with the phone on cellular and the computer on a different network, without Tailscale. Verify a selected ICE candidate pair with `candidateType=relay` in WebRTC diagnostics and observe Realtime egress; signaling via Cloudflare alone is insufficient.
 - Verify UDP-blocked connectivity using TURN over TCP/TLS 443.
 - Verify Wi-Fi/cellular changes, reconnect after sleep and renewal before the one-hour expiry.

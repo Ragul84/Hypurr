@@ -116,8 +116,7 @@ public struct ScreenView: View {
                     .transition(.opacity)
             }
             Spacer()
-            // Turning the phone does nothing while iOS rotation lock is on, and a phone held
-            // upright stays in the landscape the viewer opened in until it is turned.
+            // Allow an explicit rotation even when the user has enabled iOS rotation lock.
             OverlayButton("Rotate", "rotate.right") { OrientationLock.toggle() }
             if session != nil {
                 if interactive {
@@ -323,10 +322,10 @@ public enum OrientationLock {
     /// The delayed rotate from the last open or close; a newer request or a rotate tap cancels it.
     private static var pending: Task<Void, Never>?
 
-    /// The first open viewer allows every orientation and turns to landscape, once per presentation.
+    /// Allow rotation while viewing, leaving the initial direction and rotation lock to iOS.
     static func viewerAppeared() {
         viewers += 1
-        if viewers == 1 { set(.allButUpsideDown, prefer: .landscapeRight) }
+        if viewers == 1 { set(.allButUpsideDown) }
     }
 
     /// The last viewer to close brings the app back to portrait.
@@ -335,15 +334,16 @@ public enum OrientationLock {
         if viewers == 0 { set(.portrait, prefer: .portrait) }
     }
 
-    private static func set(_ newMask: UIInterfaceOrientationMask, prefer: UIInterfaceOrientationMask) {
+    private static func set(_ newMask: UIInterfaceOrientationMask, prefer: UIInterfaceOrientationMask? = nil) {
         guard UIDevice.current.userInterfaceIdiom == .phone else { return }
         mask = newMask
         pending?.cancel()
-        // Once the full-screen cover is up: every controller in the chain re-reads the mask, then rotate.
+        // Once the overlay is up, let UIKit reevaluate the device's current orientation.
         pending = Task { @MainActor in
             guard (try? await Task.sleep(for: .milliseconds(100))) != nil else { return }
             let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
             scenes.forEach(reloadMask)
+            guard let prefer else { return }
             guard (try? await Task.sleep(for: .milliseconds(150))) != nil else { return }
             // Best effort: turning the phone always works once the mask allows it.
             for scene in scenes { scene.requestGeometryUpdate(.iOS(interfaceOrientations: prefer)) }
