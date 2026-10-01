@@ -500,24 +500,44 @@ pub fn permission_card(ui: &App, st: &State, e: &Value, group: bool) -> gtk::Wid
             if !kind.starts_with("allow") {
                 l.add_css_class("danger-text");
             }
+            l.set_hexpand(true);
+            let spinner = gtk::Spinner::builder().visible(false).build();
+            let row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+            row.append(&l);
+            row.append(&spinner);
             let btn = gtk::Button::builder()
-                .child(&l)
+                .child(&row)
                 .css_classes(["choice"])
                 .build();
             let (entry_id, opt) = (
                 e["id"].as_str().unwrap_or("").to_owned(),
                 o["optionId"].clone(),
             );
-            let ui2 = ui.clone();
-            btn.connect_clicked(move |b| {
-                b.set_sensitive(false);
-                let ui3 = ui2.clone();
+            let (ui2, choices2) = (ui.clone(), choices.clone());
+            btn.connect_clicked(move |_| {
+                // One answer per card: while it is on its way, the chosen row spins and the rest wait.
+                choices2.set_sensitive(false);
+                spinner.set_visible(true);
+                spinner.start();
+                let (ui3, choices3, spinner2) = (ui2.clone(), choices2.clone(), spinner.clone());
                 client::call(
                     "respondPermission",
                     json!({"entryId": entry_id, "optionId": opt}),
                     move |r| {
-                        if let Err(e) = r {
-                            toast(&ui3, &e);
+                        let settle = move || {
+                            spinner2.stop();
+                            spinner2.set_visible(false);
+                            choices3.set_sensitive(true);
+                        };
+                        match r {
+                            Err(e) => {
+                                settle();
+                                toast(&ui3, &e);
+                            }
+                            // The card's own update follows on the events stream; hold the spinner until then.
+                            Ok(_) => {
+                                gtk::glib::timeout_add_seconds_local_once(2, settle);
+                            }
                         }
                     },
                 );

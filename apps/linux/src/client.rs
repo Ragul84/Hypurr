@@ -49,29 +49,43 @@ fn http() -> &'static reqwest::Client {
     C.get_or_init(reqwest::Client::new)
 }
 
+/// How long a command keeps trying while the host can't be reached (it is restarting, say).
+const PATIENCE: Duration = Duration::from_secs(20);
+
 async fn call_async(method: String, body: Value) -> Result<Value, String> {
     let token = token().ok_or("The Codync host isn't set up on this computer.")?;
-    let res = http()
-        .post(format!("{}/api/{method}", base()))
-        .bearer_auth(token)
-        .json(&body)
-        .timeout(Duration::from_secs(
-            if matches!(
-                method.as_str(),
-                "agentAuth"
-                    | "agentAuthenticate"
-                    | "setAgentEnv"
-                    | "installSkill"
-                    | "installConnector"
-            ) {
-                660
-            } else {
-                120
-            },
-        ))
-        .send()
-        .await
-        .map_err(|_| "Can't reach the Codync host.".to_owned())?;
+    let started = std::time::Instant::now();
+    let res = loop {
+        let sent = http()
+            .post(format!("{}/api/{method}", base()))
+            .bearer_auth(&token)
+            .json(&body)
+            .timeout(Duration::from_secs(
+                if matches!(
+                    method.as_str(),
+                    "agentAuth"
+                        | "agentAuthenticate"
+                        | "setAgentEnv"
+                        | "installSkill"
+                        | "installConnector"
+                ) {
+                    660
+                } else {
+                    120
+                },
+            ))
+            .send()
+            .await;
+        match sent {
+            Ok(res) => break res,
+            // Nothing was sent, so any command is safe to repeat while the host comes back.
+            // `hello` is the probe that says why it can't be reached, so it answers at once.
+            Err(e) if e.is_connect() && method != "hello" && started.elapsed() < PATIENCE => {
+                tokio::time::sleep(Duration::from_millis(500)).await;
+            }
+            Err(_) => return Err("Can't reach the Codync host.".to_owned()),
+        }
+    };
     let ok = res.status().is_success();
     let v: Value = res.json().await.unwrap_or(Value::Null);
     if ok {

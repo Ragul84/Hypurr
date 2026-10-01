@@ -18,6 +18,10 @@ actor FakeRemote: RemoteTransport {
     private var isShutdown = false
 
     func setReadFailure(_ fail: Bool) { failReadReceipts = fail }
+    private(set) var calls: [String] = []
+    private var failures: [String: Int] = [:]
+    /// The next `count` calls of `method` fail as if the link dropped under them.
+    func fail(_ method: String, times count: Int) { failures[method] = count }
     private(set) var enqueued: [String] = []
     var cancelResult = MailboxCancel.cancelled
 
@@ -41,6 +45,11 @@ actor FakeRemote: RemoteTransport {
 
     private func respond(_ method: String, _ body: Data) throws -> Data {
         guard !isShutdown else { throw HostError.unreachable }
+        calls.append(method)
+        if let left = failures[method], left > 0 {
+            failures[method] = left - 1
+            throw HostError.unreachable
+        }
         switch method {
         case "hello":
             return Data(#"{"hostId":"h1","name":"Mac","version":"3.0.0","os":"macos","backends":[],"rev":0}"#.utf8)
@@ -460,4 +469,90 @@ extension FakeRemote {
     #expect(await until { await fake.readReceipts.count == 1 })
     #expect(store.connection == .online)
     #expect(store.lastError == nil)
+}
+
+@MainActor @Test func actionDuringReconnectWaitsInsteadOfFailing() async throws {
+    let (storage, suite) = context()
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    let fake = FakeRemote(.ready(.direct))
+    let store = BotStore(computer: randomComputer("Mac"), route: .channel, clientKind: "ios", storage: storage) { fake }
+    defer { store.retire() }
+    store.setActive(true)
+    #expect(await until { await fake.subscribed })
+    await fake.emit(botEvent("b1", name: "Bot", rev: 1))
+    #expect(await until { store.connection == .online })
+    // A drop still inside its grace: the header says connected, the link is gone.
+    await fake.set(.connecting)
+    #expect(await until { store.hostRoute == nil })
+    store.stop("b1")
+    #expect(await until { store.shownConnection == .connecting })
+    #expect(await !fake.calls.contains("stop"))
+    await fake.set(.ready(.relay))
+    #expect(await until { await fake.eventSubscriptionCount == 2 })
+    await fake.emit(botEvent("b1", name: "Bot", rev: 2))
+    #expect(await until { await fake.calls.contains("stop") })
+    #expect(store.shownConnection == .online)
+    #expect(store.lastError == nil)
+}
+
+@MainActor @Test func droppedCallIsRetriedOnlyWhenSafeToRepeat() async throws {
+    let (storage, suite) = context()
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    let fake = FakeRemote(.ready(.direct))
+    let store = BotStore(computer: randomComputer("Mac"), route: .channel, clientKind: "ios", storage: storage) { fake }
+    defer { store.retire() }
+    store.setActive(true)
+    #expect(await until { await fake.subscribed })
+    await fake.emit(botEvent("b1", name: "Bot", rev: 1))
+    #expect(await until { store.connection == .online })
+    await fake.fail("stop", times: 1)
+    store.stop("b1")
+    #expect(await until { await fake.calls.filter { $0 == "stop" }.count == 2 })
+    #expect(store.lastError == nil)
+    // A new session can't be told apart from a second one, so it isn't sent twice.
+    await fake.fail("newSession", times: 1)
+    store.newSession("b1")
+    #expect(await until { store.lastError != nil })
+    #expect(await fake.calls.filter { $0 == "newSession" }.count == 1)
+}
+
+@MainActor @Test func offlineTapReconnectsBeforeGivingUp() async throws {
+    let (storage, suite) = context()
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    // The first link can't reach the computer; a fresh attempt would.
+    let down = FakeRemote(.failed("Can't reach"))
+    let up = FakeRemote(.ready(.relay))
+    var made = 0
+    let store = BotStore(computer: randomComputer("Mac"), route: .channel, clientKind: "ios", storage: storage) {
+        made += 1
+        return made == 1 ? down : up
+    }
+    defer { store.retire() }
+    store.setActive(true)
+    #expect(await until { store.connection == .offline("Can't reach") })
+    store.stop("b1")
+    #expect(await until { await up.subscribed })
+    await up.emit(botEvent("b1", name: "Bot", rev: 1))
+    #expect(await until { await up.calls.contains("stop") })
+    #expect(store.lastError == nil)
+}
+
+@MainActor @Test func permissionAnswerShowsOnTheCardAndIsSentOnce() async throws {
+    let (storage, suite) = context()
+    defer { UserDefaults(suiteName: suite)?.removePersistentDomain(forName: suite) }
+    let fake = FakeRemote(.ready(.direct))
+    let store = BotStore(computer: randomComputer("Mac"), route: .channel, clientKind: "ios", storage: storage) { fake }
+    defer { store.retire() }
+    store.setActive(true)
+    #expect(await until { await fake.subscribed })
+    await fake.emit(botEvent("b1", name: "Bot", rev: 1))
+    #expect(await until { store.connection == .online })
+    let card = Entry(id: "p1", seq: 1, botId: "b1", threadId: nil, rev: 1, kind: "permission", turn: 1,
+                     data: EntryData(status: "pending"), createdAt: 1, updatedAt: 1)
+    store.respond(card, option: "allow")
+    store.respond(card, option: "deny")
+    #expect(store.answering["p1"] == "allow")
+    #expect(await until { await fake.calls.contains("respondPermission") })
+    try await Task.sleep(for: .milliseconds(100))
+    #expect(await fake.calls.filter { $0 == "respondPermission" }.count == 1)
 }

@@ -6,6 +6,8 @@ import SwiftUI
 struct PermissionCard: View {
     let entry: Entry
     let hostName: String
+    /// The option whose answer is on its way to the computer, if any.
+    var answering: String?
     let respond: (String?) -> Void
     @State private var expanded = false
 
@@ -94,14 +96,20 @@ struct PermissionCard: View {
             ForEach(Array(options.enumerated()), id: \.element.id) { i, o in
                 if i > 0 { Rectangle().fill(Palette.border).frame(height: 0.5) }
                 Button { respond(o.optionId) } label: {
-                    Text(label(o))
-                        .font(.body.weight(o.kind == "allow_once" ? .semibold : .regular))
-                        .foregroundStyle(o.kind.hasPrefix("allow") ? Palette.text : Palette.danger)
-                        .frame(maxWidth: .infinity, minHeight: 46, alignment: .leading)
-                        .padding(.horizontal, 14)
-                        .contentShape(Rectangle())
+                    HStack(spacing: 8) {
+                        Text(label(o))
+                            .font(.body.weight(o.kind == "allow_once" ? .semibold : .regular))
+                            .foregroundStyle(o.kind.hasPrefix("allow") ? Palette.text : Palette.danger)
+                        Spacer(minLength: 0)
+                        if answering == o.optionId { Spinner(size: 14) }
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 46, alignment: .leading)
+                    .padding(.horizontal, 14)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .disabled(answering != nil)
+                .opacity(answering == nil || answering == o.optionId ? 1 : 0.4)
             }
         }
         .background(Palette.background, in: RoundedRectangle(cornerRadius: 14, style: .continuous))

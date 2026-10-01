@@ -291,10 +291,15 @@ public struct ThreadView: View {
 
     private var connectionSubtitle: some View {
         HStack(spacing: 6) {
-            Image(systemName: connectionSymbol)
-                .font(.system(size: 8, weight: .medium))
-                .frame(width: 12)
-                .accessibilityHidden(true)
+            Group {
+                if model.shownConnection == .connecting {
+                    Spinner(size: 8)
+                } else {
+                    Image(systemName: connectionSymbol).font(.system(size: 8, weight: .medium))
+                }
+            }
+            .frame(width: 12)
+            .accessibilityHidden(true)
             Text(model.connectionLabel)
                 .lineLimit(1)
                 .truncationMode(.middle)
@@ -307,9 +312,7 @@ public struct ThreadView: View {
     }
 
     private var connectionSymbol: String {
-        guard model.connection == .online else {
-            return model.connection == .connecting ? "arrow.triangle.2.circlepath" : "wifi.slash"
-        }
+        guard model.connection == .online else { return "wifi.slash" }
         switch model.hostRoute {
         case .relay: return "cloud"
         case .direct: return "wifi"
@@ -319,7 +322,7 @@ public struct ThreadView: View {
     }
 
     private var connectionDescription: String {
-        switch model.connection {
+        switch model.shownConnection {
         case .connecting: return "Connecting"
         case .computerOffline, .offline: return "Offline"
         case .unauthorized: return "No access"

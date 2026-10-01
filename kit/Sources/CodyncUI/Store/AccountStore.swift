@@ -177,11 +177,11 @@ public final class AccountStore {
             guard !retired else { return }
             if list != cloudComputers { Motion.animate { cloudComputers = list } }
             if asksForAccess { await askForAccess() }
-        } catch let error as CloudError {
+        } catch let error as CloudError where !error.isTransient {
             lastError = error.localizedDescription
         } catch {
-            // Runs on every launch and foreground: a dropped connection or a token not ready yet
-            // fixes itself on the next refresh, so only the cloud's own answers reach the dialog.
+            // Runs on every launch and foreground: a dropped connection, a busy cloud or a token
+            // not ready yet fixes itself on the next refresh, so only answers that stay reach the dialog.
             log.info("cloud refresh failed: \(error.localizedDescription, privacy: .public)")
         }
     }
@@ -239,8 +239,12 @@ public final class AccountStore {
             asked.insert(computer.computerId)
             do {
                 _ = try await requestAccess(computer.computerId)
-            } catch {
+            } catch let error as CloudError where !error.isTransient {
                 lastError = error.localizedDescription
+            } catch {
+                // Asked without a tap: a connection or cloud hiccup isn't worth a dialog.
+                // The computer stays in the list, where it can be asked by hand.
+                log.info("access request failed: \(error.localizedDescription, privacy: .public)")
             }
         }
     }

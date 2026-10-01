@@ -59,6 +59,14 @@ public enum HostError: LocalizedError, Sendable, Equatable {
         case .upgradeRequired: "Update Codync to connect to this computer."
         }
     }
+
+    /// The link failed, not the request: the same call can work once the computer is reachable again.
+    public var isTransient: Bool {
+        switch self {
+        case .unreachable, .computerOffline: true
+        default: false
+        }
+    }
 }
 
 /// Today's HTTP API on loopback: the Mac talking to its own host, or through an SSH tunnel.
