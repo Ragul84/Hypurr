@@ -15,6 +15,7 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from datetime import datetime
 
 import jwt
 
@@ -59,11 +60,11 @@ def wait_for(what, check, minutes):
 
 
 def main(version):
-    since = os.environ.get("SINCE", "")
+    since = datetime.fromisoformat(os.environ.get("SINCE", "2000-01-01T00:00:00Z"))
     build = wait_for(f"build {version} to finish processing", lambda: next(iter(
         b for b in call("GET", f"/builds?filter[app]={APP_ID}&filter[preReleaseVersion.version]={version}"
                         "&filter[processingState]=VALID&sort=-uploadedDate&limit=1")["data"]
-        if b["attributes"]["uploadedDate"] >= since), None), 150)
+        if datetime.fromisoformat(b["attributes"]["uploadedDate"]) >= since), None), 150)
     print(f"build {build['attributes']['version']} ({build['id']})")
 
     def in_flight():
