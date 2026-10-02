@@ -108,9 +108,13 @@ jobs:
           DMG_DIR=$RUNNER_TEMP/dmg_staging
           mkdir -p "$DMG_DIR"
           cp -R "$RUNNER_TEMP/Codync.app" "$DMG_DIR/"
-          ln -s /Applications "$DMG_DIR/Applications"
-          hdiutil create -volname "Codync" -srcfolder "$DMG_DIR" \
-            -ov -format UDZO build/codync-macos.dmg
+          brew install create-dmg
+          swift packaging/dmg/background.swift "$RUNNER_TEMP/dmg-background.tiff"
+          create-dmg --volname Codync --background "$RUNNER_TEMP/dmg-background.tiff" \
+            --window-size 660 400 --icon-size 128 --text-size 13 \
+            --icon Codync.app 170 200 --hide-extension Codync.app \
+            --app-drop-link 490 200 --no-internet-enable \
+            build/codync-macos.dmg "$DMG_DIR"
           spctl --assess --type execute -v "$RUNNER_TEMP/Codync.app"
 
       - name: Generate signed Sparkle appcast
