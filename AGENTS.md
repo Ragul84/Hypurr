@@ -6,7 +6,7 @@
 - `kit/`: shared Swift package. `CodyncKit` contains models, clients, and design primitives; `CodyncUI` contains shared screens and stores. Tests and fixtures live in `kit/Tests/CodyncKitTests/`.
 - `apps/`: iOS, macOS, and Linux clients, plus `screen-macos` and `screen-linux` helpers. Apple assets live in each target’s `Resources/`; widgets live in `apps/ios/Widgets/`.
 - `cloud/`: Cloudflare accounts, encrypted relay, Durable Objects and D1; tests live in `cloud/test/`.
-- `relay/`: Cloudflare push worker and `test/`; `web/`: website git submodule; `packaging/`: distribution templates; `docs/`: architecture and naming guidance.
+- `relay/`: Cloudflare push worker and `test/`; `web/`: website (Next.js); `packaging/`: distribution templates; `docs/`: architecture and naming guidance.
 
 ## Build, Test, and Development Commands
 

@@ -143,8 +143,8 @@ Data lives in `~/.codync`. The local bearer token authorizes loopback helpers an
 | `apps/screen-macos/`, `apps/screen-linux/` | Platform screen capture/input helpers |
 | `docs/` | [Documentation index](docs/README.md) and [file structure](docs/architecture/file-structure.md) |
 | `relay/` | Cloudflare Worker APNs relay with encrypted per-device tickets |
-| `web/` | Website (git submodule) |
-| `packaging/` | Homebrew formula template and `install.sh` (the curl installer) |
+| `web/` | Website (Next.js static export, deployed on Vercel) |
+| `packaging/` | Homebrew cask and formula templates (published to `leepokai/homebrew-codync` on release) and `install.sh` (the curl installer) |
 
 Build, install, restart and full checks: [development guide](docs/guides/development.md).
 

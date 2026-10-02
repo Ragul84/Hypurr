@@ -54,7 +54,7 @@ Codync/
 ├── tools/                     # Widget rendering utilities
 ├── packaging/                 # Distribution templates
 ├── marketing/app-store-screenshots/ # App Store screenshot editor (bun dev; Export bundle → out/)
-├── web/                       # Website git submodule
+├── web/                       # Website (Next.js static export)
 └── .github/workflows/         # CI, signing and release automation
 ```
 
@@ -93,7 +93,6 @@ Codync/
 - Each `BotStore` talks to one computer. `AccountStore` aggregates stores and routes by `BotReference`; bare bot IDs are not globally unique.
 - The host owns routing, reply counts, permissions and group turn scheduling. Clients render these results; they do not reimplement host policy.
 - `cloud/` transports encrypted chat traffic and manages account metadata. `relay/` delivers APNs pushes. The two Workers have separate configuration and tests.
-- `web/` is its own git repository; website changes require working in that submodule explicitly.
 
 ## Names
 
