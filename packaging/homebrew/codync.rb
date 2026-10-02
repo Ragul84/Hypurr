@@ -9,8 +9,8 @@ cask "codync" do
   name "Codync"
   desc "Message your coding agents as bots from your phone, desktop or terminal"
   homepage "https://www.codync.dev/"
-  auto_updates true
 
+  auto_updates true
   depends_on macos: :sonoma
 
   app "Codync.app"
