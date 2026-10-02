@@ -1,7 +1,8 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import { AppleLogo, DeviceMobile } from "@phosphor-icons/react";
+import { AppleLogo } from "@phosphor-icons/react";
+import Image from "next/image";
 import Phone from "./phone";
 import { APP_STORE, DMG } from "../links";
 
@@ -44,10 +45,9 @@ export default function Hero() {
               href={APP_STORE}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 rounded-full border border-neutral-500 px-6 py-3 font-medium text-neutral-50 transition hover:border-neutral-200 active:scale-[0.98]"
+              className="inline-flex justify-center transition hover:opacity-80 active:scale-[0.98]"
             >
-              <DeviceMobile size={18} />
-              Get the iPhone app
+              <Image src="/app-store-badge.svg" alt="Download on the App Store" width={144} height={48} className="h-12 w-auto" />
             </a>
           </motion.div>
         </div>

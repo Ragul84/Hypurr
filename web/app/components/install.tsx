@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { AppleLogo, DeviceMobile, LinuxLogo } from "@phosphor-icons/react/ssr";
 import CopyCommand from "./copy-command";
 import Reveal from "./reveal";
@@ -60,10 +61,9 @@ export default function Install() {
               href={APP_STORE}
               target="_blank"
               rel="noopener noreferrer"
-              className="mt-4 inline-flex items-center gap-2 rounded-full border border-neutral-500 px-5 py-2.5 text-sm font-medium text-neutral-50 transition hover:border-neutral-200 active:scale-[0.98]"
+              className="mt-4 inline-flex transition hover:opacity-80 active:scale-[0.98]"
             >
-              <DeviceMobile size={16} />
-              Get the iPhone app
+              <Image src="/app-store-badge.svg" alt="Download on the App Store" width={120} height={40} className="h-10 w-auto" />
             </a>
           </Reveal>
         </div>
