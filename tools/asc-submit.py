@@ -2,7 +2,8 @@
 """Submit the iOS build of a version for App Review once Xcode Cloud has uploaded it.
 
 Usage: asc-submit.py 2.3.0
-Env: ASC_KEY_ID, ASC_ISSUER_ID, ASC_PRIVATE_KEY (.p8 contents); DRY_RUN=1 prints writes instead.
+Env: ASC_KEY_ID, ASC_ISSUER_ID, ASC_PRIVATE_KEY (.p8 contents); DRY_RUN=1 prints writes instead;
+SINCE (ISO 8601) ignores builds uploaded before it, so a tag run never submits an older build.
 
 Latest version wins: a version still waiting for review is pulled back, renamed and
 resubmitted with the new build. A version already in review is left alone.
@@ -58,9 +59,11 @@ def wait_for(what, check, minutes):
 
 
 def main(version):
-    build = wait_for(f"build {version} to finish processing", lambda: next(iter(call(
-        "GET", f"/builds?filter[app]={APP_ID}&filter[preReleaseVersion.version]={version}"
-        "&filter[processingState]=VALID&sort=-uploadedDate&limit=1")["data"]), None), 150)
+    since = os.environ.get("SINCE", "")
+    build = wait_for(f"build {version} to finish processing", lambda: next(iter(
+        b for b in call("GET", f"/builds?filter[app]={APP_ID}&filter[preReleaseVersion.version]={version}"
+                        "&filter[processingState]=VALID&sort=-uploadedDate&limit=1")["data"]
+        if b["attributes"]["uploadedDate"] >= since), None), 150)
     print(f"build {build['attributes']['version']} ({build['id']})")
 
     def in_flight():

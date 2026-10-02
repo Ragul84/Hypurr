@@ -28,4 +28,7 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
           VERSION: ${{ inputs.version || github.ref_name }}
-        run: python3 tools/asc-submit.py "${VERSION#v}"
+        run: |
+          # A tag run waits for the build Xcode Cloud starts now, not an older upload.
+          [[ "$GITHUB_EVENT_NAME" == push ]] && export SINCE=$(date -u +%Y-%m-%dT%H:%M:%S)
+          python3 tools/asc-submit.py "${VERSION#v}"
