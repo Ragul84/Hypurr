@@ -3,7 +3,7 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { AppleLogo, DeviceMobile } from "@phosphor-icons/react";
 import Phone from "./phone";
-import { APP_STORE, DMG, IOS_LIVE } from "../links";
+import { APP_STORE, DMG } from "../links";
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
@@ -40,26 +40,15 @@ export default function Hero() {
               <AppleLogo size={18} weight="fill" />
               Download for Mac
             </a>
-            {IOS_LIVE ? (
-              <a
-                href={APP_STORE}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center gap-2 rounded-full border border-neutral-500 px-6 py-3 font-medium text-neutral-50 transition hover:border-neutral-200 active:scale-[0.98]"
-              >
-                <DeviceMobile size={18} />
-                Get the iPhone app
-              </a>
-            ) : (
-              <span
-                aria-disabled="true"
-                title="The new iPhone app is in App Store review"
-                className="inline-flex items-center justify-center gap-2 rounded-full border border-neutral-800 px-6 py-3 font-medium text-neutral-500"
-              >
-                <DeviceMobile size={18} />
-                iPhone app coming soon
-              </span>
-            )}
+            <a
+              href={APP_STORE}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-neutral-500 px-6 py-3 font-medium text-neutral-50 transition hover:border-neutral-200 active:scale-[0.98]"
+            >
+              <DeviceMobile size={18} />
+              Get the iPhone app
+            </a>
           </motion.div>
         </div>
 
