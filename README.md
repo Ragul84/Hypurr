@@ -90,7 +90,7 @@ brew install --cask leepokai/codync/codync
 
 All three install the same signed, notarized app.
 
-Open Codync: it sets up the host on first launch. **Open Codync** opens the full window; **Pair iPhone…** shows the QR code.
+Open Codync: its window asks you to **Install host** on first launch. The menu bar icon stays for quick access: **Pair iPhone…** shows the QR code.
 
 **iPhone** — [get Codync on the App Store](https://apps.apple.com/app/codync/id6760984418) (iOS 18+, free), then scan the QR code from **Pair iPhone…** on the Mac, the Linux app or `codync-host pair`.
 

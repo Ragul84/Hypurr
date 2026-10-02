@@ -17,7 +17,27 @@ struct CodyncMacApp: App {
         _host = State(initialValue: HostController(account: account))
     }
 
+    /// From both the window and the menu bar icon: macOS can hide the icon (no room, or not allowed in
+    /// the menu bar), and its view then never appears. Both starts are no-ops after the first.
+    private func launch() {
+        host.start()
+        appDelegate.updates = updates
+        updates.start(host: host)
+    }
+
     var body: some Scene {
+        // First scene: the one SwiftUI opens at launch and when the Dock icon is clicked.
+        Window("Codync", id: "chat") {
+            ChatWindow()
+                .task { launch() }
+                .modalHost()
+                .environment(host)
+                .environment(account)
+                .environment(updates)
+        }
+        .defaultSize(width: 1100, height: 760)
+        .windowStyle(.hiddenTitleBar)
+
         MenuBarExtra {
             MenuView()
                 // The macOS 27 SDK drops menu item images unless the label asks for them.
@@ -28,12 +48,7 @@ struct CodyncMacApp: App {
         } label: {
             // The Codync mark; a dot joins it when a bot needs you.
             Image(host.needsAttention ? "MenuBarIconAlert" : "MenuBarIcon")
-                .task {
-                    host.start()
-                    appDelegate.updates = updates
-                    updates.start(host: host)
-                    openWindow(id: "chat")
-                }
+                .task { launch() }
                 .onChange(of: account.userID) { _, userID in host.switchAccount(to: userID) }
                 // A device asking for access: bring up the window that holds the approval sheet.
                 .onChange(of: host.currentApproval?.id) { _, id in
@@ -58,16 +73,6 @@ struct CodyncMacApp: App {
             .environment(host)
         }
         .windowResizability(.contentSize)
-
-        Window("Codync", id: "chat") {
-            ChatWindow()
-                .modalHost()
-                .environment(host)
-                .environment(account)
-                .environment(updates)
-        }
-        .defaultSize(width: 1100, height: 760)
-        .windowStyle(.hiddenTitleBar)
     }
 }
 

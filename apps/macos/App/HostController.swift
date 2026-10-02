@@ -151,6 +151,7 @@ final class HostController {
     func requestPairing() { pairingRequest += 1 }
 
     func start() {
+        guard appearanceObservation == nil else { return }
         menuIsDark = NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
         appearanceObservation = NSApp.observe(\.effectiveAppearance) { [weak self] app, _ in
             let dark = app.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
@@ -220,15 +221,13 @@ final class HostController {
             return
         }
         guard Self.devPort != nil || FileManager.default.fileExists(atPath: plistURL.path) else {
-            // The app is the way to run the host on a Mac: set it up right away, unless the user took it out.
-            if UserDefaults.standard.bool(forKey: Self.uninstalledKey) { state = .notInstalled } else { install() }
+            // Installing is the user's call: the window shows the button.
+            state = .notInstalled
             return
         }
         connect()
     }
 
-    /// Set by "Uninstall host service", so the next launch doesn't put the host back.
-    private static let uninstalledKey = "hostUninstalled"
     private static let updateRestartKey = "hostRestartAfterAppUpdate"
 
     /// `codync-host install` also routes Claude Code's status line through the host.
@@ -236,7 +235,6 @@ final class HostController {
         guard !preparingForUpdate, !installingHost, let bin = binaryURL else { return }
         installingHost = true
         streamTask?.cancel()
-        UserDefaults.standard.set(false, forKey: Self.uninstalledKey)
         state = .starting
         Task {
             defer { installingHost = false }
@@ -264,7 +262,6 @@ final class HostController {
     func uninstall() {
         guard let bin = binaryURL else { return }
         streamTask?.cancel()
-        UserDefaults.standard.set(true, forKey: Self.uninstalledKey)
         Task {
             _ = await Self.run(bin, ["uninstall"])
             if let local { accounts.detach(local.id) }
