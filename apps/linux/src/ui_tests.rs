@@ -203,32 +203,75 @@ fn native_ui_flows() {
     click(&routines, "Ask the bot for a routine");
     wait(|| ui.window.visible_dialog().is_none());
     let buf = ui.compose.view.buffer();
-    assert!(buf.text(&buf.start_iter(), &buf.end_iter(), false).contains("I want a routine that"));
-    buf.set_text("");
-    let saved = Rc::new(std::cell::Cell::new(false));
-    let saved2 = saved.clone();
-    crate::client::call(
-        "saveRoutine",
-        serde_json::json!({"botId": "bot", "name": "Morning review", "instruction": "Review the latest changes"}),
-        move |_| saved2.set(true),
+    assert!(
+        buf.text(&buf.start_iter(), &buf.end_iter(), false)
+            .contains("I want a routine that")
     );
-    wait(|| saved.get());
+    buf.set_text("");
 
     crate::manage::routines(&ui, "bot");
     let routines = ui.window.visible_dialog().unwrap();
-    wait(|| text(&routines, "Morning review"));
-    click(&routines, "Edit routine");
+    click(&routines, "Set up a routine");
     let editor = ui.window.visible_dialog().unwrap();
-    wait(|| widgets(&editor).into_iter().filter_map(|w| w.downcast::<gtk::Entry>().ok()).any(|e| e.text() == "Morning review"));
+    let entries: Vec<_> = widgets(&editor)
+        .into_iter()
+        .filter_map(|w| w.downcast::<gtk::Entry>().ok())
+        .collect();
+    entries[0].set_text("Morning review");
+    let instruction = widgets(&editor)
+        .into_iter()
+        .find_map(|w| w.downcast::<gtk::TextView>().ok())
+        .unwrap();
+    instruction.buffer().set_text("Review the latest changes");
     click(&editor, "Preview schedule");
     wait(|| text(&editor, "Daily at 09:00 UTC"));
     screenshot("linux-routine-editor");
     click(&editor, "Save");
-    wait(|| ui.window.visible_dialog().as_ref() == Some(&routines));
-    let switch = widgets(&routines).into_iter().find_map(|w| w.downcast::<gtk::Switch>().ok()).unwrap();
+    wait(|| text(&routines, "Morning review"));
+    let switch = widgets(&routines)
+        .into_iter()
+        .find_map(|w| w.downcast::<gtk::Switch>().ok())
+        .unwrap();
     switch.set_active(false);
-    wait(|| widgets(&routines).into_iter().filter_map(|w| w.downcast::<gtk::Switch>().ok()).any(|s| !s.is_active()));
+    wait(|| {
+        widgets(&routines)
+            .into_iter()
+            .filter_map(|w| w.downcast::<gtk::Switch>().ok())
+            .any(|s| !s.is_active())
+    });
     screenshot("linux-routines");
+
+    // A new webhook routine reopens on its public URL and key.
+    click(&routines, "Set up a routine");
+    let editor = ui.window.visible_dialog().unwrap();
+    let entries: Vec<_> = widgets(&editor)
+        .into_iter()
+        .filter_map(|w| w.downcast::<gtk::Entry>().ok())
+        .collect();
+    entries[0].set_text("Deploy hook");
+    widgets(&editor)
+        .into_iter()
+        .find_map(|w| w.downcast::<gtk::TextView>().ok())
+        .unwrap()
+        .buffer()
+        .set_text("Summarize the deploy");
+    widgets(&editor)
+        .into_iter()
+        .find_map(|w| w.downcast::<gtk::DropDown>().ok())
+        .unwrap()
+        .set_selected(1);
+    click(&editor, "Save");
+    wait(|| {
+        ui.window.visible_dialog().is_some_and(|d| {
+            d != editor && d != routines && text(&d, "https://cloud.example/v1/hooks/c/hook")
+        })
+    });
+    let hook = ui.window.visible_dialog().unwrap();
+    assert!(!text(&hook, "fixture-key"), "the key starts hidden");
+    click(&hook, "Show key");
+    wait(|| text(&hook, "fixture-key-0123456789abcdef0123456789"));
+    screenshot("linux-routine-webhook");
+    close(&ui);
     close(&ui);
 
     crate::market::open(&ui);
