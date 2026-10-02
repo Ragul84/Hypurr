@@ -5,7 +5,7 @@ import Reveal from "./reveal";
 const agents = ["Claude Code", "Codex", "Cursor", "Gemini", "Copilot", "OpenCode", "Pi", "Grok Build"];
 
 const platforms = [
-  { icon: AppleLogo, title: "Mac", body: "A native chat window plus a menu bar icon. Installs the host in one click and pairs your phone." },
+  { icon: AppleLogo, title: "Mac", body: "A menu bar app with a native chat window. Pairs your phone and installs the host itself." },
   { icon: LinuxLogo, title: "Linux", body: "A GTK 4 / libadwaita app for the desktop, or just the host on a headless server or cloud VM." },
   { icon: Terminal, title: "Terminal", body: "A full terminal UI in the same binary, for SSH sessions and machines with no display." },
 ];
