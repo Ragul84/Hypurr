@@ -275,6 +275,29 @@ final class HostController {
         }
     }
 
+    #if DEBUG
+    /// Debug builds: the menu asks the chat window to confirm a full reset.
+    var confirmsReset = false
+
+    /// Debug builds: back to a first launch. Signs out every account, stops the host, deletes
+    /// its data folder (bots, transcripts, keys) and this app's settings, then relaunches.
+    func resetAllData() async {
+        let accountIDs = account.accounts.map(\.id)
+        await account.signOutAll()
+        for id in accountIDs + [nil] { SharedStore.Context(accountID: id).erase() }
+        streamTask?.cancel()
+        if let bin = binaryURL { _ = await Self.run(bin, ["uninstall"]) }
+        try? FileManager.default.removeItem(at: Self.dataDir)
+        UserDefaults(suiteName: SharedStore.appGroup)?.removePersistentDomain(forName: SharedStore.appGroup)
+        if let bundleID = Bundle.main.bundleIdentifier { UserDefaults.standard.removePersistentDomain(forName: bundleID) }
+        let relaunch = Process()
+        relaunch.executableURL = URL(filePath: "/bin/sh")
+        relaunch.arguments = ["-c", "sleep 1; /usr/bin/open -n \"$0\"", Bundle.main.bundlePath]
+        try? relaunch.run()
+        NSApp.terminate(nil)
+    }
+    #endif
+
     func setLaunchAtLogin(_ on: Bool) {
         do {
             if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
