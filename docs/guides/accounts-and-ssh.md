@@ -91,6 +91,14 @@ offers **Computers** to pair later. Skipping while adding a computer from settin
 only closes that pairing sheet. It does not grant access to a computer or change
 the account approval flow. **Start over** resets the onboarding choice.
 
+The Mac's menu bar **Settings → Reset all data…** (confirmed in the window) is the
+Mac's start over: it removes this computer from the account, revokes every paired
+device, signs out, uninstalls the host, deletes its data folder and the app's
+settings, and relaunches into the welcome screen. The host comes back with a new
+identity, so phones see the old computer as **No access** (if they were connected)
+or as an older copy once the new one is reachable, and offer to remove it; pair
+again or ask for access to reach the new one.
+
 On the Mac, open Codync in the menu bar and choose **Pair iPhone**, then scan the
 code on the phone (or paste its `codync://pair` link). The host approves the phone's
 device key; the phone saves the computer in its current account context. This

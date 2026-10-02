@@ -275,13 +275,19 @@ final class HostController {
         }
     }
 
-    #if DEBUG
-    /// Debug builds: the menu asks the chat window to confirm a full reset.
+    /// The menu asks the chat window to confirm a full reset.
     var confirmsReset = false
 
-    /// Debug builds: back to a first launch. Signs out every account, stops the host, deletes
-    /// its data folder (bots, transcripts, keys) and this app's settings, then relaunches.
+    /// Back to a first launch. Removes this computer from the account and revokes its
+    /// paired devices, signs out every account, stops the host, deletes its data folder (bots,
+    /// transcripts, keys) and this app's settings, then relaunches.
     func resetAllData() async {
+        // Tell paired devices first: connected ones see "No access" at once, and the account drops this
+        // computer instead of keeping an unreachable older copy of it.
+        if let client = store?.client {
+            try? await client.unclaim()
+            for device in (try? await client.devices()) ?? [] { try? await client.revokeDevice(device.key) }
+        }
         let accountIDs = account.accounts.map(\.id)
         await account.signOutAll()
         for id in accountIDs + [nil] { SharedStore.Context(accountID: id).erase() }
@@ -296,7 +302,6 @@ final class HostController {
         try? relaunch.run()
         NSApp.terminate(nil)
     }
-    #endif
 
     func setLaunchAtLogin(_ on: Bool) {
         do {
