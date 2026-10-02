@@ -39,8 +39,10 @@ also kills tools and MCP servers that remain in its group. Processes that detach
 into their own sessions and unrelated hosts using other data directories are
 outside this cleanup.
 
-For a manual restart of the installed launch agent, and to inspect other host
-processes for stale binaries:
+After rebuilding the host, restart the launch agent (it runs
+`build/dd/.../Codync.app/Contents/MacOS/codync-host`) and kill any `codync-host`
+still running from a different path. Test hosts you start yourself must be
+stopped when done:
 
 ```sh
 launchctl kickstart -k gui/$(id -u)/com.pokai.codync.host

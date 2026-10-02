@@ -23,10 +23,7 @@ Run from the repository root unless a command changes directories:
 
 ## Installing a new build: kill the old one first
 
-Whenever you build and install/run a new build, stop the old copies so nothing stale keeps running (old host = old protocol, old app = old UI):
-- **Mac app**: quit every running Codync (including copies from Xcode DerivedData) before opening the new one: `osascript -e 'tell application id "com.pokai.Codync" to quit'; pkill -x Codync`, then `open build/dd/Build/Products/Debug/Codync.app`.
-- **Host**: the launchd agent `com.pokai.codync.host` runs `build/dd/.../Codync.app/Contents/MacOS/codync-host`; after rebuilding, restart it with `launchctl kickstart -k gui/$(id -u)/com.pokai.codync.host`, and kill any other `codync-host` still running from a different path (`pgrep -fl codync-host`). Test hosts you start yourself must be stopped when done.
-- **iPhone**: after `xcrun devicectl device install app …`, relaunch with `xcrun devicectl device process launch --terminate-existing --device <id> com.pokai.Codync.ios` so the old process doesn't linger.
+Always stop the old Mac app, host and iPhone process before running a new build (old host = old protocol, old app = old UI); commands in [docs/guides/development.md](docs/guides/development.md#apple-apps).
 
 ## Versioning & releases
 
@@ -63,3 +60,9 @@ Use Swift Testing (`@Test`, `#expect`), Rust unit tests, and the relay’s Node 
 - English only; no `Co-Authored-By` or other AI attribution trailers (the commit-msg hook rejects them).
 
 PRs should explain behavior changes, link relevant issues, list validation performed, and include screenshots for UI changes. Update affected documentation in the same change.
+
+## Keeping this file short
+
+- CLAUDE.md and AGENTS.md hold only rules an agent needs on every task. Reference material (file structure, naming tables, API details, audits, how-tos) goes in `docs/` as its own file, with a one-line pointer here.
+- Whenever you edit either file, check its length: past ~100 lines, or a section past a few lines of reference detail, refactor that detail into `docs/` and leave the pointer, without being asked.
+- Keep `docs/` current: update the doc in the same change that makes it stale.
