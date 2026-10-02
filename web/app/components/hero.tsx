@@ -41,23 +41,25 @@ export default function Hero() {
               <AppleLogo size={18} weight="fill" />
               Download for Mac
             </a>
-            <a
-              href={APP_STORE}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex justify-center transition hover:opacity-80 active:scale-[0.98]"
-            >
-              <Image src="/app-store-badge.svg" alt="Download on the App Store" width={144} height={48} className="h-12 w-auto" />
-            </a>
-            <a
-              href={GITHUB}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-neutral-900 px-6 py-3 font-medium text-neutral-100 transition hover:bg-neutral-800 active:scale-[0.98]"
-            >
-              <GithubLogo size={18} weight="fill" />
-              Star on GitHub
-            </a>
+            <div className="flex gap-3">
+              <a
+                href={APP_STORE}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex justify-center transition hover:opacity-80 active:scale-[0.98]"
+              >
+                <Image src="/app-store-badge.svg" alt="Download on the App Store" width={144} height={48} className="h-12 w-auto" />
+              </a>
+              <a
+                href={GITHUB}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-neutral-900 px-5 py-3 font-medium text-neutral-100 sm:flex-none sm:px-6 transition hover:bg-neutral-800 active:scale-[0.98]"
+              >
+                <GithubLogo size={18} weight="fill" />
+                Star on GitHub
+              </a>
+            </div>
           </motion.div>
         </div>
 
