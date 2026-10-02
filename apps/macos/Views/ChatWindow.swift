@@ -52,6 +52,10 @@ struct ChatWindow: View {
         .background(Palette.background)
         .tint(Palette.accent)
         .ignoresSafeArea(.container, edges: .top)
+        .codyncDialog("Reset all data?", isPresented: Bindable(host).confirmsReset,
+                      message: "Signs out every account and deletes this Mac's bots, conversations, keys and settings. Codync then starts over from the welcome screen.") {
+            [DialogAction("Reset everything", destructive: true) { Task { await host.resetAllData() } }]
+        }
         // Approving a device: the code the device shows must match (spec §4.2 B).
         // It closes when the request is decided or put off (both change `currentApproval`);
         // closing it puts the request off.
@@ -140,10 +144,12 @@ private struct AccountWelcomeView: View {
             Spacer(minLength: 32)
 
             VStack(spacing: 10) {
-                Button("Continue on this Mac", action: onContinue)
-                    .font(.headline)
-                    .frame(maxWidth: .infinity, minHeight: 50)
-                    .buttonStyle(.primary)
+                Button(action: onContinue) {
+                    Text("Continue on this Mac")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, minHeight: 50)
+                }
+                .buttonStyle(.primary)
 
                 Button { onSignIn(.apple) } label: {
                     ZStack {

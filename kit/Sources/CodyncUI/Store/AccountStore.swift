@@ -212,6 +212,23 @@ public final class AccountStore {
             }
     }
 
+    /// A computer this device uses that won't come back as it is: it turned this device away (access
+    /// revoked, or its identity changed after a reset or reinstall), or it's offline while a computer
+    /// with its name is reachable, the same machine under a new identity. Removing it is the fix.
+    public func isStale(_ id: ComputerID) -> Bool {
+        guard let store = stores[id] else { return false }
+        switch store.connection {
+        case .unauthorized:
+            return true
+        case .computerOffline, .offline:
+            let name = store.computer.name
+            return stores.values.contains { $0.computer.id != id && $0.computer.name == name && $0.connection == .online }
+                || cloudComputers.contains { $0.computerId != id && $0.name == name && $0.isOnline }
+        default:
+            return false
+        }
+    }
+
     /// Access requests appear and settle with an animation, like connection changes.
     private func setPending(_ id: ComputerID, _ ticket: AccessTicket?) {
         guard pendingAccess[id] != ticket else { return }

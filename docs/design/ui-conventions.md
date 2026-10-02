@@ -62,9 +62,9 @@ Model discovery keeps loading and refresh in one fixed-size slot beside the Mode
 
 The details inspector uses a compact device summary instead of an empty screen preview. Keep the computer name, remote-screen state, and iPhone hint together; show the hint only when screen capture is ready. Use 16-point horizontal insets, 28-point section gaps, and 12-point corner radii on flat surfaces, without borders.
 
-Routines use a short empty state with one setup action and an icon action for asking in chat. Populated lists move the add action into the section header. Agent metadata uses Runtime and Workspace labels for personal bots, or Project folder for explicitly configured projects; project paths remain selectable and wrap. Personal workspace paths stay out of the default details UI. Keep status and section headings readable in both appearances through `Palette`.
+Routines are a compact grouped list: name, a one-line schedule (or the live run state), and an on/off switch per row; tapping a row opens the same form as +, filled in, with delete and test run beside Save. On the Mac the form card fits its content. The header's chat button asks the bot (puts "I want a routine that " in the composer); + opens the form, where When to run is a type choice and cron is typed directly. The empty state is one line of text. A saved webhook routine's form shows the public URL and key as filled monospaced rows with copy, show/hide and replace-key (confirmed) icon buttons, and one caption on how to send and that deliveries pass through the Codync cloud. Agent metadata uses Runtime and Workspace labels for personal bots, or Project folder for explicitly configured projects; project paths remain selectable and wrap. Personal workspace paths stay out of the default details UI. Keep status and section headings readable in both appearances through `Palette`.
 
-On iPhone, the routine editor uses a single column of trigger choices so titles and descriptions can wrap at larger text sizes. Keep the execution environment note in the scrollable form and the full-width save action in a fixed footer on the sheet background. When required fields are empty, the footer explains why saving is unavailable.
+On iPhone, the routine editor keeps the full-width save action in a fixed footer on the sheet background. When required fields are empty, the footer explains why saving is unavailable.
 
 New bots use automatically allocated personal workspaces. Settings offer Personal or an optional project folder; see [bot workspaces](../features/bot-workspaces.md).
 
@@ -95,8 +95,9 @@ SwiftUI already supplies these actions and needs no duplicate implementation.
   send can be retried with Enter; it reuses the nonce. A late response must not erase
   a draft edited while the request was running.
 - GTK bot menus include **Memory** and **Routines**. Memory supports forgetting one or
-  all facts. Routines support creation, editing, schedule previews, pause/resume, test
-  runs, deletion, history and webhook credentials. The host validates schedules;
+  all facts. Routines are a boxed list with an on/off switch,
+  edit, test run and delete per row; + opens the form (type + raw cron, host
+  preview) and the chat button asks the bot in the composer. The host validates schedules;
   editing can preserve existing event, interval and multiple triggers.
 - GTK **Marketplace** includes agents, connectors and skills. Agent setup supports
   install/login terminals, browser authentication and masked credential fields.

@@ -189,7 +189,8 @@ struct ComputersView: View {
                         ComputerBadge(store.computer, size: 22)
                         VStack(alignment: .leading, spacing: 1) {
                             Text(store.hostName).font(.callout.weight(.medium))
-                            Text(store.statusText).font(.caption).foregroundStyle(Palette.secondary)
+                            Text(host.accounts.statusText(store)).font(.caption)
+                                .foregroundStyle(host.accounts.isStale(computer.id) ? Palette.warning : Palette.secondary)
                         }
                         RouteLabel(store: store, ssh: false).foregroundStyle(Palette.tertiary)
                         Spacer()

@@ -51,9 +51,13 @@ public struct RoutineListing: Codable, Sendable {
     public var runs: [RoutineRun]
 }
 
-public struct RoutineWebhook: Codable, Sendable {
-    public var url: String
+/// A routine's webhook: `url` is public through the Codync cloud (nil while the cloud is off),
+/// `localUrl` works on the host itself.
+public struct RoutineWebhook: Codable, Sendable, Equatable {
+    public var url: String?
+    public var localUrl: String
     public var key: String
+    public var connected: Bool
 }
 
 extension HostClient {
@@ -67,9 +71,10 @@ extension HostClient {
         let _: Empty = try await call(method, Body(botId: botId, id: id, enabled: enabled))
     }
 
-    public func routineWebhook(botId: String, id: String) async throws -> RoutineWebhook {
-        struct Body: Encodable { let botId: String; let id: String }
-        return try await call("routineWebhook", Body(botId: botId, id: id))
+    /// `rotate` replaces the key first; senders using the old one stop working.
+    public func routineWebhook(botId: String, id: String, rotate: Bool = false) async throws -> RoutineWebhook {
+        struct Body: Encodable { let botId: String; let id: String; let rotate: Bool }
+        return try await call("routineWebhook", Body(botId: botId, id: id, rotate: rotate))
     }
 }
 

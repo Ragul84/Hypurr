@@ -31,12 +31,18 @@ joined by email. The Mac's `com.pokai.Codync://callback` must also remain allowe
 in Clerk. See [Apple's web configuration guide](https://developer.apple.com/help/account/capabilities/configure-sign-in-with-apple-for-the-web/)
 and [Clerk's Apple OAuth guide](https://clerk.com/docs/guides/configure/auth-strategies/social-connections/apple).
 
-To check cross-device discovery, use **Release** on both devices (the same Clerk
-production instance), select the same Apple Account, and verify that Clerk has
-one user ID. Debug uses the separate development instance; its shared Apple OAuth
-credentials do not validate production identity matching. Then verify that the
-Mac joins the account and the phone requests access with the existing approval
-flow. Hide My Email does not change the device approval requirement.
+The development instance uses the same custom credentials (Services ID, team
+`7FUM8A8H72`, key `8S76D7ADWU`) since 2026-10-03, with
+`sunny-mollusk-8651.clerk.accounts.dev` and its `/v1/oauth_callback` added to the
+Services ID. Clerk's shared Apple credentials belong to Clerk's team, so with them
+the Mac's web sign-in and the iPhone's native sign-in got different Apple user IDs
+and became two Clerk users; don't switch development back to shared credentials.
+
+To check cross-device discovery, sign in with the same Apple Account on both
+devices of one environment (Debug ↔ Debug, Release ↔ Release) and verify that
+Clerk has one user ID. Then verify that the Mac joins the account and the phone
+requests access with the existing approval flow. Hide My Email does not change the
+device approval requirement.
 
 Verified on 2026-09-30: the Mac Debug build completed Apple OAuth and displayed
 the signed-in private relay address and Log out action. The Apple and Google
@@ -90,6 +96,14 @@ tabs; this choice survives relaunches and account changes. The empty Bots screen
 offers **Computers** to pair later. Skipping while adding a computer from settings
 only closes that pairing sheet. It does not grant access to a computer or change
 the account approval flow. **Start over** resets the onboarding choice.
+
+The Mac's menu bar **Settings → Reset all data…** (confirmed in the window) is the
+Mac's start over: it removes this computer from the account, revokes every paired
+device, signs out, uninstalls the host, deletes its data folder and the app's
+settings, and relaunches into the welcome screen. The host comes back with a new
+identity, so phones see the old computer as **No access** (if they were connected)
+or as an older copy once the new one is reachable, and offer to remove it; pair
+again or ask for access to reach the new one.
 
 On the Mac, open Codync in the menu bar and choose **Pair iPhone**, then scan the
 code on the phone (or paste its `codync://pair` link). The host approves the phone's

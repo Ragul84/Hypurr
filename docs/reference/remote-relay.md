@@ -371,6 +371,8 @@ Host → DO：
 | `data` | `link`, `m`（channel 訊息物件） | host 必須 ready；將 `m` 原樣（`JSON.stringify(m)`）送到該 link 的 device socket |
 | `close` | `link`, `code`, `reason` | 關閉該 device socket |
 | `mbox.ack` | `seq`, `ok`（bool）, `code`（`ok:false` 時：`unauthorized`/`unknownBot`/`invalid`） | 刪除 mailbox 項目，通知發送裝置 `mbox.delivered` 或 `mbox.failed` |
+| `hooks` | `hooks`：`[{"id","key","enabled"}]`（完整集合，≤ 1000） | 取代 DO 存的 webhook 集合（§7.8）；格式錯誤 → `{"t":"error","code":"badHooks"}` 且保留舊集合。成功 → `{"t":"hooks.ok","n"}` |
+| `hook.ack` | `seq`, `ok`（bool）, `retry`（bool）, `code` | `ok` 或 `retry:false` → 刪除；`retry:true` → 退回 queued，`not_before = now + min(30 s·2^attempts, 15 min)` |
 | `ping` | — | auto-response |
 
 DO → Host：
@@ -381,6 +383,8 @@ DO → Host：
 | `data` | `link`, `m`（device 送來的 channel 訊息物件） |
 | `close` | `link`（device 斷線） |
 | `mbox.item` | `seq`, `from`（dk）, `nonce`（clientNonce）, `d`（blob b64url）, `exp` |
+| `hook.item` | `seq`, `hook`（routine id）, `delivery`, `headers`（白名單，小寫名）, `body`（b64url）, `at` |
+| `hooks.ok` | `n` |
 | `cloud.changed` | —（Worker 通知：請立刻拉 `/v1/host/state`） |
 | `acl.ok` / `error` | 見上 |
 
@@ -435,6 +439,20 @@ Close code 總表：`1000` 正常、`1011` 內部錯誤／逾時、`4001 unautho
 - 投遞：host `ready` 後，DO 依 `seq` 遞增逐則送 `mbox.item`（狀態改 `delivering`）；host 逐則處理並 `mbox.ack`。host 斷線時 `delivering` 退回 `queued`，重連後重送（host 以 clientNonce 去重）。
 - TTL 到期 → 刪除 + `mbox.expired`。
 
+### 7.8 公開 routine webhook
+
+讓外部服務（GitHub、監控、腳本）觸發 routine，不需要公網 IP、開 port 或使用者自己的 tunnel：沿用 host 主動連出的 relay socket。
+
+- **網址**：`POST {cloud}/v1/hooks/{computerId}/{routineId}`。Worker 檢查兩個 id 的格式、body ≤ 64 KiB（否則 `413 tooLarge`）、`HOOK_LIMITER`（每「來源 IP + hook」每分鐘 60 次 → `429`）、computer 存在且 `active`（否則 `404`，不為隨機 id 建 DO），再把原 request 轉給該 computer 的 DO `/internal/hook`。
+- **註冊**：host 在 `ready` 後送 `hooks`，之後每當集合改變（新增／刪除 webhook routine、暫停／恢復、換 key）就重送整個集合。只含有 `webhook` 或 `event` trigger 的 routine。
+- **驗證（DO 一次、host 再一次）**：`Authorization: Bearer <key>`（常數時間比較），或 `X-Hub-Signature-256: sha256=<hex HMAC-SHA256(key, 原始 body)>`（GitHub 與相容服務）。未知 hook 與錯誤 key 一律 `401 unauthorized`，無法探測 id。已暫停 → `409 paused`。host 是最終權威：DO 的集合過期或被竄改時，host 仍會拒絕。
+- **去重**：delivery id 取 `X-Delivery-Id`、`X-GitHub-Delivery` 或 `Idempotency-Key`（可列印 ASCII、≤ 200；不合法 → `400 badDeliveryId`；都沒有 → DO 產生 UUID）。DO 以 `(hook, delivery)` 唯一；佇列中的重送回 `202 {"duplicate":true}`。已投遞後的重送由 host 以保留中的 run 紀錄去重。
+- **佇列（DO `hookbox`）**：每 hook ≤ 100、每 computer ≤ 1000 則、總計 ≤ 16 MiB（滿 → `429 full`，`Retry-After: 60`）；TTL 72 小時。成功入列 → `202 {"delivery","queued":true}`。
+- **投遞**：host `ready` 時，DO 依 `seq` 一次送一則 `hook.item`（狀態 `delivering`），跳過 `not_before` 未到的；host 斷線時退回 `queued`。alarm 清除過期項目，並在最早的 `not_before` 喚醒。
+- **轉給 host 的 header 白名單**：`authorization`、`content-type`、`user-agent`、`x-delivery-id`、`idempotency-key`、`x-github-event`、`x-github-delivery`、`x-github-hook-id`、`x-hub-signature-256`。
+- **Host 處理**（`routines::hooks`）：驗證 → GitHub `ping` 回 ok 不執行 → 暫停回 `paused` → 轉成 event（JSON 物件原樣；GitHub → `{source:"github", event:"<event>.<action>", repo, sender, text, url, payload}`；其他 → `{text}`）→ trigger 不符回 ok（忽略）→ 排入 run。routine 正在執行 → `retry:true`。
+- **信任邊界**：webhook 內容在 Cloudflare 以 HTTPS 解開，雲端看得到明文，也存著 key（用來驗 HMAC）。這不是 §6 的端對端加密；App 與文件都需明講。
+
 ---
 
 ## 8. Cloud HTTP API
@@ -479,6 +497,8 @@ The route table below summarizes the contract. Executable schema and validation 
 - `POST /v1/host/grants/{grantId}/revoke` `{}` → `{}`（host 在本機撤銷帳號來源裝置時同步 D1，`revoked_reason='owner'`；失敗記錄並存入 `grant_revokes` 重試，本機撤銷已生效）
 - `POST /v1/host/access-requests/{id}/decision` `{"decision":"approve"|"deny"}` → `{"status","grantId"?}`（`cloud/src/api.ts` 的原子更新；request 過期 → `410 requestExpired`；approve 要求 `device_nonce IS NOT NULL`，否則 `409`）
 - `POST /v1/host/unclaim` `{}` → `{}`（在電腦上移出帳號；同 `DELETE /v1/computers/{id}` 的效果）
+
+**Routine webhook（公開）**：`POST /v1/hooks/{computerId}/{routineId}`，§7.8。
 
 **Relay**：§7.1。**Webhook**：`user.deleted` → accounts `status='deleted'`、devices 撤銷、grants 撤銷（`accountDeleted`）、computers owner=NULL、DO block + changed。
 

@@ -1,23 +1,30 @@
 # Routines
 
-Routines belong to an agent bot. **Set up a routine** opens a form for the name,
-instruction, trigger and timeout; Save creates it immediately. Edit opens the same
-form and preserves existing triggers by default. **Ask in chat** is a separate
-option that inserts an explanatory draft; send it to ask the bot to configure the
-routine. Every agent receives the built-in `routines` MCP server. The Mac conversation details
-panel and the iPhone's **More → Routines** show the saved instruction, triggers,
-pause/resume, edit, delete, test run and execution history. Creation/update notices
-open the routine.
+Routines belong to an agent bot and are usually created by talking to it ("I want
+a routine that…"). Every agent receives the built-in `routines` MCP server. The Mac
+conversation details panel and the iPhone's **More → Routines** show a compact list
+(name, schedule, on/off switch). The header's chat button puts "I want a routine
+that " in the composer; **+** opens the form for doing it by hand. A row opens
+the same form filled in, with delete and test run beside Save; the row's switch
+pauses and resumes. Run results appear in the chat. The form is name, instruction, a **When to run** type (Schedule or Webhook, the two
+Claude Code routines also offer besides GitHub events) and a run timeout; cron is
+written directly as five fields plus an IANA time zone, and the host checks it and
+shows the summary and next run. One-off times, intervals, events and multiple
+triggers are left to the bot: editing such a routine shows its current triggers as
+the selected type and keeps them until Schedule or Webhook replaces them. Linux (boxed list with switches,
+same form) and the TUI (`n` form with a typed When, `c` asks the bot) match.
+A saved webhook routine's form shows its public URL and key (copy, reveal, replace
+with confirmation; Linux the same, TUI `w` copies a curl command and `W` replaces the
+key). Creation/update notices open the routine.
 
 ## Apple setup interface
 
-The editor keeps task fields first, followed by trigger choices and their settings.
-Trigger choices use adaptive columns, selected checkmarks and short descriptions.
+The editor keeps task fields first, then a When to run type menu and its settings.
 Inputs use the shared palette with a visible filled surface. New recurring schedules
-default to cron; the frequency controls send form values to the host, which returns a five-field
-expression and an explicit IANA time zone. Run timeout is under an animated Run settings
+default to a typed cron expression and an explicit IANA time zone; the host
+describes it and shows the next run. Run timeout is under an animated Run settings
 expansion. A fixed footer keeps Create routine / Save changes and inline errors
-visible while the form scrolls; it explains the local execution requirement.
+visible while the form scrolls.
 The layout uses the same light/dark tokens, type family and custom controls as the
 rest of Codync, with Reduce Motion support.
 
@@ -96,22 +103,40 @@ before stopping actors.
 
 ## Webhook delivery
 
-`routineWebhook` returns a per-routine URL and secret. The ordinary listing never
-returns the secret. Send JSON to `/hooks/routines/<id>` using
-`Authorization: Bearer <key>`. `X-Delivery-Id` deduplicates retries against retained
-run records. Bodies are limited to 64 KB. The routine must be enabled. Event
-routines additionally require a matching normalized payload, for example:
+Every webhook routine has a key and two addresses (`routineWebhook`): the public
+`{cloud}/v1/hooks/{computerId}/{routineId}` through the Codync cloud (null while the
+cloud is off) and the local `http://127.0.0.1:<port>/hooks/routines/<id>`. Both run
+the same checks (`host/src/routines/hooks.rs`); the protocol is
+[spec §7.8](../reference/remote-relay.md).
+
+- **Authentication**: `Authorization: Bearer <key>`, or `X-Hub-Signature-256` (an
+  HMAC-SHA256 of the body with the key). For GitHub: payload URL = the public URL,
+  content type `application/json`, secret = the key. `routineWebhook` with
+  `rotate: true` replaces the key; the old one stops working at once, including in
+  the cloud.
+- **Events**: a JSON object is the event as-is; a GitHub delivery becomes
+  `{source:"github", event:"<event>.<action>", repo, sender, text, url, payload}`
+  (GitHub `ping` succeeds without running); other bodies become `{text}`. Event
+  triggers filter on these fields, for example:
 
 ```json
 {"source":"github","event":"pull_request.opened","repo":"owner/repo","text":"A PR opened"}
 ```
 
-The displayed URL uses host loopback. An external sender needs a deliberately
-configured forwarding service and must normalize its provider's event into this
-format. This implementation does **not** provision SaaS subscriptions, use Grok
-Bot's private cloud, register provider webhooks, or provision an inbound email
-address. Do not describe an event routine as connected before verifying delivery.
-The local endpoint is not automatically published through Codync's E2E relay.
+- **Delivery**: `X-Delivery-Id`, `X-GitHub-Delivery` or `Idempotency-Key`
+  deduplicates retries against retained run records. Bodies are limited to 64 KB.
+  A paused routine refuses (`409`); a non-matching event is accepted and ignored.
+  While the routine is running, the local endpoint answers `409` and the cloud
+  queue retries later (30 s doubling to 15 min).
+- **Offline**: the cloud keeps public deliveries for up to 72 hours and hands them
+  over one at a time once the host is back; the host acknowledges each.
+- **Trust**: deliveries are not end-to-end encrypted. The cloud terminates HTTPS,
+  sees the content and stores the key to check signatures. The host checks the key
+  again before anything runs.
+
+Codync does not create provider subscriptions: the user (or the bot, with the user)
+pastes the URL and key into the sending service. Do not describe an event routine as
+connected before a real delivery has arrived.
 
 ## API
 
@@ -125,7 +150,7 @@ All normal methods use the existing authenticated host API / authorized E2E chan
 | `setRoutineEnabled` | `botId`, `id`, `enabled` |
 | `deleteRoutine` | `botId`, `id` |
 | `runRoutine` | `botId`, `id` |
-| `routineWebhook` | `botId`, `id` |
+| `routineWebhook` | `botId`, `id`, optional `rotate`; returns `url` (public or null), `localUrl`, `key`, `connected` |
 
 The local-only `routineCall` backs the MCP tools. Each MCP instance is scoped to
 its bot. Phone and Mac panels refresh while visible; definitions do not currently
@@ -146,7 +171,8 @@ completion reporting. Most automation modules it imports are absent. Its rendere
 and private cloud are not source-complete references.
 
 Remaining differences from the reference: provider subscription provisioning,
-cloud execution/delivery while the host is offline, inactivity auto-pause, and a Linux routine panel (the TUI edits routines with a typed schedule: cron, `every 2h`, a date, or `webhook`). The Apple UI
+cloud execution while the host is offline (deliveries wait in the cloud instead), and
+inactivity auto-pause. The Apple UI
 uses Codync's shared native controls. This is not a verified complete one-to-one
 reconstruction of every Grok Bot routine behavior.
 
@@ -156,34 +182,24 @@ reconstruction of every Grok Bot routine behavior.
 checks real scheduled execution, webhook credentials, delivery deduplication,
 pause/delete/edit while queued, crash recovery in the same session, unsupported
 session recovery, hung-agent timeout, recurring work after failure, single-host
-ownership, silent completion, and the advertised routine MCP server. Unit tests
-cover timezone calculation, invalid schedules, event filters, persistence,
-pause/resume and bot ownership. Swift tests cover the wire model and transcript links.
+ownership, silent completion, and the advertised routine MCP server (including key
+rotation). Unit tests cover timezone calculation, invalid schedules, event filters,
+persistence, pause/resume, bot ownership, bearer/HMAC checks, GitHub event mapping and
+the relay's hook registration, acks and retries. `cloud/test/hooks.test.ts` covers the
+edge checks, queue limits, deduplication, ordering, retry and expiry; the cloud e2e
+(`npm run e2e`, step 5b) delivers through a real Worker and host, including a signed
+GitHub delivery queued while the host was down. Swift tests cover the wire model and
+transcript links.
 
 ## Public webhook ingress without a fixed IP
 
-Research checked on 2026-09-26:
-
-- [OpenClaw Gmail webhook setup](https://docs.openclaw.ai/cli/webhooks)
-  supports Tailscale Funnel for a public push endpoint. Serve is private to the
-  tailnet; it is not a replacement for a public URL used by an arbitrary SaaS.
-- [Hermes webhook adapter](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/messaging/webhooks.md)
-  provides an HTTP listener, route secrets/signature validation, filtering and
-  event-triggered cron jobs. Its documented setup still requires a reachable
-  server URL; enabling the adapter alone does not solve NAT traversal.
-
-For Codync, a fixed IP on the user's computer is unnecessary. Two possible
-approaches are a configured outbound tunnel, or a Codync cloud ingress with a
-persistent event queue and delivery over the host's outbound connection. The
-latter fits offline delivery but is **proposed, not implemented** here.
-
-The existing relay accepts authorized devices' encrypted frames. A third-party
-HTTP sender cannot produce those frames or act as a paired device. Public ingress
-therefore needs its own per-routine authorization, provider signature checking,
-rate/body limits, delivery IDs, expiry, acknowledgements and revocation. Cloud
-HTTPS termination sees the incoming provider payload; it must not be presented as
-the same end-to-end encryption boundary as device messages. Local execution waits
-until the host reconnects and is awake.
+Research checked on 2026-09-26: [OpenClaw](https://docs.openclaw.ai/cli/webhooks)
+uses Tailscale Funnel and the [Hermes webhook adapter](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/messaging/webhooks.md)
+needs a reachable server URL. Codync instead reuses the host's outbound relay socket
+(above): no fixed IP, open port or per-user tunnel, and deliveries survive the
+computer being off. A user's own Cloudflare Tunnel to the local endpoint also works
+but needs their own account, domain and `cloudflared`, and drops deliveries while the
+computer is off.
 
 ## Usability comparison (2026-09-27)
 
@@ -195,38 +211,21 @@ the routine by name. No reference routine was run, paused or deleted during this
 comparison.
 
 Codync retains that compact sidebar and the chat-based setup path, while providing
-a direct editor. Calendar schedules offer minute frequencies, hourly, daily, weekdays, weekly,
-selected weekdays, monthly and custom cron. The clock uses separate hour/minute
-controls with every minute available and quick 09:00 / 12:00 / 18:00 choices.
-Selected weekdays support multiple days. The summary shows the clock time and
-zone, with the generated expression available on expansion. Switching to Custom
-starts from that expression. Monthly days 29–31 explain that shorter months are
-skipped. Existing duration intervals keep their cadence until explicitly replaced. Editing hydrates the original schedule, timezone and interval exactly;
-compound and provider-event triggers retain a lossless Keep existing triggers
-fallback. Expired one-shot timestamps are preserved when editing other fields.
+a direct editor where cron is typed as written (the earlier frequency/clock pickers
+were removed as too heavy). Existing duration intervals keep their cadence until
+explicitly replaced. Editing hydrates the original expression, timezone and interval
+exactly; compound and provider-event triggers retain a lossless Keep existing
+triggers fallback. Expired one-shot timestamps are preserved when editing other fields.
 
 Saved definitions appear immediately. Paused schedules omit next-run deadlines.
-List/details expose queued/running/recovery/failure states and empty run history.
-Edit with bot includes the routine ID in a draft without sending it. Webhook
-credentials have explicit copy controls, and the panel distinguishes testing the
-task from verifying an external delivery. These changes do not configure public
-ingress or claim a provider connection is working.
-
-Verification: shared Swift tests passed (46 tests; an unrelated offline-mailbox
-assertion failed on the first run, then passed both the targeted and full rerun).
-macOS Debug and iOS Simulator builds passed. On the installed Mac build, an
-isolated fixture bot was used to create a Sunday 09:00 Asia/Taipei routine, reopen
-its populated editor, change it to weekdays, and pause it. API inspection
-confirmed one updated routine with `0 9 * * 1-5` and `enabled: false`. Edit with
-bot populated an unsent draft with the routine ID. The test bot and working
-directory were removed. Screenshots are in `build/routine-usability-calendar.jpeg`
-and `build/routine-usability-details.jpeg`.
+List rows and details expose queued/running/recovery/failure states.
+Edit with bot includes the routine ID in a draft without sending it.
 
 ## Cron scheduling contract
 
-All newly configured recurring schedules in the Apple editor use `cron` and run
-through the host's existing Croner scheduler. Minute presets divide an hour evenly
-(1, 5, 10, 15, 20, 30); hourly schedules choose an exact minute. Cron generation, parsing, validation, timezone checks, descriptions and next-run
+All newly configured recurring schedules in the editors use `cron` (sent as
+`calendarStyle: custom` with the typed expression) and run through the host's
+existing Croner scheduler. The host keeps preset compilation for its API. Cron generation, parsing, validation, timezone checks, descriptions and next-run
 calculation all live in `host/src/routines/editor.rs` and `schedule.rs`. The Swift
 draft is only a Codable form DTO. The editor debounces preview requests, discards
 stale responses, shows host errors and disables Save until the current draft is
@@ -248,32 +247,3 @@ interval and expired one-shot preservation, and next occurrences across month
 boundaries. An isolated HTTP integration test previews, saves and reloads the same
 form and verifies direct saves reject invalid drafts. Swift tests cover wire DTO
 decoding and millisecond date binding; there is no Swift cron implementation.
-
-
-### macOS selection checks
-
-The calendar editor uses shared choice menus. Nested menus become the active
-accessibility surface above the editor; Escape dismisses the top overlay through
-its own close binding. This keeps menu interaction separate from closing the
-routine editor. Schedule rules remain on the host; these are presentation rules.
-
-
-Verified on the installed Mac build through Computer Use on 2026-09-27:
-
-- Opened a saved Monday/Wednesday/Friday schedule at 14:47 in Asia/Taipei.
-- Switched to Custom and observed the host-generated `47 14 * * 1,3,5`.
-- Entered minute 61; the server error appeared and Save was disabled.
-- Selected minute 23 through the scrollable menu, saved, and reopened. Both the
-  UI and API retained `23 14 * * 1,3,5` and the paused state.
-- Selected monthly day 31; the warning and October 31 next occurrence appeared.
-- Selected every 15 minutes and hourly at minute 23; both displayed host previews.
-- Verified Escape closes the top menu and preserves the editor and form values.
-- Verified the minute menu opens scrolled to the current selection. Its selection
-  stays visible instead of starting at 00.
-
-The temporary bot and paused routine were removed after checking. Screenshots:
-`build/cron-verification/calendar-fields.png` and `minute-selection.png`.
-Validation: 52 Swift tests, 12 Rust routine unit tests, the isolated HTTP editor
-integration test, Rust Clippy with warnings denied, and signed macOS/iOS Debug
-builds passed. iPhone received the updated build; its final relaunch was blocked
-by the device lock. This GUI acceptance used macOS.

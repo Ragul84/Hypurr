@@ -136,6 +136,11 @@ struct MenuView: View {
             Button("Open log") { NSWorkspace.shared.open(host.logURL) }
             Divider()
             Button("Uninstall host service") { host.uninstall() }
+            Divider()
+            Button("Reset all data…") {
+                host.confirmsReset = true
+                open("chat")
+            }
         }
         if let version = host.version { Text("Version \(version)") }
         Button("Quit Codync") { NSApp.terminate(nil) }

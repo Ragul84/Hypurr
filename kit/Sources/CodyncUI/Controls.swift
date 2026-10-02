@@ -38,10 +38,11 @@ public struct CodyncSwitch: ToggleStyle {
                     configuration.label
                     Spacer(minLength: 0)
                     Capsule()
-                        .fill(configuration.isOn ? Palette.switchOn : Palette.bubbleUser)
+                        .fill(configuration.isOn ? Palette.accentFill : Palette.bubbleUser)
                         .frame(width: 34, height: 20)
                         .overlay(alignment: configuration.isOn ? .trailing : .leading) {
-                            Circle().fill(.white).padding(2)
+                            // Black and white: the knob takes the opposite ink of an on track.
+                            Circle().fill(configuration.isOn ? Palette.onAccent : .white).padding(2)
                         }
                 }
                 .contentShape(Rectangle())

@@ -65,16 +65,25 @@ class Host(BaseHTTPRequestHandler):
         if method == "routines":
             return self.send_json(dict(routines=cls.routines, runs=[]))
         if method == "saveRoutine":
-            assert body["schedule"]["kind"] == "cron"
+            kind = body["schedule"]["kind"]
+            assert kind in ("cron", "webhook")
             assert body["timeoutSeconds"] == 3600
-            routine = dict(id="routine", name=body["name"], instruction=body["instruction"], enabled=True, triggers=[dict(type="cron", expression="0 9 * * *", timeZone="UTC")], triggerDescriptions=["Daily at 09:00 UTC"], nextRunAt=1820000000000)
-            cls.routines = [routine]
-            return self.send_json(routine)
+            if kind == "cron":
+                routine = dict(id="routine", name=body["name"], instruction=body["instruction"], enabled=True, triggers=[dict(type="cron", expression="0 9 * * *", timeZone="UTC")], triggerDescriptions=["Daily at 09:00 UTC"], nextRunAt=1820000000000)
+            else:
+                routine = dict(id="hook", name=body["name"], instruction=body["instruction"], enabled=True, triggers=[dict(type="webhook")], triggerDescriptions=["When a webhook fires"], nextRunAt=None)
+            cls.routines = [r for r in cls.routines if r["id"] != routine["id"]] + [routine]
+            return self.send_json(dict(routine=routine))
+        if method == "routineWebhook":
+            key = "rotated-key-0123456789abcdef0123456789" if body.get("rotate") else "fixture-key-0123456789abcdef0123456789"
+            return self.send_json(dict(url="https://cloud.example/v1/hooks/c/" + body["id"], localUrl="http://127.0.0.1:19222/hooks/routines/" + body["id"], key=key, connected=True))
         if method == "routineSchedule":
             return self.send_json(dict(summary="Daily at 09:00 UTC", nextRunAt=1820000000000))
         if method == "setRoutineEnabled":
-            cls.routines[0]["enabled"] = body["enabled"]
-            cls.routines[0]["nextRunAt"] = 1820000000000 if body["enabled"] else None
+            for r in cls.routines:
+                if r["id"] == body["id"]:
+                    r["enabled"] = body["enabled"]
+                    r["nextRunAt"] = 1820000000000 if body["enabled"] and r["id"] == "routine" else None
         if method == "deleteRoutine":
             cls.routines = []
         if method == "skills":
