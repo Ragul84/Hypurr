@@ -55,9 +55,6 @@ public enum Palette {
     public static let accentDim = Color(light: 0xD9D9D9, dark: 0x333333)
     public static let danger = Color(light: 0xC23A2B, dark: 0xF0A7A7)
     public static let warning = Color(hex: 0xF0A030)
-    /// On-state for switches. Not the ink accent: a white track in dark mode
-    /// hides the white knob, so switches use a system-style blue (as in Grok Bot).
-    public static let switchOn = Color(light: 0x0A84FF, dark: 0x0A84FF)
     public static let codeBackground = Color(light: 0xF4F4F4, dark: 0x111111)
     public static let added = Color(light: 0x2E7D32, dark: 0x8FD18B)
     public static let removed = Color(light: 0xC62828, dark: 0xF0A7A7)

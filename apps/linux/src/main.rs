@@ -108,8 +108,10 @@ const CSS: &str = r#"
 @define-color popover_bg_color @cd_panel;
 @define-color popover_fg_color @cd_text;
 @define-color card_bg_color @cd_agent;
-@define-color accent_bg_color #0A84FF;
+@define-color accent_bg_color @cd_accent;
+@define-color accent_fg_color @cd_on_accent;
 @define-color accent_color @cd_text;
+switch:checked > slider { background: @cd_on_accent; }
 
 window { font-size: 12px; }
 .surface { background: @cd_surface; }
