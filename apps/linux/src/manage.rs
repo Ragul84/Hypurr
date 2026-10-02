@@ -113,17 +113,21 @@ fn load_memory(ui: &App, bot: &str, list: &gtk::Box) {
 }
 
 pub fn routines(ui: &App, bot: &str) {
-    let (_, body) = dialog(ui, "Routines");
+    let (window, body) = dialog(ui, "Routines");
     let actions = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-    let add = icon_button("list-add-symbolic", "Set up a routine");
+    let add = icon_button("list-add-symbolic", "Ask the bot for a routine");
     let refresh = icon_button("view-refresh-symbolic", "Refresh routines");
     actions.append(&add);
     actions.append(&refresh);
     body.append(&actions);
     let list = gtk::Box::new(gtk::Orientation::Vertical, 14);
     body.append(&list);
-    let (ui2, bot2, list2) = (ui.clone(), bot.to_owned(), list.clone());
-    add.connect_clicked(move |_| routine_editor(&ui2, &bot2, Value::Null, &list2));
+    // New routines are set up by talking to the bot: start the ask in its chat.
+    let ui2 = ui.clone();
+    add.connect_clicked(move |_| {
+        window.close();
+        ui::insert_draft(&ui2, "I want a routine that ");
+    });
     let (ui2, bot2, list2) = (ui.clone(), bot.to_owned(), list.clone());
     refresh.connect_clicked(move |_| load_routines(&ui2, &bot2, &list2));
     load_routines(ui, bot, &list);
@@ -144,101 +148,63 @@ fn load_routines(ui: &App, bot: &str, list: &gtk::Box) {
         };
         let items = v["routines"].as_array().cloned().unwrap_or_default();
         if items.is_empty() {
-            list.append(&label("No routines yet", &["secondary"]));
-        }
-        for item in items {
-            let card = gtk::Box::builder()
-                .orientation(gtk::Orientation::Vertical)
-                .spacing(8)
-                .css_classes(["details-box"])
-                .build();
-            card.append(&label(
-                item["name"].as_str().unwrap_or("Routine"),
-                &["headline"],
-            ));
-            let desc = item["triggerDescriptions"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .filter_map(Value::as_str)
-                .collect::<Vec<_>>()
-                .join(" · ");
-            let text = label(
-                &format!(
-                    "{} · {desc}",
-                    if item["enabled"] == true {
-                        "Enabled"
-                    } else {
-                        "Paused"
-                    }
-                ),
+            let empty = label(
+                "No routines yet. Tell the bot what to run and when, and it sets one up.",
                 &["secondary"],
             );
-            text.set_wrap(true);
-            card.append(&text);
-            let instruction = label(item["instruction"].as_str().unwrap_or(""), &[]);
-            instruction.set_wrap(true);
-            card.append(&instruction);
-            if let Some(error) = item["lastError"].as_str() {
-                card.append(&label(error, &["danger-text"]));
-            }
-            if let Some(at) = item["nextRunAt"].as_i64() {
-                card.append(&label(
-                    &format!("Next: {}", schedule_time(at)),
-                    &["secondary"],
-                ));
-            }
-            let actions = gtk::Box::new(gtk::Orientation::Horizontal, 6);
-            card.append(&actions);
+            empty.set_wrap(true);
+            list.append(&empty);
+            return;
+        }
+        let rows = gtk::ListBox::builder()
+            .selection_mode(gtk::SelectionMode::None)
+            .css_classes(["boxed-list"])
+            .build();
+        list.append(&rows);
+        for item in items {
+            let active = v["runs"].as_array().into_iter().flatten().find(|run| {
+                run["routineId"] == item["id"]
+                    && matches!(
+                        run["status"].as_str(),
+                        Some("pending" | "starting" | "running" | "recovering")
+                    )
+            });
+            // What's happening now, else when it runs.
+            let summary = if let Some(run) = active {
+                run_label(run["status"].as_str().unwrap_or(""))
+            } else if item["lastError"].is_string() {
+                "Schedule needs attention".to_owned()
+            } else {
+                item["triggerDescriptions"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(Value::as_str)
+                    .collect::<Vec<_>>()
+                    .join(" · ")
+            };
+            let row = adw::ActionRow::builder()
+                .title(item["name"].as_str().unwrap_or("Routine"))
+                .subtitle(summary)
+                .tooltip_text(item["instruction"].as_str().unwrap_or(""))
+                .build();
+            rows.append(&row);
             let edit = icon_button("document-edit-symbolic", "Edit routine");
-            actions.append(&edit);
             let (ui2, bot2, item2, list2) = (ui.clone(), bot.clone(), item.clone(), list.clone());
             edit.connect_clicked(move |_| routine_editor(&ui2, &bot2, item2.clone(), &list2));
+            row.add_suffix(&edit);
             for (icon, title, method) in [
                 ("media-playback-start-symbolic", "Test run", "runRoutine"),
-                (
-                    "media-playback-pause-symbolic",
-                    if item["enabled"] == true {
-                        "Pause"
-                    } else {
-                        "Resume"
-                    },
-                    "setRoutineEnabled",
-                ),
                 ("user-trash-symbolic", "Delete routine", "deleteRoutine"),
             ] {
                 let button = icon_button(icon, title);
-                actions.append(&button);
-                let active = v["runs"].as_array().into_iter().flatten().any(|run| {
-                    run["routineId"] == item["id"]
-                        && matches!(
-                            run["status"].as_str(),
-                            Some("pending" | "starting" | "running" | "recovering")
-                        )
-                });
-                button.set_sensitive(method != "runRoutine" || !active);
+                button.set_valign(gtk::Align::Center);
+                button.set_sensitive(method != "runRoutine" || active.is_none());
+                row.add_suffix(&button);
                 let (ui, bot, item, list) = (ui.clone(), bot.clone(), item.clone(), list.clone());
-                button.connect_clicked(move |button| {
-                    let (ui2, bot, list, item, button2) = (
-                        ui.clone(),
-                        bot.clone(),
-                        list.clone(),
-                        item.clone(),
-                        button.clone(),
-                    );
-                    let run = move || {
-                        button2.set_sensitive(false);
-                        client::call(
-                            method,
-                            json!({"botId":bot,"id":item["id"],"enabled":item["enabled"] != true}),
-                            move |r| {
-                                if let Err(e) = r {
-                                    toast(&ui2, &e);
-                                }
-                                load_routines(&ui2, &bot, &list);
-                            },
-                        );
-                    };
+                button.connect_clicked(move |_| {
+                    let (ui2, bot, list, id) = (ui.clone(), bot.clone(), list.clone(), item["id"].clone());
+                    let run = move || routine_call(&ui2, method, json!({"botId":bot,"id":id}), &bot, &list);
                     if method == "deleteRoutine" {
                         crate::dialogs::confirm(
                             &ui,
@@ -253,57 +219,39 @@ fn load_routines(ui: &App, bot: &str, list: &gtk::Box) {
                     }
                 });
             }
-            if item["triggers"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .any(|t| matches!(t["type"].as_str(), Some("webhook" | "event")))
-            {
-                let copy = icon_button("edit-copy-symbolic", "Copy webhook URL and key");
-                actions.append(&copy);
-                let (ui, bot, id) = (ui.clone(), bot.clone(), item["id"].clone());
-                copy.connect_clicked(move |button| {
-                    let (ui, button) = (ui.clone(), button.clone());
-                    client::call(
-                        "routineWebhook",
-                        json!({"botId":bot,"id":id}),
-                        move |r| match r {
-                            Ok(v) => {
-                                button.clipboard().set_text(&format!(
-                                    "{}\nAuthorization: Bearer {}",
-                                    v["url"].as_str().unwrap_or(""),
-                                    v["key"].as_str().unwrap_or("")
-                                ));
-                                toast(&ui, "Copied webhook URL and key");
-                            }
-                            Err(e) => toast(&ui, &e),
-                        },
-                    );
-                });
-            }
-            for run in v["runs"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .filter(|r| r["routineId"] == item["id"])
-                .take(10)
-            {
-                let text = format!(
-                    "{} · {}{}",
-                    schedule_time(run["createdAt"].as_i64().unwrap_or(0)),
-                    run["status"].as_str().unwrap_or(""),
-                    run["error"]
-                        .as_str()
-                        .map(|e| format!(" · {e}"))
-                        .unwrap_or_default()
-                );
-                let text = label(&text, &["small", "secondary"]);
-                text.set_wrap(true);
-                card.append(&text);
-            }
-            list.append(&card);
+            let on = gtk::Switch::builder()
+                .active(item["enabled"] == true)
+                .valign(gtk::Align::Center)
+                .tooltip_text(if item["enabled"] == true { "Pause" } else { "Resume" })
+                .build();
+            row.add_suffix(&on);
+            let (ui, bot, id, list) = (ui.clone(), bot.clone(), item["id"].clone(), list.clone());
+            on.connect_state_set(move |_, enabled| {
+                routine_call(&ui, "setRoutineEnabled", json!({"botId":bot,"id":id,"enabled":enabled}), &bot, &list);
+                gtk::glib::Propagation::Proceed
+            });
         }
     });
+}
+
+fn routine_call(ui: &App, method: &str, args: Value, bot: &str, list: &gtk::Box) {
+    let (ui, bot, list) = (ui.clone(), bot.to_owned(), list.clone());
+    client::call(method, args, move |r| {
+        if let Err(e) = r {
+            toast(&ui, &e);
+        }
+        load_routines(&ui, &bot, &list);
+    });
+}
+
+fn run_label(status: &str) -> String {
+    match status {
+        "pending" => "Queued",
+        "starting" => "Starting",
+        "running" => "Running",
+        _ => "Resuming after restart",
+    }
+    .to_owned()
 }
 
 fn schedule_time(at: i64) -> String {
@@ -324,14 +272,7 @@ fn entry(body: &gtk::Box, title: &str, value: &str) -> gtk::Entry {
 }
 
 fn routine_editor(ui: &App, bot: &str, routine: Value, list: &gtk::Box) {
-    let (window, body) = dialog(
-        ui,
-        if routine.is_null() {
-            "Set up a routine"
-        } else {
-            "Edit routine"
-        },
-    );
+    let (window, body) = dialog(ui, "Edit routine");
     let name = entry(&body, "Name", routine["name"].as_str().unwrap_or(""));
     body.append(&label("Instruction", &["secondary"]));
     let instruction = gtk::TextView::builder()
@@ -350,13 +291,9 @@ fn routine_editor(ui: &App, bot: &str, routine: Value, list: &gtk::Box) {
         .vexpand(false)
         .build();
     body.append(&scroll);
-    let kinds = if routine.is_null() {
-        vec!["daily", "weekly", "monthly", "custom", "once", "webhook"]
-    } else {
-        vec![
-            "keep", "daily", "weekly", "monthly", "custom", "once", "webhook",
-        ]
-    };
+    let kinds = vec![
+        "keep", "daily", "weekly", "monthly", "custom", "once", "webhook",
+    ];
     body.append(&label("Schedule", &["secondary"]));
     let labels: Vec<&str> = kinds
         .iter()
@@ -511,7 +448,7 @@ fn routine_editor(ui: &App, bot: &str, routine: Value, list: &gtk::Box) {
             if save && (name.text().trim().is_empty() || text.trim().is_empty()) { status.set_label("Enter a name and instruction."); return; }
             button.set_sensitive(false);
             let mut args = json!({"draft":draft});
-            if save { args = json!({"botId":bot,"name":name.text().as_str(),"instruction":text,"schedule":draft,"timeoutSeconds":timeout}); if !routine.is_null() { args["id"] = routine["id"].clone(); } }
+            if save { args = json!({"botId":bot,"name":name.text().as_str(),"instruction":text,"schedule":draft,"timeoutSeconds":timeout}); args["id"] = routine["id"].clone(); }
             let (ui, bot, list, window, status, button) = (ui.clone(), bot.clone(), list.clone(), window.clone(), status.clone(), button.clone());
             client::call(if save { "saveRoutine" } else { "routineSchedule" }, args, move |r| {
                 button.set_sensitive(true);

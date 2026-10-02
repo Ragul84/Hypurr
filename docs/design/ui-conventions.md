@@ -62,7 +62,7 @@ Model discovery keeps loading and refresh in one fixed-size slot beside the Mode
 
 The details inspector uses a compact device summary instead of an empty screen preview. Keep the computer name, remote-screen state, and iPhone hint together; show the hint only when screen capture is ready. Use 16-point horizontal insets, 28-point section gaps, and 12-point corner radii on flat surfaces, without borders.
 
-Routines use a short empty state with one setup action and an icon action for asking in chat. Populated lists move the add action into the section header. Agent metadata uses Runtime and Workspace labels for personal bots, or Project folder for explicitly configured projects; project paths remain selectable and wrap. Personal workspace paths stay out of the default details UI. Keep status and section headings readable in both appearances through `Palette`.
+Routines are a compact grouped list: name, a one-line schedule (or the live run state), and an on/off switch per row; tapping a row opens its details. New routines are set up by asking the bot: the header's + puts "I want a routine that " in the chat's composer. The empty state is one line of text. Agent metadata uses Runtime and Workspace labels for personal bots, or Project folder for explicitly configured projects; project paths remain selectable and wrap. Personal workspace paths stay out of the default details UI. Keep status and section headings readable in both appearances through `Palette`.
 
 On iPhone, the routine editor uses a single column of trigger choices so titles and descriptions can wrap at larger text sizes. Keep the execution environment note in the scrollable form and the full-width save action in a fixed footer on the sheet background. When required fields are empty, the footer explains why saving is unavailable.
 
@@ -95,8 +95,9 @@ SwiftUI already supplies these actions and needs no duplicate implementation.
   send can be retried with Enter; it reuses the nonce. A late response must not erase
   a draft edited while the request was running.
 - GTK bot menus include **Memory** and **Routines**. Memory supports forgetting one or
-  all facts. Routines support creation, editing, schedule previews, pause/resume, test
-  runs, deletion, history and webhook credentials. The host validates schedules;
+  all facts. Routines are a boxed list with an on/off switch,
+  edit (schedule previews), test run and delete per row; + asks the bot for a new one
+  in the chat composer. The host validates schedules;
   editing can preserve existing event, interval and multiple triggers.
 - GTK **Marketplace** includes agents, connectors and skills. Agent setup supports
   install/login terminals, browser authentication and masked credential fields.

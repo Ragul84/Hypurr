@@ -1,13 +1,15 @@
 # Routines
 
-Routines belong to an agent bot. **Set up a routine** opens a form for the name,
-instruction, trigger and timeout; Save creates it immediately. Edit opens the same
-form and preserves existing triggers by default. **Ask in chat** is a separate
-option that inserts an explanatory draft; send it to ask the bot to configure the
-routine. Every agent receives the built-in `routines` MCP server. The Mac conversation details
-panel and the iPhone's **More → Routines** show the saved instruction, triggers,
-pause/resume, edit, delete, test run and execution history. Creation/update notices
-open the routine.
+Routines belong to an agent bot and are created by talking to it ("I want a
+routine that…"). Every agent receives the built-in `routines` MCP server. The Mac
+conversation details panel and the iPhone's **More → Routines** show a compact list
+(name, schedule, on/off switch); **+** puts "I want a routine that " in the chat
+composer. A row opens details: instruction, triggers, pause/resume, edit (form that
+preserves existing triggers by default), edit with bot, delete, test run and run
+history. Linux (boxed list with switches) and the TUI (`n` asks the bot) match.
+Webhook credentials are not shown in clients: the endpoint is host-loopback only,
+so the bot hands them out through `routine_webhook` when a local sender needs them.
+Creation/update notices open the routine.
 
 ## Apple setup interface
 
@@ -206,11 +208,8 @@ compound and provider-event triggers retain a lossless Keep existing triggers
 fallback. Expired one-shot timestamps are preserved when editing other fields.
 
 Saved definitions appear immediately. Paused schedules omit next-run deadlines.
-List/details expose queued/running/recovery/failure states and empty run history.
-Edit with bot includes the routine ID in a draft without sending it. Webhook
-credentials have explicit copy controls, and the panel distinguishes testing the
-task from verifying an external delivery. These changes do not configure public
-ingress or claim a provider connection is working.
+List rows and details expose queued/running/recovery/failure states.
+Edit with bot includes the routine ID in a draft without sending it.
 
 Verification: shared Swift tests passed (46 tests; an unrelated offline-mailbox
 assertion failed on the first run, then passed both the targeted and full rerun).

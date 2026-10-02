@@ -200,25 +200,34 @@ fn native_ui_flows() {
     crate::manage::routines(&ui, "bot");
     let routines = ui.window.visible_dialog().unwrap();
     wait(|| text(&routines, "No routines yet"));
-    click(&routines, "Set up a routine");
+    click(&routines, "Ask the bot for a routine");
+    wait(|| ui.window.visible_dialog().is_none());
+    let buf = ui.compose.view.buffer();
+    assert!(buf.text(&buf.start_iter(), &buf.end_iter(), false).contains("I want a routine that"));
+    buf.set_text("");
+    let saved = Rc::new(std::cell::Cell::new(false));
+    let saved2 = saved.clone();
+    crate::client::call(
+        "saveRoutine",
+        serde_json::json!({"botId": "bot", "name": "Morning review", "instruction": "Review the latest changes"}),
+        move |_| saved2.set(true),
+    );
+    wait(|| saved.get());
+
+    crate::manage::routines(&ui, "bot");
+    let routines = ui.window.visible_dialog().unwrap();
+    wait(|| text(&routines, "Morning review"));
+    click(&routines, "Edit routine");
     let editor = ui.window.visible_dialog().unwrap();
-    let entries: Vec<_> = widgets(&editor)
-        .into_iter()
-        .filter_map(|w| w.downcast::<gtk::Entry>().ok())
-        .collect();
-    entries[0].set_text("Morning review");
-    let instruction = widgets(&editor)
-        .into_iter()
-        .find_map(|w| w.downcast::<gtk::TextView>().ok())
-        .unwrap();
-    instruction.buffer().set_text("Review the latest changes");
+    wait(|| widgets(&editor).into_iter().filter_map(|w| w.downcast::<gtk::Entry>().ok()).any(|e| e.text() == "Morning review"));
     click(&editor, "Preview schedule");
     wait(|| text(&editor, "Daily at 09:00 UTC"));
     screenshot("linux-routine-editor");
     click(&editor, "Save");
-    wait(|| text(&routines, "Morning review"));
-    click(&routines, "Pause");
-    wait(|| text(&routines, "Paused"));
+    wait(|| ui.window.visible_dialog().as_ref() == Some(&routines));
+    let switch = widgets(&routines).into_iter().find_map(|w| w.downcast::<gtk::Switch>().ok()).unwrap();
+    switch.set_active(false);
+    wait(|| widgets(&routines).into_iter().filter_map(|w| w.downcast::<gtk::Switch>().ok()).any(|s| !s.is_active()));
     screenshot("linux-routines");
     close(&ui);
 

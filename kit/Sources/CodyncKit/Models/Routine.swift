@@ -51,11 +51,6 @@ public struct RoutineListing: Codable, Sendable {
     public var runs: [RoutineRun]
 }
 
-public struct RoutineWebhook: Codable, Sendable {
-    public var url: String
-    public var key: String
-}
-
 extension HostClient {
     public func routines(botId: String) async throws -> RoutineListing {
         struct Body: Encodable { let botId: String }
@@ -65,11 +60,6 @@ extension HostClient {
     public func routineAction(_ method: String, botId: String, id: String, enabled: Bool? = nil) async throws {
         struct Body: Encodable { let botId: String; let id: String; let enabled: Bool? }
         let _: Empty = try await call(method, Body(botId: botId, id: id, enabled: enabled))
-    }
-
-    public func routineWebhook(botId: String, id: String) async throws -> RoutineWebhook {
-        struct Body: Encodable { let botId: String; let id: String }
-        return try await call("routineWebhook", Body(botId: botId, id: id))
     }
 }
 

@@ -3,7 +3,7 @@ import SwiftUI
 
 struct RoutineEditorView: View {
     let botId: String
-    let routine: Routine?
+    let routine: Routine
     let saved: (Routine) -> Void
     @Environment(BotStore.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -20,9 +20,8 @@ struct RoutineEditorView: View {
     @State private var checkedSchedule: RoutineScheduleDraft?
 
     private var options: [(String, String)] {
-        var values = [("cron", "Recurring schedule"),
+        var values = [("keep", "Keep existing triggers"), ("cron", "Recurring schedule"),
                       ("once", "Run once"), ("webhook", "Webhook")]
-        if routine != nil { values.insert(("keep", "Keep existing triggers"), at: 0) }
         if schedule.original.contains(where: { $0.type == "interval" }) {
             values.append(("interval", "Existing interval"))
         }
@@ -37,7 +36,7 @@ struct RoutineEditorView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            ModalHeader(routine == nil ? "Set up a routine" : "Edit routine")
+            ModalHeader("Edit routine")
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     VStack(alignment: .leading, spacing: 14) {
@@ -89,11 +88,9 @@ struct RoutineEditorView: View {
         .foregroundStyle(Palette.text)
         .background(Palette.background)
         .task {
-            if let routine {
-                name = routine.name
-                instruction = routine.instruction
-                timeout = String(routine.timeoutSeconds ?? 3600)
-            }
+            name = routine.name
+            instruction = routine.instruction
+            timeout = String(routine.timeoutSeconds ?? 3600)
             await loadSchedule()
         }
         .task(id: schedule) {
@@ -125,7 +122,7 @@ struct RoutineEditorView: View {
     private func loadSchedule() async {
         guard let client = model.client else { error = "Connect to this computer to load the schedule."; return }
         do {
-            let result = try await client.routineSchedule(triggers: routine?.triggers ?? [], timeZone: TimeZone.current.identifier)
+            let result = try await client.routineSchedule(triggers: routine.triggers, timeZone: TimeZone.current.identifier)
             schedule = result.draft
             preview = result
             checkedSchedule = result.draft
@@ -215,7 +212,7 @@ struct RoutineEditorView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(14).background(Palette.bubbleAgent, in: RoundedRectangle(cornerRadius: 12))
         default:
-            ForEach(routine?.triggerDescriptions ?? [], id: \.self) {
+            ForEach(routine.triggerDescriptions, id: \.self) {
                 Label($0, systemImage: "clock").font(.callout).foregroundStyle(Palette.secondary)
             }
         }
@@ -278,7 +275,7 @@ struct RoutineEditorView: View {
         Button(action: save) {
             HStack(spacing: 8) {
                 if busy { Spinner() }
-                Text(busy ? "Saving…" : routine == nil ? "Create routine" : "Save changes")
+                Text(busy ? "Saving…" : "Save changes")
                     .fixedSize(horizontal: false, vertical: true)
             }
             #if os(iOS)
@@ -297,7 +294,7 @@ struct RoutineEditorView: View {
         Task {
             defer { busy = false }
             do {
-                let result = try await client.saveRoutine(botId: botId, id: routine?.id, name: name,
+                let result = try await client.saveRoutine(botId: botId, id: routine.id, name: name,
                     instruction: instruction, schedule: schedule, timeoutSeconds: timeout)
                 saved(result)
             } catch { self.error = error.localizedDescription }

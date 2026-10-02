@@ -1883,6 +1883,17 @@ fn update_composer_for(ui: &App, st: &State, chat: &Value, in_thread: bool) {
     c.mentions_rev.set_reveal_child(any);
 }
 
+/// Puts text in the chat's message box (after what's already typed) and focuses it.
+pub fn insert_draft(ui: &App, text: &str) {
+    let view = &ui.composer(false).view;
+    let buf = view.buffer();
+    if buf.char_count() > 0 {
+        buf.insert(&mut buf.end_iter(), "\n");
+    }
+    buf.insert(&mut buf.end_iter(), text);
+    view.grab_focus();
+}
+
 fn send(ui: &App, in_thread: bool) {
     let buf = ui.composer(in_thread).view.buffer();
     let text = buf
