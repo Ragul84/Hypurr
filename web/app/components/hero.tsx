@@ -1,10 +1,10 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import { AppleLogo } from "@phosphor-icons/react";
+import { AppleLogo, GithubLogo } from "@phosphor-icons/react";
 import Image from "next/image";
 import Phone from "./phone";
-import { APP_STORE, DMG } from "../links";
+import { APP_STORE, DMG, GITHUB } from "../links";
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
@@ -48,6 +48,15 @@ export default function Hero() {
               className="inline-flex justify-center transition hover:opacity-80 active:scale-[0.98]"
             >
               <Image src="/app-store-badge.svg" alt="Download on the App Store" width={144} height={48} className="h-12 w-auto" />
+            </a>
+            <a
+              href={GITHUB}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-neutral-900 px-6 py-3 font-medium text-neutral-100 transition hover:bg-neutral-800 active:scale-[0.98]"
+            >
+              <GithubLogo size={18} weight="fill" />
+              Star on GitHub
             </a>
           </motion.div>
         </div>
