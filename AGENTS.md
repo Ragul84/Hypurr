@@ -28,6 +28,12 @@ Whenever you build and install/run a new build, stop the old copies so nothing s
 - **Host**: the launchd agent `com.pokai.codync.host` runs `build/dd/.../Codync.app/Contents/MacOS/codync-host`; after rebuilding, restart it with `launchctl kickstart -k gui/$(id -u)/com.pokai.codync.host`, and kill any other `codync-host` still running from a different path (`pgrep -fl codync-host`). Test hosts you start yourself must be stopped when done.
 - **iPhone**: after `xcrun devicectl device install app …`, relaunch with `xcrun devicectl device process launch --terminate-existing --device <id> com.pokai.Codync.ios` so the old process doesn't linger.
 
+## Versioning & releases
+
+- **Every source change ships as a release.** A version bump on `main` is the only release trigger (Auto Tag → DMG, host, Linux app, Homebrew, in-app update), so any change to shipped code (`apps/`, `kit/`, `host/`, `packaging/`) bumps the version before it reaches `main`, without being asked. Docs, `web/`, `cloud/`, `relay/` and CI-only changes don't bump.
+- Pick the bump yourself: patch for fixes and small tweaks, minor for new features or protocol additions. Never bump major (stay on 2.x). One bump per merge into `main`: if `MARKETING_VERSION` is already ahead of the latest `v*` tag, leave it.
+- How: set `MARKETING_VERSION` in `apps/project.yml` and `version` in `host/Cargo.toml` (+ its `Cargo.lock` entry) to the same value, run `xcodegen generate --spec apps/project.yml`, commit as `build: bump version to X.Y.Z`. `CURRENT_PROJECT_VERSION` changes only for App Store uploads.
+
 ## Coding Style & Naming Conventions
 
 Use four-space indentation for Swift and Rust. Follow Swift 6 strict concurrency, SwiftUI, and structured `async/await`; avoid unchecked sendability. Rust uses edition 2024, rustfmt, and Clippy; avoid `unwrap()` outside tests.
