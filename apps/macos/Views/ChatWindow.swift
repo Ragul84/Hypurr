@@ -140,10 +140,12 @@ private struct AccountWelcomeView: View {
             Spacer(minLength: 32)
 
             VStack(spacing: 10) {
-                Button("Continue on this Mac", action: onContinue)
-                    .font(.headline)
-                    .frame(maxWidth: .infinity, minHeight: 50)
-                    .buttonStyle(.primary)
+                Button(action: onContinue) {
+                    Text("Continue on this Mac")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, minHeight: 50)
+                }
+                .buttonStyle(.primary)
 
                 Button { onSignIn(.apple) } label: {
                     ZStack {
