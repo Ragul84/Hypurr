@@ -31,12 +31,18 @@ joined by email. The Mac's `com.pokai.Codync://callback` must also remain allowe
 in Clerk. See [Apple's web configuration guide](https://developer.apple.com/help/account/capabilities/configure-sign-in-with-apple-for-the-web/)
 and [Clerk's Apple OAuth guide](https://clerk.com/docs/guides/configure/auth-strategies/social-connections/apple).
 
-To check cross-device discovery, use **Release** on both devices (the same Clerk
-production instance), select the same Apple Account, and verify that Clerk has
-one user ID. Debug uses the separate development instance; its shared Apple OAuth
-credentials do not validate production identity matching. Then verify that the
-Mac joins the account and the phone requests access with the existing approval
-flow. Hide My Email does not change the device approval requirement.
+The development instance uses the same custom credentials (Services ID, team
+`7FUM8A8H72`, key `8S76D7ADWU`) since 2026-10-03, with
+`sunny-mollusk-8651.clerk.accounts.dev` and its `/v1/oauth_callback` added to the
+Services ID. Clerk's shared Apple credentials belong to Clerk's team, so with them
+the Mac's web sign-in and the iPhone's native sign-in got different Apple user IDs
+and became two Clerk users; don't switch development back to shared credentials.
+
+To check cross-device discovery, sign in with the same Apple Account on both
+devices of one environment (Debug ↔ Debug, Release ↔ Release) and verify that
+Clerk has one user ID. Then verify that the Mac joins the account and the phone
+requests access with the existing approval flow. Hide My Email does not change the
+device approval requirement.
 
 Verified on 2026-09-30: the Mac Debug build completed Apple OAuth and displayed
 the signed-in private relay address and Log out action. The Apple and Google
