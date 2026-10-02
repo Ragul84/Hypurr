@@ -154,7 +154,7 @@ jobs:
               -e "0,/REPLACE_WITH_SHA256/s//$(sha linux-x86_64)/" \
               packaging/homebrew/codync-host.rb > codync-host.rb
           git clone https://x-access-token:${{ secrets.TAP_TOKEN }}@github.com/leepokai/homebrew-codync.git tap
-          mkdir -p tap/Formula && cp codync-host.rb tap/Formula/
+          mkdir -p tap/Formula && cp codync-host.rb tap/Formula/ && cp packaging/homebrew/README.md tap/
           cd tap
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
