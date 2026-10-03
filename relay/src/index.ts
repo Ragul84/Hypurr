@@ -5,7 +5,8 @@
 // ticket to its own hypurr-host, which can then ask the relay to push to that
 // one device — without ever learning the raw token or holding a shared secret.
 //
-//   POST /register { token, env: "sandbox" | "production", kind: "alert" | "liveactivity" } -> { ticket }
+//   POST /register { token, env: "sandbox" | "production" | "fcm", kind: "alert" | "liveactivity" } -> { ticket }
+//                  (`env: "fcm"`: an Android FCM registration token, alerts only; see fcm.ts)
 //   POST /push     { ticket, alert?: { title, body }, threadId?, category?, data?, mutableContent?,
 //                    liveActivity?: { event: "update" | "end", contentState } }
 //
@@ -13,8 +14,9 @@
 // generic alert with the host's end-to-end encrypted title/body (`data.sealed`).
 
 import { ApnsClient, Notification, PushType, Priority } from "@fivesheepco/cloudflare-apns2";
+import { type FcmEnv, fcmConfigured, isFcmToken, sendFcm } from "./fcm.ts";
 
-export interface Env {
+export interface Env extends FcmEnv {
   APNS_TEAM_ID: string;
   APNS_KEY_ID: string;
   APNS_SIGNING_KEY: string;
@@ -24,7 +26,8 @@ export interface Env {
 
 type ApnsEnv = "sandbox" | "production";
 type Kind = "alert" | "liveactivity";
-interface TicketPayload { t: string; e: ApnsEnv; k: Kind }
+/** `e: "fcm"`: an Android FCM token instead of an APNs one. */
+interface TicketPayload { t: string; e: ApnsEnv | "fcm"; k: Kind }
 
 const BUNDLE_ID = "com.ragul84.Hypurr.ios";
 
@@ -93,6 +96,11 @@ const json = (body: unknown, status = 200) => Response.json(body, { status });
 
 async function register(req: Request, env: Env): Promise<Response> {
   const body = (await req.json().catch(() => null)) as { token?: string; env?: string; kind?: string } | null;
+  if (body?.env === "fcm") {
+    if (!isFcmToken(body.token)) return json({ error: "invalid token" }, 400);
+    if (body.kind !== "alert") return json({ error: "invalid kind" }, 400);
+    return json({ ticket: await sealTicket(env, { t: body.token, e: "fcm", k: "alert" }) });
+  }
   if (typeof body?.token !== "string" || !/^(?:[0-9a-fA-F]{2}){16,100}$/.test(body.token)) return json({ error: "invalid token" }, 400);
   if (body.env !== "production" && body.env !== "sandbox") return json({ error: "invalid environment" }, 400);
   if (body.kind !== "alert" && body.kind !== "liveactivity") return json({ error: "invalid kind" }, 400);
@@ -161,6 +169,11 @@ async function push(req: Request, env: Env): Promise<Response> {
           (body.data !== undefined && (!body.data || typeof body.data !== "object" || Array.isArray(body.data) || "aps" in body.data))) {
         return json({ error: "invalid alert" }, 400);
       }
+      if (t.e === "fcm") {
+        if (!fcmConfigured(env)) return json({ error: "fcm not configured" }, 503);
+        const sent = await sendFcm(env, t.t, { ...body, alert: body.alert });
+        return sent.status === 200 ? json({ ok: true }) : json({ error: sent.error, gone: sent.gone }, sent.status);
+      }
       const notification = new Notification(t.t, {
           type: PushType.alert,
           priority: Priority.immediate,
@@ -178,7 +191,7 @@ async function push(req: Request, env: Env): Promise<Response> {
       let aps: Record<string, unknown>;
       try { aps = liveActivityAps(la); }
       catch { return json({ error: "invalid liveActivity" }, 400); }
-      await client(env, t.e, "liveactivity").send(
+      await client(env, t.e as ApnsEnv, "liveactivity").send(
         new Notification(t.t, {
           type: PushType.liveactivity,
           priority: la.event === "end" || la.contentState?.status === "needsInput" ? Priority.immediate : Priority.throttled,
@@ -203,7 +216,8 @@ async function push(req: Request, env: Env): Promise<Response> {
 export function latestTicketIndices(tickets: Array<TicketPayload | null>): Set<number> {
   const latest = new Map<string, number>();
   tickets.forEach((ticket, index) => {
-    if (ticket) latest.set(`${ticket.e}:${ticket.k}:${ticket.t.toLowerCase()}`, index);
+    // APNs tokens are hex (case-insensitive); FCM tokens are case-sensitive.
+    if (ticket) latest.set(`${ticket.e}:${ticket.k}:${ticket.e === "fcm" ? ticket.t : ticket.t.toLowerCase()}`, index);
   });
   return new Set(latest.values());
 }
