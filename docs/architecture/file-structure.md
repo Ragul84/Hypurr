@@ -43,13 +43,14 @@ Hypurr/
 │   ├── ios/                   # App/, Views/, Resources/, Widgets/, NotificationService/
 │   ├── macos/                 # App/, Views/, Resources/, LaunchAgents/
 │   ├── linux/                 # GTK 4/libadwaita desktop client
+│   ├── android/               # Kotlin + Jetpack Compose app (Gradle); app/src/{main,test}, scripts/, screenshots/
 │   ├── screen-macos/          # macOS screen helper
 │   └── screen-linux/          # Linux portal/GStreamer screen helper
 ├── cloud/                     # Account API + encrypted relay Worker and Durable Object
 │   ├── src/
 │   ├── migrations/            # D1 migrations
 │   └── test/                  # workerd tests; e2e/ runs against a real test host
-├── relay/                     # Separate APNs push Worker; src/ and test/
+├── relay/                     # Separate push Worker (APNs + FCM); src/ and test/
 ├── docs/                      # Architecture, guides, reference, features, design, archive
 ├── tools/                     # Widget rendering utilities
 ├── packaging/                 # Distribution templates

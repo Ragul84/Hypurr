@@ -14,7 +14,7 @@ Bot-based remote for coding agents: persistent named bots on your computer, mess
 
 ## Architecture
 
-- Clients: iOS app, native Mac window (menu bar app), native Linux app (`apps/linux/`, GTK 4 + libadwaita in Rust), terminal UI (`hypurr-host tui`, `host/src/tui/`, ratatui; layout and state vocabulary modeled on herdr). All talk to the host API; no web UI.
+- Clients: iOS app, Android app (`apps/android/`, Kotlin + Jetpack Compose, [guide](docs/guides/android.md)), native Mac window (menu bar app), native Linux app (`apps/linux/`, GTK 4 + libadwaita in Rust), terminal UI (`hypurr-host tui`, `host/src/tui/`, ratatui; layout and state vocabulary modeled on herdr). All talk to the host API; no web UI.
 - Shared Swift (`kit/`): `HypurrKit` (models, client, theme, avatars) + `HypurrUI` (`BotStore` + chat screens) used by iOS and macOS. Platform specifics go through `BotStore` hooks or `Platform.swift`.
 - Design tokens (palette, colour flow, motion springs) are shared by every client: [docs/design/hypurr-design-system.md](docs/design/hypurr-design-system.md).
 - UI principle: buttons an icon can express are icon-only (with tooltip / accessibility label); text only where an icon would be ambiguous (approval choices).
@@ -31,14 +31,14 @@ Bot-based remote for coding agents: persistent named bots on your computer, mess
 - Remote screen (`host/src/screen.rs` is the reference): phones view/control the computer over WebRTC (hardware H.264, non-trickle SDP relayed by `screenOffer`, input on data channels `input` / `input-fast`); bots get the built-in `computer` MCP server (`hypurr-host mcp computer`, `host/src/mcp.rs`) when their `computer` flag is on. Capture/input live in a helper on `~/.hypurr/screen.sock`: `apps/screen-macos` (macOS, launchd agent via `SMAppService`, owns the TCC grants) or `apps/screen-linux` (`hypurr-screen`: portals + GStreamer, started by the host). Off by default; `setScreenEnabled` is accepted only from loopback. An interactive phone takes over (bots may only look).
 - Multiple computers per account are future work, not a current priority: the product targets one computer. The multi-computer structure (`AccountStore`, `BotReference`) stays because relay/accounts/SSH build on it; don't extend or polish multi-computer features unless asked.
 - Environments: **dev** (`dev-api.hypurr.dev`, Clerk development instance, Debug builds) and **main** (`api.hypurr.dev`, Clerk production, Release builds); `apps/shared/Config/<env>.plist` becomes `AccountConfig.plist`. Details: [spec §14.0](docs/reference/remote-relay.md).
-- Push: iOS registers its APNs token with `relay/` → gets an AES-GCM ticket → gives it (plus its X25519 push key) to the host; the host seals title/body to that key and a Notification Service Extension opens it, so `relay/` sees only generic text. Alert kinds: *needs you*, *done*, and *failed*, suppressed while the iOS app is connected. Delivery and lifecycle: [notification design](docs/design/push-and-live-activity.md).
+- Push: iOS registers its APNs token (Android its FCM token, `env: "fcm"`) with `relay/` → gets an AES-GCM ticket → gives it (plus its X25519 push key) to the host; the host seals title/body to that key and a Notification Service Extension opens it, so `relay/` sees only generic text. Alert kinds: *needs you*, *done*, and *failed*, suppressed while a phone app is connected. Delivery and lifecycle: [notification design](docs/design/push-and-live-activity.md).
 - Voice call (iPhone): on-device speech in, bot's final replies read aloud; the host sees plain messages. Grok-style call bar; bring-your-own-key realtime design: [docs/features/voice-call.md](docs/features/voice-call.md).
 - Usage: local only — `claude -p /usage --no-session-persistence`, the Claude status line (`hypurr-host statusline`, wrapping any existing one), Claude ACP `usage_update` rate-limit meta, Codex rollout files. Never call provider APIs with agent credentials.
 - macOS app is thin: embeds `hypurr-host` in `Contents/MacOS` (Xcode post-build script runs cargo), installs it as a launchd agent via `hypurr-host install`; menu bar shows status/pairing/usage and opens the native chat window (NavigationSplitView over `HypurrUI`). Not sandboxed, not Mac App Store (the host must spawn CLIs).
 
 ## Cross-platform UI changes
 
-- Any UI change in any client must include the corresponding updates to all other native clients and the TUI in the same change: shared SwiftUI (`kit/Sources/HypurrUI/`), iOS (`apps/ios/`), macOS (`apps/macos/`), Linux GTK (`apps/linux/src/`), and terminal UI (`host/src/tui/`). This applies in every direction; Linux and TUI changes must also be reflected in SwiftUI.
+- Any UI change in any client must include the corresponding updates to all other native clients and the TUI in the same change: shared SwiftUI (`kit/Sources/HypurrUI/`), iOS (`apps/ios/`), macOS (`apps/macos/`), Linux GTK (`apps/linux/src/`), Android (`apps/android/`), and terminal UI (`host/src/tui/`). This applies in every direction; Linux and TUI changes must also be reflected in SwiftUI.
 - Keep shared features, actions, terminology, displayed information, and loading, empty, error, and permission states consistent. Adapt layout, controls, and input to each platform, including terminal keyboard interaction, while preserving the same user-facing behavior.
 - Inspect every client's corresponding implementation before finishing a UI task. Implement applicable changes together; do not silently defer another client. For a platform-only change or an unsupported capability, document which clients are unaffected and the concrete reason in the change summary.
 - Validate each affected client with its relevant build/tests and UI checks. Report any checks that could not run and why.
@@ -68,7 +68,7 @@ Always stop the old Mac app, host and iPhone process before running a new build 
 - Minor/patch bumps are always backward compatible within the same major; the iOS decoder is lenient (`Bot.init(from:)`) so small host additions don't break older apps
 - **Every source change ships as a release.** A version bump on `main` is the only release trigger (Auto Tag → DMG, host, Linux app, Homebrew, in-app update), so any change to shipped code (`apps/`, `kit/`, `host/`, `packaging/`) bumps the version before it reaches `main`, without being asked. Docs, `web/`, `cloud/`, `relay/` and CI-only changes don't bump.
 - Pick the bump yourself: patch for fixes and small tweaks, minor for new features or protocol additions. Never bump major (stay on 2.x). One bump per merge into `main`: if `MARKETING_VERSION` is already ahead of the latest `v*` tag, leave it.
-- How: set `MARKETING_VERSION` in `apps/project.yml` and `version` in `host/Cargo.toml` (+ its `Cargo.lock` entry) to the same value, run `xcodegen generate --spec apps/project.yml`, commit as `build: bump version to X.Y.Z`. `CURRENT_PROJECT_VERSION` changes only for App Store uploads.
+- How: set `MARKETING_VERSION` in `apps/project.yml`, `version` in `host/Cargo.toml` (+ its `Cargo.lock` entry) and `versionName`/`versionCode` in `apps/android/app/build.gradle.kts` to the same value, run `xcodegen generate --spec apps/project.yml`, commit as `build: bump version to X.Y.Z`. `CURRENT_PROJECT_VERSION` changes only for App Store uploads.
 
 ## Targets
 
@@ -79,6 +79,7 @@ Always stop the old Mac app, host and iPhone process before running a new build 
 - `Widgets` (`apps/ios/Widgets/`) — usage widget + bot Live Activity (bundle id `com.ragul84.Hypurr.ios.LiveActivity`)
 - `HypurrKit` (`kit/`) — shared Swift package: `HypurrKit` + `HypurrUI` libraries
 - `apps/linux/` — `hypurr` GTK app (build/test in a container with libgtk-4-dev + libadwaita-1-dev + libvte-2.91-gtk4-dev)
+- `apps/android/` — Android app `com.ragul84.hypurr` (Gradle; `versionName` follows `MARKETING_VERSION`)
 
 ## Layout & naming
 

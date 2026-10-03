@@ -468,7 +468,7 @@ The route table below summarizes the contract. Executable schema and validation 
 
 **Clerk（使用者）**
 - `GET /v1/me` → `{"userId","email","createdAt"}`
-- `POST /v1/devices`（Clerk + Sig(dev)）`{"name","platform":"ios"|"macos"}` → `{"device":{"deviceId","deviceKey","name","platform","createdAt"}}`。以 `(owner, sign_pub)` upsert；已撤銷的同一把 key → `403 forbidden`（需換 key）。
+- `POST /v1/devices`（Clerk + Sig(dev)）`{"name","platform":"ios"|"android"|"macos"}` → `{"device":{"deviceId","deviceKey","name","platform","createdAt"}}`。以 `(owner, sign_pub)` upsert；已撤銷的同一把 key → `403 forbidden`（需換 key）。
 - `GET /v1/devices` → `{"devices":[{"deviceId","deviceKey","name","platform","createdAt","lastUsedAt","revoked":bool}]}`
 - `DELETE /v1/devices/{deviceId}` → `{}`；撤銷裝置與其所有 grants（`deviceRevoked`），對相關 computers 呼叫 DO `/internal/block` + `cloud.changed`。
 - `POST /v1/claims` → `{"claimId","nonce","expiresAt"}`（nonce = 16 random bytes b64url）

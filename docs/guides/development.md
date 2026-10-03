@@ -67,8 +67,10 @@ Unlock the phone when required. Build, install, launch, and visual inspection ar
 | Shared Swift | `swift test --package-path kit` | Swift 6 / Xcode |
 | Cloud | `cd cloud && npm ci && npm test && npm run typecheck` | Node and npm; CI uses Node 24 |
 | Cloud integration | `cd cloud && env -u HYPURR_CLOUD npm run e2e` | Built host; see [Cloudflare testing](cloudflare-testing.md) |
-| APNs relay | `cd relay && npm ci && npm test && npm run typecheck` | Separate package from `cloud/` |
+| Push relay (APNs + FCM) | `cd relay && npm ci && npm test && npm run typecheck` | Separate package from `cloud/` |
 | Linux desktop | `cd apps/linux && cargo test` | GTK 4 and libadwaita development packages |
+| Android | `cd apps/android && ./gradlew assembleDebug testDebugUnitTest` | JDK 17+, Android SDK (platform 35, build-tools 35); see [Android](android.md) |
+| Android ⇄ host E2E | `apps/android/scripts/e2e-local-host.sh` | Built host; pairs with a throwaway local host |
 
 ### Screen helpers
 
