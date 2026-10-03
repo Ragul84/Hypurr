@@ -28,6 +28,7 @@ Source review, a passing build, local integration tests and production acceptanc
 - [Remote screen](features/remote-screen.md)
 - [Marketplace and agent setup](features/marketplace.md)
 - [Connector setup and credentials](features/connector-credentials.md)
+- [Hypurr design system (tokens for every client)](design/hypurr-design-system.md)
 - [Widgets, Live Activities and onboarding](design/mobile-widgets.md)
 - [Notifications and background Live Activity updates](design/push-and-live-activity.md)
 

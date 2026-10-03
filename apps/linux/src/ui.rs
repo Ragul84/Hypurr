@@ -1209,6 +1209,7 @@ fn preview(st: &State, b: &Value) -> gtk::Widget {
         Some("working") => {
             let o = orb::widget(false, 13);
             o.add_css_class("secondary");
+            o.add_css_class("flow");
             row.append(&o);
             row.append(&text(activity.unwrap_or("Working…"), "secondary"));
         }

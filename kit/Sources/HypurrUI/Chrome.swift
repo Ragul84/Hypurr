@@ -579,7 +579,9 @@ public struct TabBar<ID: Hashable>: View {
                     .frame(width: 76, height: 50)
                     .background {
                         if on {
-                            Capsule().fill(Palette.text.opacity(0.08)).matchedGeometryEffect(id: "tab", in: thumb)
+                            Capsule()
+                                .fill(LinearGradient(colors: ColorFlow.colors.map { $0.opacity(0.24) }, startPoint: .leading, endPoint: .trailing))
+                                .matchedGeometryEffect(id: "tab", in: thumb)
                         }
                     }
                     .contentShape(Capsule())

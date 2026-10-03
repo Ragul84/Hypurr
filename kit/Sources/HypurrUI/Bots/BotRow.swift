@@ -84,7 +84,7 @@ public struct BotRow: View {
                 .lineLimit(1)
         } else if bot.isWorking {
             HStack(spacing: 6) {
-                ThinkingOrb(size: 13, color: Palette.secondary)
+                ThinkingOrb(size: 13, color: Palette.secondary, flow: true)
                 Text(bot.activity.isEmpty ? "Working…" : bot.activity)
                     .lineLimit(1)
             }

@@ -1,5 +1,7 @@
 # UI conventions
 
+Colours, the colour flow, glass, shapes and motion tokens: [Hypurr design system](hypurr-design-system.md).
+
 ## iPhone navigation
 
 The bot list and conversation use the system `NavigationStack` toolbar. `ToolbarItem` owns the account button, centered computer status/filter menu, and new-chat button. Computer management is inside the centered menu. The conversation copies Grok Bot: the title pill is a native `Menu` (details and the bot's actions), the only trailing button is the computer (remote screen; it pulses while this bot operates the screen), and the call button sits in the composer as a filled waveform capsule while the box is empty. Menus opened from toolbar buttons (New, the computer filter, the title) are native `Menu`s, because the bar hosts its items outside SwiftUI's layout and `.hypurrMenu` can't anchor to them; the conversation uses the system back button. iOS supplies Liquid Glass, control sizing, grouping and interaction feedback.

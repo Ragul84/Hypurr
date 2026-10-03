@@ -32,17 +32,19 @@ public struct HypurrSwitch: ToggleStyle {
 
         var body: some View {
             Button {
-                withAnimation(Motion.reduced(Motion.hover, reduceMotion)) { configuration.isOn.toggle() }
+                withAnimation(Motion.reduced(Motion.spatialFast, reduceMotion)) { configuration.isOn.toggle() }
             } label: {
                 HStack(spacing: 12) {
                     configuration.label
                     Spacer(minLength: 0)
                     Capsule()
-                        .fill(configuration.isOn ? Palette.accentFill : Palette.bubbleUser)
-                        .frame(width: 34, height: 20)
+                        .fill(configuration.isOn ? AnyShapeStyle(ColorFlow.linear) : AnyShapeStyle(Palette.bubbleUser))
+                        .frame(width: 36, height: 22)
                         .overlay(alignment: configuration.isOn ? .trailing : .leading) {
-                            // Black and white: the knob takes the opposite ink of an on track.
-                            Circle().fill(configuration.isOn ? Palette.onAccent : .white).padding(2)
+                            // A white knob that grows a touch when on, riding the colour flow.
+                            Circle().fill(.white)
+                                .shadow(color: .black.opacity(0.18), radius: 2, y: 1)
+                                .padding(configuration.isOn ? 2 : 3)
                         }
                 }
                 .contentShape(Rectangle())
@@ -60,12 +62,12 @@ public extension ToggleStyle where Self == HypurrSwitch {
 
 // MARK: - Buttons
 
-/// The filled call-to-action: accent capsule with press feedback.
+/// The filled call-to-action: a colour-flow capsule with springy press feedback.
 public struct PrimaryButtonStyle: ButtonStyle {
     public init() {}
 
     public func makeBody(configuration: Configuration) -> some View {
-        StyledButton(configuration: configuration, fill: Palette.accentFill, foreground: Palette.onAccent)
+        StyledButton(configuration: configuration, fill: AnyShapeStyle(ColorFlow.linear), foreground: ColorFlow.ink, glow: true)
     }
 }
 
@@ -74,24 +76,26 @@ public struct SecondaryButtonStyle: ButtonStyle {
     public init() {}
 
     public func makeBody(configuration: Configuration) -> some View {
-        StyledButton(configuration: configuration, fill: Palette.bubbleUser, foreground: Palette.text)
+        StyledButton(configuration: configuration, fill: AnyShapeStyle(Palette.bubbleUser), foreground: Palette.text)
     }
 }
 
 private struct StyledButton: View {
     let configuration: ButtonStyleConfiguration
-    let fill: Color
+    let fill: AnyShapeStyle
     let foreground: Color
+    var glow = false
     @Environment(\.isEnabled) private var isEnabled
 
     var body: some View {
         configuration.label
-            .font(InterfaceMetrics.body.weight(.medium))
+            .font(InterfaceMetrics.body.weight(.semibold))
             .foregroundStyle(foreground)
             .padding(.horizontal, InterfaceMetrics.value(mac: 12, mobile: 18))
             .padding(.vertical, InterfaceMetrics.value(mac: 6, mobile: 11))
             .background(fill, in: Capsule())
-            .opacity(isEnabled ? (configuration.isPressed ? 0.85 : 1) : 0.4)
+            .shadow(color: glow && isEnabled ? Color(hex: ColorFlow.magenta).opacity(configuration.isPressed ? 0.15 : 0.35) : .clear, radius: 12, y: 4)
+            .opacity(isEnabled ? (configuration.isPressed ? 0.9 : 1) : 0.4)
             .scaleEffect(configuration.isPressed ? Motion.pressScale : 1)
             .animation(Motion.press, value: configuration.isPressed)
             .contentShape(Capsule())
@@ -119,7 +123,7 @@ public struct Spinner: View {
     public var body: some View {
         Circle()
             .trim(from: 0, to: 0.7)
-            .stroke(Palette.secondary, style: StrokeStyle(lineWidth: max(1.5, size / 9), lineCap: .round))
+            .stroke(ColorFlow.angular, style: StrokeStyle(lineWidth: max(1.5, size / 9), lineCap: .round))
             .frame(width: size, height: size)
             .rotationEffect(.degrees(turning ? 360 : 0))
             .animation(reduceMotion ? nil : .linear(duration: 0.8).repeatForever(autoreverses: false), value: turning)
@@ -853,9 +857,12 @@ private struct DialogButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(InterfaceMetrics.body.weight(.medium))
-            .foregroundStyle(destructive ? Color.white : (prominent ? Palette.onAccent : Palette.text))
+            .foregroundStyle(destructive ? Color.white : (prominent ? ColorFlow.ink : Palette.text))
             .padding(.vertical, InterfaceMetrics.value(mac: 8, mobile: 12))
-            .background(destructive ? Palette.danger : (prominent ? Palette.accentFill : Palette.bubbleUser), in: Capsule())
+            .background(
+                destructive ? AnyShapeStyle(Palette.danger) : (prominent ? AnyShapeStyle(ColorFlow.linear) : AnyShapeStyle(Palette.bubbleUser)),
+                in: Capsule()
+            )
             .opacity(configuration.isPressed ? 0.85 : 1)
             .scaleEffect(configuration.isPressed ? Motion.pressScale : 1)
             .animation(Motion.press, value: configuration.isPressed)

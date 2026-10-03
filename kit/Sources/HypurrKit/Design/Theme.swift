@@ -36,28 +36,31 @@ public extension Color {
     }
 }
 
-/// Black and white: a pure black (or white) ground, grey bubbles, and color that
-/// comes only from the bots; amber marks "needs you" and red marks errors.
+/// Hypurr: violet-tinted neutrals, a violet accent and the violet → magenta → cyan
+/// colour flow (`ColorFlow`); colour also comes from the bots. Magenta marks
+/// "needs you" and red marks errors. Shared with the GTK app and the TUI
+/// (docs/design/hypurr-design-system.md).
 public enum Palette {
-    public static let background = Color(light: 0xFFFFFF, dark: 0x0A0A0A)
-    public static let surface = Color(light: 0xF4F4F4, dark: 0x141414)
-    public static let bubbleAgent = Color(light: 0xF0F0F0, dark: 0x1C1C1C)
-    public static let bubbleUser = Color(light: 0xE2E2E2, dark: 0x3A3A3A)
-    public static let border = Color(light: 0xE6E6E6, dark: 0x262626)
-    public static let text = Color(light: 0x141414, dark: 0xF2F2F2)
-    public static let secondary = Color(light: 0x6B6B6B, dark: 0x9A9A9A)
-    public static let tertiary = Color(light: 0x9B9B9B, dark: 0x6E6E6E)
+    public static let background = Color(light: 0xFCFAFF, dark: 0x0E0A1C)
+    public static let surface = Color(light: 0xF4EFFC, dark: 0x161029)
+    public static let bubbleAgent = Color(light: 0xEFE9FA, dark: 0x1E1736)
+    public static let bubbleUser = Color(light: 0xE4D9FB, dark: 0x3A2A6B)
+    public static let border = Color(light: 0xE6DFF3, dark: 0x2A2145)
+    public static let text = Color(light: 0x1E1433, dark: 0xF3EEFF)
+    public static let secondary = Color(light: 0x5B4F7A, dark: 0xA89CC8)
+    public static let tertiary = Color(light: 0x8C82A8, dark: 0x75699A)
     /// Ink used for fills (primary buttons, the send button, unread badges).
-    public static let accentFill = Color(light: 0x000000, dark: 0xFFFFFF)
+    public static let accentFill = Color(light: 0x6D3FD9, dark: 0xA78BFA)
     /// Ink readable as text and tint on the background.
-    public static let accent = Color(light: 0x000000, dark: 0xFFFFFF)
-    public static let onAccent = Color(light: 0xFFFFFF, dark: 0x000000)
-    public static let accentDim = Color(light: 0xD9D9D9, dark: 0x333333)
-    public static let danger = Color(light: 0xC23A2B, dark: 0xF0A7A7)
-    public static let warning = Color(hex: 0xF0A030)
-    public static let codeBackground = Color(light: 0xF4F4F4, dark: 0x111111)
-    public static let added = Color(light: 0x2E7D32, dark: 0x8FD18B)
-    public static let removed = Color(light: 0xC62828, dark: 0xF0A7A7)
+    public static let accent = Color(light: 0x6D3FD9, dark: 0xC4B5FD)
+    public static let onAccent = Color(light: 0xFFFFFF, dark: 0x150A33)
+    public static let accentDim = Color(light: 0xDCD3F0, dark: 0x352B55)
+    public static let danger = Color(light: 0xC2304D, dark: 0xFF8FA3)
+    /// "Needs you".
+    public static let warning = Color(light: 0xC0267A, dark: 0xF472B6)
+    public static let codeBackground = Color(light: 0xF1ECFB, dark: 0x120D24)
+    public static let added = Color(light: 0x1F8A5B, dark: 0x7EE0B5)
+    public static let removed = Color(light: 0xC2304D, dark: 0xFF8FA3)
 }
 
 public enum AvatarPalette {

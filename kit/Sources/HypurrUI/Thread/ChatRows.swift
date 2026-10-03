@@ -318,7 +318,7 @@ struct WorkingIndicator: View {
             } label: {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 8) {
-                        ThinkingOrb(state: bot.needsInput ? .listening : .working, size: 16, color: bot.needsInput ? Palette.warning : Palette.secondary)
+                        ThinkingOrb(state: bot.needsInput ? .listening : .working, size: 16, color: bot.needsInput ? Palette.warning : Palette.secondary, flow: !bot.needsInput)
                         Text(bot.activity.isEmpty ? "Working…" : bot.activity)
                             .font(.subheadline)
                             .foregroundStyle(bot.needsInput ? Palette.warning : Palette.secondary)

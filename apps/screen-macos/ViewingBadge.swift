@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// A small always-on-top pill while a phone is watching, so it's never a secret;
-/// its button disconnects every viewer. Black and white like the rest of Hypurr.
+/// its button disconnects every viewer. Styled with the Hypurr palette like the rest of the apps.
 @MainActor
 final class ViewingBadge {
     var onDisconnect: (() -> Void)?

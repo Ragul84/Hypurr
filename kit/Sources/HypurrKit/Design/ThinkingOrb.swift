@@ -1,6 +1,7 @@
 import SwiftUI
 
 /// Native thinking-orbs states, using its tuned dot geometry and depth shading.
+/// With `flow` the dots take the Hypurr colour flow instead of one tint.
 /// Supply an adjacent status label; this decorative view is hidden from VoiceOver.
 public struct ThinkingOrb: View {
     public enum State: String, CaseIterable, Sendable {
@@ -11,16 +12,18 @@ public struct ThinkingOrb: View {
     let size: CGFloat
     let color: Color
     let animated: Bool
+    let flow: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
     @SwiftUI.State private var visible = false
     @SwiftUI.State private var epoch = Date.now
 
-    public init(state: State = .working, size: CGFloat = 16, color: Color = Palette.text, animated: Bool = true) {
+    public init(state: State = .working, size: CGFloat = 16, color: Color = Palette.text, animated: Bool = true, flow: Bool = false) {
         self.state = state
         self.size = size
         self.color = color
         self.animated = animated
+        self.flow = flow
     }
 
     public var body: some View {
@@ -51,13 +54,18 @@ public struct ThinkingOrb: View {
                 var path = Path()
                 path.move(to: CGPoint(x: line.x1, y: line.y1))
                 path.addLine(to: CGPoint(x: line.x2, y: line.y2))
-                context.stroke(path, with: .color(color.opacity(ink(line.white, line.alpha))), lineWidth: line.width)
+                context.stroke(path, with: .color(tint(line.x1, time).opacity(ink(line.white, line.alpha))), lineWidth: line.width)
             }
             for dot in frame.dots {
                 let rect = CGRect(x: dot.x - dot.radius, y: dot.y - dot.radius, width: dot.radius * 2, height: dot.radius * 2)
-                context.fill(Path(ellipseIn: rect), with: .color(color.opacity(ink(dot.white, dot.alpha))))
+                context.fill(Path(ellipseIn: rect), with: .color(tint(dot.x, time).opacity(ink(dot.white, dot.alpha))))
             }
         }
+    }
+
+    /// The dot's colour: the single tint, or the flow sampled across the orb and drifting with time.
+    private func tint(_ x: Double, _ time: Double) -> Color {
+        flow ? ColorFlow.color(at: x / max(1, Double(size)) * 0.6 + time * 0.04) : color
     }
 
     private func ink(_ white: Double, _ alpha: Double) -> Double {

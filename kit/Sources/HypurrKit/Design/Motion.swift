@@ -5,28 +5,44 @@ import UIKit
 import AppKit
 #endif
 
-/// Grok Bot's motion, taken from its stylesheet and motion constants so ours feels the same.
-/// With Reduce Motion on, Grok drops every duration to 0; use `Motion.reduced(_:)` for that.
+/// Hypurr motion, after Material 3 Expressive's motion physics: *spatial* springs
+/// (position, size, shape) overshoot a little; *effects* (colour, opacity) never do.
+/// The web site and GTK app use the same values. With Reduce Motion on every
+/// duration drops to 0; use `Motion.reduced(_:)` for that.
 public enum Motion {
-    /// Hover and selection fills, tabs, chips, switch knob: `background-color .12s ease`.
-    public static let hover = Animation.timingCurve(0.25, 0.1, 0.25, 1, duration: 0.12)
-    /// A view switched in (the transcript on a new selection): `opacity .12s`.
-    public static let fade = Animation.timingCurve(0.25, 0.1, 0.25, 1, duration: 0.12)
-    /// Press feedback lands almost at once: `transform 50ms` (`--cursor-duration-instant`).
-    public static let press = Animation.timingCurve(0.25, 0.1, 0.25, 1, duration: 0.05)
-    /// Icon and glyph swaps, the sidebar rail morph: `.2s cubic-bezier(.22,1,.36,1)`.
-    public static let morph = Animation.timingCurve(0.22, 1, 0.36, 1, duration: 0.2)
-    public static let morphCurve = UnitCurve.bezier(startControlPoint: UnitPoint(x: 0.22, y: 1), endControlPoint: UnitPoint(x: 0.36, y: 1))
-    /// Size and layout changes (panels growing, cards resizing): the critically damped
-    /// `.3s` spring Grok writes as a `linear()` curve.
-    public static let layout = Animation.spring(duration: 0.3, bounce: 0)
-    /// A slightly slower, critically damped spring for a new chat message and its scroll.
-    public static let conversation = Animation.spring(duration: 0.42, bounce: 0)
-    /// Tiles moving into place: `{type: "spring", stiffness: 1000, damping: 63}`.
-    public static let tile = Animation.interpolatingSpring(mass: 1, stiffness: 1000, damping: 63)
+    // MARK: Expressive spring tokens (stiffness / damping ratio, mass 1)
 
-    /// `--ui-press-scale`.
-    public static let pressScale: CGFloat = 0.98
+    /// Small things that move a short way (switch knob, chips, press): 1400 / 0.6.
+    public static let spatialFast = Animation.interpolatingSpring(mass: 1, stiffness: 1400, damping: 44.9)
+    /// Default for movement and resizing: 380 / 0.8.
+    public static let spatialDefault = Animation.interpolatingSpring(mass: 1, stiffness: 380, damping: 31.2)
+    /// Big surfaces (sheets, panels): 200 / 0.8.
+    public static let spatialSlow = Animation.interpolatingSpring(mass: 1, stiffness: 200, damping: 22.6)
+    /// Colour and opacity: critically damped, 1600 / 1.0.
+    public static let effects = Animation.interpolatingSpring(mass: 1, stiffness: 1600, damping: 80)
+    /// A playful pop for confirmations and new badges.
+    public static let bouncy = Animation.spring(duration: 0.45, bounce: 0.38)
+
+    // MARK: Roles used across the apps
+
+    /// Hover and selection fills, tabs, chips: an effects spring.
+    public static let hover = effects
+    /// A view switched in (the transcript on a new selection).
+    public static let fade = Animation.timingCurve(0.2, 0, 0, 1, duration: 0.2)
+    /// Press feedback: a quick spatial spring that settles with a tiny bounce.
+    public static let press = spatialFast
+    /// Icon and glyph swaps, tab thumbs, segmented choices: springy morph.
+    public static let morph = Animation.spring(duration: 0.38, bounce: 0.28)
+    public static let morphCurve = UnitCurve.bezier(startControlPoint: UnitPoint(x: 0.2, y: 0), endControlPoint: UnitPoint(x: 0, y: 1))
+    /// Size and layout changes (panels growing, cards resizing).
+    public static let layout = Animation.spring(duration: 0.36, bounce: 0.12)
+    /// A new chat message and its scroll.
+    public static let conversation = Animation.spring(duration: 0.45, bounce: 0.18)
+    /// Tiles moving into place.
+    public static let tile = spatialDefault
+
+    /// How far a pressed control shrinks.
+    public static let pressScale: CGFloat = 0.96
 
     public static func reduced(_ animation: Animation, _ reduce: Bool) -> Animation? {
         reduce ? nil : animation
@@ -46,7 +62,7 @@ public enum Motion {
     }
 }
 
-/// Grok's press: shrink to 98% in 50ms, spring back.
+/// Press: shrink to 96% on a fast spatial spring, spring back.
 public struct PressScale: ButtonStyle {
     public init() {}
 

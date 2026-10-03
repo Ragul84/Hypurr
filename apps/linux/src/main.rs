@@ -30,40 +30,46 @@ struct Palette {
     danger: &'static str,
     code: &'static str,
     panel: &'static str,
+    /// "Needs you" (magenta in Hypurr).
+    warning: &'static str,
 }
 
+// Hypurr tokens (docs/design/hypurr-design-system.md): violet-tinted neutrals,
+// a violet accent and the violet → magenta → cyan colour flow.
 const LIGHT: Palette = Palette {
-    background: "#FFFFFF",
-    surface: "#F4F4F4",
-    bubble_agent: "#F0F0F0",
-    bubble_user: "#E2E2E2",
-    border: "#E6E6E6",
-    text: "#141414",
-    secondary: "#6B6B6B",
-    tertiary: "#9B9B9B",
-    accent_fill: "#000000",
+    background: "#FCFAFF",
+    surface: "#F4EFFC",
+    bubble_agent: "#EFE9FA",
+    bubble_user: "#E4D9FB",
+    border: "#E6DFF3",
+    text: "#1E1433",
+    secondary: "#5B4F7A",
+    tertiary: "#8C82A8",
+    accent_fill: "#6D3FD9",
     on_accent: "#FFFFFF",
-    accent_dim: "#D9D9D9",
-    danger: "#C23A2B",
-    code: "#F4F4F4",
-    panel: "#FAFAFA",
+    accent_dim: "#DCD3F0",
+    danger: "#C2304D",
+    code: "#F1ECFB",
+    panel: "#FFFFFF",
+    warning: "#C0267A",
 };
 
 const DARK: Palette = Palette {
-    background: "#0A0A0A",
-    surface: "#141414",
-    bubble_agent: "#1C1C1C",
-    bubble_user: "#3A3A3A",
-    border: "#262626",
-    text: "#F2F2F2",
-    secondary: "#9A9A9A",
-    tertiary: "#6E6E6E",
-    accent_fill: "#FFFFFF",
-    on_accent: "#000000",
-    accent_dim: "#333333",
-    danger: "#F0A7A7",
-    code: "#111111",
-    panel: "#1B1B1B",
+    background: "#0E0A1C",
+    surface: "#161029",
+    bubble_agent: "#1E1736",
+    bubble_user: "#3A2A6B",
+    border: "#2A2145",
+    text: "#F3EEFF",
+    secondary: "#A89CC8",
+    tertiary: "#75699A",
+    accent_fill: "#A78BFA",
+    on_accent: "#150A33",
+    accent_dim: "#352B55",
+    danger: "#FF8FA3",
+    code: "#120D24",
+    panel: "#1E1736",
+    warning: "#F472B6",
 };
 
 fn colors(p: &Palette) -> String {
@@ -71,7 +77,9 @@ fn colors(p: &Palette) -> String {
         "@define-color cd_bg {};\n@define-color cd_surface {};\n@define-color cd_agent {};\n@define-color cd_user {};\n\
          @define-color cd_border {};\n@define-color cd_text {};\n@define-color cd_secondary {};\n@define-color cd_tertiary {};\n\
          @define-color cd_accent {};\n@define-color cd_on_accent {};\n@define-color cd_accent_dim {};\n@define-color cd_danger {};\n\
-         @define-color cd_code {};\n@define-color cd_panel {};\n@define-color cd_warning #F0A030;\n",
+         @define-color cd_code {};\n@define-color cd_panel {};\n@define-color cd_warning {};\n\
+         @define-color cd_flow1 #A78BFA;\n@define-color cd_flow2 #F472B6;\n@define-color cd_flow3 #22D3EE;\n\
+         @define-color cd_on_flow #150A33;\n",
         p.background,
         p.surface,
         p.bubble_agent,
@@ -85,7 +93,8 @@ fn colors(p: &Palette) -> String {
         p.accent_dim,
         p.danger,
         p.code,
-        p.panel
+        p.panel,
+        p.warning
     )
 }
 
@@ -227,6 +236,45 @@ entry.field-box, entry.field-box:focus-within { background: @cd_surface; border-
 button.candidate { padding: 8px 12px; border-radius: 12px; background: transparent; box-shadow: none; border: none;
   font-weight: normal; transition: background 120ms; }
 button.candidate:hover { background: @cd_agent; }
+/* ---------- Hypurr expressive layer: colour flow, glass, springy motion ---------- */
+@keyframes hypurr-flow {
+  0% { background-image: linear-gradient(120deg, @cd_flow1, @cd_flow2, @cd_flow3); }
+  50% { background-image: linear-gradient(120deg, @cd_flow2, @cd_flow3, @cd_flow1); }
+  100% { background-image: linear-gradient(120deg, @cd_flow3, @cd_flow1, @cd_flow2); }
+}
+@keyframes hypurr-breathe {
+  from { box-shadow: 0 0 0 0 alpha(@cd_flow2, 0.0); }
+  to { box-shadow: 0 0 14px 2px alpha(@cd_flow2, 0.35); }
+}
+button.primary-pill, button.send, .badge {
+  background-image: linear-gradient(120deg, @cd_flow1, @cd_flow2, @cd_flow3);
+  color: @cd_on_flow; font-weight: 600;
+  transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 220ms ease, opacity 150ms;
+}
+button.primary-pill:hover, button.send:hover { box-shadow: 0 6px 18px alpha(@cd_flow2, 0.35); }
+button.primary-pill:active, button.send:active, button.secondary-pill:active, button.icon-btn:active { transform: scale(0.94); }
+button.send { animation: hypurr-flow 6s ease-in-out infinite alternate; }
+button.send:disabled { background-image: none; animation: none; }
+button.secondary-pill { border-radius: 999px; transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1), background 150ms; }
+button.icon-btn { border-radius: 12px; transition: transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1), background 150ms, color 150ms; }
+
+list.roster > row { border-radius: 16px; transition: background 180ms cubic-bezier(0.2, 0, 0, 1); }
+list.roster > row:selected, list.roster > row:selected:hover {
+  background-image: linear-gradient(110deg, alpha(@cd_flow1, 0.30), alpha(@cd_flow2, 0.16) 70%, alpha(@cd_flow3, 0.10));
+}
+.bubble { border-radius: 24px; padding: 9px 14px; }
+.bubble-user { background-image: linear-gradient(135deg, alpha(@cd_flow1, 0.30), alpha(@cd_flow2, 0.18)); }
+.perm-card { border-radius: 28px; padding: 18px; box-shadow: inset 0 0 0 1px alpha(@cd_flow2, 0.35), 0 10px 30px alpha(@cd_flow2, 0.12); }
+button.working { border-radius: 24px; animation: hypurr-breathe 1.6s ease-in-out infinite alternate; }
+.composer { border-radius: 28px; background-color: alpha(@cd_user, 0.92);
+  box-shadow: 0 8px 28px alpha(@cd_flow1, 0.14); transition: box-shadow 220ms ease; }
+.composer:focus-within { box-shadow: 0 0 0 2px alpha(@cd_flow1, 0.55), 0 10px 32px alpha(@cd_flow2, 0.22); }
+popover.panel > contents { border-radius: 22px; box-shadow: 0 16px 40px alpha(black, 0.35), inset 0 1px alpha(white, 0.06); }
+floating-sheet > sheet, dialog.floating sheet, dialog sheet { border-radius: 28px; }
+.pick-card { border-radius: 24px; }
+entry.field-box, entry.field-box:focus-within, .field-box-area { border-radius: 14px; }
+entry.field-box:focus-within { box-shadow: 0 0 0 2px alpha(@cd_flow1, 0.5); }
+.brand-title { font-weight: 800; font-size: 15px; color: @cd_flow1; }
 "#;
 
 fn main() -> gtk::glib::ExitCode {
@@ -239,7 +287,7 @@ fn main() -> gtk::glib::ExitCode {
         base.load_from_string(CSS);
         let palette = gtk::CssProvider::new();
         let style = adw::StyleManager::default();
-        // Black and white like the Apple apps: follow the system, default dark.
+        // Hypurr's tinted palette like the Apple apps: follow the system, default dark.
         style.set_color_scheme(adw::ColorScheme::PreferDark);
         let apply = {
             let palette = palette.clone();
