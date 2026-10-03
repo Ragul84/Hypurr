@@ -1,5 +1,5 @@
 //! Grok-Bot-style characters (same silhouettes and palette as the Apple apps), drawn with cairo.
-//! Mirrors CodyncKit/Design/CharacterAvatar.swift: `CharacterAvatar`, `GroupAvatar`, `AvatarWithStatus`.
+//! Mirrors HypurrKit/Design/CharacterAvatar.swift: `CharacterAvatar`, `GroupAvatar`, `AvatarWithStatus`.
 
 use gtk::cairo::Context;
 use gtk::prelude::*;

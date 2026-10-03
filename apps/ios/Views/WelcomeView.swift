@@ -1,5 +1,5 @@
-import CodyncKit
-import CodyncUI
+import HypurrKit
+import HypurrUI
 import SwiftUI
 
 /// First launch, before any setup: who the bots are, a glimpse of talking to one, one way forward.

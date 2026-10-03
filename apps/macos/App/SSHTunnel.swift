@@ -1,11 +1,11 @@
-import CodyncKit
+import HypurrKit
 import Darwin
 import Foundation
 import Observation
 import OSLog
 import os
 
-private let log = Logger(subsystem: "com.pokai.Codync", category: "ssh")
+private let log = Logger(subsystem: "com.ragul84.Hypurr", category: "ssh")
 
 /// A computer reached over SSH (spec §11.4). Nothing secret: keys stay in ssh-agent or on disk.
 struct SSHProfile: Codable, Hashable, Identifiable, Sendable {
@@ -28,7 +28,7 @@ enum SSH {
     static let keygen = URL(filePath: "/usr/bin/ssh-keygen")
     static let keyscan = URL(filePath: "/usr/bin/ssh-keyscan")
     static let lsof = URL(filePath: "/usr/sbin/lsof")
-    static let installCommand = "brew install leepokai/codync/codync-host && codync-host install"
+    static let installCommand = "brew install Ragul84/hypurr/hypurr-host && hypurr-host install"
 
     static var home: String { FileManager.default.homeDirectoryForCurrentUser.path }
 
@@ -39,7 +39,7 @@ enum SSH {
         }
         if let user = p.user, !matches(user, #"^[A-Za-z_][A-Za-z0-9._-]*$"#) { return "That user name isn't valid." }
         if let port = p.port, !(1...65535).contains(port) { return "The SSH port must be between 1 and 65535." }
-        if !(1...65535).contains(p.remotePort) { return "The Codync port must be between 1 and 65535." }
+        if !(1...65535).contains(p.remotePort) { return "The Hypurr port must be between 1 and 65535." }
         if let file = p.identityFile {
             var isDir: ObjCBool = false
             guard file.hasPrefix("/"), FileManager.default.fileExists(atPath: file, isDirectory: &isDir), !isDir.boolValue else {
@@ -50,7 +50,7 @@ enum SSH {
     }
 
     static func knownHostsFiles(home: String) -> [String] {
-        ["\(home)/.ssh/known_hosts", "\(home)/.codync/ssh_known_hosts"]
+        ["\(home)/.ssh/known_hosts", "\(home)/.hypurr/ssh_known_hosts"]
     }
 
     /// ssh's config tokenizer splits `UserKnownHostsFile` on spaces, so each path carries literal quotes.
@@ -74,15 +74,15 @@ enum SSH {
         return args + ["--", p.host]
     }
 
-    /// Where `codync-host` lives when `sh -l` doesn't see it: Homebrew on Apple Silicon is only on PATH
+    /// Where `hypurr-host` lives when `sh -l` doesn't see it: Homebrew on Apple Silicon is only on PATH
     /// through `~/.zprofile`, install.sh uses `~/.local/bin`, and the Mac app keeps the host in its bundle.
-    static let remotePath = "$PATH:/opt/homebrew/bin:/usr/local/bin:/home/linuxbrew/.linuxbrew/bin:$HOME/.local/bin:/Applications/Codync.app/Contents/MacOS"
+    static let remotePath = "$PATH:/opt/homebrew/bin:/usr/local/bin:/home/linuxbrew/.linuxbrew/bin:$HOME/.local/bin:/Applications/Hypurr.app/Contents/MacOS"
 
     /// The remote command is fixed; only the validated port number goes into it.
     static func infoArguments(_ p: SSHProfile, home: String) -> [String] {
         ["-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-o", "ForwardAgent=no", "-o", "ForwardX11=no"]
             + hostKeyOptions(home: home) + targetOptions(p)
-            + ["--", p.host, "sh -lc 'PATH=\"\(remotePath)\" codync-host info --json --port \(p.remotePort)'"]
+            + ["--", p.host, "sh -lc 'PATH=\"\(remotePath)\" hypurr-host info --json --port \(p.remotePort)'"]
     }
 
     /// The far side rejected our key (BatchMode never prompts, so a password or passphrase can't help).
@@ -90,9 +90,9 @@ enum SSH {
         stderr.contains("Permission denied") || stderr.contains("Too many authentication failures")
     }
 
-    /// Tunnels a crashed or force-quit Codync left running: only Codync's tunnels carry this known_hosts file.
+    /// Tunnels a crashed or force-quit Hypurr left running: only Hypurr's tunnels carry this known_hosts file.
     static func killOrphanTunnels() async {
-        _ = await ProcessRunner.run(URL(filePath: "/usr/bin/pkill"), ["-f", "--", #"^/usr/bin/ssh -N .*\.codync/ssh_known_hosts"#])
+        _ = await ProcessRunner.run(URL(filePath: "/usr/bin/pkill"), ["-f", "--", #"^/usr/bin/ssh -N .*\.hypurr/ssh_known_hosts"#])
     }
 
     static func tunnelArguments(_ p: SSHProfile, localPort: Int, home: String) -> [String] {
@@ -165,13 +165,13 @@ enum SSH {
         let home = "/Users/k"
         let p = SSHProfile(host: "box", port: 2222, user: "kevin", name: "Box")
         assert(hostKeyOptions(home: home) == [
-            "-o", #"UserKnownHostsFile="/Users/k/.ssh/known_hosts" "/Users/k/.codync/ssh_known_hosts""#,
+            "-o", #"UserKnownHostsFile="/Users/k/.ssh/known_hosts" "/Users/k/.hypurr/ssh_known_hosts""#,
             "-o", "StrictHostKeyChecking=yes",
         ])
         assert(resolveArguments(p) == ["-G", "-p", "2222", "-l", "kevin", "--", "box"])
         assert(Array(tunnelArguments(p, localPort: 50000, home: home).suffix(8))
             == ["-L", "127.0.0.1:50000:127.0.0.1:19222", "-p", "2222", "-l", "kevin", "--", "box"])
-        assert(infoArguments(p, home: home).last?.hasSuffix(" codync-host info --json --port 19222'") == true)
+        assert(infoArguments(p, home: home).last?.hasSuffix(" hypurr-host info --json --port 19222'") == true)
         assert(authRefused("kevin@box: Permission denied (publickey)."))
         assert(!authRefused("ssh: connect to host box port 22: Connection refused"))
         assert(tunnelArguments(p, localPort: 1, home: home).contains("ExitOnForwardFailure=yes"))
@@ -269,7 +269,7 @@ final class StderrTail: Sendable {
     }
 }
 
-/// What `codync-host info --json` prints.
+/// What `hypurr-host info --json` prints.
 private struct RemoteInfo: Decodable {
     var name: String
     var computerId: ComputerID
@@ -335,7 +335,7 @@ final class SSHComputers {
     private var tasks: [UUID: Task<Void, Never>] = [:]
     private var backoff: [UUID: Double] = [:]
     private var connectedAt: [UUID: Date] = [:]
-    /// Where `.ssh/known_hosts` and `.codync/ssh_known_hosts` live; tests point it elsewhere.
+    /// Where `.ssh/known_hosts` and `.hypurr/ssh_known_hosts` live; tests point it elsewhere.
     private let home: String
 
     init(home: String = SSH.home) {
@@ -393,11 +393,11 @@ final class SSHComputers {
         for id in Array(tunnels.keys) + Array(tasks.keys) { disconnect(id) }
     }
 
-    /// The user compared the fingerprints: remember the key in Codync's known_hosts and go on.
+    /// The user compared the fingerprints: remember the key in Hypurr's known_hosts and go on.
     func trustHostKey(_ id: UUID) {
         guard case let .confirmHostKey(_, _, lines) = status(of: id) else { return }
         do {
-            let dir = URL(filePath: home).appending(path: ".codync")
+            let dir = URL(filePath: home).appending(path: ".hypurr")
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
             let file = dir.appending(path: "ssh_known_hosts")
             if !FileManager.default.fileExists(atPath: file.path) {
@@ -484,7 +484,7 @@ final class SSHComputers {
                 // Only plain host keys can be compared: a `@cert-authority` key is never what keyscan returns.
                 let pinned = await recordedKeys(resolved.knownHostsName, certAuthorities: false)
                 if !current.isEmpty, !pinned.isEmpty, current.isDisjoint(with: pinned) {
-                    return .stop(.failed("The host key of \(profile.host) changed. This can mean someone is intercepting the connection. Codync won't connect until the old key is removed from known_hosts."))
+                    return .stop(.failed("The host key of \(profile.host) changed. This can mean someone is intercepting the connection. Hypurr won't connect until the old key is removed from known_hosts."))
                 }
             }
             return .retry("SSH couldn't connect to \(profile.host). \(result.detail)")
@@ -492,7 +492,7 @@ final class SSHComputers {
         if result.status == 127 { return .stop(.notInstalled) }
         guard let info = try? JSONDecoder().decode(RemoteInfo.self, from: result.stdout) else {
             if result.status == 0 { return .stop(.notInstalled) }
-            return .stop(.failed("codync-host on \(profile.host) couldn't report its identity. Run `codync-host install` there. \(result.detail)"))
+            return .stop(.failed("hypurr-host on \(profile.host) couldn't report its identity. Run `hypurr-host install` there. \(result.detail)"))
         }
         let computer = Computer(id: info.computerId, name: info.name, signKey: info.signKey, boxKey: info.boxKey)
         guard computer.isConsistent else { return .stop(.failed("\(profile.host) reported an invalid identity.")) }
@@ -501,7 +501,7 @@ final class SSHComputers {
         }
         if profile.computerId == nil { remember(info.computerId, name: info.name, for: id) }
         guard info.running else {
-            return .retry("codync-host is installed on \(info.name) but not running. Run `codync-host install` there.")
+            return .retry("hypurr-host is installed on \(info.name) but not running. Run `hypurr-host install` there.")
         }
 
         // Tunnel: a free loopback port each attempt; a port taken in between just makes ssh exit (ExitOnForwardFailure).
@@ -569,7 +569,7 @@ final class SSHComputers {
     }
 
     private static func signInRefused(_ profile: SSHProfile) -> String {
-        "\(profile.host) refused the key. Codync signs in with an SSH key (ssh-agent or the key file) and can't type a password or passphrase; make `ssh \(profile.host)` work in Terminal without prompting, then connect again."
+        "\(profile.host) refused the key. Hypurr signs in with an SSH key (ssh-agent or the key file) and can't type a password or passphrase; make `ssh \(profile.host)` work in Terminal without prompting, then connect again."
     }
 
     private func recordedKeys(_ name: String, certAuthorities: Bool = true) async -> Set<String> {

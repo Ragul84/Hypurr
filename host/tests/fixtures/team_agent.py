@@ -39,7 +39,7 @@ def prompt(request):
                 return json.loads(mcp.stdout.readline())
 
             initialized = rpc(1, "initialize", {"protocolVersion": "2025-06-18"})
-            assert initialized["result"]["serverInfo"]["name"] == "codync-team"
+            assert initialized["result"]["serverInfo"]["name"] == "hypurr-team"
             tools = rpc(2, "tools/list", {})
             assert {t["name"] for t in tools["result"]["tools"]} == {"list_bots", "ask_bot"}
             roster = rpc(3, "tools/call", {"name": "list_bots", "arguments": {}})

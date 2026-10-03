@@ -1,11 +1,11 @@
 ---
 name: product-launch-film
-description: Make a product launch film (60–90 s, 1080p60) the way the Codync launch film was made — a white-stage, continuously moving film where every piece of product UI is rebuilt as DOM, type arrives word by word out of blur, and every beat sits on a music grid. Use when asked for a launch video, product film, promo, teaser, release video or App Store preview for an app or developer tool. Built on HyperFrames (one index.html, one GSAP timeline).
+description: Make a product launch film (60–90 s, 1080p60) the way the Hypurr launch film was made — a white-stage, continuously moving film where every piece of product UI is rebuilt as DOM, type arrives word by word out of blur, and every beat sits on a music grid. Use when asked for a launch video, product film, promo, teaser, release video or App Store preview for an app or developer tool. Built on HyperFrames (one index.html, one GSAP timeline).
 ---
 
 # Product launch film
 
-The method that produced the Codync launch film (https://youtu.be/awhZJPjJaPc). The film itself
+The method that produced the Hypurr launch film (https://youtu.be/awhZJPjJaPc). The film itself
 is not the point; the point is the method, which works for any product. Read the whole file
 before writing anything.
 
@@ -213,13 +213,13 @@ template/
 
 - Show stills before motion and a draft before the delivery render; ask for notes per beat.
 - When the user rejects a look, ask what they liked in the rejected version before replacing it,
-  then offer the plainest native version first (in the Codync film, plain macOS Terminal windows
+  then offer the plainest native version first (in the Hypurr film, plain macOS Terminal windows
   beat every stylised "IDE" treatment).
 - Keep the previous cut in `versions/` so any reverted idea is one copy away.
 
 ## Worked example
 
-The Codync film's source is at `videos/codync-silk/` in this repo (git-ignored, so only on the
+The Hypurr film's source is at `videos/hypurr-silk/` in this repo (git-ignored, so only on the
 author's machine). If it is there, read it for the full set of factories this template leaves out: the
 pile of Terminal windows, the iPhone with chat, approval card and composer, the notification, the lock
 screen with a Live Activity, the Mac app window, the landscape phone showing a remote desktop, the wall,

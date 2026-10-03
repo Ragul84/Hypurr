@@ -12,7 +12,7 @@ there has been no keyboard/mouse input for ten minutes, and the local host repor
 no working bots, pending input, or running setup terminals. A staged update can
 also install when quitting. Manual installation can interrupt work.
 
-Before replacement, Codync unregisters its screen helper and stops the host,
+Before replacement, Hypurr unregisters its screen helper and stops the host,
 waiting for its data lock to be released. If cleanup fails, installation pauses
 with a retry action. A persistent restart marker makes the next app launch
 reinstall the host service from the new bundle; remote screen registration is
@@ -27,11 +27,11 @@ versions follow the marketing version; the iOS build counter is independent.
 ## Standalone hosts on Linux and macOS
 
 ```sh
-codync-host update --check
-codync-host update
-codync-host update --status --json
-codync-host update --auto on
-codync-host update --auto off
+hypurr-host update --check
+hypurr-host update
+hypurr-host update --status --json
+hypurr-host update --auto on
+hypurr-host update --auto off
 ```
 
 Use `--port` for a host on a nondefault port. `--force` explicitly allows a manual
@@ -59,7 +59,7 @@ previous binary. Data is preserved; this is binary rollback, not database rollba
 or recovery from power loss during installation.
 
 Bundled hosts are updated with the Mac app. Homebrew hosts use
-`brew upgrade leepokai/codync/codync-host`, followed by `codync-host install`.
+`brew upgrade Ragul84/hypurr/hypurr-host`, followed by `hypurr-host install`.
 Development builds must be rebuilt. The independent updater refuses to overwrite
 those installations. The Linux desktop executable remains package-managed or
 manually installed; its update controls update the host.
@@ -82,7 +82,7 @@ already distributed clients. Repository Actions secrets:
 
 The Mac workflow signs/notarizes the app, builds its DMG, generates `appcast.xml`,
 then verifies the actual DMG signature and metadata before upload. The host
-workflow emits `codync-host-<platform>.update.json` and `.update.json.sig` alongside
+workflow emits `hypurr-host-<platform>.update.json` and `.update.json.sig` alongside
 each archive. Signing fails if a private key does not match the committed public
 key. Never commit private keys or put them in command-line arguments.
 
@@ -97,4 +97,4 @@ used. Building locally or configuring secrets does not publish a release.
 - [Grok Bot's safe relaunch gate](https://github.com/b-nnett/grok-bot-0.18-reconstructed/blob/main/source/electron-main/update/safe-relaunch-gate.ts)
 
 Grok Bot supplied the reference for opt-in, staged updates and idle-gated restart.
-Codync uses app inactivity and input idle time; it does not require a locked screen.
+Hypurr uses app inactivity and input idle time; it does not require a locked screen.

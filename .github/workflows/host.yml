@@ -1,4 +1,4 @@
-name: codync-host
+name: hypurr-host
 
 on:
   push:
@@ -53,7 +53,7 @@ jobs:
       - name: Verify native UI flows
         env:
           GTK_A11Y: none
-          CODYNC_UI_ARTIFACTS: ${{ github.workspace }}/build/ui-parity
+          HYPURR_UI_ARTIFACTS: ${{ github.workspace }}/build/ui-parity
         run: xvfb-run -a dbus-run-session -- python3 tests/ui_fixture.py
       - uses: actions/upload-artifact@v4
         if: always()
@@ -64,20 +64,20 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
           # <product>-<os>-<arch>, no version: the website links to releases/latest/download/<name>.
-          NAME=codync-${{ matrix.name }}
+          NAME=hypurr-${{ matrix.name }}
           cargo build --release
           mkdir -p $NAME/share/applications $NAME/share/icons/hicolor/scalable/apps $NAME/bin
-          cp target/release/codync $NAME/bin/
-          cp data/com.pokai.Codync.desktop $NAME/share/applications/
-          cp data/com.pokai.Codync.svg $NAME/share/icons/hicolor/scalable/apps/
+          cp target/release/hypurr $NAME/bin/
+          cp data/com.ragul84.Hypurr.desktop $NAME/share/applications/
+          cp data/com.ragul84.Hypurr.svg $NAME/share/icons/hicolor/scalable/apps/
           tar czf $GITHUB_WORKSPACE/$NAME.tar.gz $NAME
           cd $GITHUB_WORKSPACE && shasum -a 256 $NAME.tar.gz > $NAME.tar.gz.sha256
       - uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           files: |
-            codync-linux-*.tar.gz
-            codync-linux-*.tar.gz.sha256
+            hypurr-linux-*.tar.gz
+            hypurr-linux-*.tar.gz.sha256
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -111,9 +111,9 @@ jobs:
           cargo build --release --target ${{ matrix.target }}
       - name: Package
         run: |
-          NAME=codync-host-${{ matrix.name }}
+          NAME=hypurr-host-${{ matrix.name }}
           mkdir $NAME
-          cp host/target/${{ matrix.target }}/release/codync-host $NAME/
+          cp host/target/${{ matrix.target }}/release/hypurr-host $NAME/
           cp LICENSE $NAME/
           tar czf $NAME.tar.gz $NAME
           shasum -a 256 $NAME.tar.gz > $NAME.tar.gz.sha256
@@ -124,18 +124,18 @@ jobs:
           python3 -m venv "$RUNNER_TEMP/update-signing"
           "$RUNNER_TEMP/update-signing/bin/pip" install 'cryptography>=44,<47'
           "$RUNNER_TEMP/update-signing/bin/python" packaging/updates/sign-host-release.py \
-            "codync-host-${{ matrix.name }}.tar.gz" \
+            "hypurr-host-${{ matrix.name }}.tar.gz" \
             --version "$GITHUB_REF_NAME" --platform "${{ matrix.name }}"
       - uses: softprops/action-gh-release@v2
         with:
           files: |
-            codync-host-*.tar.gz
-            codync-host-*.tar.gz.sha256
-            codync-host-*.update.json
-            codync-host-*.update.json.sig
+            hypurr-host-*.tar.gz
+            hypurr-host-*.tar.gz.sha256
+            hypurr-host-*.update.json
+            hypurr-host-*.update.json.sig
 
   homebrew:
-    # Keeps `brew install leepokai/codync/codync-host` (Linux, headless Macs) in step with releases.
+    # Keeps `brew install Ragul84/hypurr/hypurr-host` (Linux, headless Macs) in step with releases.
     needs: release
     runs-on: ubuntu-latest
     steps:
@@ -145,19 +145,19 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION=${GITHUB_REF_NAME#v}
-          gh release download "$GITHUB_REF_NAME" --pattern 'codync-host-*.sha256' --dir sums
-          sha() { cut -d' ' -f1 "sums/codync-host-$1.tar.gz.sha256"; }
+          gh release download "$GITHUB_REF_NAME" --pattern 'hypurr-host-*.sha256' --dir sums
+          sha() { cut -d' ' -f1 "sums/hypurr-host-$1.tar.gz.sha256"; }
           sed -e "s/^  version .*/  version \"$VERSION\"/" \
               -e "0,/REPLACE_WITH_SHA256/s//$(sha macos-arm64)/" \
               -e "0,/REPLACE_WITH_SHA256/s//$(sha macos-x86_64)/" \
               -e "0,/REPLACE_WITH_SHA256/s//$(sha linux-arm64)/" \
               -e "0,/REPLACE_WITH_SHA256/s//$(sha linux-x86_64)/" \
-              packaging/homebrew/codync-host.rb > codync-host.rb
-          git clone https://x-access-token:${{ secrets.TAP_TOKEN }}@github.com/leepokai/homebrew-codync.git tap
-          mkdir -p tap/Formula && cp codync-host.rb tap/Formula/ && cp packaging/homebrew/README.md tap/
+              packaging/homebrew/hypurr-host.rb > hypurr-host.rb
+          git clone https://x-access-token:${{ secrets.TAP_TOKEN }}@github.com/Ragul84/homebrew-hypurr.git tap
+          mkdir -p tap/Formula && cp hypurr-host.rb tap/Formula/ && cp packaging/homebrew/README.md tap/
           cd tap
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "codync-host $VERSION" || exit 0
+          git commit -m "hypurr-host $VERSION" || exit 0
           git push

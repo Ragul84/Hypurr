@@ -121,14 +121,14 @@ pub async fn serve(bot: String, port: u16, server: Server) -> Result<()> {
     let mut out = tokio::io::stdout();
     let (name, instructions, available_tools) = match server {
         Server::Connectors => {
-            ("codync-connectors", crate::market::requests::INSTRUCTIONS, crate::market::requests::tools())
+            ("hypurr-connectors", crate::market::requests::INSTRUCTIONS, crate::market::requests::tools())
         }
-        Server::Computer => ("codync-computer", INSTRUCTIONS, tools()),
-        Server::Routines => ("codync-routines", crate::routines::INSTRUCTIONS, crate::routines::tools()),
-        Server::Team => ("codync-team", crate::chat::team::INSTRUCTIONS, crate::chat::team::tools()),
-        Server::Memory => ("codync-memory", crate::chat::memory::INSTRUCTIONS, crate::chat::memory::tools()),
+        Server::Computer => ("hypurr-computer", INSTRUCTIONS, tools()),
+        Server::Routines => ("hypurr-routines", crate::routines::INSTRUCTIONS, crate::routines::tools()),
+        Server::Team => ("hypurr-team", crate::chat::team::INSTRUCTIONS, crate::chat::team::tools()),
+        Server::Memory => ("hypurr-memory", crate::chat::memory::INSTRUCTIONS, crate::chat::memory::tools()),
         Server::Composio => {
-            ("codync-composio", crate::market::composio::INSTRUCTIONS, crate::market::composio::tools())
+            ("hypurr-composio", crate::market::composio::INSTRUCTIONS, crate::market::composio::tools())
         }
     };
     while let Some(line) = lines.next_line().await? {
@@ -196,16 +196,16 @@ async fn call(port: u16, token: &str, bot: &str, params: &Value, server: Server)
                         Server::Composio => json!({"content": [{"type": "text", "text": v["result"].to_string()}]}),
                     };
                 }
-                Ok(v) => v["error"].as_str().unwrap_or("the Codync host refused the call").to_owned(),
-                Err(e) => format!("bad response from the Codync host: {e}"),
+                Ok(v) => v["error"].as_str().unwrap_or("the Hypurr host refused the call").to_owned(),
+                Err(e) => format!("bad response from the Hypurr host: {e}"),
             }
         }
-        Err(e) => format!("can't reach the Codync host: {e}"),
+        Err(e) => format!("can't reach the Hypurr host: {e}"),
     };
     json!({"content": [{"type": "text", "text": error}], "isError": true})
 }
 
-/// `codync-host mcp remote`: a stdio MCP server that forwards every message to a remote
+/// `hypurr-host mcp remote`: a stdio MCP server that forwards every message to a remote
 /// connector with the headers and fresh sign-in token the host gives it. Speaks streamable
 /// HTTP, and falls back to the older HTTP+SSE transport when the server doesn't.
 pub async fn serve_remote(connector: String, port: u16) -> Result<()> {
@@ -283,11 +283,11 @@ impl Remote {
             .timeout(Duration::from_secs(30))
             .send()
             .await
-            .map_err(|e| anyhow::anyhow!("can't reach the Codync host: {e}"))?;
+            .map_err(|e| anyhow::anyhow!("can't reach the Hypurr host: {e}"))?;
         let ok = res.status().is_success();
         let target: Value = res.json().await?;
         if !ok {
-            anyhow::bail!("{}", target["error"].as_str().unwrap_or("the Codync host refused"));
+            anyhow::bail!("{}", target["error"].as_str().unwrap_or("the Hypurr host refused"));
         }
         let mut headers = reqwest::header::HeaderMap::new();
         for (k, v) in target["headers"].as_object().into_iter().flatten() {
@@ -493,7 +493,7 @@ pub async fn serve_local(connector: String, port: u16) -> Result<()> {
         .send()
         .await?;
     if !res.status().is_success() {
-        anyhow::bail!("Connector credentials unavailable; check Credentials in Codync");
+        anyhow::bail!("Connector credentials unavailable; check Credentials in Hypurr");
     }
     let v: Value = res.json().await?;
     let command = v["command"].as_str().ok_or_else(|| anyhow::anyhow!("Not a local connector"))?;

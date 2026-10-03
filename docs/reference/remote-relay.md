@@ -14,8 +14,8 @@ Shared deterministic [vectors](fixtures/remote-relay-vectors.json) and their [ge
 | D4 | **Host 是授權的唯一權威**。host 在本機 SQLite 保存「已授權裝置」表；**只有兩條路能新增列**：本機 QR 配對（§4.1）與 host 自己的核准動作（`decideAccessRequest` approve，§4.2 B）。雲端 state **只能縮短**授權（刪除列、延長既有列的 lease），永遠不能新增。host 把此表簽成 **ACL** 發佈到自己的 DO，DO 據此放行 WebSocket；E2E 握手時 host 再驗一次。 | 無帳號模式也能用中繼（host 以機器金鑰向雲端註冊，不需帳號）；雲端被攻破也無法新增可解密的裝置（新增要 host 本機的使用者動作、ACL 要 host 簽、握手要 host 私鑰）；撤權有兩道即時關卡（DO 封鎖 + host 關 channel）。 |
 | D5 | **Computer ID 由 host 簽章公鑰推導**：`computerId = b64url(SHA-256(hostSignPub)[0..16])`。不由雲端分配。 | 自我驗證、離線可得、無法被搶註；DO 名稱可直接推導。代價：換 host 金鑰 = 新 computer（見 §3.5）。 |
 | D6 | 帳號 → Computers → Bots：`AccountStore`（`[ComputerID: BotStore]`），`BotReference = accountId + computerId + botId`。 | 依帳號與電腦隔離狀態。 |
-| D7 | 共用 bearer token（`~/.codync/token`）**只接受 loopback 連線**（Mac App 本機、SSH tunnel、statusline、MCP、TUI、Linux App）。手機與其他遠端 client 一律走 E2E channel。 | 移除「一個 token 開所有手機」的舊模型；不留相容路徑。 |
-| D8 | SSH：macOS App 以系統 OpenSSH `-L` 轉發到遠端 host 的 loopback API；遠端側看到的是 loopback 呼叫者，所以 SSH 帳號等同本機使用者權限（能讀 `~/.codync/token` 的人本來就有這權限）。 | 產品決策 6；重用 loopback API，不需要額外授權層。 |
+| D7 | 共用 bearer token（`~/.hypurr/token`）**只接受 loopback 連線**（Mac App 本機、SSH tunnel、statusline、MCP、TUI、Linux App）。手機與其他遠端 client 一律走 E2E channel。 | 移除「一個 token 開所有手機」的舊模型；不留相容路徑。 |
+| D8 | SSH：macOS App 以系統 OpenSSH `-L` 轉發到遠端 host 的 loopback API；遠端側看到的是 loopback 呼叫者，所以 SSH 帳號等同本機使用者權限（能讀 `~/.hypurr/token` 的人本來就有這權限）。 | 產品決策 6；重用 loopback API，不需要額外授權層。 |
 | D10 | **推播內容也加密**：host 以裝置註冊的 X25519 push key 封裝通知標題／內文（§6.7），APNs 只帶通用文字 + `mutable-content`，iOS Notification Service Extension 解開。Live Activity 只推狀態 enum，不推自由文字。 | 決策 2：Cloudflare（`relay/`）只看得到密文。 |
 
 **審查後的取捨（rev 2）**：
@@ -59,8 +59,8 @@ Shared deterministic [vectors](fixtures/remote-relay-vectors.json) and their [ge
 | Cloud schema | `cloud/migrations/` |
 | Host identity / crypto / channel | `host/src/remote/identity.rs`, `crypto.rs`, `channel.rs` |
 | Host cloud / relay | `host/src/remote/cloud.rs`, `relay.rs` |
-| Swift transports / identity | `kit/Sources/CodyncKit/Client/` |
-| Account and per-computer state | `kit/Sources/CodyncUI/` |
+| Swift transports / identity | `kit/Sources/HypurrKit/Client/` |
+| Account and per-computer state | `kit/Sources/HypurrUI/` |
 | Apple account integration | `apps/shared/AccountSession.swift` |
 
 See [architecture](../architecture/overview.md) and [file structure](../architecture/file-structure.md). Application/host compatibility follows their major version; channel `v`, QR version and Worker package version are separate values.
@@ -82,9 +82,9 @@ See [architecture](../architecture/overview.md) and [file structure](../architec
 - 只有一把 Ed25519 金鑰（`Curve25519.Signing.PrivateKey`）。
 - 每個 `SharedStore.Context.id`（帳號 namespace，`local` 或 hash(userID)）一把，避免跨帳號關聯。
 - 另有一把 X25519 **push key**（`Curve25519.KeyAgreement.PrivateKey`），同樣每 context 一把，只用於解開推播（§6.7）。
-- Keychain：`kSecClassGenericPassword`，`kSecAttrService = "com.pokai.Codync.device-key"`（push key 用 `"com.pokai.Codync.push-key"`），`kSecAttrAccount = context.id`，值 = 32-byte `rawRepresentation`，`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`，`kSecAttrSynchronizable = false`。
+- Keychain：`kSecClassGenericPassword`，`kSecAttrService = "com.ragul84.Hypurr.device-key"`（push key 用 `"com.ragul84.Hypurr.push-key"`），`kSecAttrAccount = context.id`，值 = 32-byte `rawRepresentation`，`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`，`kSecAttrSynchronizable = false`。
 - macOS：**不設** `kSecUseDataProtectionKeychain`（Mac App 是 Developer ID、未 sandbox、沒有 entitlements 檔；data protection keychain 需要 provisioning profile 背書的 entitlement，否則 `-34018`）。使用 login keychain，不設 access group。
-- iOS App、Widgets、NotificationService 共用 access group `$(AppIdentifierPrefix)com.pokai.Codync`（APPLE-APPS 在 `project.yml` 對這三個 target 加 `keychain-access-groups` entitlement；kit 從 Info.plist `CodyncKeychainGroup` 讀 group，缺值則不設 group）。
+- iOS App、Widgets、NotificationService 共用 access group `$(AppIdentifierPrefix)com.ragul84.Hypurr`（APPLE-APPS 在 `project.yml` 對這三個 target 加 `keychain-access-groups` entitlement；kit 從 Info.plist `HypurrKeychainGroup` 讀 group，缺值則不設 group）。
 - 私鑰永不離開 Keychain／process；雲端只存公鑰。
 - 帳號登出／移除帳號：刪除該 context 的 device key、computers 快取、mailbox 草稿、widget snapshot。
 
@@ -103,7 +103,7 @@ See [architecture](../architecture/overview.md) and [file structure](../architec
 
 | 動作 | 效果 |
 |---|---|
-| 在電腦上撤銷裝置（Mac UI／`codync-host devices revoke`） | host 刪除裝置列與其 push tickets、Live Activity tickets → 立即關閉該裝置所有 channel → 發佈新 ACL → DO 關閉其 WebSocket；帳號來源的另呼叫 `DELETE` 對應 grant（見 §8.4 `POST /v1/host/grants/{id}/revoke`） |
+| 在電腦上撤銷裝置（Mac UI／`hypurr-host devices revoke`） | host 刪除裝置列與其 push tickets、Live Activity tickets → 立即關閉該裝置所有 channel → 發佈新 ACL → DO 關閉其 WebSocket；帳號來源的另呼叫 `DELETE` 對應 grant（見 §8.4 `POST /v1/host/grants/{id}/revoke`） |
 | 雲端撤銷 grant／裝置／解除綁定／刪帳號 | Worker 寫 D1 → 呼叫 DO `/internal/block`（`[{dk, grantId}]`，立即關閉並封鎖）→ DO 通知 host `cloud.changed` → host 拉 `/v1/host/state` 並刪除裝置列 |
 | host 連不到雲端 | 帳號來源裝置的 lease 最長 15 分鐘後失效，host 關閉 channel；本機（QR）來源裝置不受影響 |
 
@@ -112,7 +112,7 @@ See [architecture](../architecture/overview.md) and [file structure](../architec
 - **Channel 金鑰**：每次連線新產生；任一方向 counter 達 2^32 或連線滿 24 小時 → host 以 close code `4011 rekey` 關閉，client 立即重連。
 - **Device key**：不做原地輪替。要換 → 刪 key、重新配對／重新申請。
 - **Host key**：不做原地輪替。刪除 `identity.json` 即成為新 computer（新 `computerId`），所有裝置需重新配對；舊 D1 列由使用者在帳號中移除。這是刻意的簡化（D5）。
-- **Loopback token**：`codync-host reset-token` 照舊，只影響本機 helper。
+- **Loopback token**：`hypurr-host reset-token` 照舊，只影響本機 helper。
 
 ---
 
@@ -120,15 +120,15 @@ See [architecture](../architecture/overview.md) and [file structure](../architec
 
 ### 4.1 QR 配對（無帳號也可用）
 
-QR／連結保留 `codync://pair` scheme，**移除 `token`**，欄位：
+QR／連結保留 `hypurr://pair` scheme，**移除 `token`**，欄位：
 
 ```
-codync://pair?v=3&name=<pct>&id=<computerId>&sk=<signPub>&bk=<boxPub>&code=<pairing code>&urls=<pct a,b>&cloud=<pct cloud base URL>
+hypurr://pair?v=3&name=<pct>&id=<computerId>&sk=<signPub>&bk=<boxPub>&code=<pairing code>&urls=<pct a,b>&cloud=<pct cloud base URL>
 ```
 
 | 欄位 | 必填 | 說明 |
 |---|---|---|
-| `v` | 是 | 固定 `3`；缺或不同 → App 顯示「請更新電腦上的 Codync」 |
+| `v` | 是 | 固定 `3`；缺或不同 → App 顯示「請更新電腦上的 Hypurr」 |
 | `id` | 是 | 必須等於 `computerId(sk)`，否則拒絕 |
 | `sk`, `bk` | 是 | host 公鑰 |
 | `code` | 是 | 16 random bytes，b64url；一次性、10 分鐘；host 最多同時 5 組（新的擠掉最舊的） |
@@ -136,10 +136,10 @@ codync://pair?v=3&name=<pct>&id=<computerId>&sk=<signPub>&bk=<boxPub>&code=<pair
 | `cloud` | 否 | host 使用的 cloud base URL（`https://…`；DEBUG build 另允許 `http://127.0.0.1:*`／`http://localhost:*`）；缺 = host 關閉雲端 |
 | `name` | 否 | 顯示名稱 |
 
-`urls` 與 `cloud` 至少要有一個。`offerId = b64url(SHA-256("codync/offer/v1" ‖ codeBytes)[0..16])`。
+`urls` 與 `cloud` 至少要有一個。`offerId = b64url(SHA-256("hypurr/offer/v1" ‖ codeBytes)[0..16])`。
 
 流程：
-1. 使用者在電腦上開 QR（Mac 選單 → loopback `pairing`；或 `codync-host pair`）。host 產生 code，記在記憶體，並立即發佈含 `offers` 的新 ACL。
+1. 使用者在電腦上開 QR（Mac 選單 → loopback `pairing`；或 `hypurr-host pair`）。host 產生 code，記在記憶體，並立即發佈含 `offers` 的新 ACL。
 2. 手機載入／建立 device key，用 §7.5 的連線策略連線，hello 帶 `"pair": true`（中繼另需 URL `pair=<offerId>`）。
 3. 握手成功（手機已用 QR 的 `sk` 驗證 host）後，第一個 request 必須是：
    ```json
@@ -160,21 +160,21 @@ codync://pair?v=3&name=<pct>&id=<computerId>&sk=<signPub>&bk=<boxPub>&code=<pair
 **A. 電腦加入帳號（claim）**—在該電腦上的 Mac App（或經 SSH tunnel 的 Mac App）操作：
 1. Mac App（Clerk 已登入）`POST /v1/claims` → `{claimId, nonce, expiresAt}`（5 分鐘）。
 2. Mac App 呼叫 loopback `claimSign {claimId, nonce, userId}` → host 回傳註冊資料與簽章：
-   `sig = Ed25519_host("codync/claim/v1\n" + claimId + "\n" + nonce + "\n" + userId + "\n" + computerId + "\n" + boxKey)`（UTF-8，**無結尾換行**；向量 `claim`）。Worker 以此 `boxKey` 建立或更新 `computers.box_pub`，不接受 client 另給的值。
+   `sig = Ed25519_host("hypurr/claim/v1\n" + claimId + "\n" + nonce + "\n" + userId + "\n" + computerId + "\n" + boxKey)`（UTF-8，**無結尾換行**；向量 `claim`）。Worker 以此 `boxKey` 建立或更新 `computers.box_pub`，不接受 client 另給的值。
 3. Mac App `POST /v1/claims/{claimId}/complete`（Clerk）帶上 host 回傳的內容。Worker 驗 Clerk、claim、簽章，原子化設定 owner。
 4. Worker 通知 DO `cloud.changed` → host 拉 state 得知 owner。
 
 **B. 手機取得存取權**（commit-then-reveal SAS，ZRTP／BLE numeric comparison 同型）：
-1. 手機登入後 `POST /v1/devices`（Clerk + 該 device key 的 `Codync-Sig`）。
-2. `GET /v1/computers`（帶 `Codync-Sig` 則回傳每台的 `access`）。 iPhone 的 Bots 首頁直接列出尚未連線的帳號電腦，點 **Connect** 進入存取申請，不需掃 QR Code；核准後顯示該電腦的 bots。首次裝置授權仍由電腦上的使用者確認。
-3. 對 `access == "none"` 的電腦：手機產生 32 random bytes `nD`（只存記憶體），`POST /v1/computers/{id}/access-requests {"commit": b64url(SHA-256("codync/sascommit/v1" ‖ dk ‖ nD))}` → `{requestId, expiresAt}`。
+1. 手機登入後 `POST /v1/devices`（Clerk + 該 device key 的 `Hypurr-Sig`）。
+2. `GET /v1/computers`（帶 `Hypurr-Sig` 則回傳每台的 `access`）。 iPhone 的 Bots 首頁直接列出尚未連線的帳號電腦，點 **Connect** 進入存取申請，不需掃 QR Code；核准後顯示該電腦的 bots。首次裝置授權仍由電腦上的使用者確認。
+3. 對 `access == "none"` 的電腦：手機產生 32 random bytes `nD`（只存記憶體），`POST /v1/computers/{id}/access-requests {"commit": b64url(SHA-256("hypurr/sascommit/v1" ‖ dk ‖ nD))}` → `{requestId, expiresAt}`。
 4. Worker 通知 DO → host 拉 state → 看到新申請（含 `commit`）→ host 產生 32 random bytes `nH`（存本機記憶體，每個 requestId 只產生一次）→ `POST /v1/host/access-requests/{id}/nonce {"nonce": nH}`（已有 host nonce → `409 conflict`，host 不得換）。
 5. 手機輪詢 `GET /v1/access-requests/{id}`（每 2 秒）→ 出現 `hostNonce` 後才 `POST /v1/access-requests/{id}/reveal {"nonce": nD}` → Worker 存入並通知 DO `cloud.changed`。手機此時計算 SAS 顯示「在電腦上確認代碼 123456」。
-6. host 拉 state 取得 `deviceNonce` → 驗 `SHA-256("codync/sascommit/v1" ‖ dk ‖ nD) == commit`（不符 → 自動 deny 並記 `warn`）→ 計算 SAS → `accessRequests` 事件 → Mac App 顯示核准對話框（裝置名稱、平台、帳號 email、SAS）。**`nD` 驗證通過前 host 不顯示 SAS、不接受 approve**（`decideAccessRequest` 回 409）。無 GUI 的 host：`codync-host access list|approve|deny`。
+6. host 拉 state 取得 `deviceNonce` → 驗 `SHA-256("hypurr/sascommit/v1" ‖ dk ‖ nD) == commit`（不符 → 自動 deny 並記 `warn`）→ 計算 SAS → `accessRequests` 事件 → Mac App 顯示核准對話框（裝置名稱、平台、帳號 email、SAS）。**`nD` 驗證通過前 host 不顯示 SAS、不接受 approve**（`decideAccessRequest` 回 409）。無 GUI 的 host：`hypurr-host access list|approve|deny`。
 7. 核准 → host `POST /v1/host/access-requests/{id}/decision {"decision":"approve"}` → D1 建立 grant → 回 `grantId` → host **以自己顯示給使用者的 `dk` 與回傳的 `grantId`** 新增裝置列（`source=account`，lease 15 分鐘）→ 發佈 ACL。
 8. 手機輪詢到 `approved` → 連線（§7.5）。第一次 `hello` 回應帶 `boxKey`，此時 pin（§3.3）。
 
-**SAS**：`sas = uint32_be(SHA-256("codync/sas/v2" ‖ hostSignPub ‖ dk ‖ nD ‖ nH)[0..4]) mod 1_000_000`，左補零成 6 位數（向量 `sas`）。手機用從雲端拿到的 `signKey` 算、host 用自己的公鑰與申請內 dk 算。因為雙方的 nonce 在對方的值確定之後才揭露，被攻破的雲端每次申請只有 10⁻⁶ 的機會讓兩邊代碼相同，無法離線搜尋金鑰。手機核准後 pin 住算 SAS 用的那把 `signKey`，之後以 `welcome.sig` 驗證。
+**SAS**：`sas = uint32_be(SHA-256("hypurr/sas/v2" ‖ hostSignPub ‖ dk ‖ nD ‖ nH)[0..4]) mod 1_000_000`，左補零成 6 位數（向量 `sas`）。手機用從雲端拿到的 `signKey` 算、host 用自己的公鑰與申請內 dk 算。因為雙方的 nonce 在對方的值確定之後才揭露，被攻破的雲端每次申請只有 10⁻⁶ 的機會讓兩邊代碼相同，無法離線搜尋金鑰。手機核准後 pin 住算 SAS 用的那把 `signKey`，之後以 `welcome.sig` 驗證。
 
 ### 4.3 授權表與 ACL（host 為權威）
 
@@ -199,19 +199,19 @@ ACL（host 簽章，DO 驗證；逐位元組簽章，不做 JSON 正規化；向
 
 ---
 
-## 5. Codync-Sig：HTTP／WebSocket 請求簽章
+## 5. Hypurr-Sig：HTTP／WebSocket 請求簽章
 
 用於：host → `/v1/host/*`、host／device → `/v1/relay/*`（WebSocket upgrade）、device 在 `/v1/devices`、`/v1/computers/{id}/access-requests`、`/v1/access-requests/{id}/reveal` 與 `GET /v1/computers` 的持有證明。
 
 Header：
 ```
-Codync-Sig: v=1,kid=<b64url pub>,ts=<ms>,nonce=<b64url 16 random bytes>,sig=<b64url 64-byte sig>
+Hypurr-Sig: v=1,kid=<b64url pub>,ts=<ms>,nonce=<b64url 16 random bytes>,sig=<b64url 64-byte sig>
 ```
 簽章輸入（UTF-8，`\n` 分隔，無結尾換行）：
 ```
-codync-sig-v1
+hypurr-sig-v1
 <METHOD 大寫>
-<authority：小寫的 Host header 值，含非預設 port，例如 codync-cloud-dev.x.workers.dev 或 127.0.0.1:8787>
+<authority：小寫的 Host header 值，含非預設 port，例如 hypurr-cloud-dev.x.workers.dev 或 127.0.0.1:8787>
 <path + query，與實際送出的 request-target 逐字相同>
 <ts>
 <nonce>
@@ -238,14 +238,14 @@ codync-sig-v1
 
 ```
 cidRaw = SHA-256(hostSignPub)[0..16]
-hs1 輸入 = "codync/hs1/v1" ‖ cidRaw ‖ dk ‖ ekD ‖ n          (13+16+32+32+32 bytes)
+hs1 輸入 = "hypurr/hs1/v1" ‖ cidRaw ‖ dk ‖ ekD ‖ n          (13+16+32+32+32 bytes)
 hello.sig = Ed25519_device(hs1 輸入)
-TH        = SHA-256("codync/hs2/v1" ‖ cidRaw ‖ dk ‖ ekD ‖ n ‖ ekH)
+TH        = SHA-256("hypurr/hs2/v1" ‖ cidRaw ‖ dk ‖ ekD ‖ n ‖ ekH)
 welcome.sig = Ed25519_host(TH)
 ss   = X25519(ekD_priv, ekH)      ← 全零結果必須拒絕
 prk  = HKDF-Extract(salt = TH, ikm = ss)
-kD2H = HKDF-Expand(prk, "codync/d2h/v1", 32)
-kH2D = HKDF-Expand(prk, "codync/h2d/v1", 32)
+kD2H = HKDF-Expand(prk, "hypurr/d2h/v1", 32)
+kH2D = HKDF-Expand(prk, "hypurr/h2d/v1", 32)
 ```
 - host 的檢查順序（便宜的先做）：
   1. 中繼 link：`hello.dk` 必須等於 DO 在 `open` 給的 `dk`；`pair` 必須與 `open.pair` 相同。不符 → `4002`。
@@ -260,7 +260,7 @@ kH2D = HKDF-Expand(prk, "codync/h2d/v1", 32)
 
 ```
 nonce(12) = 0x00000000 ‖ u64_be(c)
-aad       = "codync/frame/v1" ‖ u64_be(c)
+aad       = "hypurr/frame/v1" ‖ u64_be(c)
 plaintext = flag(1 byte: 0x00 最後一段, 0x01 還有後續) ‖ chunk bytes
 d         = ChaCha20-Poly1305(kDir, nonce, plaintext, aad)   (密文 ‖ 16-byte tag)
 ```
@@ -273,10 +273,10 @@ d         = ChaCha20-Poly1305(kDir, nonce, plaintext, aad)   (密文 ‖ 16-byte
 ```
 epk, eprv = 新的 X25519 金鑰對
 ss   = X25519(eprv, hostBoxPub)          ← 全零拒絕
-prk  = HKDF-Extract(salt = "codync/mbox/v1" ‖ cidRaw ‖ dk ‖ epk, ikm = ss)
-key  = HKDF-Expand(prk, "codync/mbox-key/v1", 32)
+prk  = HKDF-Extract(salt = "hypurr/mbox/v1" ‖ cidRaw ‖ dk ‖ epk, ikm = ss)
+key  = HKDF-Expand(prk, "hypurr/mbox-key/v1", 32)
 ct   = ChaCha20-Poly1305(key, nonce = 12 × 0x00, plaintext = inner JSON, aad = dk ‖ UTF-8(clientNonce))
-sig  = Ed25519_device("codync/mbox/v1" ‖ cidRaw ‖ epk ‖ ct)
+sig  = Ed25519_device("hypurr/mbox/v1" ‖ cidRaw ‖ epk ‖ ct)
 blob = epk(32) ‖ sig(64) ‖ ct
 ```
 固定 nonce 安全的前提：**每次封裝都必須產生新的 `epk`（MUST）**，不得快取或重用。重試時只能重送當初存下的同一個 blob，或以新的 `epk` 重新封裝。kit 與 TS 參考實作各有一個測試：連續封裝兩次同一則訊息，`epk` 不同。inner JSON：
@@ -321,12 +321,12 @@ v1 發出的 grant 一律 `["control","screen"]`。
 ```
 epk, eprv = 新的 X25519 金鑰對（每則通知、每個 ticket 各自新產生）
 ss   = X25519(eprv, pushKey)            ← 全零拒絕
-prk  = HKDF-Extract(salt = "codync/push/v1" ‖ cidRaw ‖ pushKey ‖ epk, ikm = ss)
-key  = HKDF-Expand(prk, "codync/push-key/v1", 32)
+prk  = HKDF-Extract(salt = "hypurr/push/v1" ‖ cidRaw ‖ pushKey ‖ epk, ikm = ss)
+key  = HKDF-Expand(prk, "hypurr/push-key/v1", 32)
 ct   = ChaCha20-Poly1305(key, nonce = 12 × 0x00, plaintext = {"title","subtitle"?,"body"} JSON, aad = cidRaw)
 sealed = b64url(epk ‖ ct)
 ```
-送給 `relay/` 的 body：`alert` 為 Codync 與依 kind 選擇的通用說明句、`mutableContent: true`、`threadId = computerId:botId`、`category = done|needsInput|failed`、`data = {"botId","computerId","ctx":<SharedStore.Context.id>,"sealed"}`。Notification Service Extension 依 `ctx` 從共用 Keychain 取 push key、解開後替換 title／subtitle／body；解不開就保留通用文字。Live Activity 的 `contentState` 只含 `status` 與 `startedAt`（`activity` 固定為空字串），不含任何自由文字。向量 `push` 保留沒有 subtitle 的相容格式。通知呈現、票券更新、ActivityKit 時間與部署驗收見 [通知與 Live Activity 設計](../design/push-and-live-activity.md)。
+送給 `relay/` 的 body：`alert` 為 Hypurr 與依 kind 選擇的通用說明句、`mutableContent: true`、`threadId = computerId:botId`、`category = done|needsInput|failed`、`data = {"botId","computerId","ctx":<SharedStore.Context.id>,"sealed"}`。Notification Service Extension 依 `ctx` 從共用 Keychain 取 push key、解開後替換 title／subtitle／body；解不開就保留通用文字。Live Activity 的 `contentState` 只含 `status` 與 `startedAt`（`activity` 固定為空字串），不含任何自由文字。向量 `push` 保留沒有 subtitle 的相容格式。通知呈現、票券更新、ActivityKit 時間與部署驗收見 [通知與 Live Activity 設計](../design/push-and-live-activity.md)。
 
 ---
 
@@ -336,12 +336,12 @@ sealed = b64url(epk ‖ ct)
 
 | 用途 | URL | 認證 |
 |---|---|---|
-| host | `GET {cloud}/v1/relay/host?v=1`（Upgrade: websocket） | `Codync-Sig`，kid = hostSignPub；Worker 由 kid 推導 `computerId`，D1 `computers` 必須存在且 `status='active'`（先 `/v1/host/register`） |
-| device | `GET {cloud}/v1/relay/device/{computerId}?v=1[&pair=<offerId>]` | `Codync-Sig`，kid = deviceKey；DO 以 ACL 判斷 |
+| host | `GET {cloud}/v1/relay/host?v=1`（Upgrade: websocket） | `Hypurr-Sig`，kid = hostSignPub；Worker 由 kid 推導 `computerId`，D1 `computers` 必須存在且 `status='active'`（先 `/v1/host/register`） |
+| device | `GET {cloud}/v1/relay/device/{computerId}?v=1[&pair=<offerId>]` | `Hypurr-Sig`，kid = deviceKey；DO 以 ACL 判斷 |
 
 `v` 不是 `1` → HTTP `426 {"error":{"code":"upgradeRequired"}}`。`{computerId}` 必須符合 `^[A-Za-z0-9_-]{22}$`，否則 `400`（不轉給 DO）。
 
-Worker → DO 的轉送**不沿用 client 的 URL**：Worker 自己建立新 request `new Request("https://do/relay", {headers})`（只帶 `Upgrade`、`Sec-WebSocket-*` 與下列內部 header），交給 `env.RELAY.get(env.RELAY.idFromName(computerId))`。內部 header：`X-Codync-Internal: 1`、`X-Codync-Role`、`X-Codync-Key`、`X-Codync-Nonce`、`X-Codync-Ts`、`X-Codync-Pair`（offerId 或空）、`X-Codync-Computer`。DO 只以 pathname 完全等於 `/relay`、`/internal/block`、`/internal/changed` 路由，且全部要求 `X-Codync-Internal: 1`；其他 → `404`。因為 client 的 request 永遠不會被原樣轉進 DO，外部無法觸及 `/internal/*`。DO 檢查 nonce 重放後才 `acceptWebSocket`。
+Worker → DO 的轉送**不沿用 client 的 URL**：Worker 自己建立新 request `new Request("https://do/relay", {headers})`（只帶 `Upgrade`、`Sec-WebSocket-*` 與下列內部 header），交給 `env.RELAY.get(env.RELAY.idFromName(computerId))`。內部 header：`X-Hypurr-Internal: 1`、`X-Hypurr-Role`、`X-Hypurr-Key`、`X-Hypurr-Nonce`、`X-Hypurr-Ts`、`X-Hypurr-Pair`（offerId 或空）、`X-Hypurr-Computer`。DO 只以 pathname 完全等於 `/relay`、`/internal/block`、`/internal/changed` 路由，且全部要求 `X-Hypurr-Internal: 1`；其他 → `404`。因為 client 的 request 永遠不會被原樣轉進 DO，外部無法觸及 `/internal/*`。DO 檢查 nonce 重放後才 `acceptWebSocket`。
 
 Device 准入（DO）：
 - 一般 socket 的 `dk` 在 `blocked` 表 → `403`；pairing socket 仍可申請配對。
@@ -461,7 +461,7 @@ The route table below summarizes the contract. Executable schema and validation 
 
 ### 8.4 `/v1` HTTP API
 
-所有 body 為 JSON；時間為 ms。「Clerk」= 需要 Bearer；「Sig(dev)」= 需要該 device key 的 `Codync-Sig`；「Sig(host)」= host key 的 `Codync-Sig`。
+所有 body 為 JSON；時間為 ms。「Clerk」= 需要 Bearer；「Sig(dev)」= 需要該 device key 的 `Hypurr-Sig`；「Sig(host)」= host key 的 `Hypurr-Sig`。
 
 **公開**
 - `GET /v1/health` → `{"ok":true,"version":"2.2.0"}`
@@ -506,11 +506,11 @@ The route table below summarizes the contract. Executable schema and validation 
 
 `host/src/api/mod.rs` dispatches inner methods and enforces caller permissions. Bearer HTTP/SSE is loopback-only; remote callers use the encrypted channel. `host/src/remote/cloud.rs` manages registration, claims, access state and grant revocation retries; `host/src/remote/relay.rs` manages the outgoing relay connection. Inspect these implementations for current method signatures and storage keys.
 
-`codync-host cloud` reports cloud status; `devices` lists/revokes device access; `access` handles pending approval. `reset-token` rotates the local bearer credential, not remote device grants.
+`hypurr-host cloud` reports cloud status; `devices` lists/revokes device access; `access` handles pending approval. `reset-token` rotates the local bearer credential, not remote device grants.
 
 ## 10. Shared Swift integration
 
-`CodyncKit/Client` owns transport, crypto, identity and cloud API models. `CodyncUI` owns account/per-computer stores and presentation. Consumers must retain account and computer scope when handling asynchronous responses, links and cached widget data. See [file structure](../architecture/file-structure.md).
+`HypurrKit/Client` owns transport, crypto, identity and cloud API models. `HypurrUI` owns account/per-computer stores and presentation. Consumers must retain account and computer scope when handling asynchronous responses, links and cached widget data. See [file structure](../architecture/file-structure.md).
 
 ## 11. Apple apps and SSH
 
@@ -532,7 +532,7 @@ Verify pairing and approval, same-computer direct/relay connectivity, encrypted 
 
 ## 14. Environments and deployment
 
-See [environments and deployment](../guides/environments-and-deployment.md) and [cloud setup](../../cloud/README.md). Debug builds target development (`dev-api.codync.dev`); Release builds target production (`api.codync.dev`).
+See [environments and deployment](../guides/environments-and-deployment.md) and [cloud setup](../../cloud/README.md). Debug builds target development (`dev-api.hypurr.dev`); Release builds target production (`api.hypurr.dev`).
 
 ## Implementation clarifications
 

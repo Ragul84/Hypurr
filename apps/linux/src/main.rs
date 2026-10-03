@@ -1,4 +1,4 @@
-//! Codync for Linux — the same bot chat as the iPhone and Mac apps, in GTK 4 + libadwaita.
+//! Hypurr for Linux — the same bot chat as the iPhone and Mac apps, in GTK 4 + libadwaita.
 
 mod avatar;
 mod client;
@@ -14,7 +14,7 @@ mod ui;
 
 use adw::prelude::*;
 
-/// The Apple apps' `Palette` (CodyncKit/Design/Theme.swift), light then dark.
+/// The Apple apps' `Palette` (HypurrKit/Design/Theme.swift), light then dark.
 struct Palette {
     background: &'static str,
     surface: &'static str,
@@ -231,7 +231,7 @@ button.candidate:hover { background: @cd_agent; }
 
 fn main() -> gtk::glib::ExitCode {
     let app = adw::Application::builder()
-        .application_id("com.pokai.Codync")
+        .application_id("com.ragul84.Hypurr")
         .build();
     app.connect_startup(|_| {
         let display = gtk::gdk::Display::default().expect("no display");

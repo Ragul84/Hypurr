@@ -213,7 +213,7 @@ pub struct Ui {
     shown_thread: RefCell<String>,
     pub state: RefCell<State>,
     rendering: Cell<bool>,
-    /// Debug builds: `CODYNC_DEBUG_OPEN=compose | group | <bot name>[/thread]` opens a screen
+    /// Debug builds: `HYPURR_DEBUG_OPEN=compose | group | <bot name>[/thread]` opens a screen
     /// once the bots arrive (screenshot checks, like the Mac's).
     debug_open: RefCell<Option<String>>,
     account: gtk::Button,
@@ -371,9 +371,9 @@ pub fn build(app: &adw::Application) -> App {
         .placeholder_text("Search")
         .css_classes(["search-field"])
         .build();
-    let banner = adw::Banner::new("Reconnecting to the Codync host…");
+    let banner = adw::Banner::new("Reconnecting to the Hypurr host…");
     let (sidebar_box, roster, roster_empty, account_btn) = sidebar(&new_btn, &search, &banner);
-    let sidebar_page = adw::NavigationPage::new(&sidebar_box, "Codync");
+    let sidebar_page = adw::NavigationPage::new(&sidebar_box, "Hypurr");
 
     // Chat header: avatar + name (toggles details), details toggle, more.
     let head_avatar = gtk::Box::new(gtk::Orientation::Horizontal, 0);
@@ -540,7 +540,7 @@ pub fn build(app: &adw::Application) -> App {
     toasts.set_child(Some(&split));
     let window = adw::ApplicationWindow::builder()
         .application(app)
-        .title("Codync")
+        .title("Hypurr")
         .default_width(1100)
         .default_height(760)
         .width_request(360)
@@ -598,7 +598,7 @@ pub fn build(app: &adw::Application) -> App {
         rendering: Cell::new(false),
         account: account_btn.clone(),
         debug_open: RefCell::new(if cfg!(debug_assertions) {
-            std::env::var("CODYNC_DEBUG_OPEN").ok()
+            std::env::var("HYPURR_DEBUG_OPEN").ok()
         } else {
             None
         }),
@@ -708,9 +708,9 @@ pub fn build(app: &adw::Application) -> App {
             ui2.search.grab_focus();
         });
         actions.add_action(&find);
-        ui.window.insert_action_group("codync", Some(&actions));
-        app.set_accels_for_action("codync.new-chat", &["<Control>n"]);
-        app.set_accels_for_action("codync.search", &["<Control>f"]);
+        ui.window.insert_action_group("hypurr", Some(&actions));
+        app.set_accels_for_action("hypurr.new-chat", &["<Control>n"]);
+        app.set_accels_for_action("hypurr.search", &["<Control>f"]);
         let keys = gtk::EventControllerKey::new();
         let ui2 = ui.clone();
         keys.connect_key_pressed(move |_, key, _, _| {
@@ -898,7 +898,7 @@ fn connect(ui: &App) {
         Ok(hello) => {
             let mut st = ui2.state.borrow_mut();
             st.hello = hello;
-            // Open a specific bot on launch: `codync --bot <id>` (also used by desktop notifications).
+            // Open a specific bot on launch: `hypurr --bot <id>` (also used by desktop notifications).
             let args: Vec<String> = std::env::args().collect();
             if let Some(i) = args.iter().position(|a| a == "--bot") {
                 st.current = args.get(i + 1).cloned();
@@ -1016,7 +1016,7 @@ fn debug_open_now(ui: &App, target: &str) {
     }
 }
 
-/// Desktop notification when a bot needs you or finishes, unless Codync is focused.
+/// Desktop notification when a bot needs you or finishes, unless Hypurr is focused.
 fn notify(ui: &App, old: &Value, new: &Value) {
     if ui.window.is_active() || new["notify"] == false || new["hidden"] == true {
         return;

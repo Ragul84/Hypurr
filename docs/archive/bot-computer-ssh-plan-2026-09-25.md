@@ -7,7 +7,7 @@
 
 ## 1. 產品目標
 
-使用者可以在同一個 Codync 介面與多個 bots 聊天，每個 bot 固定使用一台 computer。這台 computer 可以是正在操作的 Mac，也可以是透過網路／SSH 連上的遠端電腦。
+使用者可以在同一個 Hypurr 介面與多個 bots 聊天，每個 bot 固定使用一台 computer。這台 computer 可以是正在操作的 Mac，也可以是透過網路／SSH 連上的遠端電腦。
 
 例如：
 
@@ -25,11 +25,11 @@
 
 | 名稱 | 範例 | 管理什麼 |
 |---|---|---|
-| Codync account | 個人／工作用 Google 或其他 Clerk 登入 | 電腦歸屬、裝置授權、資料隔離 |
+| Hypurr account | 個人／工作用 Google 或其他 Clerk 登入 | 電腦歸屬、裝置授權、資料隔離 |
 | Connection identity | `alice@dev-server`、`deploy@build-machine` | 使用哪個 OS 使用者連到遠端執行環境 |
 | Agent identity | Claude Code／Codex 自己的訂閱登入 | 該 agent 的憑證、用量與供應商權限 |
 
-已確認：手機左上角切換不同 Google／Clerk 的 **Codync account**，每個帳號各自管理電腦與 bots。SSH connection identity 僅在 computer 連線設定中選擇，agent identity 留在該 computer 的 agent 登入流程。
+已確認：手機左上角切換不同 Google／Clerk 的 **Hypurr account**，每個帳號各自管理電腦與 bots。SSH connection identity 僅在 computer 連線設定中選擇，agent identity 留在該 computer 的 agent 登入流程。
 
 同一台實體機器上的兩個 OS 使用者可能各自執行 host、各自有資料庫和權限。computer 應標識一個已驗證的 host 執行環境，而不是僅用 IP、主機名稱或硬體名稱作唯一鍵；不同 OS 使用者的環境不得任意合併。
 
@@ -57,7 +57,7 @@
 
 ### 模型
 
-- `AccountContext`：目前可用的 Codync 登入 session、active account ID、該帳號的電腦目錄。
+- `AccountContext`：目前可用的 Hypurr 登入 session、active account ID、該帳號的電腦目錄。
 - `Computer`：穩定 ID、owner、驗證過的 host identity、公用顯示資訊與能力。
 - `ComputerConnection`：transport 類型（local/direct/ssh/relay）、connection identity、狀態、秘密參照；可有多種路徑通往同一個已驗證 host。
 - `BotReference`：`accountId + computerId + botId`，用於 client 路由、導覽、cache 和通知。
@@ -86,13 +86,13 @@
 
 ### 首選：遠端 host + OpenSSH tunnel
 
-遠端電腦安裝 codync-host，agent 與 repo 都在遠端；Mac 透過系統 OpenSSH 的 local forwarding 存取遠端 loopback API。SSH tunnel 本身不取代 codync-host 的授權。
+遠端電腦安裝 hypurr-host，agent 與 repo 都在遠端；Mac 透過系統 OpenSSH 的 local forwarding 存取遠端 loopback API。SSH tunnel 本身不取代 hypurr-host 的授權。
 
 ```text
-Mac Codync
+Mac Hypurr
   → 本機 loopback 上的臨時 tunnel port
   → OpenSSH 加密連線
-  → 遠端 loopback 的 codync-host
+  → 遠端 loopback 的 hypurr-host
   → 遠端 agent、repo、SQLite
 ```
 
@@ -137,7 +137,7 @@ MVP 支援既有 key／agent 驗證與 macOS 客戶端；password、互動式 MF
 
 ### A. 現在納入
 
-- 左上角使用已確認的 Codync 登入帳號語意。
+- 左上角使用已確認的 Hypurr 登入帳號語意。
 - 定義一 bot 一 computer、複合路由 identity、account-scoped cache。
 - 帳號切換器與 computer 管理入口分離。
 - Bot 新增／設定與清單顯示 computer context。
@@ -175,7 +175,7 @@ MVP 支援既有 key／agent 驗證與 macOS 客戶端；password、互動式 MF
 
 ## 8. 目前評估依據
 
-對照 `apps/ios/Views/BotListView.swift`、`SettingsView.swift`、`kit/Sources/CodyncUI/Store/BotStore.swift`、`HostClient.swift`、`host/src/agent/acp.rs` 與 `apps/macos/App/HostController.swift`：目前是一個 active computer 對應一個 store／client 的設計，尚無跨 computer 的 account store 或 SSH 連線管理。因此此功能不能只換手機左上角圖示或加 `computerId` 就算完成。
+對照 `apps/ios/Views/BotListView.swift`、`SettingsView.swift`、`kit/Sources/HypurrUI/Store/BotStore.swift`、`HostClient.swift`、`host/src/agent/acp.rs` 與 `apps/macos/App/HostController.swift`：目前是一個 active computer 對應一個 store／client 的設計，尚無跨 computer 的 account store 或 SSH 連線管理。因此此功能不能只換手機左上角圖示或加 `computerId` 就算完成。
 
 SSH 與 Clerk 具體 API／平台相容性應在實作階段依當時官方文件和已安裝版本核對；本文件未宣告任何 SSH 或多帳號功能已經可用。
 

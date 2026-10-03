@@ -5,7 +5,7 @@ This is the map of the current repository. Paths below are repository-relative. 
 ## Top-level layout
 
 ```text
-Codync/
+Hypurr/
 ├── host/                      # Rust daemon and terminal client
 │   ├── src/
 │   │   ├── main.rs            # CLI entry, shared helpers (LockExt, http)
@@ -21,12 +21,12 @@ Codync/
 │   └── tests/                 # Host integration tests and scripted ACP agents
 ├── kit/                       # Shared Swift package
 │   ├── Sources/
-│   │   ├── CodyncKit/          # Wire models, transports, design; widget-safe
+│   │   ├── HypurrKit/          # Wire models, transports, design; widget-safe
 │   │   │   ├── Client/
 │   │   │   ├── Models/
 │   │   │   ├── Design/
 │   │   │   └── Resources/
-│   │   └── CodyncUI/           # Stores, shared screens and custom controls
+│   │   └── HypurrUI/           # Stores, shared screens and custom controls
 │   │       ├── Store/
 │   │       ├── Bots/
 │   │       ├── Thread/
@@ -35,10 +35,10 @@ Codync/
 │   │       ├── Marketplace/
 │   │       ├── Usage/
 │   │       └── Resources/
-│   └── Tests/                 # CodyncKitTests and CodyncUITests
+│   └── Tests/                 # HypurrKitTests and HypurrUITests
 ├── apps/
 │   ├── project.yml            # XcodeGen source of truth for every Apple target
-│   ├── Codync.xcodeproj/      # Generated Xcode project
+│   ├── Hypurr.xcodeproj/      # Generated Xcode project
 │   ├── shared/                # AccountSession, ComputerStatus, Config/{dev,main}.plist
 │   ├── ios/                   # App/, Views/, Resources/, Widgets/, NotificationService/
 │   ├── macos/                 # App/, Views/, Resources/, LaunchAgents/
@@ -75,21 +75,21 @@ Codync/
 | Agent discovery, sign-in, setup terminal | `host/src/agent/backends.rs`, `registry.rs`, `auth.rs`, `term.rs` |
 | Marketplace, Composio, connector OAuth | `host/src/market/` |
 | Screen bridge and built-in MCP tools | `host/src/screen.rs`, `mcp.rs` |
-| Swift transport and cloud API | `kit/Sources/CodyncKit/Client/` |
-| Account aggregation / one host mirror | `kit/Sources/CodyncUI/Store/AccountStore.swift` / `BotStore.swift` |
-| Chat, replies, composer and trace | `kit/Sources/CodyncUI/Thread/` |
-| Reusable Apple UI chrome | `kit/Sources/CodyncUI/Chrome.swift`, `Controls.swift`, `Platform.swift` |
+| Swift transport and cloud API | `kit/Sources/HypurrKit/Client/` |
+| Account aggregation / one host mirror | `kit/Sources/HypurrUI/Store/AccountStore.swift` / `BotStore.swift` |
+| Chat, replies, composer and trace | `kit/Sources/HypurrUI/Thread/` |
+| Reusable Apple UI chrome | `kit/Sources/HypurrUI/Chrome.swift`, `Controls.swift`, `Platform.swift` |
 | iOS navigation, pairing, account settings | `apps/ios/Views/RootView.swift`, `BotListView.swift`, `PairingView.swift`, `AccountSwitcherView.swift`, `SettingsView.swift` |
 | Apple account sessions / public environment config | `apps/shared/AccountSession.swift`, `apps/shared/Config/` |
 | Mac local host / SSH lifecycle | `apps/macos/App/HostController.swift`, `SSHTunnel.swift` |
 | Cloud routes / authentication / relay | `cloud/src/index.ts`, `api.ts`, `auth.ts`, `relay.ts` |
 | Push encryption / APNs delivery / decryption | `host/src/remote/push.rs`, `relay/src/`, `apps/ios/NotificationService/` |
-| Widget and activity rendering | `kit/Sources/CodyncKit/Design/`, `apps/ios/Widgets/` |
+| Widget and activity rendering | `kit/Sources/HypurrKit/Design/`, `apps/ios/Widgets/` |
 
 ## Dependency rules
 
-- `CodyncKit` owns serializable models, clients and rendering primitives shared with widgets. It must not import `CodyncUI` or ClerkKit.
-- `CodyncUI` owns observable stores and shared application screens. App-specific lifecycle, OAuth configuration and device hooks belong in `apps/`.
+- `HypurrKit` owns serializable models, clients and rendering primitives shared with widgets. It must not import `HypurrUI` or ClerkKit.
+- `HypurrUI` owns observable stores and shared application screens. App-specific lifecycle, OAuth configuration and device hooks belong in `apps/`.
 - Each `BotStore` talks to one computer. `AccountStore` aggregates stores and routes by `BotReference`; bare bot IDs are not globally unique.
 - The host owns routing, reply counts, permissions and group turn scheduling. Clients render these results; they do not reimplement host policy.
 - `cloud/` transports encrypted chat traffic and manages account metadata. `relay/` delivers APNs pushes. The two Workers have separate configuration and tests.

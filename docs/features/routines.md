@@ -26,7 +26,7 @@ describes it and shows the next run. Run timeout is under an animated Run settin
 expansion. A fixed footer keeps Create routine / Save changes and inline errors
 visible while the form scrolls.
 The layout uses the same light/dark tokens, type family and custom controls as the
-rest of Codync, with Reduce Motion support.
+rest of Hypurr, with Reduce Motion support.
 
 ## Conversational setup and tools
 
@@ -104,7 +104,7 @@ before stopping actors.
 ## Webhook delivery
 
 Every webhook routine has a key and two addresses (`routineWebhook`): the public
-`{cloud}/v1/hooks/{computerId}/{routineId}` through the Codync cloud (null while the
+`{cloud}/v1/hooks/{computerId}/{routineId}` through the Hypurr cloud (null while the
 cloud is off) and the local `http://127.0.0.1:<port>/hooks/routines/<id>`. Both run
 the same checks (`host/src/routines/hooks.rs`); the protocol is
 [spec §7.8](../reference/remote-relay.md).
@@ -134,7 +134,7 @@ the same checks (`host/src/routines/hooks.rs`); the protocol is
   sees the content and stores the key to check signatures. The host checks the key
   again before anything runs.
 
-Codync does not create provider subscriptions: the user (or the bot, with the user)
+Hypurr does not create provider subscriptions: the user (or the bot, with the user)
 pastes the URL and key into the sending service. Do not describe an event routine as
 connected before a real delivery has arrived.
 
@@ -173,7 +173,7 @@ and private cloud are not source-complete references.
 Remaining differences from the reference: provider subscription provisioning,
 cloud execution while the host is offline (deliveries wait in the cloud instead), and
 inactivity auto-pause. The Apple UI
-uses Codync's shared native controls. This is not a verified complete one-to-one
+uses Hypurr's shared native controls. This is not a verified complete one-to-one
 reconstruction of every Grok Bot routine behavior.
 
 ## Validation
@@ -195,7 +195,7 @@ transcript links.
 
 Research checked on 2026-09-26: [OpenClaw](https://docs.openclaw.ai/cli/webhooks)
 uses Tailscale Funnel and the [Hermes webhook adapter](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/messaging/webhooks.md)
-needs a reachable server URL. Codync instead reuses the host's outbound relay socket
+needs a reachable server URL. Hypurr instead reuses the host's outbound relay socket
 (above): no fixed IP, open port or per-user tunnel, and deliveries survive the
 computer being off. A user's own Cloudflare Tunnel to the local endpoint also works
 but needs their own account, domain and `cloudflared`, and drops deliveries while the
@@ -210,7 +210,7 @@ conversation contains a linked creation notice; an existing edit draft refers to
 the routine by name. No reference routine was run, paused or deleted during this
 comparison.
 
-Codync retains that compact sidebar and the chat-based setup path, while providing
+Hypurr retains that compact sidebar and the chat-based setup path, while providing
 a direct editor where cron is typed as written (the earlier frequency/clock pickers
 were removed as too heavy). Existing duration intervals keep their cadence until
 explicitly replaced. Editing hydrates the original expression, timezone and interval

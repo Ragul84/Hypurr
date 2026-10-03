@@ -347,7 +347,7 @@ function shade(hex: string, percent: number) {
 
 // ---------- Halftone field ----------
 
-// Dot grid whose dots shrink away from two corners, like the Codync icon.
+// Dot grid whose dots shrink away from two corners, like the Hypurr icon.
 // The heavy corner sits on the device side so the headline stays on a clean ground.
 function Halftone({ cW, cH, color, topText }: { cW: number; cH: number; color: string; topText: boolean }) {
   const step = cW * 0.036;

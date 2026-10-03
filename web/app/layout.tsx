@@ -13,10 +13,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Codync: the open-source Grok Bot / Muse alternative for any coding agent",
+  title: "Hypurr: the open-source Grok Bot / Muse alternative for any coding agent",
   description:
     "A free, open-source 1:1 alternative to Grok Bot and Muse. Message Claude Code, Codex, Cursor and 40+ coding agents as persistent bots from your iPhone, Mac or Linux desktop. Group chats, threads, approvals, memory, remote screen and voice, on your own computer. Native on iPhone, Mac and Linux, with a terminal UI over SSH.",
-  metadataBase: new URL("https://www.codync.dev"),
+  metadataBase: new URL("https://www.hypurr.dev"),
   icons: {
     icon: [
       { url: "/icon.svg", type: "image/svg+xml" },

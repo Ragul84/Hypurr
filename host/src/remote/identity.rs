@@ -103,7 +103,7 @@ impl Identity {
         crypto::sign(&self.sign, msg)
     }
 
-    /// `Codync-Sig` header value for a request to `authority` (the lowercase Host header,
+    /// `Hypurr-Sig` header value for a request to `authority` (the lowercase Host header,
     /// with a non-default port). The spec's `sign_request(method, path_query, body)`
     /// plus the authority, which the signature covers.
     pub fn sign_request(&self, method: &str, authority: &str, path_query: &str, body: &[u8]) -> String {
@@ -142,7 +142,7 @@ mod tests {
     use super::*;
 
     fn temp_dir() -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("codync-id-{}", uuid::Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("hypurr-id-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         dir
     }

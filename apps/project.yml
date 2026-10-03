@@ -1,7 +1,7 @@
 # Generate the Xcode project with: xcodegen generate --spec apps/project.yml
-name: Codync
+name: Hypurr
 options:
-  bundleIdPrefix: com.pokai
+  bundleIdPrefix: com.ragul84
   deploymentTarget:
     iOS: "18.0"
     macOS: "14.0"
@@ -16,7 +16,7 @@ packages:
   Clerk:
     url: https://github.com/clerk/clerk-ios
     exactVersion: 1.5.6
-  CodyncKit:
+  HypurrKit:
     path: ../kit
   WebRTC:
     url: https://github.com/stasel/WebRTC
@@ -28,15 +28,15 @@ settings:
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
     CODE_SIGN_STYLE: Automatic
-    DEVELOPMENT_TEAM: 7FUM8A8H72
+    DEVELOPMENT_TEAM: ""
     DEAD_CODE_STRIPPING: YES
     ENABLE_USER_SCRIPT_SANDBOXING: NO
   configs:
-    # Which Codync cloud a build talks to: shared/Config/<env>.plist becomes AccountConfig.plist.
+    # Which Hypurr cloud a build talks to: shared/Config/<env>.plist becomes AccountConfig.plist.
     Debug:
-      CODYNC_ENV: dev
+      HYPURR_ENV: dev
     Release:
-      CODYNC_ENV: main
+      HYPURR_ENV: main
 targets:
   macOS:
     type: application
@@ -49,7 +49,7 @@ targets:
         excludes:
           - LaunchAgents
       # Registered with SMAppService.agent when Remote screen is turned on.
-      - path: macos/LaunchAgents/com.pokai.Codync.screen.plist
+      - path: macos/LaunchAgents/com.ragul84.Hypurr.screen.plist
         buildPhase:
           copyFiles:
             destination: wrapper
@@ -59,10 +59,10 @@ targets:
         product: Sparkle
       - package: Clerk
         product: ClerkKit
-      - package: CodyncKit
-        product: CodyncKit
-      - package: CodyncKit
-        product: CodyncUI
+      - package: HypurrKit
+        product: HypurrKit
+      - package: HypurrKit
+        product: HypurrUI
       - target: Screen
         embed: true
         codeSign: true
@@ -71,13 +71,13 @@ targets:
           subpath: Contents/Library/LoginItems
     settings:
       base:
-        PRODUCT_NAME: Codync
-        PRODUCT_BUNDLE_IDENTIFIER: com.pokai.Codync
+        PRODUCT_NAME: Hypurr
+        PRODUCT_BUNDLE_IDENTIFIER: com.ragul84.Hypurr
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_FILE: macos/Resources/Info.plist
         # Sparkle compares this version; iOS retains its separate upload counter.
         CURRENT_PROJECT_VERSION: "$(MARKETING_VERSION)"
-        INFOPLIST_KEY_CFBundleDisplayName: Codync
+        INFOPLIST_KEY_CFBundleDisplayName: Hypurr
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
         INFOPLIST_KEY_NSHumanReadableCopyright: ""
         ENABLE_HARDENED_RUNTIME: YES
@@ -86,20 +86,20 @@ targets:
         # Black / white instead of the system blue wherever macOS draws the app's accent.
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
     postBuildScripts:
-      - name: Codync environment
+      - name: Hypurr environment
         basedOnDependencyAnalysis: false
         showEnvVars: false
         script: |
-          # Debug builds use dev (dev-api.codync.dev), Release builds use main (api.codync.dev).
-          cp "$SRCROOT/shared/Config/$CODYNC_ENV.plist" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/AccountConfig.plist"
-      - name: Embed codync-host
+          # Debug builds use dev (dev-api.hypurr.dev), Release builds use main (api.hypurr.dev).
+          cp "$SRCROOT/shared/Config/$HYPURR_ENV.plist" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/AccountConfig.plist"
+      - name: Embed hypurr-host
         basedOnDependencyAnalysis: false
         showEnvVars: false
         script: |
-          # Builds the Rust host and ships it inside Codync.app/Contents/MacOS.
+          # Builds the Rust host and ships it inside Hypurr.app/Contents/MacOS.
           export PATH="$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
           if ! command -v cargo >/dev/null; then
-            echo "warning: cargo not found; Codync.app will look for codync-host on PATH instead"
+            echo "warning: cargo not found; Hypurr.app will look for hypurr-host on PATH instead"
             exit 0
           fi
           PROFILE=release
@@ -110,16 +110,16 @@ targets:
             rustup target add aarch64-apple-darwin x86_64-apple-darwin >/dev/null 2>&1 || true
             cargo build --release --manifest-path "$SRCROOT/../host/Cargo.toml" --target aarch64-apple-darwin &&
             cargo build --release --manifest-path "$SRCROOT/../host/Cargo.toml" --target x86_64-apple-darwin &&
-            lipo -create -output "$SRCROOT/../host/target/codync-host-universal" \
-              "$SRCROOT/../host/target/aarch64-apple-darwin/release/codync-host" \
-              "$SRCROOT/../host/target/x86_64-apple-darwin/release/codync-host" &&
-            BIN="$SRCROOT/../host/target/codync-host-universal" ||
-            { cargo build --release --manifest-path "$SRCROOT/../host/Cargo.toml" && BIN="$SRCROOT/../host/target/release/codync-host"; }
+            lipo -create -output "$SRCROOT/../host/target/hypurr-host-universal" \
+              "$SRCROOT/../host/target/aarch64-apple-darwin/release/hypurr-host" \
+              "$SRCROOT/../host/target/x86_64-apple-darwin/release/hypurr-host" &&
+            BIN="$SRCROOT/../host/target/hypurr-host-universal" ||
+            { cargo build --release --manifest-path "$SRCROOT/../host/Cargo.toml" && BIN="$SRCROOT/../host/target/release/hypurr-host"; }
           else
-            cargo build --manifest-path "$SRCROOT/../host/Cargo.toml" && BIN="$SRCROOT/../host/target/debug/codync-host"
+            cargo build --manifest-path "$SRCROOT/../host/Cargo.toml" && BIN="$SRCROOT/../host/target/debug/hypurr-host"
           fi
-          [ -n "$BIN" ] || { echo "error: building codync-host failed"; exit 1; }
-          DEST="$TARGET_BUILD_DIR/$EXECUTABLE_FOLDER_PATH/codync-host"
+          [ -n "$BIN" ] || { echo "error: building hypurr-host failed"; exit 1; }
+          DEST="$TARGET_BUILD_DIR/$EXECUTABLE_FOLDER_PATH/hypurr-host"
           cp "$BIN" "$DEST"
           if [ -n "$EXPANDED_CODE_SIGN_IDENTITY" ] && [ "$CODE_SIGNING_ALLOWED" != "NO" ]; then
             codesign --force --options runtime --timestamp=none --sign "$EXPANDED_CODE_SIGN_IDENTITY" "$DEST"
@@ -135,11 +135,11 @@ targets:
       - package: WebRTC
     settings:
       base:
-        PRODUCT_NAME: CodyncScreen
-        PRODUCT_BUNDLE_IDENTIFIER: com.pokai.Codync.screen
+        PRODUCT_NAME: HypurrScreen
+        PRODUCT_BUNDLE_IDENTIFIER: com.ragul84.Hypurr.screen
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_LSUIElement: YES
-        INFOPLIST_KEY_CFBundleDisplayName: Codync Screen
+        INFOPLIST_KEY_CFBundleDisplayName: Hypurr Screen
         INFOPLIST_KEY_NSHumanReadableCopyright: ""
         ENABLE_HARDENED_RUNTIME: YES
         ENABLE_APP_SANDBOX: NO
@@ -158,30 +158,30 @@ targets:
     dependencies:
       - package: Clerk
         product: ClerkKit
-      - package: CodyncKit
-        product: CodyncKit
-      - package: CodyncKit
-        product: CodyncUI
+      - package: HypurrKit
+        product: HypurrKit
+      - package: HypurrKit
+        product: HypurrUI
       - target: Widgets
         embed: true
       - target: NotificationService
         embed: true
     postBuildScripts:
-      - name: Codync environment
+      - name: Hypurr environment
         basedOnDependencyAnalysis: false
         showEnvVars: false
         script: |
-          # Debug builds use dev (dev-api.codync.dev), Release builds use main (api.codync.dev).
-          cp "$SRCROOT/shared/Config/$CODYNC_ENV.plist" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/AccountConfig.plist"
+          # Debug builds use dev (dev-api.hypurr.dev), Release builds use main (api.hypurr.dev).
+          cp "$SRCROOT/shared/Config/$HYPURR_ENV.plist" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/AccountConfig.plist"
     settings:
       base:
-        PRODUCT_NAME: Codync
-        PRODUCT_BUNDLE_IDENTIFIER: com.pokai.Codync.ios
+        PRODUCT_NAME: Hypurr
+        PRODUCT_BUNDLE_IDENTIFIER: com.ragul84.Hypurr.ios
         INFOPLIST_FILE: ios/Resources/Info.plist
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_ENTITLEMENTS: ios/Resources/iOS.entitlements
         TARGETED_DEVICE_FAMILY: "1,2"
-        INFOPLIST_KEY_CFBundleDisplayName: Codync
+        INFOPLIST_KEY_CFBundleDisplayName: Hypurr
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
         INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
@@ -191,7 +191,7 @@ targets:
         INFOPLIST_KEY_NSCameraUsageDescription: Scan the pairing code shown on your computer.
         INFOPLIST_KEY_NSMicrophoneUsageDescription: Talk to your bots in a voice call.
         INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: Your words are transcribed on this iPhone and sent to your bot as a message.
-        INFOPLIST_KEY_NSLocalNetworkUsageDescription: Codync connects to the computer running your bots on your local network.
+        INFOPLIST_KEY_NSLocalNetworkUsageDescription: Hypurr connects to the computer running your bots on your local network.
         # Portrait everywhere except the screen viewer (AppDelegate + OrientationLock).
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
@@ -202,18 +202,18 @@ targets:
     sources:
       - ios/Widgets
     dependencies:
-      - package: CodyncKit
-        product: CodyncKit
+      - package: HypurrKit
+        product: HypurrKit
       - sdk: WidgetKit.framework
       - sdk: SwiftUI.framework
     settings:
       base:
-        PRODUCT_NAME: CodyncWidgets
-        PRODUCT_BUNDLE_IDENTIFIER: com.pokai.Codync.ios.LiveActivity
+        PRODUCT_NAME: HypurrWidgets
+        PRODUCT_BUNDLE_IDENTIFIER: com.ragul84.Hypurr.ios.LiveActivity
         INFOPLIST_FILE: ios/Widgets/Resources/Info.plist
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_ENTITLEMENTS: ios/Widgets/Resources/Widgets.entitlements
-        INFOPLIST_KEY_CFBundleDisplayName: Codync
+        INFOPLIST_KEY_CFBundleDisplayName: Hypurr
         TARGETED_DEVICE_FAMILY: "1,2"
         SKIP_INSTALL: YES
   # Opens end-to-end sealed alert text (spec §6.7) with this account's push key from the shared Keychain.
@@ -223,15 +223,15 @@ targets:
     sources:
       - ios/NotificationService
     dependencies:
-      - package: CodyncKit
-        product: CodyncKit
+      - package: HypurrKit
+        product: HypurrKit
     settings:
       base:
-        PRODUCT_NAME: CodyncNotificationService
-        PRODUCT_BUNDLE_IDENTIFIER: com.pokai.Codync.ios.NotificationService
+        PRODUCT_NAME: HypurrNotificationService
+        PRODUCT_BUNDLE_IDENTIFIER: com.ragul84.Hypurr.ios.NotificationService
         INFOPLIST_FILE: ios/NotificationService/Info.plist
         GENERATE_INFOPLIST_FILE: YES
         CODE_SIGN_ENTITLEMENTS: ios/NotificationService/NotificationService.entitlements
-        INFOPLIST_KEY_CFBundleDisplayName: Codync
+        INFOPLIST_KEY_CFBundleDisplayName: Hypurr
         TARGETED_DEVICE_FAMILY: "1,2"
         SKIP_INSTALL: YES

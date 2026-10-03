@@ -42,7 +42,7 @@ jobs:
       - name: Build screen helper
         run: >-
           xcodebuild build
-          -project apps/Codync.xcodeproj
+          -project apps/Hypurr.xcodeproj
           -scheme Screen
           -configuration Debug
           -destination 'generic/platform=macOS'

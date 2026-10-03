@@ -50,8 +50,8 @@ fn rgb(hex: u32) -> Color {
 pub fn theme() -> &'static Theme {
     static T: LazyLock<Theme> = LazyLock::new(|| {
         let color = std::env::var_os("NO_COLOR").is_none_or(|v| v.is_empty());
-        // COLORFGBG="15;0" is a dark background; "0;15" a light one. CODYNC_THEME wins.
-        let light = match std::env::var("CODYNC_THEME").as_deref() {
+        // COLORFGBG="15;0" is a dark background; "0;15" a light one. HYPURR_THEME wins.
+        let light = match std::env::var("HYPURR_THEME").as_deref() {
             Ok("light") => true,
             Ok("dark") => false,
             _ => std::env::var("COLORFGBG")
@@ -455,7 +455,7 @@ fn status_line(buf: &mut Buffer, r: Rect, app: &mut App) {
     };
     let pill_style = if t.color { pill_style } else { t.sel };
     let mut x = put(buf, r.x, r.y, r.width, pill, pill_style) + 1;
-    let host = if app.host.is_empty() { "codync" } else { &app.host };
+    let host = if app.host.is_empty() { "hypurr" } else { &app.host };
     x = put(buf, x, r.y, 24, host, t.bold.patch(t.panel)) + 2;
     let c = app.counts();
     let marks = [("◆", t.amber, 1), ("⠹", t.secondary, 2), ("●", t.bold, 3), ("×", t.red, 4)];
@@ -532,7 +532,7 @@ fn roster(buf: &mut Buffer, r: Rect, app: &mut App, narrow: bool) {
     if narrow {
         fill(buf, Rect::new(r.x, r.y, r.width, 1), t.panel);
     }
-    put(buf, x0 + 1, r.y, wd.saturating_sub(10), if app.host.is_empty() { "codync" } else { &app.host }, t.bold);
+    put(buf, x0 + 1, r.y, wd.saturating_sub(10), if app.host.is_empty() { "hypurr" } else { &app.host }, t.bold);
     rput(buf, r.right() - 1, r.y, &format!("{} chat{}", bots.len(), if bots.len() == 1 { "" } else { "s" }), t.dim);
     if !narrow {
         hline(buf, x0, r.y + 1, wd, t.line);
@@ -2413,7 +2413,7 @@ fn pair(buf: &mut Buffer, area: Rect, url: Option<&str>) {
         inner.x,
         y,
         inner.width,
-        "Scan with the Codync iPhone app, or open on the phone:",
+        "Scan with the Hypurr iPhone app, or open on the phone:",
         t.secondary.patch(t.panel),
     );
     put(buf, inner.x, y + 1, inner.width, &truncate(url, usize::from(inner.width)), t.dim.patch(t.panel));

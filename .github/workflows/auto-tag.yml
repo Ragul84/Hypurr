@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "apps/Codync.xcodeproj/project.pbxproj"
+      - "apps/Hypurr.xcodeproj/project.pbxproj"
 
 permissions:
   contents: write
@@ -21,7 +21,7 @@ jobs:
       - name: Read version from pbxproj
         id: version
         run: |
-          VERSION=$(grep -m1 'MARKETING_VERSION' apps/Codync.xcodeproj/project.pbxproj | sed 's/.*= //;s/;//;s/ //g')
+          VERSION=$(grep -m1 'MARKETING_VERSION' apps/Hypurr.xcodeproj/project.pbxproj | sed 's/.*= //;s/;//;s/ //g')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Detected version: $VERSION"
 

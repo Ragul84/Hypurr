@@ -1,5 +1,5 @@
-import CodyncKit
-import CodyncUI
+import HypurrKit
+import HypurrUI
 import SwiftUI
 import WidgetKit
 
@@ -43,19 +43,19 @@ struct RootView: View {
             // device-level milestone across account changes and unpairing.
             if !empty { onboardingCompleted = true }
         }
-        .codyncDialog("Something went wrong", isPresented: errorShown, message: errorMessage, cancel: "OK", inPlace: true) { [] }
-        .codyncOverlay(isPresented: Binding(get: { screenTarget.wrappedValue != nil }, set: { if !$0 { screenTarget.wrappedValue = nil } })) { close in
+        .hypurrDialog("Something went wrong", isPresented: errorShown, message: errorMessage, cancel: "OK", inPlace: true) { [] }
+        .hypurrOverlay(isPresented: Binding(get: { screenTarget.wrappedValue != nil }, set: { if !$0 { screenTarget.wrappedValue = nil } })) { close in
             if let target = screenTarget.wrappedValue, let store = accounts.store(for: target.computerId) {
                 ScreenView(watching: target.request.watching, close: close)
                     .environment(store)
                     .id(target.id)
             }
         }
-        .codyncSheet(isPresented: Bindable(app).showComputers) {
+        .hypurrSheet(isPresented: Bindable(app).showComputers) {
             // Holds the pushes inside the sheet (Widgets, Live Activity); no bar shows.
             NavigationStack { SettingsView() }
         }
-        .codyncSheet(item: Binding(get: { app.marketplace.map(MarketplaceTarget.init) }, set: { app.marketplace = $0?.computerId })) { target in
+        .hypurrSheet(item: Binding(get: { app.marketplace.map(MarketplaceTarget.init) }, set: { app.marketplace = $0?.computerId })) { target in
             // Switching computers inside keeps the sheet up and loads that computer's own marketplace.
             let computerId = app.marketplace ?? target.computerId
             if let store = accounts.store(for: computerId) {
@@ -119,7 +119,7 @@ struct RootView: View {
         var id: String { "\(computerId)/\(request.id)" }
     }
 
-    /// Any computer's "open the screen" request (thread toolbar, computers list, `codync://screen`).
+    /// Any computer's "open the screen" request (thread toolbar, computers list, `hypurr://screen`).
     private var screenTarget: Binding<ScreenTarget?> {
         Binding(get: {
             accounts.computers.lazy.compactMap { c in
@@ -159,10 +159,10 @@ private struct StateTab: View {
 
     @Environment(AppStore.self) private var app
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    // Screenshots: CODYNC_STATE_SURFACE=widget|liveActivity|island opens the tab on that gallery.
+    // Screenshots: HYPURR_STATE_SURFACE=widget|liveActivity|island opens the tab on that gallery.
     @State private var surface: Surface = {
         #if DEBUG
-            switch ProcessInfo.processInfo.environment["CODYNC_STATE_SURFACE"] {
+            switch ProcessInfo.processInfo.environment["HYPURR_STATE_SURFACE"] {
             case "liveActivity": return .liveActivity
             case "island": return .island
             default: return .widget
@@ -199,7 +199,7 @@ private struct StateTab: View {
             .animation(Motion.reduced(Motion.fade, reduceMotion), value: surface)
         }
         .background(Palette.background)
-        .codyncSheet(isPresented: Bindable(app).showUsage) { UsageSheet() }
+        .hypurrSheet(isPresented: Bindable(app).showUsage) { UsageSheet() }
     }
 }
 
@@ -225,7 +225,7 @@ private struct UsageSheet: View {
                             MenuItem(computer.name, selected: computer.id == store.computer.id) {
                                 picked = computer.id
                                 accounts.storage.lastComputerId = computer.id
-                                WidgetCenter.shared.reloadTimelines(ofKind: "CodyncUsage")
+                                WidgetCenter.shared.reloadTimelines(ofKind: "HypurrUsage")
                             }
                         }
                     } label: {

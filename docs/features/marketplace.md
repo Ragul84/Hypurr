@@ -7,13 +7,13 @@ The Plugins screen configures capabilities installed on the selected computer. A
 | Agents | `host/src/agent/backends.rs`, `host/src/agent/registry.rs` | Detect installed harnesses and resolve ACP registry adapters |
 | Connectors | `host/src/market/mod.rs` | Discover MCP servers or add one manually; install per computer; on for every bot unless a bot turns it off |
 | Connected apps | `host/src/market/composio.rs` | Expose connected Composio apps as connectors |
-| Skills | `host/src/market/mod.rs` | Instruction folders containing `SKILL.md`, stored under `~/.codync/skills/<id>` |
+| Skills | `host/src/market/mod.rs` | Instruction folders containing `SKILL.md`, stored under `~/.hypurr/skills/<id>` |
 
 The Connectors shelf opens with a short featured list, then pages through the whole MCP Registry (`marketConnectors {search, cursor}` → `{items, nextCursor}`, 60 metadata records per API page; the UI initially shows 12 and reveals another 12 only when *Load more connectors* is pressed). Apps through Composio use the same 12-at-a-time display with *Load more apps*. Searching resets the visible batch; late responses from an older search are ignored. Scrolling never triggers another catalog fetch. Listed: stdio npm/PyPI/OCI/NuGet packages (the registry's runtime and package arguments become inputs) and streamable-HTTP or SSE remotes (URL `{variables}` become inputs). Not listed: MCPB bundles and packages that serve HTTP locally; add those as a custom connector.
 
 A custom connector is a command line (split like a shell), a URL, or a pasted MCP config (`importConnectors {config}`: the `mcpServers` / `servers` JSON from READMEs, Claude, Cursor or VS Code, or one server's entry); every server in a config is added.
 
-A connector installed on the computer (or an app connected through Composio) is turned on for every existing bot, and a new bot starts with all of them on; each bot can turn one off in its settings. An enabled connector is passed to the agent as an MCP server when its session starts or resumes. Local connectors are spawned by the agent; remote ones always go through the host's stdio proxy (`codync-host mcp remote`, `host/src/mcp.rs`), so they work with agents that only speak stdio and always carry a fresh token. The proxy speaks streamable HTTP and falls back to the older HTTP+SSE transport when the first POST fails with 400/404/405, as the MCP spec suggests.
+A connector installed on the computer (or an app connected through Composio) is turned on for every existing bot, and a new bot starts with all of them on; each bot can turn one off in its settings. An enabled connector is passed to the agent as an MCP server when its session starts or resumes. Local connectors are spawned by the agent; remote ones always go through the host's stdio proxy (`hypurr-host mcp remote`, `host/src/mcp.rs`), so they work with agents that only speak stdio and always carry a fresh token. The proxy speaks streamable HTTP and falls back to the older HTTP+SSE transport when the first POST fails with 400/404/405, as the MCP spec suggests.
 
 ## Sign-in for remote connectors (`host/src/market/oauth.rs`)
 
@@ -22,7 +22,7 @@ Installing a remote connector probes it; a 401 marks it `signedOut` and bots don
 | Where the user signs in | Redirect URI | Who finishes |
 | --- | --- | --- |
 | On the computer (Mac app, TUI; loopback caller) | `http://127.0.0.1:<port>/oauth/callback` | the host's callback page |
-| On the phone (E2E channel caller) | `<cloud>/v1/oauth/callback` → 302 `codync://oauth?…` | the app's system sign-in sheet sends `connectorSignInFinish` |
+| On the phone (E2E channel caller) | `<cloud>/v1/oauth/callback` → 302 `hypurr://oauth?…` | the app's system sign-in sheet sends `connectorSignInFinish` |
 
 The cloud page is stateless and the code is useless without the PKCE verifier held by the host. Servers without dynamic client registration (e.g. GitHub) need a token header instead (custom connector, URL + headers). `connectorTarget` (loopback only) hands the proxy the URL and headers.
 
@@ -38,7 +38,7 @@ See [file structure](../architecture/file-structure.md), [bot collaboration](bot
 
 The shared bot editor requests `agentModels {backend}` from the selected computer. The host starts an isolated ACP session under its probe directory with saved agent credentials, no MCP servers and no prompt, then closes the process. The response is `{models: [{id, name, description}], currentModelId}`.
 
-Discovery prefers ACP `configOptions` with category `model` (including grouped options), with conventional `model`/`models` IDs as a compatibility fallback. Older agents may expose `models.availableModels`. Model names and IDs come from the agent; Codync does not bundle a provider catalog. See the [ACP config option contract](https://agentclientprotocol.com/protocol/v1/session-config-options).
+Discovery prefers ACP `configOptions` with category `model` (including grouped options), with conventional `model`/`models` IDs as a compatibility fallback. Older agents may expose `models.availableModels`. Model names and IDs come from the agent; Hypurr does not bundle a provider catalog. See the [ACP config option contract](https://agentclientprotocol.com/protocol/v1/session-config-options).
 
 The editor keeps Default, shows available models in a dropdown, and resets the selected model when changing agents. Errors are visible and retryable. Custom commands and agents without model discovery retain manual ID entry; an existing unlisted ID is preserved. The probe uses an isolated directory, so project-specific agent configuration can differ from the real bot session. Changing the model restarts the bot's agent sessions with fresh model context and preserves the stored chat history. The agent remains responsible for validating availability when a session starts.
 

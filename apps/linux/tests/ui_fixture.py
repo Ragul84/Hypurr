@@ -126,14 +126,14 @@ class Host(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     server = ThreadingHTTPServer(("127.0.0.1", 0), Host)
     threading.Thread(target=server.serve_forever, daemon=True).start()
-    with tempfile.TemporaryDirectory(prefix="codync-ui-fixture-") as directory:
+    with tempfile.TemporaryDirectory(prefix="hypurr-ui-fixture-") as directory:
         pathlib.Path(directory, "token").write_text("fixture-token")
         downloads = pathlib.Path(directory, "downloads")
         downloads.mkdir()
         config = pathlib.Path(directory, "config")
         config.mkdir()
         (config / "user-dirs.dirs").write_text(f'XDG_DOWNLOAD_DIR="{downloads}"\n')
-        env = {**os.environ, "XDG_CONFIG_HOME":str(config), "CODYNC_UI_DOWNLOADS":str(downloads), "CODYNC_HOME":directory, "CODYNC_URL":f"http://127.0.0.1:{server.server_port}", "CODYNC_UI_TEST":"1", "CODYNC_UI_ARTIFACTS":os.environ.get("CODYNC_UI_ARTIFACTS", directory)}
+        env = {**os.environ, "XDG_CONFIG_HOME":str(config), "HYPURR_UI_DOWNLOADS":str(downloads), "HYPURR_HOME":directory, "HYPURR_URL":f"http://127.0.0.1:{server.server_port}", "HYPURR_UI_TEST":"1", "HYPURR_UI_ARTIFACTS":os.environ.get("HYPURR_UI_ARTIFACTS", directory)}
         try:
             result = subprocess.run(sys.argv[1:] or ["cargo", "test", "native_ui_flows", "--", "--ignored", "--test-threads=1", "--nocapture"], env=env)
         finally:

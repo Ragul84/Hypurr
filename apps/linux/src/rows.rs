@@ -1,4 +1,4 @@
-//! The rows a conversation is made of (kit/Sources/CodyncUI/Thread/ChatRows.swift and
+//! The rows a conversation is made of (kit/Sources/HypurrUI/Thread/ChatRows.swift and
 //! PermissionCard.swift): bubbles, author labels, thread chips, notices, approval cards and
 //! the working indicator.
 

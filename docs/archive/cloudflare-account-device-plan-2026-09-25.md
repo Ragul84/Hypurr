@@ -1,4 +1,4 @@
-# Codync 帳號、裝置管理與 Cloudflare 架構計畫
+# Hypurr 帳號、裝置管理與 Cloudflare 架構計畫
 
 > Archived 2026-09-25 record. Statements below describe the original plan/audit, not current implementation or verification. See the [archive index](README.md) for current replacements.
 
@@ -21,13 +21,13 @@ Cloudflare API、D1、裝置目錄、雲端授權／撤權與中繼由 Claude Co
 
 ## 1. 目標與核心決策
 
-讓使用者在 Mac 和 iPhone 登入同一個 Codync 帳號後，能找到自己的電腦、完成首次授權、管理已授權裝置，並在之後擴充訂閱與免 Tailscale 的遠端連線。
+讓使用者在 Mac 和 iPhone 登入同一個 Hypurr 帳號後，能找到自己的電腦、完成首次授權、管理已授權裝置，並在之後擴充訂閱與免 Tailscale 的遠端連線。
 
 採用以下分工：
 
 - **Clerk**：使用者身分、Google 等登入方式與登入 session。
 - **Cloudflare Workers + D1**：帳號與電腦的歸屬、裝置授權、撤權、必要的管理資料。
-- **電腦上的 codync-host + SQLite**：bots、threads、entries、專案設定、agent 執行與實際操作權限。
+- **電腦上的 hypurr-host + SQLite**：bots、threads、entries、專案設定、agent 執行與實際操作權限。
 - **既有 Cloudflare 推播 relay**：APNs 通知與 Live Activities，逐步補上帳號與裝置授權。
 - **Durable Objects + WebSocket**：每台 host 一個，端對端加密中繼、presence 與離線 mailbox（第一版即實作）。
 
@@ -42,8 +42,8 @@ Cloudflare API、D1、裝置目錄、雲端授權／撤權與中繼由 Claude Co
 - 一個 bot 只能對應一台 computer；預設允許同一台 computer 執行多個 bots，不強加「一台只能有一個 bot」的限制。
 - computer 可以是本機 Mac、另一台已配對的電腦，或經 SSH 連到的遠端 Mac／Linux。
 - SSH 是連線方式；它不取代 computer 的穩定身分，也不是 agent 類型。
-- Codync 帳號管理 computer 與 bot 的可見範圍；SSH 的 `user@machine` 是執行／連線身分；Claude／Codex 帳號則是 agent 自身的登入，三者不得混用同一個 account 欄位。
-- 手機左上角目標改成「帳號切換」，不再以切換目前 computer 作為整個 bot 清單的主入口。已確認此處指不同 Google／Clerk 的 Codync 登入帳號，各自管理電腦與 bots。
+- Hypurr 帳號管理 computer 與 bot 的可見範圍；SSH 的 `user@machine` 是執行／連線身分；Claude／Codex 帳號則是 agent 自身的登入，三者不得混用同一個 account 欄位。
+- 手機左上角目標改成「帳號切換」，不再以切換目前 computer 作為整個 bot 清單的主入口。已確認此處指不同 Google／Clerk 的 Hypurr 登入帳號，各自管理電腦與 bots。
 - computer 選擇放在新增 bot 流程與 bot 設定；bot 清單、聊天標頭顯示所屬 computer，讓使用者知道命令會在哪裡執行。
 
 目標階層為 `Account → Computers → Bots`，帳號下的 bot 清單可跨 computer 彙整。使用者可以同時保有本機 bot 與遠端 bot，不需要每次先切換全域 host。
@@ -55,13 +55,13 @@ Cloudflare API、D1、裝置目錄、雲端授權／撤權與中繼由 Claude Co
 | 現況 | 程式位置 | 對計畫的影響 |
 |---|---|---|
 | Mac 已使用 ClerkKit，支援 Google 登入 | `apps/shared/AccountSession.swift`、`docs/guides/accounts-and-ssh.md` | 延伸現有登入，不另建帳號系統 |
-| iOS 已接 Clerk 帳號入口，電腦仍靠掃碼配對 | `apps/ios/App/CodyncApp.swift`、`apps/ios/Views/RootView.swift`、`PairingView.swift` | 登入入口已建立；雲端電腦清單待實作 |
-| host SQLite 位於 `~/.codync/codync.db` | `host/src/main.rs`、`host/src/store.rs` | 保留本機資料與既有 `rev` 同步機制 |
+| iOS 已接 Clerk 帳號入口，電腦仍靠掃碼配對 | `apps/ios/App/HypurrApp.swift`、`apps/ios/Views/RootView.swift`、`PairingView.swift` | 登入入口已建立；雲端電腦清單待實作 |
+| host SQLite 位於 `~/.hypurr/hypurr.db` | `host/src/main.rs`、`host/src/store.rs` | 保留本機資料與既有 `rev` 同步機制 |
 | host 使用共用 pairing token，旋轉會使所有舊裝置失效 | `host/src/main.rs`、`host/src/api/mod.rs` | 必須新增逐裝置授權，才能精準撤權 |
-| 手機配對資料依帳號分區存入 App Group UserDefaults | `kit/Sources/CodyncKit/Client/SharedStore.swift` | 秘密搬到 Keychain，UserDefaults 僅留顯示資料與參照 |
-| 命令走 HTTP API，事件走 SSE | `host/src/api/mod.rs`、`kit/Sources/CodyncKit/Client/HostClient.swift` | 第一版沿用；後續用 transport 抽象接中繼 |
+| 手機配對資料依帳號分區存入 App Group UserDefaults | `kit/Sources/HypurrKit/Client/SharedStore.swift` | 秘密搬到 Keychain，UserDefaults 僅留顯示資料與參照 |
+| 命令走 HTTP API，事件走 SSE | `host/src/api/mod.rs`、`kit/Sources/HypurrKit/Client/HostClient.swift` | 第一版沿用；後續用 transport 抽象接中繼 |
 | 已有 Cloudflare Worker 轉送 APNs，使用加密 ticket | `relay/src/index.ts`、`relay/wrangler.toml` | 保留相容性；它目前不是裝置目錄或聊天中繼 |
-| Remote screen 使用獨立 helper 與 WebRTC | `apps/screen-macos/`、`kit/Sources/CodyncUI/Screen/` | 影像傳輸與聊天中繼分開 |
+| Remote screen 使用獨立 helper 與 WebRTC | `apps/screen-macos/`、`kit/Sources/HypurrUI/Screen/` | 影像傳輸與聊天中繼分開 |
 
 目前「Mac 登入成功」不等於「手機已獲准連 host」。現有配對 token 也不會因 Clerk 登出而自動失效。
 
@@ -90,9 +90,9 @@ SQLite 是資料庫引擎；本機 SQLite 存在使用者電腦，D1 的資料�
 | 服務 | 用途 | 導入階段 |
 |---|---|---|
 | Clerk | 原生登入、session、身分驗證 | 第一版 |
-| Workers，新增 `codync-api` | 帳號 API、claim、授權、撤權、webhook | 第一版 |
+| Workers，新增 `hypurr-api` | 帳號 API、claim、授權、撤權、webhook | 第一版 |
 | D1 | 管理資料與事件去重 | 第一版 |
-| 現有 `codync-relay` Worker | APNs 與 Live Activities | 延用並升級 |
+| 現有 `hypurr-relay` Worker | APNs 與 Live Activities | 延用並升級 |
 | Durable Objects | 每台 host 的 E2E 中繼、presence、離線 mailbox、即時撤權 | 第一版 |
 | R2 | 使用者明確選擇的附件／備份 | 有實際需求再導入 |
 | Queues | 推播與 webhook 的背景處理、重試 | 量體或可靠性需要時導入 |
@@ -109,10 +109,10 @@ Cloudflare Tunnel 不列為第一版終端使用者的安裝依賴。帳號驗�
 flowchart TD
     IOS[iPhone App] --> CLERK[Clerk 登入]
     MAC[Mac App] --> CLERK
-    IOS --> API[Workers：Codync API]
+    IOS --> API[Workers：Hypurr API]
     MAC --> API
     API --> D1[(D1：電腦歸屬與裝置授權)]
-    HOST[codync-host] -->|機器身分、授權更新| API
+    HOST[hypurr-host] -->|機器身分、授權更新| API
     MAC -->|本機連線| HOST
     IOS -->|第一版：Tailscale／安全直連| HOST
     HOST --> DB[(本機 SQLite)]
@@ -311,8 +311,8 @@ WebRTC 優先直連，必要時使用 TURN；憑證需短效且受裝置授權�
 | `apps/shared/AccountSession.swift`（已提取共用） | 從 Mac 提取兩端共用 Clerk wrapper，以 target sources 引入 |
 | `apps/ios/App/`、`apps/macos/App/` | App lifecycle、登入、登出清理、各平台 callback |
 | `apps/ios/Views/`、`apps/macos/Views/` | 登入入口、我的電腦、授權申請與撤權 |
-| `kit/Sources/CodyncKit/Client/` | `CloudClient`、Keychain 儲存、配對遷移；不引入 Clerk 到 widget-safe core |
-| `kit/Sources/CodyncUI/Store/` | 本機／雲端電腦清單合併、帳號切換、grant 更新 |
+| `kit/Sources/HypurrKit/Client/` | `CloudClient`、Keychain 儲存、配對遷移；不引入 Clerk 到 widget-safe core |
+| `kit/Sources/HypurrUI/Store/` | 本機／雲端電腦清單合併、帳號切換、grant 更新 |
 | `host/src/` | host identity、cloud client、逐裝置 auth、撤權與版本協商 |
 | `project.yml` | iOS Clerk 依賴、shared sources、config 與 Keychain entitlement 配置 |
 | `docs/guides/accounts-and-ssh.md`、README、PairingView 文案 | 更新帳號、資料處理與本機模式說明 |
@@ -362,7 +362,7 @@ WebRTC 優先直連，必要時使用 TURN；憑證需短效且受裝置授權�
 
 - P1／P2 的資料模型一併納入每 bot 的 computer 關聯、帳號作用域與複合路由 ID，避免日後重做 cache、deep link 與通知格式。
 - 先實作帳號內多 computer 的 bot 彙整與路由；每台 computer 保有自己的 `BotStore`／同步游標，不把多個 host 的 `rev` 混成一個。
-- SSH 試行使用 macOS 系統 OpenSSH，連到遠端已安裝的 codync-host，透過 loopback tunnel 重用既有 API；不先實作任意 SSH command 當完整 bot backend。
+- SSH 試行使用 macOS 系統 OpenSSH，連到遠端已安裝的 hypurr-host，透過 loopback tunnel 重用既有 API；不先實作任意 SSH command 當完整 bot backend。
 - SSH 試行不依賴雲端中繼，可以在 P2 後、P3 前交付；但必須先完成 host 身分驗證、獨立授權、連線生命週期及正確路由。
 - 手機直接連 SSH host、手機經 Mac gateway 存取，以及免安裝 remote host 是不同工作項；不因桌面 tunnel 成功就宣稱三者均完成。
 

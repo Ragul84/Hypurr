@@ -1,5 +1,5 @@
 //! A bot's long-term memory, modeled on Grok Bot's: plain markdown facts in
-//! `~/.codync/bots/<id>/memory/`: `profile.md` (who the user is, kept in mind
+//! `~/.hypurr/bots/<id>/memory/`: `profile.md` (who the user is, kept in mind
 //! every turn) and `log/YYYY-MM.md` (dated history), one `- (YYYY-MM-DD) fact`
 //! per line, so the user and the agent can read, grep and edit them.
 //!
@@ -923,7 +923,7 @@ mod tests {
     use super::*;
 
     fn temp() -> Memory {
-        let dir = std::env::temp_dir().join(format!("codync-memory-{}", uuid::Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("hypurr-memory-{}", uuid::Uuid::new_v4()));
         Memory::at(dir)
     }
 
@@ -944,14 +944,14 @@ mod tests {
         let t = parse_ymd("2026-09-25").expect("valid date");
         assert!(mem.add("The user's name is Kai", Kind::Profile, t).expect("add"));
         assert!(!mem.add("the user's   name is kai", Kind::Profile, t).expect("add"));
-        assert!(mem.add("Shipping Codync 2.2", Kind::Log, t).expect("add"));
-        assert!(read(&mem.dir.join("log/2026-09.md")).contains("- (2026-09-25) Shipping Codync 2.2"));
+        assert!(mem.add("Shipping Hypurr 2.2", Kind::Log, t).expect("add"));
+        assert!(read(&mem.dir.join("log/2026-09.md")).contains("- (2026-09-25) Shipping Hypurr 2.2"));
         let recall = mem.recall(RECENT_PROMPT_LIMIT);
         assert_eq!(recall.profile.len(), 1);
         assert_eq!(recall.recent.len(), 1);
         let (text, has) = render(&recall, mem.location());
         assert!(has && text.contains("- (learned 2026-09-25) The user's name is Kai"));
-        assert!(mem.remove_by_content("Shipping Codync 2.2").expect("remove"));
+        assert!(mem.remove_by_content("Shipping Hypurr 2.2").expect("remove"));
         assert!(mem.recall(10).recent.is_empty());
         mem.clear().expect("clear");
         assert!(mem.facts().is_empty());

@@ -1,5 +1,5 @@
 #if DEBUG
-import CodyncKit
+import HypurrKit
 import SwiftUI
 import WidgetKit
 import ActivityKit
@@ -73,7 +73,7 @@ import ActivityKit
 }
 
 private extension BotActivityAttributes {
-    static var preview: Self { .init(bot: Bot.widgetPreview[0], computerId: "preview", link: URL(string: "codync://computers")) }
+    static var preview: Self { .init(bot: Bot.widgetPreview[0], computerId: "preview", link: URL(string: "hypurr://computers")) }
 }
 
 #Preview("Activity · Lock Screen", as: .content, using: BotActivityAttributes.preview) {

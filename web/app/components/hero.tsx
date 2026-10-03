@@ -29,7 +29,7 @@ export default function Hero() {
             Message your coding agents like teammates.
           </motion.h1>
           <motion.p {...rise(0.1)} className="mt-6 max-w-[34rem] text-lg leading-relaxed text-neutral-400">
-            Codync runs Claude Code, Codex and 40+ agents as named bots on your computer. Reply and approve from
+            Hypurr runs Claude Code, Codex and 40+ agents as named bots on your computer. Reply and approve from
             your iPhone, Mac, Linux desktop or a terminal over SSH. Free, MIT licensed, and every feature of Grok
             Bot and Muse, 1:1.
           </motion.p>
@@ -70,7 +70,7 @@ export default function Hero() {
               : { initial: { opacity: 0, y: 40 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.9, delay: 0.1, ease } })}
             className="relative w-[58%]"
           >
-            <Phone src="/screens/roster.webp" alt="The Codync bot list: Pacer needs approval, the other bots have replied" eager />
+            <Phone src="/screens/roster.webp" alt="The Hypurr bot list: Pacer needs approval, the other bots have replied" eager />
           </motion.div>
           <motion.div
             {...(reduce

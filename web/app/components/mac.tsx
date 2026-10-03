@@ -20,7 +20,7 @@ export default function Mac() {
           <Reveal>
             <Image
               src="/screens/mac-chat.webp"
-              alt="The Codync Mac window: Ship room, where Pacer, Reviewer and Scout discuss an isoWeek fix, with the member list on the right"
+              alt="The Hypurr Mac window: Ship room, where Pacer, Reviewer and Scout discuss an isoWeek fix, with the member list on the right"
               width={1600}
               height={1096}
               className="h-auto w-full drop-shadow-[0_40px_60px_rgba(0,0,0,0.8)]"
@@ -32,7 +32,7 @@ export default function Mac() {
           >
             <Image
               src="/screens/mac-menu.webp"
-              alt="The Codync menu bar menu: three bots, Remote screen, and Claude and Codex usage bars"
+              alt="The Hypurr menu bar menu: three bots, Remote screen, and Claude and Codex usage bars"
               width={700}
               height={876}
               className="h-auto w-full drop-shadow-[0_30px_50px_rgba(0,0,0,0.85)]"

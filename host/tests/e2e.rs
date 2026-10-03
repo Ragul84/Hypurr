@@ -1,4 +1,4 @@
-//! End to end: a real `codync-host serve` driving a scripted ACP agent
+//! End to end: a real `hypurr-host serve` driving a scripted ACP agent
 //! (`fake_agent.py`) through a full turn with an approval in the middle.
 
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // test code: failing loudly is the point
@@ -36,13 +36,13 @@ fn free_port() -> u16 {
 }
 
 async fn start_host() -> Host {
-    let home = std::env::temp_dir().join(format!("codync-e2e-{}", uuid::Uuid::new_v4()));
+    let home = std::env::temp_dir().join(format!("hypurr-e2e-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&home).unwrap();
     let port = free_port();
-    let child = Command::new(env!("CARGO_BIN_EXE_codync-host"))
+    let child = Command::new(env!("CARGO_BIN_EXE_hypurr-host"))
         .args(["serve", "--bind", "127.0.0.1", "--port", &port.to_string()])
-        .env("CODYNC_HOME", &home)
-        .env("CODYNC_CLOUD", "off")
+        .env("HYPURR_HOME", &home)
+        .env("HYPURR_CLOUD", "off")
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
@@ -93,7 +93,7 @@ async fn termination_exits_with_an_open_event_stream() {
     assert!(health["binaryHash"].as_str().is_some_and(|hash| hash.len() == 64));
     assert_eq!(
         health["binaryPath"],
-        std::fs::canonicalize(env!("CARGO_BIN_EXE_codync-host")).unwrap().to_str().unwrap()
+        std::fs::canonicalize(env!("CARGO_BIN_EXE_hypurr-host")).unwrap().to_str().unwrap()
     );
     let stream =
         reqwest::Client::new().get(format!("{}/events", host.base)).bearer_auth(&host.token).send().await.unwrap();

@@ -1123,7 +1123,7 @@ impl App {
                 self.flash("Agents refreshed");
             }
             After::Update => match v["state"]["availableVersion"].as_str() {
-                Some(version) => self.flash(&format!("Version {version} is available: run codync-host update")),
+                Some(version) => self.flash(&format!("Version {version} is available: run hypurr-host update")),
                 None => self.flash("The host is up to date."),
             },
             After::Thread => {
@@ -1584,7 +1584,7 @@ impl App {
         }
     }
 
-    /// `codync-host install` with this same binary, for when nothing is listening yet.
+    /// `hypurr-host install` with this same binary, for when nothing is listening yet.
     fn install_host(&mut self) {
         let Ok(exe) = std::env::current_exe() else { return };
         self.flash("Installing the host…");
@@ -2551,7 +2551,7 @@ mod tests {
 
     #[test]
     fn dropped_paths_are_files_only() {
-        let dir = std::env::temp_dir().join(format!("codync-drop-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("hypurr-drop-{}", std::process::id()));
         std::fs::create_dir_all(&dir).expect("temp dir");
         let a = dir.join("a b.txt");
         std::fs::write(&a, "x").expect("write");

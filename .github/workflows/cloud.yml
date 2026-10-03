@@ -1,4 +1,4 @@
-name: codync-cloud
+name: hypurr-cloud
 
 on:
   push:

@@ -4,7 +4,7 @@ import CopyCommand from "./copy-command";
 import Reveal from "./reveal";
 import { APP_STORE, DMG } from "../links";
 
-const INSTALL_SH = "curl -fsSL https://raw.githubusercontent.com/leepokai/Codync/main/packaging/install.sh | sh";
+const INSTALL_SH = "curl -fsSL https://raw.githubusercontent.com/Ragul84/Hypurr/main/packaging/install.sh | sh";
 
 export default function Install() {
   return (
@@ -13,7 +13,7 @@ export default function Install() {
         <Reveal>
           <h2 className="text-3xl font-semibold tracking-tight text-neutral-50 md:text-4xl">Install once.</h2>
           <p className="mt-4 max-w-[36rem] text-lg leading-relaxed text-neutral-400">
-            Put Codync on the computer your agents run on, then pair your phone from it.
+            Put Hypurr on the computer your agents run on, then pair your phone from it.
           </p>
         </Reveal>
 
@@ -28,10 +28,10 @@ export default function Install() {
               <a href={DMG} className="text-neutral-200 underline underline-offset-4 hover:text-white">
                 signed download
               </a>
-              . Open Codync and it starts the host itself.
+              . Open Hypurr and it starts the host itself.
             </p>
             <div className="mt-4">
-              <CopyCommand command="brew install --cask leepokai/codync/codync" />
+              <CopyCommand command="brew install --cask Ragul84/hypurr/hypurr" />
             </div>
           </Reveal>
 
@@ -41,7 +41,7 @@ export default function Install() {
               <h3 className="text-lg font-semibold">Linux and servers</h3>
             </div>
             <p className="mt-2 text-neutral-400">
-              The host, plus the desktop app when there is a display. Then run <code className="font-mono text-neutral-200">codync-host install</code>.
+              The host, plus the desktop app when there is a display. Then run <code className="font-mono text-neutral-200">hypurr-host install</code>.
             </p>
             <div className="mt-4">
               <CopyCommand command={INSTALL_SH} />
@@ -55,7 +55,7 @@ export default function Install() {
             </div>
             <p className="mt-2 text-neutral-400">
               Get the app, then scan the code from <span className="text-neutral-200">Pair iPhone…</span> in the Mac
-              menu bar, the Linux app or <code className="font-mono text-neutral-200">codync-host pair</code>.
+              menu bar, the Linux app or <code className="font-mono text-neutral-200">hypurr-host pair</code>.
             </p>
             <a
               href={APP_STORE}

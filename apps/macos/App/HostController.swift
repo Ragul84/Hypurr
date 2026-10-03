@@ -1,6 +1,6 @@
 import AppKit
-import CodyncKit
-import CodyncUI
+import HypurrKit
+import HypurrUI
 import CryptoKit
 import Foundation
 import Observation
@@ -21,9 +21,9 @@ struct Approval: Identifiable {
     }
 }
 
-private let log = Logger(subsystem: "com.pokai.Codync", category: "Host")
+private let log = Logger(subsystem: "com.ragul84.Hypurr", category: "Host")
 
-/// Manages the local codync-host (binary, background service) and owns the `AccountStore`
+/// Manages the local hypurr-host (binary, background service) and owns the `AccountStore`
 /// the menu and the chat window share: this Mac over loopback, SSH computers through their
 /// tunnels, and the account's other computers over the encrypted channel.
 @MainActor
@@ -37,11 +37,11 @@ final class HostController {
         case failed(String)
     }
 
-    /// `CODYNC_PORT` / `CODYNC_HOME` point the app at a dev host started with `codync-host serve`.
-    static let devPort = ProcessInfo.processInfo.environment["CODYNC_PORT"].flatMap(Int.init)
+    /// `HYPURR_PORT` / `HYPURR_HOME` point the app at a dev host started with `hypurr-host serve`.
+    static let devPort = ProcessInfo.processInfo.environment["HYPURR_PORT"].flatMap(Int.init)
     static let port = devPort ?? 19222
-    static let dataDir = ProcessInfo.processInfo.environment["CODYNC_HOME"].map { URL(filePath: $0) }
-        ?? FileManager.default.homeDirectoryForCurrentUser.appending(path: ".codync")
+    static let dataDir = ProcessInfo.processInfo.environment["HYPURR_HOME"].map { URL(filePath: $0) }
+        ?? FileManager.default.homeDirectoryForCurrentUser.appending(path: ".hypurr")
     static let baseURL = URL(string: "http://127.0.0.1:\(port)")!
 
     let account: AccountSession
@@ -57,8 +57,8 @@ final class HostController {
 
     private(set) var state: State = .starting
     var launchAtLogin: Bool = SMAppService.mainApp.status == .enabled
-    /// Codync Screen (capture + input for Remote screen), a launchd agent inside this app.
-    private let screenAgent = SMAppService.agent(plistName: "com.pokai.Codync.screen.plist")
+    /// Hypurr Screen (capture + input for Remote screen), a launchd agent inside this app.
+    private let screenAgent = SMAppService.agent(plistName: "com.ragul84.Hypurr.screen.plist")
     private(set) var screenAgentNeedsApproval = false
     private(set) var screenError: String?
     /// Approvals closed with "later"; they come back when the request changes (e.g. its code arrives).
@@ -126,16 +126,16 @@ final class HostController {
     /// Bundled next to the app executable, else a Homebrew / cargo install.
     var binaryURL: URL? {
         let candidates = [
-            Bundle.main.bundleURL.appending(path: "Contents/MacOS/codync-host"),
-            URL(filePath: "/opt/homebrew/bin/codync-host"),
-            URL(filePath: "/usr/local/bin/codync-host"),
-            FileManager.default.homeDirectoryForCurrentUser.appending(path: ".cargo/bin/codync-host"),
+            Bundle.main.bundleURL.appending(path: "Contents/MacOS/hypurr-host"),
+            URL(filePath: "/opt/homebrew/bin/hypurr-host"),
+            URL(filePath: "/usr/local/bin/hypurr-host"),
+            FileManager.default.homeDirectoryForCurrentUser.appending(path: ".cargo/bin/hypurr-host"),
         ]
         return candidates.first { FileManager.default.isExecutableFile(atPath: $0.path) }
     }
 
     private var plistURL: URL {
-        FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/LaunchAgents/com.pokai.codync.host.plist")
+        FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/LaunchAgents/com.ragul84.hypurr.host.plist")
     }
 
     private var tokenURL: URL { Self.dataDir.appending(path: "token") }
@@ -165,7 +165,7 @@ final class HostController {
 
     /// Cloudflare is on by default, so a Mac without Tailscale is reachable away from home. It's turned on
     /// once per host identity, the first time it's seen off; after that, off stays off, whoever turned it
-    /// off (this app's switch, `codync-host cloud --disable`), and it's never undone behind the user's back.
+    /// off (this app's switch, `hypurr-host cloud --disable`), and it's never undone behind the user's back.
     private func watchCloudDefault() {
         let target = withObservationTracking {
             cloudDefaultTarget
@@ -232,7 +232,7 @@ final class HostController {
     private static let uninstalledKey = "hostUninstalled"
     private static let updateRestartKey = "hostRestartAfterAppUpdate"
 
-    /// `codync-host install` also routes Claude Code's status line through the host.
+    /// `hypurr-host install` also routes Claude Code's status line through the host.
     func install() {
         guard !preparingForUpdate, !installingHost, let bin = binaryURL else { return }
         installingHost = true
@@ -310,7 +310,7 @@ final class HostController {
         launchAtLogin = SMAppService.mainApp.status == .enabled
     }
 
-    /// Remote screen: starts/stops Codync Screen and tells the host (which only accepts this from the Mac itself).
+    /// Remote screen: starts/stops Hypurr Screen and tells the host (which only accepts this from the Mac itself).
     func setRemoteScreen(_ on: Bool) {
         guard !preparingForUpdate else { return }
         Task {
@@ -330,7 +330,7 @@ final class HostController {
         SMAppService.openSystemSettingsLoginItems()
     }
 
-    /// Keeps Codync Screen registered while the host has Remote screen on (e.g. after the app moved),
+    /// Keeps Hypurr Screen registered while the host has Remote screen on (e.g. after the app moved),
     /// and registers it again when this app ships a different helper binary (an update or a rebuild):
     /// launchd keeps running the old helper, and a new binary under the old registration fails to start.
     private func syncScreenAgent() async {
@@ -346,7 +346,7 @@ final class HostController {
             return
         }
         if stale, screenAgent.status == .enabled {
-            log.info("Codync Screen changed; registering it again")
+            log.info("Hypurr Screen changed; registering it again")
             // Stops the old helper along with its job.
             try? await screenAgent.unregister()
         }
@@ -359,7 +359,7 @@ final class HostController {
 
     /// Identifies the helper binary inside this app: its path and modification date.
     private static var helperStamp: String {
-        let url = Bundle.main.bundleURL.appending(path: "Contents/Library/LoginItems/CodyncScreen.app/Contents/MacOS/CodyncScreen")
+        let url = Bundle.main.bundleURL.appending(path: "Contents/Library/LoginItems/HypurrScreen.app/Contents/MacOS/HypurrScreen")
         let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
         return "\(url.path)@\(modified?.timeIntervalSince1970 ?? 0)"
     }
@@ -374,7 +374,7 @@ final class HostController {
     func prepareForUpdate() async throws {
         guard Self.devPort == nil else { return }
         guard !installingHost else {
-            throw NSError(domain: "Codync.Update", code: 1,
+            throw NSError(domain: "Hypurr.Update", code: 1,
                           userInfo: [NSLocalizedDescriptionKey: "The host is being installed. Try again when it finishes."])
         }
         preparingForUpdate = true
@@ -388,12 +388,12 @@ final class HostController {
             UserDefaults.standard.removeObject(forKey: Self.helperStampKey)
         }
         guard let bin = binaryURL else {
-            throw NSError(domain: "Codync.Update", code: 2,
+            throw NSError(domain: "Hypurr.Update", code: 2,
                           userInfo: [NSLocalizedDescriptionKey: "The bundled host is missing."])
         }
         let result = await Self.run(bin, ["stop"])
         guard result.status == 0 else {
-            throw NSError(domain: "Codync.Update", code: 3,
+            throw NSError(domain: "Hypurr.Update", code: 3,
                           userInfo: [NSLocalizedDescriptionKey: result.output.isEmpty ? "The old host could not be stopped." : result.output])
         }
     }
@@ -509,7 +509,7 @@ final class HostController {
         UserDefaults.standard.set(Array(ids), forKey: "keptOutOfAccount.\(userID)")
     }
 
-    /// This Mac's host got new keys (a reset `~/.codync`, a reinstall): the identities this Mac claimed
+    /// This Mac's host got new keys (a reset `~/.hypurr`, a reinstall): the identities this Mac claimed
     /// before are dead copies of it, so they leave the account instead of showing up as a second Mac.
     private func forgetEarlierIdentities(of current: ComputerID) async {
         let key = "claimedComputerIds"
@@ -544,7 +544,7 @@ final class HostController {
     private func enableCloud(_ client: HostClient, store: BotStore) async throws -> CloudStatus {
         let url = store.cloud?.url == nil ? account.cloudURL : nil
         guard store.cloud?.url != nil || url != nil else {
-            throw CloudError(status: 400, code: "badRequest", message: "This build of Codync has no cloud to connect to.")
+            throw CloudError(status: 400, code: "badRequest", message: "This build of Hypurr has no cloud to connect to.")
         }
         return try await client.setCloud(enabled: true, url: url)
     }

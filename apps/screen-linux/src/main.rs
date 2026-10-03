@@ -1,5 +1,5 @@
-//! `codync-screen`: Remote screen for Linux. The host (`codync-host`) starts it
-//! while Remote screen is on; it connects to `~/.codync/screen.sock` and serves
+//! `hypurr-screen`: Remote screen for Linux. The host (`hypurr-host`) starts it
+//! while Remote screen is on; it connects to `~/.hypurr/screen.sock` and serves
 //! the same JSON-RPC as the macOS helper (see `host/src/screen.rs`):
 //! capture and input through the xdg `RemoteDesktop` + `ScreenCast` portals
 //! (approved once, then restored from a saved token), video as H.264 over
@@ -21,8 +21,8 @@ use tokio::net::UnixStream;
 use tokio::sync::{Mutex, mpsc};
 
 fn data_dir() -> PathBuf {
-    std::env::var_os("CODYNC_HOME").map_or_else(
-        || dirs::home_dir().expect("HOME must be set").join(".codync"),
+    std::env::var_os("HYPURR_HOME").map_or_else(
+        || dirs::home_dir().expect("HOME must be set").join(".hypurr"),
         PathBuf::from,
     )
 }
@@ -41,7 +41,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "codync_screen=info".into()),
+                .unwrap_or_else(|_| "hypurr_screen=info".into()),
         )
         .init();
     gst::init().context("starting GStreamer")?;
@@ -51,12 +51,12 @@ async fn main() -> Result<()> {
     loop {
         match UnixStream::connect(data_dir().join("screen.sock")).await {
             Ok(sock) => {
-                tracing::info!("connected to codync-host");
+                tracing::info!("connected to hypurr-host");
                 if let Err(error) = serve(sock, &portal).await {
                     tracing::warn!(error = format!("{error:#}"), "host link ended");
                 }
             }
-            Err(error) => tracing::debug!(%error, "codync-host isn't listening yet"),
+            Err(error) => tracing::debug!(%error, "hypurr-host isn't listening yet"),
         }
         tokio::time::sleep(Duration::from_secs(2)).await;
     }

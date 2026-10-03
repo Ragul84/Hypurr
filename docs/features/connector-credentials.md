@@ -1,6 +1,6 @@
 # Connector setup and credentials
 
-Codync uses one host-owned connection workflow on iOS, macOS and Linux. A
+Hypurr uses one host-owned connection workflow on iOS, macOS and Linux. A
 Marketplace installation and a bot's connection request use the same installation,
 OAuth and verification endpoints. The clients never implement a separate password
 store. A phone submits credentials through its authenticated encrypted channel to
@@ -89,7 +89,7 @@ to the accessibility API. The same-user boundary above applies.
 
 Credentials settings accepts a service-account token and checks it using the
 installed `op` CLI. Use a dedicated vault and grant the service account access only
-to that vault. Codync does not create a 1Password account or vault automatically.
+to that vault. Hypurr does not create a 1Password account or vault automatically.
 
 Use an `op://vault/item/field` reference as an environment value or complete header
 value. The host resolves it when verifying/launching a local connector or preparing

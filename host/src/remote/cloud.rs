@@ -1,5 +1,5 @@
-//! The Codync cloud (Cloudflare relay + accounts, spec §4.2, §4.3, §8.4, §9.6): which one
-//! this host uses, its `/v1/host/*` API (signed with `Codync-Sig`), the state pull that may
+//! The Hypurr cloud (Cloudflare relay + accounts, spec §4.2, §4.3, §8.4, §9.6): which one
+//! this host uses, its `/v1/host/*` API (signed with `Hypurr-Sig`), the state pull that may
 //! only renew or remove account devices, never add one, and account access requests with
 //! the commit-then-reveal SAS. The relay socket itself lives in `relay`.
 
@@ -21,9 +21,9 @@ use tokio::sync::watch;
 pub const DEFAULT_CLOUD_URL: Option<&str> = if cfg!(test) {
     None
 } else if cfg!(debug_assertions) {
-    Some("https://dev-api.codync.dev")
+    Some("https://dev-api.hypurr.dev")
 } else {
-    Some("https://api.codync.dev")
+    Some("https://api.hypurr.dev")
 };
 
 /// How long one successful state pull keeps an account device allowed.
@@ -46,14 +46,14 @@ const SAS_NONCES_PER_HOUR: usize = 5;
 const HOUR_MS: i64 = 60 * 60 * 1000;
 
 /// The cloud base URL in use, or `None` when the cloud is off.
-/// `CODYNC_CLOUD=off` > turned off here > `CODYNC_CLOUD_URL` > kv `cloud_url` > the default.
+/// `HYPURR_CLOUD=off` > turned off here > `HYPURR_CLOUD_URL` > kv `cloud_url` > the default.
 pub fn url(store: &Store) -> Option<String> {
-    if std::env::var("CODYNC_CLOUD").is_ok_and(|v| v == "off")
+    if std::env::var("HYPURR_CLOUD").is_ok_and(|v| v == "off")
         || store.kv_get("cloud_enabled").as_deref() == Some("false")
     {
         return None;
     }
-    std::env::var("CODYNC_CLOUD_URL")
+    std::env::var("HYPURR_CLOUD_URL")
         .ok()
         .or_else(|| store.kv_get("cloud_url"))
         .or_else(|| DEFAULT_CLOUD_URL.map(str::to_owned))
@@ -190,7 +190,7 @@ pub struct CloudError {
 
 impl std::fmt::Display for CloudError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "the Codync cloud refused ({} {}): {}", self.status, self.code, self.message)
+        write!(f, "the Hypurr cloud refused ({} {}): {}", self.status, self.code, self.message)
     }
 }
 
@@ -212,7 +212,7 @@ impl std::fmt::Display for Conflict {
 
 impl std::error::Error for Conflict {}
 
-/// The lowercase `Host` header value for `base` (with a non-default port), as `Codync-Sig` signs it.
+/// The lowercase `Host` header value for `base` (with a non-default port), as `Hypurr-Sig` signs it.
 pub fn authority(base: &str) -> Result<String> {
     let u = reqwest::Url::parse(base).context("invalid cloud URL")?;
     let host = u.host_str().ok_or_else(|| anyhow!("cloud URL has no host"))?;
@@ -224,18 +224,18 @@ pub fn authority(base: &str) -> Result<String> {
 }
 
 fn base(hub: &Hub) -> Result<String> {
-    url(&hub.store).ok_or_else(|| anyhow!("The Codync cloud is off on this computer."))
+    url(&hub.store).ok_or_else(|| anyhow!("The Hypurr cloud is off on this computer."))
 }
 
 /// One signed `/v1/host/*` call.
 async fn call(hub: &Hub, base: &str, method: Method, path: &str, body: Option<&Value>) -> Result<Value> {
     let bytes = body.map(serde_json::to_vec).transpose()?.unwrap_or_default();
     let sig = hub.identity.sign_request(method.as_str(), &authority(base)?, path, &bytes);
-    let mut req = crate::http().request(method, format!("{base}{path}")).header("Codync-Sig", sig).timeout(TIMEOUT);
+    let mut req = crate::http().request(method, format!("{base}{path}")).header("Hypurr-Sig", sig).timeout(TIMEOUT);
     if body.is_some() {
         req = req.header("content-type", "application/json").body(bytes);
     }
-    let res = req.send().await.context("the Codync cloud is unreachable")?;
+    let res = req.send().await.context("the Hypurr cloud is unreachable")?;
     let status = res.status();
     let v: Value = res.json().await.unwrap_or(Value::Null);
     if !status.is_success() {
@@ -263,7 +263,7 @@ pub async fn register(hub: &Hub, base: &str) -> Result<()> {
     if v["computerId"].as_str() != Some(hub.identity.computer_id().as_str()) {
         bail!("the cloud registered a different computer id");
     }
-    tracing::info!(computer_id = hub.identity.computer_id(), "registered with the Codync cloud");
+    tracing::info!(computer_id = hub.identity.computer_id(), "registered with the Hypurr cloud");
     update_status(hub, |s| s.registered = true);
     Ok(())
 }
@@ -638,7 +638,7 @@ mod tests {
     use crate::remote::identity::Identity;
 
     fn temp_hub() -> Arc<Hub> {
-        let dir = std::env::temp_dir().join(format!("codync-cloud-{}", uuid::Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("hypurr-cloud-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         let store = Store::open(&dir.join("t.db")).unwrap();
         Hub::new(store, "host".into(), Identity::load_or_create(&dir).unwrap(), "token".into(), 0)
@@ -678,12 +678,12 @@ mod tests {
 
     #[test]
     fn only_safe_cloud_urls() {
-        assert!(valid_url("https://codync-cloud.example.workers.dev/"));
+        assert!(valid_url("https://hypurr-cloud.example.workers.dev/"));
         assert!(valid_url("http://127.0.0.1:8787/"));
         assert!(!valid_url("http://example.com/"));
         assert!(!valid_url("https://example.com/path/"));
         assert!(!valid_url("ftp://example.com/"));
-        assert_eq!(authority("https://Codync.Example.dev").unwrap(), "codync.example.dev");
+        assert_eq!(authority("https://Hypurr.Example.dev").unwrap(), "hypurr.example.dev");
         assert_eq!(authority("http://127.0.0.1:8787").unwrap(), "127.0.0.1:8787");
         assert_eq!(authority("https://x.dev:443").unwrap(), "x.dev", "default port is left out");
     }

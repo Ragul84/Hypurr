@@ -7,14 +7,14 @@ The private values are fixed **test seeds**, not live credentials. Changing thes
 [remote-relay-vectors.py](remote-relay-vectors.py) prints the JSON to stdout and requires Python 3 plus `cryptography`. To compare without overwriting the checked-in fixture, from the repository root:
 
 ```sh
-python3 docs/reference/fixtures/remote-relay-vectors.py > /tmp/codync-relay-vectors.json
-cmp docs/reference/fixtures/remote-relay-vectors.json /tmp/codync-relay-vectors.json
+python3 docs/reference/fixtures/remote-relay-vectors.py > /tmp/hypurr-relay-vectors.json
+cmp docs/reference/fixtures/remote-relay-vectors.json /tmp/hypurr-relay-vectors.json
 ```
 
 Consumers:
 
 - `host/src/remote/crypto.rs` (`include_str!`)
-- `kit/Tests/CodyncKitTests/RelayVectorsTests.swift`
+- `kit/Tests/HypurrKitTests/RelayVectorsTests.swift`
 - `cloud/test/vectors.test.ts` and `cloud/test/relay.test.ts`
 
 When moving or changing a fixture, update those paths and the cloud/kit/host CI path filters. Run the affected vector tests; a Markdown link check alone cannot validate executable imports. [Protocol reference](../remote-relay.md).

@@ -1,4 +1,4 @@
-//! `ThinkingOrb` from the Apple apps (CodyncKit/Design/ThinkingOrbGeometry.swift, a port of
+//! `ThinkingOrb` from the Apple apps (HypurrKit/Design/ThinkingOrbGeometry.swift, a port of
 //! thinking-orbs 0.3.1, MIT, Jakub Antalik): the *working* orbits and the *listening* lattice.
 //! Drawn in the widget's CSS color, so a `warning-text` / `secondary` class tints it.
 

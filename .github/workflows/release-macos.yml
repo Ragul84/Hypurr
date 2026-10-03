@@ -58,7 +58,7 @@ jobs:
       - name: Build
         run: |
           xcodebuild build \
-            -project apps/Codync.xcodeproj \
+            -project apps/Hypurr.xcodeproj \
             -scheme macOS \
             -configuration Release \
             -destination 'generic/platform=macOS' \
@@ -72,18 +72,18 @@ jobs:
 
       - name: Sign app with Developer ID
         run: |
-          APP_PATH=$(find build/derived -name "Codync.app" -path "*/Release/*" | head -1)
+          APP_PATH=$(find build/derived -name "Hypurr.app" -path "*/Release/*" | head -1)
           # Sign-in and the cloud relay read their settings from here.
           test -f "$APP_PATH/Contents/Resources/AccountConfig.plist" || { echo "AccountConfig.plist missing"; exit 1; }
           sign() { codesign --force --options runtime --timestamp --preserve-metadata=entitlements --sign "Developer ID Application" "$1"; }
           # Sparkle's XPC services and updater must share our signing identity.
           # Preserve the framework helpers' sandbox entitlements while resigning.
           find "$APP_PATH" -type f -name Autoupdate -print0 | while IFS= read -r -d '' f; do sign "$f"; done
-          sign "$APP_PATH/Contents/MacOS/codync-host"
+          sign "$APP_PATH/Contents/MacOS/hypurr-host"
           find "$APP_PATH" -depth \( -name '*.xpc' -o -name '*.app' -o -name '*.framework' \) -print0 |
             while IFS= read -r -d '' f; do sign "$f"; done
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
-          cp -R "$APP_PATH" "$RUNNER_TEMP/Codync.app"
+          cp -R "$APP_PATH" "$RUNNER_TEMP/Hypurr.app"
 
       - name: Notarize and staple
         env:
@@ -92,30 +92,30 @@ jobs:
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
           ditto -c -k --keepParent \
-            "$RUNNER_TEMP/Codync.app" \
-            "$RUNNER_TEMP/codync-submit.zip"
+            "$RUNNER_TEMP/Hypurr.app" \
+            "$RUNNER_TEMP/hypurr-submit.zip"
 
-          xcrun notarytool submit "$RUNNER_TEMP/codync-submit.zip" \
+          xcrun notarytool submit "$RUNNER_TEMP/hypurr-submit.zip" \
             --apple-id "$APPLE_ID" \
             --team-id "$APPLE_TEAM_ID" \
             --password "$APPLE_APP_PASSWORD" \
             --wait
 
-          xcrun stapler staple "$RUNNER_TEMP/Codync.app"
+          xcrun stapler staple "$RUNNER_TEMP/Hypurr.app"
 
       - name: Create DMG
         run: |
           DMG_DIR=$RUNNER_TEMP/dmg_staging
           mkdir -p "$DMG_DIR"
-          cp -R "$RUNNER_TEMP/Codync.app" "$DMG_DIR/"
+          cp -R "$RUNNER_TEMP/Hypurr.app" "$DMG_DIR/"
           brew install create-dmg
           swift packaging/dmg/background.swift "$RUNNER_TEMP/dmg-background.tiff"
-          create-dmg --volname Codync --background "$RUNNER_TEMP/dmg-background.tiff" \
+          create-dmg --volname Hypurr --background "$RUNNER_TEMP/dmg-background.tiff" \
             --window-size 660 400 --icon-size 128 --text-size 13 \
-            --icon Codync.app 170 200 --hide-extension Codync.app \
+            --icon Hypurr.app 170 200 --hide-extension Hypurr.app \
             --app-drop-link 490 200 --no-internet-enable \
-            build/codync-macos.dmg "$DMG_DIR"
-          spctl --assess --type execute -v "$RUNNER_TEMP/Codync.app"
+            build/hypurr-macos.dmg "$DMG_DIR"
+          spctl --assess --type execute -v "$RUNNER_TEMP/Hypurr.app"
 
       - name: Generate signed Sparkle appcast
         env:
@@ -125,51 +125,51 @@ jobs:
           SPARKLE_BIN=build/derived/SourcePackages/artifacts/sparkle/Sparkle/bin
           test -x "$SPARKLE_BIN/generate_appcast"
           mkdir -p build/updates
-          cp build/codync-macos.dmg build/updates/
+          cp build/hypurr-macos.dmg build/updates/
           printf '%s' "$SPARKLE_PRIVATE_KEY" | "$SPARKLE_BIN/generate_appcast" \
             --ed-key-file - --maximum-deltas 0 \
-            --download-url-prefix "https://github.com/leepokai/Codync/releases/download/v${VERSION}/" \
-            --link https://www.codync.dev/ \
+            --download-url-prefix "https://github.com/Ragul84/Hypurr/releases/download/v${VERSION}/" \
+            --link https://www.hypurr.dev/ \
             -o build/appcast.xml build/updates
           python3 -m venv "$RUNNER_TEMP/update-verification"
           "$RUNNER_TEMP/update-verification/bin/pip" install 'cryptography>=44,<47'
           "$RUNNER_TEMP/update-verification/bin/python" packaging/updates/verify-appcast.py \
-            build/appcast.xml "$RUNNER_TEMP/Codync.app" build/codync-macos.dmg
+            build/appcast.xml "$RUNNER_TEMP/Hypurr.app" build/hypurr-macos.dmg
 
       - name: Keep the dry run's DMG
         if: "!startsWith(github.ref, 'refs/tags/')"
         uses: actions/upload-artifact@v4
         with:
-          name: codync-macos
+          name: hypurr-macos
           path: |
-            build/codync-macos.dmg
+            build/hypurr-macos.dmg
             build/appcast.xml
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           # The host workflow may have created this release already (same tag).
-          (cd build && shasum -a 256 codync-macos.dmg > codync-macos.dmg.sha256)
+          (cd build && shasum -a 256 hypurr-macos.dmg > hypurr-macos.dmg.sha256)
           gh release create ${{ github.ref_name }} \
-            build/codync-macos.dmg build/codync-macos.dmg.sha256 build/appcast.xml \
-            --title "Codync ${{ github.ref_name }}" \
+            build/hypurr-macos.dmg build/hypurr-macos.dmg.sha256 build/appcast.xml \
+            --title "Hypurr ${{ github.ref_name }}" \
             --generate-notes \
-          || gh release upload ${{ github.ref_name }} build/codync-macos.dmg build/codync-macos.dmg.sha256 build/appcast.xml --clobber
+          || gh release upload ${{ github.ref_name }} build/hypurr-macos.dmg build/hypurr-macos.dmg.sha256 build/appcast.xml --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update Homebrew tap
         if: startsWith(github.ref, 'refs/tags/')
         run: |
-          SHA=$(shasum -a 256 build/codync-macos.dmg | awk '{print $1}')
-          git clone https://x-access-token:${{ secrets.TAP_TOKEN }}@github.com/leepokai/homebrew-codync.git tap
+          SHA=$(shasum -a 256 build/hypurr-macos.dmg | awk '{print $1}')
+          git clone https://x-access-token:${{ secrets.TAP_TOKEN }}@github.com/Ragul84/homebrew-hypurr.git tap
           mkdir -p tap/Casks
           sed -e "s/^  version .*/  version \"${{ env.VERSION }}\"/" -e "s/REPLACE_WITH_SHA256/$SHA/" \
-              packaging/homebrew/codync.rb > tap/Casks/codync.rb
+              packaging/homebrew/hypurr.rb > tap/Casks/hypurr.rb
           cp packaging/homebrew/README.md tap/
           cd tap
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "Update Codync to ${{ env.VERSION }}" || exit 0
+          git commit -m "Update Hypurr to ${{ env.VERSION }}" || exit 0
           git push

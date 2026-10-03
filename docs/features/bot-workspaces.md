@@ -1,6 +1,6 @@
 # Bot workspaces
 
-New agent bots get a personal, persistent workspace automatically. Creating a bot does not require choosing a project. An omitted or empty `cwd` in `createBot` allocates `<CODYNC_HOME>/bots/<bot-id>/workspace` (normally `~/.codync/bots/<bot-id>/workspace`). Groups do not allocate folders.
+New agent bots get a personal, persistent workspace automatically. Creating a bot does not require choosing a project. An omitted or empty `cwd` in `createBot` allocates `<HYPURR_HOME>/bots/<bot-id>/workspace` (normally `~/.hypurr/bots/<bot-id>/workspace`). Groups do not allocate folders.
 
 The host persists the resolved absolute directory in `cwd` and exposes `managedWorkspace` in bot responses. Empty `cwd` in `updateBot` selects the same bot's personal workspace again. Existing explicit project directories remain unchanged, must already exist, and can still be selected in settings. Templates for personal bots send an empty cwd so a new bot gets its own directory.
 

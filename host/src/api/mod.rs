@@ -173,12 +173,12 @@ async fn oauth_callback(
         market::oauth::finish(&hub.store, q.state.as_deref().unwrap_or_default(), q.code.as_deref(), error.as_deref())
             .await;
     let (title, detail) = match &result {
-        Ok(c) => (format!("{} is connected", c.name), "You can close this tab and go back to Codync.".to_owned()),
+        Ok(c) => (format!("{} is connected", c.name), "You can close this tab and go back to Hypurr.".to_owned()),
         Err(e) => ("Sign-in didn't finish".to_owned(), format!("{e:#}")),
     };
     let escape = |s: &str| s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
     axum::response::Html(format!(
-        "<!doctype html><meta charset=utf-8><meta name=viewport content=\"width=device-width\"><title>Codync</title>\
+        "<!doctype html><meta charset=utf-8><meta name=viewport content=\"width=device-width\"><title>Hypurr</title>\
          <body style=\"font:16px system-ui;margin:20vh auto;max-width:28em;padding:0 16px;text-align:center\">\
          <h2>{}</h2><p>{}</p></body>",
         escape(&title),
@@ -1021,7 +1021,7 @@ async fn pairing(hub: &Arc<Hub>) -> Result<Value> {
     let urls = tokio::task::spawn_blocking(move || crate::service::addresses(port)).await?;
     let cloud = crate::remote::cloud::url(&hub.store);
     if urls.is_empty() && cloud.is_none() {
-        bail!("No network address a phone could reach, and the Codync cloud is off.");
+        bail!("No network address a phone could reach, and the Hypurr cloud is off.");
     }
     let issued = hub.pairing.locked().issue();
     hub.auth_changed();
@@ -1110,7 +1110,7 @@ mod tests {
 
     #[tokio::test]
     async fn new_connectors_turn_on_for_every_bot() {
-        let dir = std::env::temp_dir().join(format!("codync-connectors-{}", uuid::Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("hypurr-connectors-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).expect("temp dir");
         let store = crate::store::Store::open(std::path::Path::new(":memory:")).expect("memory store");
         for (id, on) in [("a", json!([])), ("b", json!(["old"]))] {

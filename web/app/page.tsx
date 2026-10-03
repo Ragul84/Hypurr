@@ -18,7 +18,7 @@ export default function Home() {
         <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
           <Link href="/" className="flex items-center gap-2.5 font-semibold text-neutral-50">
             <Image src="/icon.png" alt="" width={28} height={28} className="rounded-[7px]" />
-            Codync
+            Hypurr
           </Link>
           <div className="flex items-center gap-2">
             <a href="#install" className="hidden rounded-full px-4 py-2 text-sm text-neutral-400 transition hover:text-neutral-100 sm:block">
@@ -26,7 +26,7 @@ export default function Home() {
             </a>
             <a
               href={GITHUB}
-              aria-label="Codync on GitHub"
+              aria-label="Hypurr on GitHub"
               title="GitHub"
               className="rounded-full p-2 text-neutral-400 transition hover:text-neutral-100"
             >

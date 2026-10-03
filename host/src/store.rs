@@ -956,7 +956,7 @@ mod tests {
     use serde_json::json;
 
     fn temp_store() -> Store {
-        let dir = std::env::temp_dir().join(format!("codync-test-{}", uuid::Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("hypurr-test-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         Store::open(&dir.join("t.db")).unwrap()
     }
@@ -965,7 +965,7 @@ mod tests {
     fn history_search_matches_every_term_in_chat_messages() {
         let s = temp_store();
         let main = Lane::main("b1");
-        s.insert_entry(&main, EntryKind::User, 1, &json!({"text": "我們用 Swift 6 寫 Codync"})).unwrap();
+        s.insert_entry(&main, EntryKind::User, 1, &json!({"text": "我們用 Swift 6 寫 Hypurr"})).unwrap();
         s.insert_entry(&main, EntryKind::Agent, 1, &json!({"text": "swift narration", "final": false})).unwrap();
         s.insert_entry(&main, EntryKind::Agent, 1, &json!({"text": "Swift 6 strict mode is on", "final": true}))
             .unwrap();
@@ -978,8 +978,8 @@ mod tests {
                 .map(|e| e.data["text"].as_str().unwrap().to_owned())
                 .collect()
         };
-        assert_eq!(texts(&["SWIFT", "6"]), ["Swift 6 strict mode is on", "我們用 Swift 6 寫 Codync"]);
-        assert_eq!(texts(&["codync", "寫"]), ["我們用 Swift 6 寫 Codync"]);
+        assert_eq!(texts(&["SWIFT", "6"]), ["Swift 6 strict mode is on", "我們用 Swift 6 寫 Hypurr"]);
+        assert_eq!(texts(&["hypurr", "寫"]), ["我們用 Swift 6 寫 Hypurr"]);
         assert_eq!(texts(&["narration"]).len(), 0);
     }
 
@@ -1107,7 +1107,7 @@ mod tests {
 
     #[test]
     fn migrations_replace_the_old_ticket_table_and_add_threads() {
-        let dir = std::env::temp_dir().join(format!("codync-test-{}", uuid::Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("hypurr-test-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         let db = dir.join("t.db");
         {

@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
     <key>SUFeedURL</key>
-    <string>https://github.com/leepokai/Codync/releases/latest/download/appcast.xml</string>
+    <string>https://github.com/Ragul84/Hypurr/releases/latest/download/appcast.xml</string>
     <key>SUPublicEDKey</key>
-    <string>/WvuKYw0ghkj3ExQbCejTquAcozuP1Llo2k8TIvx0Mc=</string>
+    <string>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</string>
     <key>SUEnableAutomaticChecks</key>
     <true/>
     <key>SUAutomaticallyUpdate</key>

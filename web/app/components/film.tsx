@@ -9,7 +9,7 @@ export default function Film() {
         <Reveal>
           <iframe
             src={`https://www.youtube-nocookie.com/embed/${FILM}?rel=0`}
-            title="Codync launch film"
+            title="Hypurr launch film"
             loading="lazy"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowFullScreen

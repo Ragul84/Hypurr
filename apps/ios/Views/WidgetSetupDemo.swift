@@ -1,8 +1,8 @@
-import CodyncKit
-import CodyncUI
+import HypurrKit
+import HypurrUI
 import SwiftUI
 
-/// "Add a widget", acted out on a drawn iPhone: hold the Home Screen, Edit, Add Widget, find Codync,
+/// "Add a widget", acted out on a drawn iPhone: hold the Home Screen, Edit, Add Widget, find Hypurr,
 /// add it, Done. Every frame is a pure function of one clock, so it loops, pauses and scrubs.
 struct WidgetSetupDemo: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -23,7 +23,7 @@ struct WidgetSetupDemo: View {
                 VStack(spacing: 14) {
                     DemoPhone(t: t)
                         .accessibilityElement(children: .ignore)
-                        .accessibilityLabel("How to add the Codync widget")
+                        .accessibilityLabel("How to add the Hypurr widget")
                         .accessibilityValue(Self.step(at: t).text)
                     Text(Self.step(at: t).text)
                         .font(.footnote.weight(.medium))
@@ -117,7 +117,7 @@ struct WidgetSetupDemo: View {
     static let steps: [Step] = [
         Step(index: 0, start: 0, text: "Touch and hold an empty spot on the Home Screen"),
         Step(index: 1, start: 1.8, text: "Tap Edit, then Add Widget"),
-        Step(index: 2, start: 3.0, text: "Find Codync in the list"),
+        Step(index: 2, start: 3.0, text: "Find Hypurr in the list"),
         Step(index: 3, start: 4.5, text: "Tap Add Widget"),
         Step(index: 4, start: 6.0, text: "Tap Done"),
     ]
@@ -339,7 +339,7 @@ private struct DemoPhone: View {
             .padding(.bottom, 10)
             listRow("Batteries", Image(systemName: "battery.100percent"), tint: .green)
             listRow("Calendar", Image(systemName: "calendar"), tint: .red)
-            listRow("Codync", nil, tint: .clear, highlighted: pressed(near: 4.3))
+            listRow("Hypurr", nil, tint: .clear, highlighted: pressed(near: 4.3))
             listRow("Fitness", Image(systemName: "figure.run"), tint: .orange)
             listRow("Weather", Image(systemName: "cloud.sun.fill"), tint: .blue)
         }
@@ -370,7 +370,7 @@ private struct DemoPhone: View {
             Capsule().fill(.white.opacity(0.3)).frame(width: 28, height: 3).padding(.top, 6)
             HStack(spacing: 6) {
                 CharacterAvatar(shape: "hex", color: "gray", size: 18)
-                Text("Codync").font(.system(size: 11, weight: .semibold)).foregroundStyle(.white)
+                Text("Hypurr").font(.system(size: 11, weight: .semibold)).foregroundStyle(.white)
             }
             Text("See who needs you and who's still working.")
                 .font(.system(size: 8)).foregroundStyle(.white.opacity(0.6))

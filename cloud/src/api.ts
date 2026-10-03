@@ -65,7 +65,7 @@ export interface Ctx {
   env: Env;
   exec: ExecutionContext;
   url: URL;
-  /** Raw body bytes: Codync-Sig hashes exactly these. */
+  /** Raw body bytes: Hypurr-Sig hashes exactly these. */
   raw: Uint8Array;
   now: number;
 }
@@ -129,7 +129,7 @@ async function user(c: Ctx): Promise<User> {
   return { userId: clerk.userId, email: row.email, createdAt: row.created_at };
 }
 
-/** Codync-Sig with D1 replay protection (§5). */
+/** Hypurr-Sig with D1 replay protection (§5). */
 async function signed(c: Ctx): Promise<SignedRequest> {
   const s = await verifySig(c.req, c.raw, c.now);
   if (!s) throw new ApiError("badSignature");
@@ -247,7 +247,7 @@ async function notify(env: Env, computerId: string, blocked: Blocked[] = []): Pr
   try {
     const res = await env.RELAY.get(env.RELAY.idFromName(computerId)).fetch(`https://do${path}`, {
       method: "POST",
-      headers: { "X-Codync-Internal": "1", "Content-Type": "application/json" },
+      headers: { "X-Hypurr-Internal": "1", "Content-Type": "application/json" },
       body: JSON.stringify(blocked.length ? { devices: blocked } : {}),
     });
     if (!res.ok) console.error("relay notify failed", { computerId, path, status: res.status });
@@ -271,7 +271,7 @@ async function unclaim(env: Env, id: string, actor: string, now: number): Promis
 }
 
 export const claimCanonical = (claimId: string, nonce: string, userId: string, computerId: string, boxKey: string) =>
-  ["codync/claim/v1", claimId, nonce, userId, computerId, boxKey].join("\n");
+  ["hypurr/claim/v1", claimId, nonce, userId, computerId, boxKey].join("\n");
 
 // ---- public ----
 
@@ -283,7 +283,7 @@ export const health = async () => ({ ok: true, version: VERSION });
  * is useless without the PKCE verifier that only the host holds.
  */
 export const oauthCallback = async (c: Ctx) =>
-  new Response(null, { status: 302, headers: { Location: `codync://oauth${c.url.search}`, "Cache-Control": "no-store" } });
+  new Response(null, { status: 302, headers: { Location: `hypurr://oauth${c.url.search}`, "Cache-Control": "no-store" } });
 
 // ---- Clerk (users) ----
 
@@ -448,7 +448,7 @@ export async function completeClaim(c: Ctx, [claimId]: string[]) {
 export async function listComputers(c: Ctx) {
   const u = await user(c);
   let deviceId: string | null = null;
-  if (c.req.headers.has("Codync-Sig")) {
+  if (c.req.headers.has("Hypurr-Sig")) {
     const s = await signed(c);
     const d = await c.env.DB.prepare(
       "UPDATE devices SET last_used_at = ? WHERE owner_user_id = ? AND sign_pub = ? AND revoked_at IS NULL RETURNING id",
@@ -860,13 +860,13 @@ function checkUpgrade(c: Ctx): void {
 /** Forwards the upgrade to the computer's DO in a request the Worker builds itself; the client's URL never reaches it. */
 async function forward(c: Ctx, computerId: string, role: "host" | "device", s: SignedRequest, pair: string): Promise<Response> {
   const headers = new Headers({
-    "X-Codync-Internal": "1",
-    "X-Codync-Role": role,
-    "X-Codync-Key": s.kid,
-    "X-Codync-Nonce": s.nonce,
-    "X-Codync-Ts": String(s.ts),
-    "X-Codync-Pair": pair,
-    "X-Codync-Computer": computerId,
+    "X-Hypurr-Internal": "1",
+    "X-Hypurr-Role": role,
+    "X-Hypurr-Key": s.kid,
+    "X-Hypurr-Nonce": s.nonce,
+    "X-Hypurr-Ts": String(s.ts),
+    "X-Hypurr-Pair": pair,
+    "X-Hypurr-Computer": computerId,
   });
   for (const [name, value] of c.req.headers) {
     if (name === "upgrade" || name.startsWith("sec-websocket-")) headers.set(name, value);
@@ -918,8 +918,8 @@ export async function routineHook(c: Ctx, [computerId, hookId]: string[]): Promi
   const row = await c.env.DB.prepare("SELECT status FROM computers WHERE id = ?").bind(computerId).first<{ status: string }>();
   if (!row || row.status !== "active") throw new ApiError("notFound");
   const headers = new Headers(c.req.headers);
-  headers.set("X-Codync-Internal", "1");
-  headers.set("X-Codync-Hook", hookId!);
+  headers.set("X-Hypurr-Internal", "1");
+  headers.set("X-Hypurr-Hook", hookId!);
   return c.env.RELAY.get(c.env.RELAY.idFromName(computerId!)).fetch(
     new Request("https://do/internal/hook", { method: "POST", headers, body: c.raw }),
   );

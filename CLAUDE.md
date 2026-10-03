@@ -1,4 +1,4 @@
-# Codync
+# Hypurr
 
 Bot-based remote for coding agents: persistent named bots on your computer, messaged from the iPhone (UI patterns from Grok Bot).
 
@@ -14,37 +14,37 @@ Bot-based remote for coding agents: persistent named bots on your computer, mess
 
 ## Architecture
 
-- Clients: iOS app, native Mac window (menu bar app), native Linux app (`apps/linux/`, GTK 4 + libadwaita in Rust), terminal UI (`codync-host tui`, `host/src/tui/`, ratatui; layout and state vocabulary modeled on herdr). All talk to the host API; no web UI.
-- Shared Swift (`kit/`): `CodyncKit` (models, client, theme, avatars) + `CodyncUI` (`BotStore` + chat screens) used by iOS and macOS. Platform specifics go through `BotStore` hooks or `Platform.swift`.
+- Clients: iOS app, native Mac window (menu bar app), native Linux app (`apps/linux/`, GTK 4 + libadwaita in Rust), terminal UI (`hypurr-host tui`, `host/src/tui/`, ratatui; layout and state vocabulary modeled on herdr). All talk to the host API; no web UI.
+- Shared Swift (`kit/`): `HypurrKit` (models, client, theme, avatars) + `HypurrUI` (`BotStore` + chat screens) used by iOS and macOS. Platform specifics go through `BotStore` hooks or `Platform.swift`.
 - UI principle: buttons an icon can express are icon-only (with tooltip / accessibility label); text only where an icon would be ambiguous (approval choices).
-- UI controls default to the shared custom components. Explicit exception: iOS BotListView and ThreadView use native navigation/toolbar items and automatic back navigation for system Liquid Glass, as specified in `docs/design/ui-conventions.md`. **iOS menus are always the system ones**: tap menus through `DropdownMenu`/`ChoicePicker` (native `Menu`), long-press through `.contextActions` (native `contextMenu`). Never hand-build a dropdown on iOS and never call `.codyncMenu` there (it is macOS-only and a compile error on iOS): the custom overlay lands in the wrong place (sheets, scroll views, the composer's + menu). The macOS menu bar also uses native `MenuBarExtra(.menu)`, menus, pickers and toggles. Keep system authentication and widget containers native. Outside these exceptions, avoid: no `Menu`/`Picker`, `.switch` toggles, `Form`/`List` styling, `confirmationDialog`/`alert`, `ProgressView`, `.sheet`/`.popover`/`.fullScreenCover`, `.toolbar`/navigation bars, `TabView`, `ContentUnavailableView`. Use `kit/Sources/CodyncUI/Controls.swift` + `Chrome.swift` (`.codyncSheet`, `ModalHeader`, `ScreenHeader`, `TabBar`, `.codyncMenu`, `.codyncDialog`, `ToggleStyle.codync`). Every tap that shows/hides something animates (`Motion`). Anything with a background fill gets no border line.
-- `host/` — **codync-host** (Rust, macOS + Linux). Detects installed harnesses (`agent/backends.rs`: login-shell PATH + known dirs) and the ACP registry (`agent/registry.rs`, cached in `~/.codync/registry.json`, binaries under `~/.codync/agents`). Drives agents over **ACP** (JSON-RPC on stdio, hand-rolled in `agent/acp.rs`, updates kept as `serde_json::Value` so new adapter variants never break parsing). One actor per bot (`agent/bot.rs`) owns the agent process + session and maps `session/update` onto transcript entries.
+- UI controls default to the shared custom components. Explicit exception: iOS BotListView and ThreadView use native navigation/toolbar items and automatic back navigation for system Liquid Glass, as specified in `docs/design/ui-conventions.md`. **iOS menus are always the system ones**: tap menus through `DropdownMenu`/`ChoicePicker` (native `Menu`), long-press through `.contextActions` (native `contextMenu`). Never hand-build a dropdown on iOS and never call `.hypurrMenu` there (it is macOS-only and a compile error on iOS): the custom overlay lands in the wrong place (sheets, scroll views, the composer's + menu). The macOS menu bar also uses native `MenuBarExtra(.menu)`, menus, pickers and toggles. Keep system authentication and widget containers native. Outside these exceptions, avoid: no `Menu`/`Picker`, `.switch` toggles, `Form`/`List` styling, `confirmationDialog`/`alert`, `ProgressView`, `.sheet`/`.popover`/`.fullScreenCover`, `.toolbar`/navigation bars, `TabView`, `ContentUnavailableView`. Use `kit/Sources/HypurrUI/Controls.swift` + `Chrome.swift` (`.hypurrSheet`, `ModalHeader`, `ScreenHeader`, `TabBar`, `.hypurrMenu`, `.hypurrDialog`, `ToggleStyle.hypurr`). Every tap that shows/hides something animates (`Motion`). Anything with a background fill gets no border line.
+- `host/` — **hypurr-host** (Rust, macOS + Linux). Detects installed harnesses (`agent/backends.rs`: login-shell PATH + known dirs) and the ACP registry (`agent/registry.rs`, cached in `~/.hypurr/registry.json`, binaries under `~/.hypurr/agents`). Drives agents over **ACP** (JSON-RPC on stdio, hand-rolled in `agent/acp.rs`, updates kept as `serde_json::Value` so new adapter variants never break parsing). One actor per bot (`agent/bot.rs`) owns the agent process + session and maps `session/update` onto transcript entries.
 - **Chat ≠ session**: a bot is one endless transcript (SQLite `entries`, ordered by `seq`); the ACP session underneath is resumed with `session/load` or replaced by *New session*.
 - **Group chats and threads** are host features every client drives through the same methods (`send` with `threadId`, `thread`, `createBot {kind: group}`); clients never route, parse mentions or count replies themselves. A group is a roster row whose members answer in their own sessions (Grok Bot's room turns); a thread on a bot's message is a forked session: [docs/features/groups-and-threads.md](docs/features/groups-and-threads.md).
 - Bot collaboration: built-in `team` MCP (`chat/team.rs`) lists visible bots and asks one for a reply through its actor queue. Requests are separate turns, cycle-checked and cancellable; native subagents stay with the harness. See [docs/features/bot-collaboration.md](docs/features/bot-collaboration.md).
 - **Context & memory** (Grok Bot's design): frozen instruction snapshot per session + compaction epoch (Claude gets it as a system prompt), profile edits as update blocks, per-bot memory files written by a keeper agent, busy-time messages folded into one turn, interrupted turns resumed: [docs/features/context-and-memory.md](docs/features/context-and-memory.md).
 - **Chat shows only**: user messages, the *final* agent message of each turn (`data.final`), permission cards, notices. Narration, thoughts, tool calls, plans are trace entries (Full conversation sheet).
 - **Sync**: every mutation stamps a global `rev`. Clients call `GET /events?since=<rev>` (catch-up in rev order, then live). Emission happens under `Hub::emit_lock` so events leave in rev order. Clients upsert by id; never skip undecodable events (the iOS app rewinds to rev 0).
-- API: `POST /api/<method>` + SSE with the bearer token (`~/.codync/token`) is **loopback only** (Mac app, SSH tunnel, local helpers). Phones and other remote clients use the E2E channel (`/channel` direct, or the Cloudflare relay). Default port **19222**.
+- API: `POST /api/<method>` + SSE with the bearer token (`~/.hypurr/token`) is **loopback only** (Mac app, SSH tunnel, local helpers). Phones and other remote clients use the E2E channel (`/channel` direct, or the Cloudflare relay). Default port **19222**.
 - Remote access (Cloudflare relay primary, direct LAN/Tailscale alternative, accounts, SSH, public routine webhooks queued in the relay §7.8): [docs/reference/remote-relay.md](docs/reference/remote-relay.md).
-- Remote screen (`host/src/screen.rs` is the reference): phones view/control the computer over WebRTC (hardware H.264, non-trickle SDP relayed by `screenOffer`, input on data channels `input` / `input-fast`); bots get the built-in `computer` MCP server (`codync-host mcp computer`, `host/src/mcp.rs`) when their `computer` flag is on. Capture/input live in a helper on `~/.codync/screen.sock`: `apps/screen-macos` (macOS, launchd agent via `SMAppService`, owns the TCC grants) or `apps/screen-linux` (`codync-screen`: portals + GStreamer, started by the host). Off by default; `setScreenEnabled` is accepted only from loopback. An interactive phone takes over (bots may only look).
+- Remote screen (`host/src/screen.rs` is the reference): phones view/control the computer over WebRTC (hardware H.264, non-trickle SDP relayed by `screenOffer`, input on data channels `input` / `input-fast`); bots get the built-in `computer` MCP server (`hypurr-host mcp computer`, `host/src/mcp.rs`) when their `computer` flag is on. Capture/input live in a helper on `~/.hypurr/screen.sock`: `apps/screen-macos` (macOS, launchd agent via `SMAppService`, owns the TCC grants) or `apps/screen-linux` (`hypurr-screen`: portals + GStreamer, started by the host). Off by default; `setScreenEnabled` is accepted only from loopback. An interactive phone takes over (bots may only look).
 - Multiple computers per account are future work, not a current priority: the product targets one computer. The multi-computer structure (`AccountStore`, `BotReference`) stays because relay/accounts/SSH build on it; don't extend or polish multi-computer features unless asked.
-- Environments: **dev** (`dev-api.codync.dev`, Clerk development instance, Debug builds) and **main** (`api.codync.dev`, Clerk production, Release builds); `apps/shared/Config/<env>.plist` becomes `AccountConfig.plist`. Details: [spec §14.0](docs/reference/remote-relay.md).
+- Environments: **dev** (`dev-api.hypurr.dev`, Clerk development instance, Debug builds) and **main** (`api.hypurr.dev`, Clerk production, Release builds); `apps/shared/Config/<env>.plist` becomes `AccountConfig.plist`. Details: [spec §14.0](docs/reference/remote-relay.md).
 - Push: iOS registers its APNs token with `relay/` → gets an AES-GCM ticket → gives it (plus its X25519 push key) to the host; the host seals title/body to that key and a Notification Service Extension opens it, so `relay/` sees only generic text. Alert kinds: *needs you*, *done*, and *failed*, suppressed while the iOS app is connected. Delivery and lifecycle: [notification design](docs/design/push-and-live-activity.md).
 - Voice call (iPhone): on-device speech in, bot's final replies read aloud; the host sees plain messages. Grok-style call bar; bring-your-own-key realtime design: [docs/features/voice-call.md](docs/features/voice-call.md).
-- Usage: local only — `claude -p /usage --no-session-persistence`, the Claude status line (`codync-host statusline`, wrapping any existing one), Claude ACP `usage_update` rate-limit meta, Codex rollout files. Never call provider APIs with agent credentials.
-- macOS app is thin: embeds `codync-host` in `Contents/MacOS` (Xcode post-build script runs cargo), installs it as a launchd agent via `codync-host install`; menu bar shows status/pairing/usage and opens the native chat window (NavigationSplitView over `CodyncUI`). Not sandboxed, not Mac App Store (the host must spawn CLIs).
+- Usage: local only — `claude -p /usage --no-session-persistence`, the Claude status line (`hypurr-host statusline`, wrapping any existing one), Claude ACP `usage_update` rate-limit meta, Codex rollout files. Never call provider APIs with agent credentials.
+- macOS app is thin: embeds `hypurr-host` in `Contents/MacOS` (Xcode post-build script runs cargo), installs it as a launchd agent via `hypurr-host install`; menu bar shows status/pairing/usage and opens the native chat window (NavigationSplitView over `HypurrUI`). Not sandboxed, not Mac App Store (the host must spawn CLIs).
 
 ## Cross-platform UI changes
 
-- Any UI change in any client must include the corresponding updates to all other native clients and the TUI in the same change: shared SwiftUI (`kit/Sources/CodyncUI/`), iOS (`apps/ios/`), macOS (`apps/macos/`), Linux GTK (`apps/linux/src/`), and terminal UI (`host/src/tui/`). This applies in every direction; Linux and TUI changes must also be reflected in SwiftUI.
+- Any UI change in any client must include the corresponding updates to all other native clients and the TUI in the same change: shared SwiftUI (`kit/Sources/HypurrUI/`), iOS (`apps/ios/`), macOS (`apps/macos/`), Linux GTK (`apps/linux/src/`), and terminal UI (`host/src/tui/`). This applies in every direction; Linux and TUI changes must also be reflected in SwiftUI.
 - Keep shared features, actions, terminology, displayed information, and loading, empty, error, and permission states consistent. Adapt layout, controls, and input to each platform, including terminal keyboard interaction, while preserving the same user-facing behavior.
 - Inspect every client's corresponding implementation before finishing a UI task. Implement applicable changes together; do not silently defer another client. For a platform-only change or an unsupported capability, document which clients are unaffected and the concrete reason in the change summary.
 - Validate each affected client with its relevant build/tests and UI checks. Report any checks that could not run and why.
 
-## Codync 1.x does not exist for us
+## Hypurr 1.x does not exist for us
 
-- Ignore everything from Codync 1.x (the Claude Code hooks + CloudKit session monitor): no migration, no compatibility shims, no cleanup of its files or hooks, no keeping old workers or App Store copy alive for it. Don't mention 1.x in code, docs or release notes.
+- Ignore everything from Hypurr 1.x (the Claude Code hooks + CloudKit session monitor): no migration, no compatibility shims, no cleanup of its files or hooks, no keeping old workers or App Store copy alive for it. Don't mention 1.x in code, docs or release notes.
 - Build only the current design; don't reintroduce hooks or CloudKit.
 - Don't carry legacy along. Old names, settings, schemes, files or code paths left from earlier designs get renamed or deleted outright when you meet them, not kept "for compatibility". Put full effort into the new design.
 
@@ -54,7 +54,7 @@ Always stop the old Mac app, host and iPhone process before running a new build 
 
 ## Project generation
 
-- `apps/project.yml` + `xcodegen generate --spec apps/project.yml` produce `apps/Codync.xcodeproj`. Edit `project.yml`, not the pbxproj.
+- `apps/project.yml` + `xcodegen generate --spec apps/project.yml` produce `apps/Hypurr.xcodeproj`. Edit `project.yml`, not the pbxproj.
 
 ## App Store Upload
 
@@ -73,11 +73,11 @@ Always stop the old Mac app, host and iPhone process before running a new build 
 
 - `macOS` (`apps/macos/`) — menu bar app + embedded host
 - `iOS` (`apps/ios/`) — iOS app
-- `Screen` (`apps/screen-macos/`) — Codync Screen: capture, input and WebRTC for Remote screen, embedded in the Mac app (`Contents/Library/LoginItems`)
-- `apps/screen-linux/` — `codync-screen` (Rust, GStreamer + xdg portals), the Linux Remote screen helper; build/test in the same container as `apps/linux`
-- `Widgets` (`apps/ios/Widgets/`) — usage widget + bot Live Activity (bundle id `com.pokai.Codync.ios.LiveActivity`)
-- `CodyncKit` (`kit/`) — shared Swift package: `CodyncKit` + `CodyncUI` libraries
-- `apps/linux/` — `codync` GTK app (build/test in a container with libgtk-4-dev + libadwaita-1-dev + libvte-2.91-gtk4-dev)
+- `Screen` (`apps/screen-macos/`) — Hypurr Screen: capture, input and WebRTC for Remote screen, embedded in the Mac app (`Contents/Library/LoginItems`)
+- `apps/screen-linux/` — `hypurr-screen` (Rust, GStreamer + xdg portals), the Linux Remote screen helper; build/test in the same container as `apps/linux`
+- `Widgets` (`apps/ios/Widgets/`) — usage widget + bot Live Activity (bundle id `com.ragul84.Hypurr.ios.LiveActivity`)
+- `HypurrKit` (`kit/`) — shared Swift package: `HypurrKit` + `HypurrUI` libraries
+- `apps/linux/` — `hypurr` GTK app (build/test in a container with libgtk-4-dev + libadwaita-1-dev + libvte-2.91-gtk4-dev)
 
 ## Layout & naming
 

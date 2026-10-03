@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{fmt::Write as _, io::Read, path::Path, time::Duration};
 
-pub const RELEASES: &str = "https://github.com/leepokai/Codync/releases";
+pub const RELEASES: &str = "https://github.com/Ragul84/Hypurr/releases";
 pub const MAX_ARCHIVE: usize = 128 * 1024 * 1024;
 const MAX_UNPACKED: u64 = 256 * 1024 * 1024;
 const PUBLIC_KEY: &str = include_str!("../../../packaging/updates/host-public-key.txt");
@@ -52,7 +52,7 @@ pub fn verify_manifest(bytes: &[u8], signature: &str, public_key: &str, platform
     let version = semver::Version::parse(&release.version).context("invalid release version")?;
     ensure!(version.pre.is_empty() && version.build.is_empty(), "only stable host releases are supported");
     ensure!(release.platform == platform, "release targets another platform");
-    let expected = format!("{RELEASES}/download/v{version}/codync-host-{platform}.tar.gz");
+    let expected = format!("{RELEASES}/download/v{version}/hypurr-host-{platform}.tar.gz");
     ensure!(release.url == expected, "release download URL does not match its version and platform");
     ensure!(release.size > 0 && release.size <= MAX_ARCHIVE as u64, "invalid release archive size");
     ensure!(
@@ -65,7 +65,7 @@ pub fn verify_manifest(bytes: &[u8], signature: &str, public_key: &str, platform
 pub async fn download(url: &str, limit: usize) -> Result<Vec<u8>> {
     let mut response = crate::http()
         .get(url)
-        .header(reqwest::header::USER_AGENT, concat!("codync-host/", env!("CARGO_PKG_VERSION")))
+        .header(reqwest::header::USER_AGENT, concat!("hypurr-host/", env!("CARGO_PKG_VERSION")))
         .timeout(Duration::from_secs(180))
         .send()
         .await?
@@ -87,8 +87,8 @@ pub async fn latest() -> Result<Release> {
     // Resolve latest once. Fetching manifest and signature through separate
     // latest redirects could straddle two releases.
     let response = crate::http()
-        .get("https://api.github.com/repos/leepokai/Codync/releases/latest")
-        .header(reqwest::header::USER_AGENT, "codync-host")
+        .get("https://api.github.com/repos/Ragul84/Hypurr/releases/latest")
+        .header(reqwest::header::USER_AGENT, "hypurr-host")
         .timeout(Duration::from_secs(20))
         .send()
         .await?
@@ -96,7 +96,7 @@ pub async fn latest() -> Result<Release> {
     let metadata: serde_json::Value = response.json().await?;
     let tag = metadata["tag_name"].as_str().context("latest release has no tag")?;
     let version = semver::Version::parse(tag.strip_prefix('v').context("invalid release tag")?)?;
-    let url = format!("{RELEASES}/download/v{version}/codync-host-{platform}.update.json");
+    let url = format!("{RELEASES}/download/v{version}/hypurr-host-{platform}.update.json");
     let bytes = download(&url, 16 * 1024).await.context("this release has no valid signed host update manifest")?;
     let signature = download(&format!("{url}.sig"), 1024).await?;
     let release = verify_manifest(&bytes, std::str::from_utf8(&signature)?, PUBLIC_KEY, &platform)?;
@@ -120,7 +120,7 @@ pub fn extract(bytes: &[u8], platform: &str, destination: &Path) -> Result<()> {
     use std::os::unix::fs::PermissionsExt as _;
     let decoder = flate2::read::GzDecoder::new(bytes).take(MAX_UNPACKED);
     let mut archive = tar::Archive::new(decoder);
-    let expected = format!("codync-host-{platform}/codync-host");
+    let expected = format!("hypurr-host-{platform}/hypurr-host");
     let mut found = false;
     for entry in archive.entries()? {
         let mut entry = entry?;

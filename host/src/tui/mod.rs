@@ -1,4 +1,4 @@
-//! `codync-host tui`: the Codync client for a terminal. It talks to a host over the
+//! `hypurr-host tui`: the Hypurr client for a terminal. It talks to a host over the
 //! same HTTP + SSE API as the phone and desktop apps (locally: no pairing needed).
 
 mod app;
@@ -76,7 +76,7 @@ pub async fn run(url: String, token: Option<String>) -> Result<()> {
             let out = term.backend_mut();
             if in_shell {
                 execute!(out, DisableMouseCapture, LeaveAlternateScreen)?;
-                write!(out, "\x1b[2J\x1b[H\x1b[2m^] closes the terminal and goes back to Codync\x1b[0m\r\n")?;
+                write!(out, "\x1b[2J\x1b[H\x1b[2m^] closes the terminal and goes back to Hypurr\x1b[0m\r\n")?;
             } else {
                 execute!(out, EnterAlternateScreen, EnableMouseCapture)?;
                 term.clear()?;

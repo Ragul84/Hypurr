@@ -1,5 +1,5 @@
-import CodyncKit
-import CodyncUI
+import HypurrKit
+import HypurrUI
 import SwiftUI
 
 /// Native desktop chat: roster on the left, the conversation on the right
@@ -52,14 +52,14 @@ struct ChatWindow: View {
         .background(Palette.background)
         .tint(Palette.accent)
         .ignoresSafeArea(.container, edges: .top)
-        .codyncDialog("Reset all data?", isPresented: Bindable(host).confirmsReset,
-                      message: "Signs out every account and deletes this Mac's bots, conversations, keys and settings. Codync then starts over from the welcome screen.") {
+        .hypurrDialog("Reset all data?", isPresented: Bindable(host).confirmsReset,
+                      message: "Signs out every account and deletes this Mac's bots, conversations, keys and settings. Hypurr then starts over from the welcome screen.") {
             [DialogAction("Reset everything", destructive: true) { Task { await host.resetAllData() } }]
         }
         // Approving a device: the code the device shows must match (spec §4.2 B).
         // It closes when the request is decided or put off (both change `currentApproval`);
         // closing it puts the request off.
-        .codyncSheet(isPresented: Binding(
+        .hypurrSheet(isPresented: Binding(
             get: { host.currentApproval != nil },
             set: { if !$0, let approval = host.currentApproval { host.deferApproval(approval) } }
         )) {
@@ -185,7 +185,7 @@ private struct AccountWelcomeView: View {
                 .disabled(!isConfigured || isBusy)
 
                 if !isConfigured {
-                    Text("Sign-in isn't configured in this build. You can still use Codync on this Mac.")
+                    Text("Sign-in isn't configured in this build. You can still use Hypurr on this Mac.")
                         .font(.footnote)
                         .foregroundStyle(Palette.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -294,14 +294,14 @@ private extension ChatWindow {
             EmptyState(
                 icon: "desktopcomputer",
                 title: "Set up this Mac",
-                message: "Codync runs your coding agents through the host, a small background service on this Mac.",
+                message: "Hypurr runs your coding agents through the host, a small background service on this Mac.",
                 action: ("Install host", host.install)
             )
         case .missingBinary:
             EmptyState(
                 icon: "desktopcomputer.trianglebadge.exclamationmark",
                 title: "The host is missing",
-                message: "This copy of Codync doesn't include codync-host. Download Codync again from codync.dev or GitHub."
+                message: "This copy of Hypurr doesn't include hypurr-host. Download Hypurr again from hypurr.dev or GitHub."
             )
         case .starting, .running:
             EmptyState(icon: "desktopcomputer", title: "Starting the host…", message: "This takes a few seconds.")
@@ -442,7 +442,7 @@ private struct ChatSplitView: View {
                     Spacer(minLength: 0)
                     ComputerFilterHeader(accounts: accounts, hidden: $hiddenComputers) { showComputers = true }
                     IconButton("New", systemImage: "plus") { newMenu.toggle() }
-                        .codyncMenu(isPresented: $newMenu, items: newItems)
+                        .hypurrMenu(isPresented: $newMenu, items: newItems)
                         .disabled(onlineStores.isEmpty)
                 }
                 .padding(.leading, compact ? 0 : 80)
@@ -633,12 +633,12 @@ private struct ChatSplitView: View {
         .animation(Motion.reduced(Motion.fade, reduceMotion), value: showAccount)
         .animation(Motion.reduced(Motion.fade, reduceMotion), value: contextBot?.bot.id)
         .ignoresSafeArea(.container, edges: .top)
-        .codyncSheet(item: $editing) { target in
+        .hypurrSheet(item: $editing) { target in
             BotEditorView(draft: target.request.draft)
                 .environment(target.store)
                 .frame(width: 520, height: min(680, sheetHeight))
         }
-        .codyncSheet(isPresented: Binding(get: { marketplace != nil }, set: { if !$0 { marketplace = nil } })) {
+        .hypurrSheet(isPresented: Binding(get: { marketplace != nil }, set: { if !$0 { marketplace = nil } })) {
             if let store = marketplace.flatMap(accounts.store(for:)) {
                 MarketplaceView(computers: onlineStores.map { ($0.computer.id, $0.hostName) },
                                 computer: Binding(get: { store.computer.id }, set: { marketplace = $0 }))
@@ -647,11 +647,11 @@ private struct ChatSplitView: View {
                 .frame(width: min(920, windowSize.width - 80), height: sheetHeight)
             }
         }
-        .codyncSheet(isPresented: $showComputers) {
+        .hypurrSheet(isPresented: $showComputers) {
             ComputersView()
                 .frame(width: 620, height: sheetHeight)
         }
-        .codyncSheet(isPresented: $showUsage) {
+        .hypurrSheet(isPresented: $showUsage) {
             UsageSheet().frame(width: 520)
         }
         .background {
@@ -674,21 +674,21 @@ private struct ChatSplitView: View {
             sidebarWidth = min(sidebarWidth, max(260, $0.width - 420))
         }
         .hiddenWindowTitle()
-        .codyncDialog("Start a new session?", isPresented: Binding(
+        .hypurrDialog("Start a new session?", isPresented: Binding(
             get: { newSessionBot != nil },
             set: { if !$0 { newSessionBot = nil } }
         ), message: "The conversation stays here, but the agent starts with a fresh context.") {
             guard let target = newSessionBot else { return [] }
             return [DialogAction("New session") { target.store.newSession(target.bot.id); newSessionBot = nil }]
         }
-        .codyncDialog("Delete \(confirmDelete?.bot.name ?? "bot")?", isPresented: Binding(
+        .hypurrDialog("Delete \(confirmDelete?.bot.name ?? "bot")?", isPresented: Binding(
             get: { confirmDelete != nil },
             set: { if !$0 { confirmDelete = nil } }
         ), message: "Files it changed on your computer stay as they are.") {
             guard let target = confirmDelete else { return [] }
             return [DialogAction("Delete bot and its conversation", destructive: true) { target.store.delete(target.bot) }]
         }
-        .codyncDialog("Something went wrong", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { clearErrors() } }),
+        .hypurrDialog("Something went wrong", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { clearErrors() } }),
                       message: errorMessage, cancel: "OK") { [] }
         .animation(Motion.reduced(Motion.fade, reduceMotion), value: accounts.selection)
         .animation(Motion.reduced(Motion.fade, reduceMotion), value: composing)
@@ -700,8 +700,8 @@ private struct ChatSplitView: View {
         }
         #if DEBUG
             .onAppear {
-                // Screenshot/UI checks: CODYNC_DEBUG_OPEN=compose | group | plugins | computers | <bot name>
-                let target = ProcessInfo.processInfo.environment["CODYNC_DEBUG_OPEN"]
+                // Screenshot/UI checks: HYPURR_DEBUG_OPEN=compose | group | plugins | computers | <bot name>
+                let target = ProcessInfo.processInfo.environment["HYPURR_DEBUG_OPEN"]
                 if target == "compose" || target == "group" {
                     compose(group: target == "group")
                 } else if target == "plugins" {
@@ -955,7 +955,7 @@ extension ChatSplitView {
                 .help("New")
                 .labelStyle(.iconOnly)
                 .buttonStyle(IconButtonStyle(size: 36))
-                .codyncMenu(isPresented: $railNewMenu, items: newItems)
+                .hypurrMenu(isPresented: $railNewMenu, items: newItems)
             Button("Marketplace", systemImage: "square.grid.2x2") {
                 marketplace = (selectedStore ?? host.store ?? onlineStores.first)?.computer.id
             }
@@ -1073,9 +1073,9 @@ private struct SidebarAccountPanel: View {
             return [
                 Item(title: "Support", icon: "chevron.left", action: { navigate("main") }),
                 Item(title: "Help & documentation", icon: "book", chevron: true,
-                     action: { open("https://github.com/leepokai/codync#readme") }),
+                     action: { open("https://github.com/Ragul84/hypurr#readme") }),
                 Item(title: "Report an issue", icon: "bubble.left", chevron: true,
-                     action: { open("https://github.com/leepokai/codync/issues") })
+                     action: { open("https://github.com/Ragul84/hypurr/issues") })
             ]
         case "settings":
             return [
@@ -1088,7 +1088,7 @@ private struct SidebarAccountPanel: View {
                 Item(title: "Usage", icon: "gauge.with.dots.needle.33percent", chevron: true, action: onUsage),
                 Item(title: "Computers & devices", icon: "desktopcomputer",
                      detail: approvals > 0 ? "\(approvals)" : nil, chevron: true, action: onComputers),
-                Item(title: "Get Codync for mobile", icon: "iphone", action: { open("https://apps.apple.com/app/id6760984418") }),
+                Item(title: "Get Hypurr for mobile", icon: "iphone", action: { open("https://apps.apple.com/app/id0000000000") }),
                 Item(title: "Support", icon: "book.closed", chevron: true, action: { navigate("support") }),
                 Item(title: "Settings", icon: "gearshape", action: { navigate("settings") }),
                 Item(title: updateVersion.map { "Update to \($0)" } ?? "Check for updates", icon: "arrow.down.circle",

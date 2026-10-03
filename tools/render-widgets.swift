@@ -1,5 +1,5 @@
 import AppKit
-import CodyncKit
+import HypurrKit
 import SwiftUI
 
 // Exports views directly with ImageRenderer. These are layout review artifacts,
@@ -42,7 +42,7 @@ private struct ActivityBoard: View {
     private let statuses = ["working", "needsInput", "idle", "error", "stale"]
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
-            Text("Codync · Live Activity & Dynamic Island").font(.title2.weight(.semibold))
+            Text("Hypurr · Live Activity & Dynamic Island").font(.title2.weight(.semibold))
             Text("Lock Screen / compact + minimal / expanded · illustrative sample task")
                 .font(.caption).foregroundStyle(Palette.secondary)
             if let bot = Bot.widgetPreview.first {
@@ -125,7 +125,7 @@ private struct WidgetBoard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("Codync · Widget layout review").font(.title2.weight(.semibold))
+            Text("Hypurr · Widget layout review").font(.title2.weight(.semibold))
             Text("158 pt small · 338 × 158 pt medium · sample data")
                 .font(.caption).foregroundStyle(Palette.secondary)
             providerRow("Claude", provider(0))
@@ -168,7 +168,7 @@ private struct IconBoard: View {
     private let shapes = ["blob", "pebble", "squircle", "tablet", "wedge", "hex", "cloud", "teardrop"]
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("Codync · Halftone icons").font(.title2.weight(.semibold))
+            Text("Hypurr · Halftone icons").font(.title2.weight(.semibold))
             Text("15 / 20 / 22 / 26 / 32 / 64 pt · static reference frames")
                 .font(.caption).foregroundStyle(Palette.secondary)
             ForEach(shapes, id: \.self) { shape in

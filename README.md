@@ -1,15 +1,15 @@
 <div align="center">
 
-<img src="apps/linux/data/com.pokai.Codync.svg" width="128" alt="Codync icon">
+<img src="apps/linux/data/com.ragul84.Hypurr.svg" width="128" alt="Hypurr icon">
 
-# Codync
+# Hypurr
 
 **The open-source, 1:1 alternative to Grok Bot and Muse.**<br>
 Your coding agents, as teammates you can message.
 
-[![App Store](https://img.shields.io/badge/App_Store-iOS-0D96F6?logo=apple&logoColor=white)](https://apps.apple.com/app/codync/id6760984418)
-[![Homebrew](https://img.shields.io/badge/Homebrew-codync-FBB040?logo=homebrew&logoColor=white)](https://github.com/leepokai/homebrew-codync)
-[![Release](https://img.shields.io/github/v/release/leepokai/Codync?color=black)](https://github.com/leepokai/Codync/releases/latest)
+[![App Store](https://img.shields.io/badge/App_Store-iOS-0D96F6?logo=apple&logoColor=white)](https://apps.apple.com/app/hypurr/id0000000000)
+[![Homebrew](https://img.shields.io/badge/Homebrew-hypurr-FBB040?logo=homebrew&logoColor=white)](https://github.com/Ragul84/homebrew-hypurr)
+[![Release](https://img.shields.io/github/v/release/Ragul84/Hypurr?color=black)](https://github.com/Ragul84/Hypurr/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 <br>
 ![iOS](https://img.shields.io/badge/iOS-18+-black?logo=apple)
@@ -18,22 +18,22 @@ Your coding agents, as teammates you can message.
 ![Rust](https://img.shields.io/badge/host-Rust-B7410E?logo=rust)
 ![Swift](https://img.shields.io/badge/apps-SwiftUI-F05138?logo=swift&logoColor=white)
 
-<a href="https://youtu.be/awhZJPjJaPc"><img src="docs/screenshots/launch-film.jpg" width="760" alt="Watch the Codync launch film on YouTube (1:26)"></a>
+<a href="https://youtu.be/awhZJPjJaPc"><img src="docs/screenshots/launch-film.jpg" width="760" alt="Watch the Hypurr launch film on YouTube (1:26)"></a>
 
-<a href="https://apps.apple.com/app/codync/id6760984418"><img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" height="54" alt="Download on the App Store"></a>
+<a href="https://apps.apple.com/app/hypurr/id0000000000"><img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" height="54" alt="Download on the App Store"></a>
 
 </div>
 
-Codync turns the coding agents on your computer — Claude Code, Codex, Cursor, Pi, OpenCode, Grok Build, Gemini, Copilot and ~40 more — into persistent *bots* you delegate to from your iPhone, Mac, Linux desktop or any terminal, the way you'd message a colleague. Pick who, say what, put the phone away. You get a notification when a bot finishes or needs your approval.
+Hypurr turns the coding agents on your computer — Claude Code, Codex, Cursor, Pi, OpenCode, Grok Build, Gemini, Copilot and ~40 more — into persistent *bots* you delegate to from your iPhone, Mac, Linux desktop or any terminal, the way you'd message a colleague. Pick who, say what, put the phone away. You get a notification when a bot finishes or needs your approval.
 
 > Why bots? On a phone, "find the right working session, then pick an environment" is too slow. With bots you already know who to hand the intent to: open the chat, type, done.
 
-## Why Codync
+## Why Hypurr
 
 - **Free and open source.** No subscription, no paid tier, MIT licensed. It runs on your computer with the agents and accounts you already have.
 - **Bring any coding agent.** Claude Code, Codex, Cursor, Gemini, Copilot, OpenCode, Pi, Grok Build and ~40 more — everything in the [ACP registry](https://agentclientprotocol.com/registry). Installed agents are found automatically, the rest are fetched on first use, and every bot picks its own. Mix them freely: a Claude bot can ask a Codex bot for a review.
 - **Many bots, one team.** Run as many bots as you like side by side, each with its own agent, project folder and approvals, all working at once. Put several in a **group chat** and they answer in turn, like a team channel; `@name` picks who replies. Start a **thread** on any message to branch off without cluttering the main chat.
-- **Built in Rust.** `codync-host` is one small, fast Rust binary for macOS and Linux (static on Linux, runs on any distro) that drives every agent, keeps the transcripts and serves every client.
+- **Built in Rust.** `hypurr-host` is one small, fast Rust binary for macOS and Linux (static on Linux, runs on any distro) that drives every agent, keeps the transcripts and serves every client.
 - **Native on every platform.** SwiftUI on iPhone and Mac, GTK 4 / libadwaita on Linux, and a terminal UI for SSH. No web views, no Electron.
 - **A 1:1 Grok Bot / Muse alternative.** Persistent named bots, group chats, reply threads, bots asking each other for help, approval cards, per-bot memory, remote screen, voice calls and "needs you / done" notifications — the same features, without being tied to one model or one subscription.
 - **Reach your computer from anywhere, free.** The hosted Cloudflare relay is included at no cost: no Tailscale, no VPN, no port forwarding. Traffic is end-to-end encrypted between your phone and your computer, so the relay only forwards ciphertext. Same Wi-Fi or Tailscale? The phone connects directly instead.
@@ -49,15 +49,15 @@ Codync turns the coding agents on your computer — Claude Code, Codex, Cursor, 
 | 📱 | **iPhone** | Native SwiftUI | Chat with bots, approvals, push notifications, Live Activity, widgets, remote screen, voice calls |
 | 💻 | **macOS** | Native SwiftUI, menu bar + window | Runs the host, chat window, usage in the menu bar, iPhone pairing |
 | 🐧 | **Linux** | Native GTK 4 / libadwaita | Runs the host (desktop or headless server), chat app |
-| ⌨️ | **Terminal** | `codync-host tui` | Message your bots from any terminal, over SSH too |
+| ⌨️ | **Terminal** | `hypurr-host tui` | Message your bots from any terminal, over SSH too |
 
-The host (`codync-host`, Rust) runs on macOS and Linux; every client talks to it, so all your bots and chats are the same everywhere.
+The host (`hypurr-host`, Rust) runs on macOS and Linux; every client talks to it, so all your bots and chats are the same everywhere.
 
 ## How it works
 
 ```text
-Remote Apple client ⇄ encrypted channel (direct or Cloudflare cloud/) ⇄ codync-host ⇄ ACP agent
-Local / SSH client  ⇄ loopback HTTP + SSE                             ⇄ codync-host
+Remote Apple client ⇄ encrypted channel (direct or Cloudflare cloud/) ⇄ hypurr-host ⇄ ACP agent
+Local / SSH client  ⇄ loopback HTTP + SSE                             ⇄ hypurr-host
 Host notifications → APNs worker (relay/) → iPhone
 ```
 
@@ -65,8 +65,8 @@ Host notifications → APNs worker (relay/) → iPhone
 - **Group chats** hold several bots and you. Each message starts a short room turn: the bots you @-mention (or everyone) reply one at a time, each in its own session, and can react to each other, up to 3 rounds. See [group chats and threads](docs/features/groups-and-threads.md).
 - **Bots can ask each other for help.** Tell one “ask Reviewer to check these changes.” The built-in `team` MCP server lets it discover your other visible bots and wait for a reply. Requests appear in both chats; each recipient keeps its own agent, folder and approvals. Native subagents stay under the coding agent's control. See [bot collaboration](docs/features/bot-collaboration.md).
 - **The chat only shows what matters**: your messages, each turn's final reply, approval cards and notices. Every tool call, diff, plan and thought is one tap away in *Full conversation*. While a bot works, its row shows what it's doing right now.
-- **Agents are detected automatically**: the host hydrates PATH from your login shell (plus Homebrew, ~/.local/bin, nvm, bun, volta, asdf, mise, pnpm…), finds every harness you have installed, and prefers its native ACP mode. Anything else in the official [ACP registry](https://agentclientprotocol.com/registry) can be picked too — Codync fetches it on first use (npx, uvx or a checksummed binary).
-- **codync-host** (Rust, macOS + Linux) runs on your computer. It speaks the [Agent Client Protocol](https://agentclientprotocol.com) to each agent, keeps transcripts in SQLite, and serves the phone. Every change carries a global `rev`, so the phone reconnects with `since: rev` and never misses anything.
+- **Agents are detected automatically**: the host hydrates PATH from your login shell (plus Homebrew, ~/.local/bin, nvm, bun, volta, asdf, mise, pnpm…), finds every harness you have installed, and prefers its native ACP mode. Anything else in the official [ACP registry](https://agentclientprotocol.com/registry) can be picked too — Hypurr fetches it on first use (npx, uvx or a checksummed binary).
+- **hypurr-host** (Rust, macOS + Linux) runs on your computer. It speaks the [Agent Client Protocol](https://agentclientprotocol.com) to each agent, keeps transcripts in SQLite, and serves the phone. Every change carries a global `rev`, so the phone reconnects with `since: rev` and never misses anything.
 - **Usage limits** come from your local installs, with no extra login: Claude via `claude -p /usage` (a local command, no model call) plus Claude Code's status line, Codex via `~/.codex/sessions`. The phone, widgets and menu bar only see percentages.
 - **Push** goes through a tiny relay that holds the APNs key. The phone trades its device token for an encrypted ticket; the host only ever holds tickets.
 
@@ -77,33 +77,33 @@ UI patterns (roster, character avatars, approval cards, trace sheet, "needs you 
 **One line** (macOS or Linux):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/leepokai/Codync/main/packaging/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/Ragul84/Hypurr/main/packaging/install.sh | sh
 ```
 
 On a Mac it installs the app (the host ships inside it); on Linux the host, plus the desktop app when a display is present. Add `sh -s -- --host-only` for servers and headless Macs. Re-run it to upgrade.
 
-**Mac** — [download codync-macos.dmg](https://github.com/leepokai/Codync/releases/latest/download/codync-macos.dmg) and drag it to Applications, or:
+**Mac** — [download hypurr-macos.dmg](https://github.com/Ragul84/Hypurr/releases/latest/download/hypurr-macos.dmg) and drag it to Applications, or:
 
 ```bash
-brew install --cask leepokai/codync/codync
+brew install --cask Ragul84/hypurr/hypurr
 ```
 
 All three install the same signed, notarized app.
 
-Open Codync: it sets up the host on first launch. **Open Codync** opens the full window; **Pair iPhone…** shows the QR code.
+Open Hypurr: it sets up the host on first launch. **Open Hypurr** opens the full window; **Pair iPhone…** shows the QR code.
 
-**iPhone** — [get Codync on the App Store](https://apps.apple.com/app/codync/id6760984418) (iOS 18+, free), then scan the QR code from **Pair iPhone…** on the Mac, the Linux app or `codync-host pair`.
+**iPhone** — [get Hypurr on the App Store](https://apps.apple.com/app/hypurr/id0000000000) (iOS 18+, free), then scan the QR code from **Pair iPhone…** on the Mac, the Linux app or `hypurr-host pair`.
 
 **Linux** — the host, plus the native GTK 4 / libadwaita app:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/leepokai/Codync/main/packaging/install.sh | sh
-# or: brew install leepokai/codync/codync-host
-codync-host install   # systemd --user service
-codync-host pair      # QR code in the terminal, or Settings in the app
+curl -fsSL https://raw.githubusercontent.com/Ragul84/Hypurr/main/packaging/install.sh | sh
+# or: brew install Ragul84/hypurr/hypurr-host
+hypurr-host install   # systemd --user service
+hypurr-host pair      # QR code in the terminal, or Settings in the app
 ```
 
-The script also installs the desktop app (`codync`, with its `.desktop` file and icon) when you're in a graphical session; it needs GTK 4 and libadwaita. By hand: unpack `codync-linux-<arch>.tar.gz` from [Releases](https://github.com/leepokai/Codync/releases/latest) and run `bin/codync`.
+The script also installs the desktop app (`hypurr`, with its `.desktop` file and icon) when you're in a graphical session; it needs GTK 4 and libadwaita. By hand: unpack `hypurr-linux-<arch>.tar.gz` from [Releases](https://github.com/Ragul84/Hypurr/releases/latest) and run `bin/hypurr`.
 
 Building the Linux app yourself needs `libgtk-4-dev libadwaita-1-dev`: `cargo install --path apps/linux`.
 
@@ -111,33 +111,33 @@ Building the Linux app yourself needs `libgtk-4-dev libadwaita-1-dev`: `cargo in
 
 **Remote access** works out of the box through the free Cloudflare relay, end-to-end encrypted; the phone switches to a direct connection on the same network or over Tailscale. Details: [remote relay](docs/reference/remote-relay.md).
 
-**Agents** — install and sign in to whichever you use; Codync finds them. Claude Code, Codex and Pi run through their ACP adapters (fetched by `npx`, so Node.js is needed for those).
+**Agents** — install and sign in to whichever you use; Hypurr finds them. Claude Code, Codex and Pi run through their ACP adapters (fetched by `npx`, so Node.js is needed for those).
 
-`codync-host install` also routes Claude Code's status line through `codync-host statusline` so live limits reach the host; an existing status line keeps working (it's wrapped, and restored on `uninstall`).
+`hypurr-host install` also routes Claude Code's status line through `hypurr-host statusline` so live limits reach the host; an existing status line keeps working (it's wrapped, and restored on `uninstall`).
 
-## `codync-host`
+## `hypurr-host`
 
 | Command | |
 |---|---|
-| `codync-host install` / `uninstall` | background service (launchd on macOS, systemd `--user` on Linux) |
-| `codync-host tui [--url … --token …]` | message your bots from a terminal (this computer by default; SSH-friendly) |
-| `codync-host pair [--json]` | pairing QR code / link |
-| `codync-host status` | installed? running? |
-| `codync-host serve [--port 19222]` | run in the foreground |
-| `codync-host statusline [-- <your command>]` | Claude Code status line command (wraps yours) |
-| `codync-host reset-token` | rotate the local loopback bearer token |
-| `codync-host cloud` | cloud enablement, URL and status |
-| `codync-host devices` | list/revoke authorized remote devices |
-| `codync-host access` | review device access requests |
+| `hypurr-host install` / `uninstall` | background service (launchd on macOS, systemd `--user` on Linux) |
+| `hypurr-host tui [--url … --token …]` | message your bots from a terminal (this computer by default; SSH-friendly) |
+| `hypurr-host pair [--json]` | pairing QR code / link |
+| `hypurr-host status` | installed? running? |
+| `hypurr-host serve [--port 19222]` | run in the foreground |
+| `hypurr-host statusline [-- <your command>]` | Claude Code status line command (wraps yours) |
+| `hypurr-host reset-token` | rotate the local loopback bearer token |
+| `hypurr-host cloud` | cloud enablement, URL and status |
+| `hypurr-host devices` | list/revoke authorized remote devices |
+| `hypurr-host access` | review device access requests |
 
-Data lives in `~/.codync`. The local bearer token authorizes loopback helpers and SSH-forwarded callers. Remote devices use individual keys and grants over the encrypted channel; revoke a lost device through device management rather than rotating the loopback token. Host methods and caller permissions live in `host/src/api/mod.rs`.
+Data lives in `~/.hypurr`. The local bearer token authorizes loopback helpers and SSH-forwarded callers. Remote devices use individual keys and grants over the encrypted channel; revoke a lost device through device management rather than rotating the loopback token. Host methods and caller permissions live in `host/src/api/mod.rs`.
 
 ## Repository
 
 | Path | |
 |---|---|
-| `host/` | `codync-host` — Rust daemon: ACP client, SQLite transcript, HTTP/SSE API, push, usage |
-| `kit/` | Swift package: `CodyncKit` (wire models, host client, theme, avatars) and `CodyncUI` (store + chat screens shared by iPhone and Mac) |
+| `host/` | `hypurr-host` — Rust daemon: ACP client, SQLite transcript, HTTP/SSE API, push, usage |
+| `kit/` | Swift package: `HypurrKit` (wire models, host client, theme, avatars) and `HypurrUI` (store + chat screens shared by iPhone and Mac) |
 | `apps/ios/` | iOS app: pairing, roster, push, Live Activity glue |
 | `apps/ios/Widgets/` | Bots, usage and per-provider usage widgets + bot Live Activity |
 | `apps/macos/` | Menu bar + native chat window; installs/monitors the host |
@@ -148,7 +148,7 @@ Data lives in `~/.codync`. The local bearer token authorizes loopback helpers an
 | `docs/` | [Documentation index](docs/README.md) and [file structure](docs/architecture/file-structure.md) |
 | `relay/` | Cloudflare Worker APNs relay with encrypted per-device tickets |
 | `web/` | Website (Next.js static export, deployed on Vercel) |
-| `packaging/` | Homebrew cask and formula templates (published to `leepokai/homebrew-codync` on release) and `install.sh` (the curl installer) |
+| `packaging/` | Homebrew cask and formula templates (published to `Ragul84/homebrew-hypurr` on release) and `install.sh` (the curl installer) |
 
 Build, install, restart and full checks: [development guide](docs/guides/development.md).
 

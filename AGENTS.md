@@ -3,7 +3,7 @@
 ## Project Structure & Module Organization
 
 - `host/`: Rust daemon, ACP integration, SQLite storage, HTTP/SSE API, and terminal UI; unit tests live alongside modules in `src/`.
-- `kit/`: shared Swift package. `CodyncKit` contains models, clients, and design primitives; `CodyncUI` contains shared screens and stores. Tests and fixtures live in `kit/Tests/CodyncKitTests/`.
+- `kit/`: shared Swift package. `HypurrKit` contains models, clients, and design primitives; `HypurrUI` contains shared screens and stores. Tests and fixtures live in `kit/Tests/HypurrKitTests/`.
 - `apps/`: iOS, macOS, and Linux clients, plus `screen-macos` and `screen-linux` helpers. Apple assets live in each target’s `Resources/`; widgets live in `apps/ios/Widgets/`.
 - `cloud/`: Cloudflare accounts, encrypted relay, Durable Objects and D1; tests live in `cloud/test/`.
 - `relay/`: Cloudflare push worker and `test/`; `web/`: website (Next.js); `packaging/`: distribution templates; `docs/`: architecture and naming guidance.
@@ -12,8 +12,8 @@
 
 Run from the repository root unless a command changes directories:
 
-- `xcodegen generate --spec apps/project.yml`: regenerate `apps/Codync.xcodeproj` after editing `apps/project.yml`; never edit `project.pbxproj` directly.
-- `xcodebuild build -project apps/Codync.xcodeproj -scheme macOS -configuration Debug`: build the Mac app. Use Xcode’s `iOS` scheme to run on a simulator or device.
+- `xcodegen generate --spec apps/project.yml`: regenerate `apps/Hypurr.xcodeproj` after editing `apps/project.yml`; never edit `project.pbxproj` directly.
+- `xcodebuild build -project apps/Hypurr.xcodeproj -scheme macOS -configuration Debug`: build the Mac app. Use Xcode’s `iOS` scheme to run on a simulator or device.
 - `cd host && cargo build`: build the host; `cargo run -- serve` starts it in the foreground.
 - `cd host && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test`: run host CI checks.
 - `cd kit && swift test`: run shared Swift tests.
@@ -37,11 +37,11 @@ Use four-space indentation for Swift and Rust. Follow Swift 6 strict concurrency
 
 Name Swift files after their main `UpperCamelCase` type; use `snake_case.rs` and `kebab-case.ts`. Follow role suffixes such as `View`, `Row`, and `Store`. See `docs/architecture/file-structure.md` and `CLAUDE.md` for architectural conventions.
 
-- UI controls default to the shared custom components. Explicit exception: iOS BotListView and ThreadView use native navigation/toolbar items and automatic back navigation for system Liquid Glass, as specified in `docs/design/ui-conventions.md`. The macOS menu bar also uses native `MenuBarExtra(.menu)`, menus, pickers and toggles. Keep system authentication and widget containers native. Outside these exceptions, avoid: no `Menu`/`Picker`, `.switch` toggles, `Form`/`List` styling, `confirmationDialog`/`alert`, `ProgressView`, `.sheet`/`.popover`/`.fullScreenCover`, `.toolbar`/navigation bars, `TabView`, `ContentUnavailableView`. Use `kit/Sources/CodyncUI/Controls.swift` + `Chrome.swift` (`.codyncSheet`, `ModalHeader`, `ScreenHeader`, `TabBar`, `.codyncMenu`, `.codyncDialog`, `ToggleStyle.codync`). Every tap that shows/hides something animates (`Motion`). Anything with a background fill gets no border line.
+- UI controls default to the shared custom components. Explicit exception: iOS BotListView and ThreadView use native navigation/toolbar items and automatic back navigation for system Liquid Glass, as specified in `docs/design/ui-conventions.md`. The macOS menu bar also uses native `MenuBarExtra(.menu)`, menus, pickers and toggles. Keep system authentication and widget containers native. Outside these exceptions, avoid: no `Menu`/`Picker`, `.switch` toggles, `Form`/`List` styling, `confirmationDialog`/`alert`, `ProgressView`, `.sheet`/`.popover`/`.fullScreenCover`, `.toolbar`/navigation bars, `TabView`, `ContentUnavailableView`. Use `kit/Sources/HypurrUI/Controls.swift` + `Chrome.swift` (`.hypurrSheet`, `ModalHeader`, `ScreenHeader`, `TabBar`, `.hypurrMenu`, `.hypurrDialog`, `ToggleStyle.hypurr`). Every tap that shows/hides something animates (`Motion`). Anything with a background fill gets no border line.
 
 ## Cross-platform UI changes
 
-- Any UI change in any client must include the corresponding updates to all other native clients and the TUI in the same change: shared SwiftUI (`kit/Sources/CodyncUI/`), iOS (`apps/ios/`), macOS (`apps/macos/`), Linux GTK (`apps/linux/src/`), and terminal UI (`host/src/tui/`). This applies in every direction; Linux and TUI changes must also be reflected in SwiftUI.
+- Any UI change in any client must include the corresponding updates to all other native clients and the TUI in the same change: shared SwiftUI (`kit/Sources/HypurrUI/`), iOS (`apps/ios/`), macOS (`apps/macos/`), Linux GTK (`apps/linux/src/`), and terminal UI (`host/src/tui/`). This applies in every direction; Linux and TUI changes must also be reflected in SwiftUI.
 - Keep shared features, actions, terminology, displayed information, and loading, empty, error, and permission states consistent. Adapt layout, controls, and input to each platform, including terminal keyboard interaction, while preserving the same user-facing behavior.
 - Inspect every client's corresponding implementation before finishing a UI task. Implement applicable changes together; do not silently defer another client. For a platform-only change or an unsupported capability, document which clients are unaffected and the concrete reason in the change summary.
 - Validate each affected client with its relevant build/tests and UI checks. Report any checks that could not run and why.

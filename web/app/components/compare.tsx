@@ -32,7 +32,7 @@ export default function Compare() {
             Everything Grok Bot and Muse do. Open source, with any agent.
           </h2>
           <p className="mt-5 max-w-[36rem] text-lg leading-relaxed text-neutral-400">
-            Codync is a 1:1 alternative: the same bot-based way of working, rebuilt in the open so it isn&apos;t tied
+            Hypurr is a 1:1 alternative: the same bot-based way of working, rebuilt in the open so it isn&apos;t tied
             to one model or one subscription.
           </p>
         </Reveal>
@@ -74,7 +74,7 @@ export default function Compare() {
         </div>
 
         <p className="mt-6 text-sm text-neutral-600">
-          Grok Bot and Muse are products of their respective owners. Codync is an independent project and isn&apos;t
+          Grok Bot and Muse are products of their respective owners. Hypurr is an independent project and isn&apos;t
           affiliated with them.
         </p>
       </div>

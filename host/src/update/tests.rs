@@ -9,7 +9,7 @@ use std::{
 struct Directory(PathBuf);
 impl Directory {
     fn new() -> Self {
-        let path = std::env::temp_dir().join(format!("codync-update-test-{}", uuid::Uuid::new_v4()));
+        let path = std::env::temp_dir().join(format!("hypurr-update-test-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir(&path).unwrap();
         Self(path)
     }
@@ -24,7 +24,7 @@ fn manifest() -> release::Release {
     release::Release {
         version: "3.0.0".into(),
         platform: "linux-arm64".into(),
-        url: format!("{}/download/v3.0.0/codync-host-linux-arm64.tar.gz", release::RELEASES),
+        url: format!("{}/download/v3.0.0/hypurr-host-linux-arm64.tar.gz", release::RELEASES),
         sha256: "a".repeat(64),
         size: 12,
     }
@@ -62,7 +62,7 @@ fn archive(symlink: bool) -> Vec<u8> {
     }
     header.set_cksum();
     let contents: &[u8] = if symlink { b"" } else { b"new" };
-    tar.append_data(&mut header, "codync-host-linux-arm64/codync-host", contents).unwrap();
+    tar.append_data(&mut header, "hypurr-host-linux-arm64/hypurr-host", contents).unwrap();
     tar.into_inner().unwrap().finish().unwrap()
 }
 
@@ -149,11 +149,11 @@ async fn a_healthy_update_replaces_the_binary_and_removes_its_backup() {
 #[test]
 fn app_and_homebrew_binaries_keep_their_installation_owner() {
     assert_eq!(
-        install::method(std::path::Path::new("/Applications/Codync.app/Contents/MacOS/codync-host")),
+        install::method(std::path::Path::new("/Applications/Hypurr.app/Contents/MacOS/hypurr-host")),
         install::Method::AppBundle
     );
     assert_eq!(
-        install::method(std::path::Path::new("/opt/homebrew/Cellar/codync-host/2.2.1/bin/codync-host")),
+        install::method(std::path::Path::new("/opt/homebrew/Cellar/hypurr-host/2.2.1/bin/hypurr-host")),
         install::Method::Homebrew
     );
 }

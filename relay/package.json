@@ -1,7 +1,7 @@
 {
-  "name": "codync-relay",
+  "name": "hypurr-relay",
   "version": "1.0.0",
-  "description": "Codync APNs push relay (Cloudflare Worker)",
+  "description": "Hypurr APNs push relay (Cloudflare Worker)",
   "main": "src/index.ts",
   "scripts": {
     "deploy": "wrangler deploy",

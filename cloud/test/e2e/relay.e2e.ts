@@ -1,7 +1,7 @@
-// Cross-track integration test (spec §12.1): the real codync-host against `wrangler dev`, driven by a
-// fake phone. Run with `npm run e2e` after `cargo build` in host/ (or set CODYNC_HOST_BIN).
+// Cross-track integration test (spec §12.1): the real hypurr-host against `wrangler dev`, driven by a
+// fake phone. Run with `npm run e2e` after `cargo build` in host/ (or set HYPURR_HOST_BIN).
 //
-// Steps: local D1 + wrangler dev with a test Clerk key → host with CODYNC_CLOUD_URL → QR pairing over the
+// Steps: local D1 + wrangler dev with a test Clerk key → host with HYPURR_CLOUD_URL → QR pairing over the
 // relay → chat through the relay → mailbox while the host is down → account claim + SAS access request →
 // cloud revocation → injected grant ignored → direct /channel and loopback-only bearer token.
 
@@ -17,14 +17,14 @@ import { Channel, FakePhone, parsePairing, waitFor, type Json, type PairingInfo,
 
 const CLOUD_DIR = fileURLToPath(new URL("../..", import.meta.url));
 const ROOT = join(CLOUD_DIR, "..");
-const HOST_BIN = process.env.CODYNC_HOST_BIN ?? join(ROOT, "host/target/debug/codync-host");
+const HOST_BIN = process.env.HYPURR_HOST_BIN ?? join(ROOT, "host/target/debug/hypurr-host");
 const FAKE_AGENT = join(ROOT, "host/tests/fake_agent.py");
-const CLOUD_PORT = Number(process.env.CODYNC_E2E_CLOUD_PORT ?? 8787);
+const CLOUD_PORT = Number(process.env.HYPURR_E2E_CLOUD_PORT ?? 8787);
 const CLOUD = `http://127.0.0.1:${CLOUD_PORT}`;
 const ISSUER = "https://clerk.test.local"; // [env.local] CLERK_ISSUER
 const WRANGLER = join(CLOUD_DIR, "node_modules/.bin/wrangler");
 
-const tmp = mkdtempSync(join(tmpdir(), "codync-e2e-"));
+const tmp = mkdtempSync(join(tmpdir(), "hypurr-e2e-"));
 const persist = join(tmp, "wrangler");
 const home = join(tmp, "home");
 const children: ChildProcess[] = [];
@@ -68,7 +68,7 @@ async function stop(child: ChildProcess) {
 /// Async on purpose: a blocking spawn stalls the event loop past wrangler's keep-alive timeout, and
 /// the next `fetch` then reuses a socket the server already closed (ECONNRESET).
 function d1(sql: string): Promise<Json[]> {
-  const args = ["d1", "execute", "codync-local", "--local", "--env", "local", "--persist-to", persist, "--json", "--command", sql];
+  const args = ["d1", "execute", "hypurr-local", "--local", "--env", "local", "--persist-to", persist, "--json", "--command", sql];
   return new Promise((resolve, reject) =>
     execFile(WRANGLER, args, { cwd: CLOUD_DIR, encoding: "utf8" }, (err, stdout, stderr) => {
       if (err) return reject(new Error(`d1 failed: ${stderr}`));
@@ -101,7 +101,7 @@ async function cloud(method: string, path: string, o: { token?: string; key?: re
   const headers: Record<string, string> = {};
   if (o.token) headers.Authorization = `Bearer ${o.token}`;
   if (o.body !== undefined) headers["Content-Type"] = "application/json";
-  if (o.key) headers["Codync-Sig"] = ref.signRequest(o.key, { method, authority: `127.0.0.1:${CLOUD_PORT}`, pathAndQuery: path, body: bytes });
+  if (o.key) headers["Hypurr-Sig"] = ref.signRequest(o.key, { method, authority: `127.0.0.1:${CLOUD_PORT}`, pathAndQuery: path, body: bytes });
   const res = await fetch(CLOUD + path, { method, headers, body: bytes.length ? bytes : undefined });
   return { status: res.status, body: await res.json() };
 }
@@ -114,7 +114,7 @@ let host: ChildProcess | undefined;
 async function startHost() {
   hostPort ||= await freePort();
   // 0.0.0.0 so step 7 can prove a non-loopback bearer token is refused.
-  host = run(HOST_BIN, ["serve", "--bind", "0.0.0.0", "--port", String(hostPort)], { CODYNC_HOME: home, CODYNC_CLOUD_URL: CLOUD });
+  host = run(HOST_BIN, ["serve", "--bind", "0.0.0.0", "--port", String(hostPort)], { HYPURR_HOME: home, HYPURR_CLOUD_URL: CLOUD });
   await waitFor("host /health", () => fetch(`http://127.0.0.1:${hostPort}/health`).then((r) => r.ok || undefined).catch(() => undefined), 30_000);
 }
 
@@ -142,7 +142,7 @@ const computerOnline = async (id: string) => (await d1(`SELECT online FROM compu
 
 async function main() {
   step("1. local D1 + wrangler dev");
-  const migrate = spawnSync(WRANGLER, ["d1", "migrations", "apply", "codync-local", "--local", "--env", "local", "--persist-to", persist], {
+  const migrate = spawnSync(WRANGLER, ["d1", "migrations", "apply", "hypurr-local", "--local", "--env", "local", "--persist-to", persist], {
     cwd: CLOUD_DIR,
     encoding: "utf8",
     env: { ...process.env, CI: "1" },
@@ -326,7 +326,7 @@ async function cleanup() {
 
 try {
   if (spawnSync(HOST_BIN, ["--version"]).error) {
-    throw new Error(`codync-host not found at ${HOST_BIN}; run \`cargo build\` in host/ or set CODYNC_HOST_BIN`);
+    throw new Error(`hypurr-host not found at ${HOST_BIN}; run \`cargo build\` in host/ or set HYPURR_HOST_BIN`);
   }
   await main();
   await cleanup();

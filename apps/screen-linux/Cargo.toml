@@ -1,8 +1,8 @@
 [package]
-name = "codync-screen"
+name = "hypurr-screen"
 version = "2.1.0"
 edition = "2024"
-description = "Codync Remote screen helper for Linux: xdg portals + PipeWire + GStreamer WebRTC"
+description = "Hypurr Remote screen helper for Linux: xdg portals + PipeWire + GStreamer WebRTC"
 license = "MIT"
 
 [dependencies]

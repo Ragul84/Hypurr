@@ -566,9 +566,9 @@ fn webhook_panel(ui: &App, bot: &str, id: &str) -> gtk::Widget {
             });
             show.set_tooltip_text(Some(if shown.get() { "Hide key" } else { "Show key" }));
             note.set_label(if public.is_some() {
-                "POST with Authorization: Bearer <key>. For GitHub, use content type application/json and the key as the secret. Deliveries wait up to 72 hours while this computer is off. They pass through the Codync cloud, which can read them."
+                "POST with Authorization: Bearer <key>. For GitHub, use content type application/json and the key as the secret. Deliveries wait up to 72 hours while this computer is off. They pass through the Hypurr cloud, which can read them."
             } else {
-                "The Codync cloud is off, so only this computer can send to it."
+                "The Hypurr cloud is off, so only this computer can send to it."
             });
         }
     };

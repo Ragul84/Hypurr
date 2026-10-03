@@ -1,4 +1,4 @@
-# Codync documentation
+# Hypurr documentation
 
 Current documentation describes the checked-out implementation. Last reviewed: **2026-09-26**.
 Source review, a passing build, local integration tests and production acceptance are different checks; a feature documented here is not a claim that its deployed service has been verified.
