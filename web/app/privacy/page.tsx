@@ -4,8 +4,8 @@ export default function Privacy() {
   return (
     <main className="flex-1 flex flex-col items-center px-6 py-16">
       <article className="max-w-2xl w-full space-y-6">
-        <h1 className="text-3xl font-bold text-white">Privacy Policy</h1>
-        <p className="text-neutral-400 text-sm">Last updated: September 25, 2026</p>
+        <h1 className="text-3xl font-bold text-on-surface">Privacy Policy</h1>
+        <p className="text-on-surface-variant text-sm">Last updated: September 25, 2026</p>
 
         <Section title="Overview">
           Hypurr lets you message the coding agents that run on your own computer. It is built so that your code, conversations and credentials stay on your devices.
@@ -50,17 +50,17 @@ export default function Privacy() {
 
         <Section title="Contact">
           Questions? Open an issue at{" "}
-          <a href="https://github.com/Ragul84/Hypurr/issues" className="text-white underline">github.com/Ragul84/Hypurr/issues</a>.
+          <a href="https://github.com/Ragul84/Hypurr/issues" className="text-on-surface underline">github.com/Ragul84/Hypurr/issues</a>.
         </Section>
 
         <div className="pt-4">
-          <p className="text-neutral-400">
-            <Link href="/terms" className="text-white underline">Terms of Use</Link>
+          <p className="text-on-surface-variant">
+            <Link href="/terms" className="text-on-surface underline">Terms of Use</Link>
           </p>
         </div>
 
         <div className="pt-4">
-          <Link href="/" className="text-sm text-neutral-500 hover:text-neutral-300 transition-colors">
+          <Link href="/" className="text-sm text-on-surface-variant hover:text-on-surface transition-colors">
             &larr; Back to home
           </Link>
         </div>
@@ -72,8 +72,8 @@ export default function Privacy() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section>
-      <h2 className="text-xl font-semibold text-white mb-2">{title}</h2>
-      <div className="text-neutral-400 leading-relaxed">{children}</div>
+      <h2 className="text-xl font-semibold text-on-surface mb-2">{title}</h2>
+      <div className="text-on-surface-variant leading-relaxed">{children}</div>
     </section>
   );
 }
