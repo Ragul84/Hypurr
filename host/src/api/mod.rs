@@ -937,19 +937,19 @@ struct EventsQuery {
     client: Option<String>,
 }
 
-/// Counts a connected iOS client (pushes are held while one is connected) for as long as its stream lives.
-struct IosClientGuard(Arc<Hub>);
+/// Counts a connected phone client, iOS or Android (pushes are held while one is connected), for as long as its stream lives.
+struct PhoneClientGuard(Arc<Hub>);
 
-impl IosClientGuard {
+impl PhoneClientGuard {
     fn new(hub: Arc<Hub>) -> Self {
-        hub.ios_clients.fetch_add(1, Ordering::Relaxed);
+        hub.phone_clients.fetch_add(1, Ordering::Relaxed);
         Self(hub)
     }
 }
 
-impl Drop for IosClientGuard {
+impl Drop for PhoneClientGuard {
     fn drop(&mut self) {
-        self.0.ios_clients.fetch_sub(1, Ordering::Relaxed);
+        self.0.phone_clients.fetch_sub(1, Ordering::Relaxed);
     }
 }
 
@@ -984,7 +984,7 @@ pub fn events_stream(
     catch_up.insert(0, hello);
 
     let local = matches!(caller, Caller::Local);
-    let guard = Arc::new((client == Some("ios")).then(|| IosClientGuard::new(hub.clone())));
+    let guard = Arc::new(matches!(client, Some("ios" | "android")).then(|| PhoneClientGuard::new(hub.clone())));
     let tail = live.filter_map(move |msg| {
         let _keep = guard.clone();
         async move {

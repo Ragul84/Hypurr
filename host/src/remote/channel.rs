@@ -564,9 +564,9 @@ impl Channel {
         }
         let b = &v["b"];
         let name = b["name"].as_str().map(str::trim).filter(|n| !n.is_empty() && n.chars().count() <= 100);
-        let platform = b["platform"].as_str().filter(|p| matches!(*p, "ios" | "macos"));
+        let platform = b["platform"].as_str().filter(|p| matches!(*p, "ios" | "android" | "macos"));
         let (Some(name), Some(platform)) = (name, platform) else {
-            self.send(err(id, 400, "`name` and `platform` (ios or macos) are required")).await;
+            self.send(err(id, 400, "`name` and `platform` (ios, android or macos) are required")).await;
             return protocol;
         };
         if !self.hub.pairing.locked().attempt(source) {
@@ -713,15 +713,34 @@ mod tests {
     }
 
     async fn paired_phone(hub: &Arc<Hub>) -> SigningKey {
+        paired_device(hub, "Kevin's iPhone", "ios").await
+    }
+
+    async fn paired_device(hub: &Arc<Hub>, name: &str, platform: &str) -> SigningKey {
         let key = SigningKey::from_bytes(&crypto::random());
         let code = hub.pairing.locked().issue().code;
         let mut p = Phone::direct(hub, key.clone());
         assert!(matches!(p.hello(hub, true).await, Out::Msg(v) if v["t"] == "welcome"));
-        p.send(json!({"id": 1, "m": "pair", "b": {"code": code, "name": "Kevin's iPhone", "platform": "ios"}})).await;
+        p.send(json!({"id": 1, "m": "pair", "b": {"code": code, "name": name, "platform": platform}})).await;
         let reply = p.recv().await.unwrap();
         assert_eq!(reply["ok"]["computerId"], hub.identity.computer_id());
         assert_eq!(p.recv().await.unwrap_err().0, close::PAIRED);
         key
+    }
+
+    #[tokio::test]
+    async fn android_pairs_and_its_events_stream_holds_pushes() {
+        let hub = temp_hub();
+        let key = paired_device(&hub, "Pixel 9", "android").await;
+        let d = hub.store.device(&crypto::b64(key.verifying_key().as_bytes())).unwrap();
+        assert_eq!(d.platform, "android");
+
+        let mut p = Phone::direct(&hub, key);
+        p.hello(&hub, false).await;
+        p.send(json!({"id": 3, "sub": "events", "b": {"since": hub.store.current_rev(), "client": "android"}})).await;
+        let hello = p.recv().await.unwrap();
+        assert_eq!(hello["ev"]["type"], "hello");
+        assert!(hub.phone_connected(), "a connected Android app holds pushes like the iOS app");
     }
 
     #[tokio::test]
@@ -812,7 +831,7 @@ mod tests {
         p.send(json!({"id": 3, "sub": "events", "b": {"since": hub.store.current_rev(), "client": "ios"}})).await;
         let hello = p.recv().await.unwrap();
         assert_eq!((hello["id"].as_u64(), hello["ev"]["type"].as_str()), (Some(3), Some("hello")));
-        assert!(hub.ios_connected());
+        assert!(hub.phone_connected());
 
         assert!(hub.revoke_device(&dk).unwrap());
         let (code, reject) = p.recv().await.unwrap_err();
@@ -821,7 +840,7 @@ mod tests {
         assert!(hub.store.push_tickets().is_empty());
         assert_eq!(hub.store.activity_tickets("b1").len(), 0);
         tokio::time::sleep(Duration::from_millis(50)).await;
-        assert!(!hub.ios_connected(), "the events subscription ended with the channel");
+        assert!(!hub.phone_connected(), "the events subscription ended with the channel");
         assert!(hub.connected.locked().is_empty());
     }
 

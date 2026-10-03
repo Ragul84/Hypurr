@@ -70,7 +70,7 @@ enum Sub {
         #[arg(long, default_value = "0.0.0.0")]
         bind: String,
     },
-    /// Show a one-time pairing QR code for the Hypurr iOS app (the host must be running).
+    /// Show a one-time pairing QR code for the Hypurr iOS or Android app (the host must be running).
     Pair {
         #[arg(long, default_value_t = service::DEFAULT_PORT)]
         port: u16,
@@ -567,7 +567,7 @@ async fn pair(port: u16, as_json: bool) -> Result<()> {
     let url = p["pairingUrl"].as_str().unwrap_or_default();
     let code = qrcode::QrCode::new(url.as_bytes())?;
     println!("{}", code.render::<qrcode::render::unicode::Dense1x2>().quiet_zone(true).build());
-    println!("Scan with the Hypurr iOS app within 10 minutes, or open this link on the phone:\n{url}\n");
+    println!("Scan with the Hypurr iOS or Android app within 10 minutes, or open this link on the phone:\n{url}\n");
     if hello["cloud"].is_null()
         && p["urls"].as_array().is_none_or(|u| {
             !u.iter().any(|u| u.as_str().is_some_and(|u| u.contains("://100.") || u.contains(".ts.net")))
