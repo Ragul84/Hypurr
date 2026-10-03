@@ -1,10 +1,9 @@
 name: Auto Tag
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "apps/Hypurr.xcodeproj/project.pbxproj"
+  # Disabled until Hypurr has its own release secrets (TAP_TOKEN, signing keys).
+  # Restore the push trigger on main when releases are ready.
+  workflow_dispatch:
 
 permissions:
   contents: write

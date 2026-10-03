@@ -1,8 +1,8 @@
 name: Release macOS
 
 on:
-  push:
-    tags: ["v*"]
+  # Tag-triggered publishing is disabled until Hypurr has its own Apple, Sparkle
+  # and tap secrets. Restore `push: tags: ["v*"]` when releases are ready.
   # A dry run from any branch: builds, signs and notarizes, but publishes nothing.
   workflow_dispatch:
 
