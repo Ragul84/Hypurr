@@ -1,28 +1,26 @@
 <div align="center">
 
-<img src="apps/linux/data/com.ragul84.Hypurr.svg" width="128" alt="Hypurr icon">
+<img src="docs/brand/hypurr-icon.svg" width="128" alt="Hypurr icon">
 
 # Hypurr
 
-**The open-source, 1:1 alternative to Grok Bot and Muse.**<br>
-Your coding agents, as teammates you can message.
+**Message your coding agents like teammates. They purr while they work.**<br>
+Free, open source, native on iPhone, Mac, Linux and the terminal.
 
-[![App Store](https://img.shields.io/badge/App_Store-iOS-0D96F6?logo=apple&logoColor=white)](https://apps.apple.com/app/hypurr/id0000000000)
-[![Homebrew](https://img.shields.io/badge/Homebrew-hypurr-FBB040?logo=homebrew&logoColor=white)](https://github.com/Ragul84/homebrew-hypurr)
-[![Release](https://img.shields.io/github/v/release/Ragul84/Hypurr?color=black)](https://github.com/Ragul84/Hypurr/releases/latest)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-<br>
-![iOS](https://img.shields.io/badge/iOS-18+-black?logo=apple)
-![macOS](https://img.shields.io/badge/macOS-14+-black?logo=apple)
-![Linux](https://img.shields.io/badge/Linux-x86__64%20%7C%20arm64-black?logo=linux&logoColor=white)
+[![License: MIT](https://img.shields.io/badge/license-MIT-a78bfa)](LICENSE)
+![iOS](https://img.shields.io/badge/iOS-18+-f472b6?logo=apple)
+![macOS](https://img.shields.io/badge/macOS-14+-f472b6?logo=apple)
+![Linux](https://img.shields.io/badge/Linux-x86__64%20%7C%20arm64-22d3ee?logo=linux&logoColor=white)
 ![Rust](https://img.shields.io/badge/host-Rust-B7410E?logo=rust)
 ![Swift](https://img.shields.io/badge/apps-SwiftUI-F05138?logo=swift&logoColor=white)
 
-<a href="https://youtu.be/awhZJPjJaPc"><img src="docs/screenshots/launch-film.jpg" width="760" alt="Watch the Hypurr launch film on YouTube (1:26)"></a>
-
-<a href="https://apps.apple.com/app/hypurr/id0000000000"><img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" height="54" alt="Download on the App Store"></a>
-
 </div>
+
+> **Status:** Hypurr is a fresh fork. Hosted services (cloud relay, push, sign-in),
+> App Store listing, Homebrew tap and signed releases are not live yet; the
+> placeholders and how to set them up are listed in
+> [docs/guides/hypurr-setup.md](docs/guides/hypurr-setup.md). Local, LAN, Tailscale
+> and SSH use work from source today.
 
 Hypurr turns the coding agents on your computer — Claude Code, Codex, Cursor, Pi, OpenCode, Grok Build, Gemini, Copilot and ~40 more — into persistent *bots* you delegate to from your iPhone, Mac, Linux desktop or any terminal, the way you'd message a colleague. Pick who, say what, put the phone away. You get a notification when a bot finishes or needs your approval.
 
@@ -36,7 +34,7 @@ Hypurr turns the coding agents on your computer — Claude Code, Codex, Cursor, 
 - **Built in Rust.** `hypurr-host` is one small, fast Rust binary for macOS and Linux (static on Linux, runs on any distro) that drives every agent, keeps the transcripts and serves every client.
 - **Native on every platform.** SwiftUI on iPhone and Mac, GTK 4 / libadwaita on Linux, and a terminal UI for SSH. No web views, no Electron.
 - **A 1:1 Grok Bot / Muse alternative.** Persistent named bots, group chats, reply threads, bots asking each other for help, approval cards, per-bot memory, remote screen, voice calls and "needs you / done" notifications — the same features, without being tied to one model or one subscription.
-- **Reach your computer from anywhere, free.** The hosted Cloudflare relay is included at no cost: no Tailscale, no VPN, no port forwarding. Traffic is end-to-end encrypted between your phone and your computer, so the relay only forwards ciphertext. Same Wi-Fi or Tailscale? The phone connects directly instead.
+- **Reach your computer from anywhere.** Deploy the included Cloudflare relay (`cloud/`) on your own account: no Tailscale, no VPN, no port forwarding. Traffic is end-to-end encrypted between your phone and your computer, so the relay only forwards ciphertext. Same Wi-Fi or Tailscale? The phone connects directly instead.
 - **Every computer, one app.** Sign in and your iPhone lists every computer on your account (Mac, Linux desktop, server or cloud VM); tap **Connect**, confirm a 6-digit code on that computer, and its bots show up next to the others. A new bot can live on any of them, and the Mac app reaches your SSH machines too. Each computer approves each device itself, so an account alone never unlocks a computer.
 - **Remote screen.** See and control your computer from the iPhone over WebRTC (hardware H.264), and let bots use the screen themselves through the built-in `computer` tool.
 - **Voice calls.** Talk to a bot hands-free from the iPhone and hear its replies read aloud.
@@ -109,7 +107,7 @@ Building the Linux app yourself needs `libgtk-4-dev libadwaita-1-dev`: `cargo in
 
 **Linux server / cloud VM** — the host runs headless on any distro (static binary, x86_64 + arm64). Setup, remote access and limitations: [docs/guides/linux-servers.md](docs/guides/linux-servers.md).
 
-**Remote access** works out of the box through the free Cloudflare relay, end-to-end encrypted; the phone switches to a direct connection on the same network or over Tailscale. Details: [remote relay](docs/reference/remote-relay.md).
+**Remote access** goes through your own deployment of the Cloudflare relay, end-to-end encrypted; the phone switches to a direct connection on the same network or over Tailscale. Details: [remote relay](docs/reference/remote-relay.md).
 
 **Agents** — install and sign in to whichever you use; Hypurr finds them. Claude Code, Codex and Pi run through their ACP adapters (fetched by `npx`, so Node.js is needed for those).
 
@@ -168,4 +166,4 @@ The major version is the phone ↔ host protocol: apps work with hosts of the sa
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE) and [NOTICE](NOTICE) for attribution.
