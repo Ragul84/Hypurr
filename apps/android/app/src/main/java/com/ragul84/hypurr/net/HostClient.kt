@@ -7,7 +7,12 @@ import com.ragul84.hypurr.model.Entry
 import com.ragul84.hypurr.model.Hello
 import com.ragul84.hypurr.model.HypurrJson
 import com.ragul84.hypurr.model.Pairing
+import com.ragul84.hypurr.model.Attachment
+import com.ragul84.hypurr.model.Integrations
+import com.ragul84.hypurr.model.Issue
+import com.ragul84.hypurr.model.IssueList
 import com.ragul84.hypurr.model.SafetySettings
+import com.ragul84.hypurr.model.TaskCosts
 import com.ragul84.hypurr.model.SyncResponse
 import com.ragul84.hypurr.model.TaskInfo
 import com.ragul84.hypurr.model.TaskRoute
@@ -136,9 +141,12 @@ class HostClient(val transport: ChannelTransport) {
 
     /** Starts a task; returns its bot (with `task`). */
     suspend fun startTask(goal: String, template: String?, input: String, project: String?, backend: String?,
-                          attachments: List<String> = emptyList(), command: String? = null): Bot {
+                          attachments: List<String> = emptyList(), command: String? = null,
+                          draftId: String? = null, issue: Issue? = null): Bot {
         val res = transport.call("startTask", buildJsonObject {
             put("goal", goal)
+            draftId?.let { put("draftId", it) }
+            issue?.let { put("issue", HypurrJson.encodeToJsonElement(Issue.serializer(), it)) }
             template?.let { put("template", it) }
             if (input.isNotBlank()) put("input", input)
             project?.let { put("project", it) }
@@ -164,9 +172,65 @@ class HostClient(val transport: ChannelTransport) {
         }, timeoutMs = 60_000)
     }
 
-    suspend fun finishTask(taskId: String) {
-        transport.call("finishTask", buildJsonObject { put("taskId", taskId) }, timeoutMs = 60_000)
+    /** Unset options follow the host's Work tools settings. */
+    suspend fun finishTask(taskId: String, openPr: Boolean? = null, notify: Boolean? = null, learning: Boolean? = null) {
+        transport.call("finishTask", buildJsonObject {
+            put("taskId", taskId)
+            openPr?.let { put("openPr", it) }
+            notify?.let { put("notify", it) }
+            learning?.let { put("learning", it) }
+        }, timeoutMs = 60_000)
     }
+
+    /**
+     * One file for a task that hasn't started yet (`draftId`) or a bot's chat (`botId`), in
+     * 384 KiB chunks so each call stays under the channel's 1 MiB limit (docs/features/file-attachments.md).
+     */
+    suspend fun upload(uploadId: String, name: String, bytes: ByteArray, draftId: String? = null, botId: String? = null): Attachment {
+        val chunk = 384 * 1024
+        var offset = 0
+        var result: Attachment? = null
+        do {
+            val end = minOf(bytes.size, offset + chunk)
+            val done = end == bytes.size
+            val res = transport.call("upload", buildJsonObject {
+                draftId?.let { put("draftId", it) }
+                botId?.let { put("botId", it) }
+                put("uploadId", uploadId)
+                put("name", name)
+                put("offset", offset.toLong())
+                put("data", java.util.Base64.getEncoder().encodeToString(bytes.copyOfRange(offset, end)))
+                put("done", done)
+            }, timeoutMs = 60_000)
+            if (done) result = HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("attachment"))
+            offset = end
+        } while (!done)
+        return result!!
+    }
+
+    // Work tools (host `integrations`).
+
+    suspend fun integrations(): Integrations {
+        val res = transport.call("integrations")
+        return HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("integrations"))
+    }
+
+    /** Partial update: only the given fields change; an empty string clears a credential. */
+    suspend fun setIntegrations(patch: JsonObject): Integrations {
+        val res = transport.call("setIntegrations", patch)
+        return HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("integrations"))
+    }
+
+    /** Checks a connection or posts a test message; returns what happened in plain words. */
+    suspend fun testIntegration(kind: String): String {
+        val res = transport.call("testIntegration", buildJsonObject { put("kind", kind) }, timeoutMs = 40_000)
+        return res.jsonObject.str("detail") ?: "OK"
+    }
+
+    suspend fun issues(project: String? = null): IssueList =
+        call("issues", buildJsonObject { project?.let { put("project", it) } }, timeoutMs = 45_000)
+
+    suspend fun taskCosts(): TaskCosts = call("taskCosts")
 
     suspend fun saveTemplate(template: TaskTemplate): TaskTemplate {
         val res = transport.call("saveTemplate", HypurrJson.encodeToJsonElement(TaskTemplate.serializer(), template).jsonObject)

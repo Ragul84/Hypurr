@@ -2,6 +2,7 @@ package com.ragul84.hypurr.ui.screens
 
 import android.os.Build
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -30,7 +31,16 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.ragul84.hypurr.model.Integrations
 import com.ragul84.hypurr.model.SafetySettings
+import com.ragul84.hypurr.model.TaskCosts
+import com.ragul84.hypurr.model.costLabel
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 import com.ragul84.hypurr.model.TaskTemplate
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -70,6 +80,11 @@ data class SettingsUiState(
     /** The computer's safety-net settings; null until loaded. */
     val safety: SafetySettings? = null,
     val customTemplates: List<TaskTemplate> = emptyList(),
+    /** Work tools on the computer (no secrets, only hints); null until loaded. */
+    val integrations: Integrations? = null,
+    val costs: TaskCosts? = null,
+    /** The last "Test" result per kind (github, jira, slack, teams). */
+    val testResults: Map<String, String> = emptyMap(),
 )
 
 @Composable
@@ -83,6 +98,8 @@ fun SettingsScreen(
     onSafety: (SafetySettings) -> Unit = {},
     onAddTemplate: (title: String, prompt: String) -> Unit = { _, _ -> },
     onDeleteTemplate: (String) -> Unit = {},
+    onIntegrations: (JsonObject) -> Unit = {},
+    onTestIntegration: (String) -> Unit = {},
 ) {
     val c = Hypurr.colors
     Column(Modifier.fillMaxSize().background(c.bg).safeDrawingPadding().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
@@ -152,6 +169,8 @@ fun SettingsScreen(
                 AddTemplate(onAddTemplate)
             }
         }
+        state.integrations?.let { work -> WorkTools(work, state.testResults, onIntegrations, onTestIntegration) }
+        state.costs?.let { Spending(it) }
         Section("Notifications") {
             ToggleRow("Alerts", if (state.pushAvailable) "Needs you, done and failed, sealed end to end"
             else "Push isn't configured in this build (placeholder Firebase project)", state.notifications, true, onNotifications)
@@ -190,11 +209,12 @@ private fun AddTemplate(onAdd: (String, String) -> Unit) {
 }
 
 @Composable
-private fun SmallField(value: String, hint: String, minLines: Int = 1, onChange: (String) -> Unit) {
+private fun SmallField(value: String, hint: String, minLines: Int = 1, secret: Boolean = false, onChange: (String) -> Unit) {
     val c = Hypurr.colors
     Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.bg.copy(alpha = 0.6f)).padding(12.dp)) {
         if (value.isEmpty()) Text(hint, color = c.tertiary, style = MaterialTheme.typography.bodyMedium)
-        androidx.compose.foundation.text.BasicTextField(value, onChange, minLines = minLines,
+        androidx.compose.foundation.text.BasicTextField(value, onChange, minLines = minLines, singleLine = secret,
+            visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
             textStyle = MaterialTheme.typography.bodyMedium.copy(color = c.text),
             cursorBrush = androidx.compose.ui.graphics.SolidColor(c.accent), modifier = Modifier.fillMaxWidth())
     }
@@ -220,7 +240,7 @@ private fun Detail(label: String, value: String) {
 
 /** A Hypurr toggle: a pill whose knob springs across. */
 @Composable
-private fun ToggleRow(title: String, subtitle: String, on: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
+internal fun ToggleRow(title: String, subtitle: String, on: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
     val c = Hypurr.colors
     Row(Modifier.fillMaxWidth().pressable(title, role = Role.Switch, enabled = enabled) { onChange(!on) },
         verticalAlignment = Alignment.CenterVertically) {
@@ -234,5 +254,135 @@ private fun ToggleRow(title: String, subtitle: String, on: Boolean, enabled: Boo
             .background(if (on) ColorFlow.linear() else androidx.compose.ui.graphics.SolidColor(c.border))) {
             Box(Modifier.offset(x = knob, y = 2.dp).size(26.dp).clip(CircleShape).background(androidx.compose.ui.graphics.Color.White))
         }
+    }
+}
+
+/**
+ * Work tools: GitHub, Jira, Slack and Teams. Credentials go straight to the computer and stay
+ * there; this screen only ever shows whether each is set up and the last few characters.
+ */
+@Composable
+private fun WorkTools(work: Integrations, tests: Map<String, String>, onSave: (JsonObject) -> Unit, onTest: (String) -> Unit) {
+    val c = Hypurr.colors
+    Section("When a task finishes") {
+        ToggleRow("Learning mode", "The agent explains what it changed, why, and what to check", work.learning, true) {
+            onSave(buildJsonObject { put("learning", it) })
+        }
+        ToggleRow("Open a pull request", "On GitHub projects, upload the task branch and open a PR", work.autoPr, true) {
+            onSave(buildJsonObject { put("autoPr", it) })
+        }
+        ToggleRow("Post the result", "Send a summary to Slack or Teams", work.notify, true) {
+            onSave(buildJsonObject { put("notify", it) })
+        }
+    }
+    Section("Work tools") {
+        Text("Keys are saved on your computer, never on this phone or our servers.", color = c.secondary,
+            style = MaterialTheme.typography.bodySmall)
+        Service("GitHub", when {
+            work.github.usesCli -> "Connected through the GitHub CLI on your computer"
+            work.github.configured -> "Token ${work.github.tokenHint}"
+            else -> "Issues as tasks, and a pull request when a task finishes"
+        }, work.github.configured, tests["github"], onTest = { onTest("github") }) {
+            var token by remember { mutableStateOf("") }
+            SmallField(token, if (work.github.tokenHint.isNotEmpty()) "Paste a new token to replace ${work.github.tokenHint}"
+                else "Personal access token (optional with the GitHub CLI)", secret = true) { token = it }
+            SoftButton("Save", Modifier.fillMaxWidth()) {
+                onSave(buildJsonObject { putJsonObject("github") { put("token", token.trim()) } })
+                token = ""
+            }
+        }
+        Service("Jira", if (work.jira.configured) "${work.jira.email} · ${work.jira.baseUrl.removePrefix("https://")}"
+            else "Your tickets as tasks, and a comment when done", work.jira.configured, tests["jira"], onTest = { onTest("jira") }) {
+            var url by remember(work.jira.baseUrl) { mutableStateOf(work.jira.baseUrl) }
+            var email by remember(work.jira.email) { mutableStateOf(work.jira.email) }
+            var token by remember { mutableStateOf("") }
+            SmallField(url, "https://yourcompany.atlassian.net") { url = it }
+            SmallField(email, "Your work email") { email = it }
+            SmallField(token, if (work.jira.tokenHint.isNotEmpty()) "Paste a new API token to replace ${work.jira.tokenHint}"
+                else "Atlassian API token", secret = true) { token = it }
+            SoftButton("Save", Modifier.fillMaxWidth()) {
+                onSave(buildJsonObject {
+                    putJsonObject("jira") {
+                        put("baseUrl", url.trim())
+                        put("email", email.trim())
+                        if (token.isNotBlank()) put("token", token.trim())
+                    }
+                })
+                token = ""
+            }
+        }
+        listOf("slack" to "Slack", "teams" to "Microsoft Teams").forEach { (kind, name) ->
+            val hook = if (kind == "slack") work.slack else work.teams
+            Service(name, if (hook.configured) "Webhook ${hook.urlHint}" else "Post finished tasks to a channel (incoming webhook)",
+                hook.configured, tests[kind], onTest = { onTest(kind) }) {
+                var url by remember { mutableStateOf("") }
+                SmallField(url, if (hook.configured) "Paste a new webhook URL to replace it" else "https://… incoming webhook URL", secret = true) { url = it }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SoftButton("Save", Modifier.weight(1f)) {
+                        onSave(buildJsonObject { putJsonObject(kind) { put("url", url.trim()) } })
+                        url = ""
+                    }
+                    if (hook.configured) SoftButton("Remove", Modifier.weight(1f), tint = c.danger) {
+                        onSave(buildJsonObject { putJsonObject(kind) { put("url", "") } })
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun Service(name: String, status: String, configured: Boolean, test: String?, onTest: () -> Unit,
+                    edit: @Composable ColumnScope.() -> Unit) {
+    val c = Hypurr.colors
+    var open by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(c.bg.copy(alpha = 0.5f)).padding(12.dp)
+        .animateContentSize(Motion.spatialDefault()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth().pressable("Set up $name") { open = !open }, verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(name, color = c.text, style = MaterialTheme.typography.titleSmall)
+                Text(status, color = c.secondary, style = MaterialTheme.typography.bodySmall)
+            }
+            com.ragul84.hypurr.ui.Pill(if (configured) "Connected" else "Set up", if (configured) c.success else c.accent)
+        }
+        if (test != null) Text(test, color = c.secondary, style = MaterialTheme.typography.bodySmall)
+        androidx.compose.animation.AnimatedVisibility(open) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                edit()
+                if (configured) SoftButton("Test", Modifier.fillMaxWidth(), tint = c.secondary, onClick = onTest)
+            }
+        }
+    }
+}
+
+/** The cost tracker: what tasks cost, from what the agents report (or an estimate). */
+@Composable
+private fun Spending(costs: TaskCosts) {
+    val c = Hypurr.colors
+    val est = costs.total.estimated
+    Section("Spending") {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("Today" to costs.today, "7 days" to costs.week, "All time" to costs.total.cost).forEach { (label, v) ->
+                Column(Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).background(c.bg.copy(alpha = 0.5f)).padding(10.dp)) {
+                    Text(costLabel(v, est), color = c.text, style = MaterialTheme.typography.titleMedium)
+                    Text(label, color = c.secondary, style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
+        if (costs.tasks.isEmpty()) {
+            Text("Costs show up here once a task's agent reports its usage.", color = c.secondary, style = MaterialTheme.typography.bodySmall)
+        }
+        costs.tasks.sortedByDescending { it.usage.cost }.take(5).forEach { t ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(t.title, color = c.text, style = MaterialTheme.typography.bodyMedium, maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    Text("${"%,d".format(t.usage.totalTokens)} tokens", color = c.tertiary, style = MaterialTheme.typography.labelSmall)
+                }
+                Text(t.usage.label, color = c.text, style = MaterialTheme.typography.titleSmall)
+            }
+        }
+        if (est) Text("≈ means an estimate from list prices; the agent didn't report its exact cost.", color = c.tertiary,
+            style = MaterialTheme.typography.labelSmall)
     }
 }

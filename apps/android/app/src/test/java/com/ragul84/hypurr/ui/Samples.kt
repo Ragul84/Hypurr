@@ -13,6 +13,21 @@ import com.ragul84.hypurr.model.TaskInfo
 import com.ragul84.hypurr.model.TaskRoute
 import com.ragul84.hypurr.model.TaskSetup
 import com.ragul84.hypurr.model.TaskTemplate
+import com.ragul84.hypurr.data.PickedFile
+import com.ragul84.hypurr.model.Attachment
+import com.ragul84.hypurr.model.CostRow
+import com.ragul84.hypurr.model.CostTotal
+import com.ragul84.hypurr.model.FileChange
+import com.ragul84.hypurr.model.GitHubStatus
+import com.ragul84.hypurr.model.Integrations
+import com.ragul84.hypurr.model.Issue
+import com.ragul84.hypurr.model.IssueList
+import com.ragul84.hypurr.model.JiraStatus
+import com.ragul84.hypurr.model.Learning
+import com.ragul84.hypurr.model.PullRequest
+import com.ragul84.hypurr.model.TaskCosts
+import com.ragul84.hypurr.model.TaskUsage
+import com.ragul84.hypurr.model.WebhookStatus
 
 /** Fixed sample state for the screenshot tests. */
 object Samples {
@@ -109,4 +124,76 @@ object Samples {
     )
     val route = TaskRoute(Project("shop", "/Users/priya/shop"), Agent("claude", "Claude Code"),
         "shop matches “checkout” in your request; Claude Code is installed and good at making careful code changes.")
+
+    // MARK: workplace (stage B)
+
+    val integrations = Integrations(
+        github = GitHubStatus(configured = true, usesCli = true),
+        jira = JiraStatus(configured = true, baseUrl = "https://acme.atlassian.net", email = "priya@acme.in", tokenHint = "…x9Qe"),
+        slack = WebhookStatus(configured = true, urlHint = "…Hk2s"),
+        teams = WebhookStatus(),
+    )
+    val setupWork = setup.copy(integrations = integrations)
+
+    val ghIssue = Issue("github", "#142", "Checkout button does nothing on Safari", "https://github.com/acme/shop/issues/142",
+        "Clicking Checkout on Safari 17 does nothing.", "/Users/priya/shop")
+    val issues = IssueList(listOf(
+        ghIssue,
+        Issue("github", "#139", "Coupon total rounds the wrong way", "https://github.com/acme/shop/issues/139", project = "/Users/priya/shop"),
+        Issue("jira", "SHOP-311", "Add VAT to invoice PDFs", "https://acme.atlassian.net/browse/SHOP-311"),
+        Issue("jira", "SHOP-298", "Login times out after 5 minutes on VPN", "https://acme.atlassian.net/browse/SHOP-298"),
+    ))
+
+    /** A phone screenshot of a browser error, drawn so the attachment chip has a real picture. */
+    fun screenshot(): PickedFile {
+        val bmp = android.graphics.Bitmap.createBitmap(270, 480, android.graphics.Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bmp)
+        canvas.drawColor(0xFFFFFFFF.toInt())
+        val p = android.graphics.Paint().apply { isAntiAlias = true }
+        p.color = 0xFFE8EAED.toInt(); canvas.drawRect(0f, 0f, 270f, 40f, p)
+        p.color = 0xFFD93025.toInt(); canvas.drawRect(16f, 90f, 254f, 200f, p)
+        p.color = 0xFFFFFFFF.toInt(); p.textSize = 22f; canvas.drawText("TypeError", 30f, 130f, p)
+        p.textSize = 15f; canvas.drawText("Cannot read 'total'", 30f, 160f, p)
+        p.color = 0xFF9AA0A6.toInt()
+        for (i in 0 until 6) canvas.drawRect(16f, 230f + i * 34f, 254f - (i % 3) * 40f, 246f + i * 34f, p)
+        val out = java.io.ByteArrayOutputStream()
+        bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out)
+        return PickedFile("checkout-error.png", out.toByteArray(), "image/png")
+    }
+
+    private val usage = TaskUsage(inputTokens = 48_210, outputTokens = 6_930, totalTokens = 55_140, cost = 0.31, estimated = false, turns = 4)
+    val workTask = task.copy(id = "t2", botId = "b7", title = "#142 Checkout button does nothing on Safari", template = "fix-error",
+        branch = "hypurr/142-checkout-button-does-nothing-9f8e7d6c", issue = ghIssue, usage = usage)
+    val workBot = taskBot.copy(id = "b7", name = workTask.title, status = "idle", activity = "", task = workTask, avatarColor = "orange")
+    val finishedBot = workBot.copy(task = workTask.copy(status = "finished", pr = PullRequest(57, "https://github.com/acme/shop/pull/57"),
+        summary = "Fixed the click handler."))
+
+    private fun w(kind: String, data: EntryData, at: Long) = Entry(id = "w${++seq}", seq = seq, botId = "b7", kind = kind, data = data,
+        createdAt = at, updatedAt = at)
+
+    val workChat = listOf(
+        w("user", EntryData(text = "#142 Checkout button does nothing on Safari",
+            attachments = listOf(Attachment("u1", "checkout-error.png", 48_213))), NOW - 20 * MIN),
+        w("agent", EntryData(text = "Found it: Safari doesn't support `Array.prototype.at` in the checkout bundle's target, so the " +
+            "click handler threw before submitting. I replaced it with an index lookup and added a test.", final = true), NOW - 12 * MIN),
+        w("user", EntryData(text = "Explain what you changed and why (learning mode)"), NOW - 4 * MIN),
+        w("agent", EntryData(text = "- I changed src/Checkout.tsx and added tests/checkout.test.tsx.\n- Why: older Safari can't run `.at()`, " +
+            "so the button's code crashed.\n- Check: open Checkout on Safari and tap the button.", final = true), NOW - 3 * MIN),
+        w("notice", EntryData(text = "What changed", style = "info", learning = Learning(
+            taskId = "t2", title = workTask.title,
+            summary = "• I changed src/Checkout.tsx and added a test.\n• Why: older Safari can't run .at(), so the button's code crashed " +
+                "before it could submit the order.\n• Check: open Checkout on Safari and tap the button.",
+            files = listOf(FileChange("src/Checkout.tsx", 3, 2), FileChange("tests/checkout.test.tsx", 41, 0)), added = 44, removed = 2,
+            branch = workTask.branch, base = "main", pr = PullRequest(57, "https://github.com/acme/shop/pull/57"), cost = usage,
+            posted = listOf("slack"))), NOW - 2 * MIN),
+    )
+
+    val costs = TaskCosts(
+        tasks = listOf(
+            CostRow("t2", "b7", workTask.title, NOW - 20 * MIN, usage),
+            CostRow("t1", "b6", task.title, NOW - 14 * MIN, TaskUsage(totalTokens = 31_400, cost = 0.18, estimated = true, turns = 3)),
+            CostRow("t0", "b8", "Update dependencies", NOW - 26 * 60 * MIN, TaskUsage(totalTokens = 92_700, cost = 0.64, estimated = false, turns = 6)),
+        ),
+        total = CostTotal(1.13, 179_240, 3, estimated = true), week = 1.13, today = 0.49,
+    )
 }

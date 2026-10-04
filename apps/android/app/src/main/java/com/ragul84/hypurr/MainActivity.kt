@@ -26,7 +26,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.result.PickVisualMediaRequest
 import com.ragul84.hypurr.data.HypurrStore
+import com.ragul84.hypurr.data.PickedFile
 import com.ragul84.hypurr.model.Pairing
 import com.ragul84.hypurr.net.LinkState
 import com.ragul84.hypurr.ui.screens.BotListScreen
@@ -54,6 +58,22 @@ class MainActivity : ComponentActivity() {
 
     private val scan = registerForActivityResult(ScanContract()) { result -> result.contents?.let { scanned.value = it } }
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    /** A screenshot or photo picked for the New task screen. */
+    private val picked = MutableStateFlow<PickedFile?>(null)
+    private val pickImage = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { readFile(it, "screenshot.jpg") }?.let { picked.value = it }
+    }
+
+    /** Reads a picked or pasted file (the system photo picker or the clipboard; no storage permission). */
+    private fun readFile(uri: Uri, fallback: String): PickedFile? = runCatching {
+        val mime = contentResolver.getType(uri) ?: "application/octet-stream"
+        val name = contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cur ->
+            if (cur.moveToFirst()) cur.getString(0) else null
+        } ?: fallback
+        val bytes = contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
+        if (bytes.size > MAX_FILE) return null
+        PickedFile(name, bytes, mime)
+    }.getOrNull()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -168,6 +188,8 @@ class MainActivity : ComponentActivity() {
                         return@AnimatedContent
                     }
                     var draft by rememberSaveable(id) { mutableStateOf("") }
+                    val integrations by store.integrations.collectAsState()
+                    LaunchedEffect(bot.task != null) { if (bot.task != null) store.loadIntegrations() }
                     androidx.compose.runtime.LaunchedEffect(id, synced) { store.openChat(id) }
                     ChatScreen(
                         bot, entries[id].orEmpty(), draft, { draft = it },
@@ -181,8 +203,10 @@ class MainActivity : ComponentActivity() {
                         onRespond = { entry, option -> scope.launch { runCatching { store.respond(entry.id, option) } } },
                         onUndo = { entry -> entry.data.checkpoint?.let { cp -> scope.launch { runCatching { store.rollback(id, cp) } } } },
                         onRollback = { cp -> scope.launch { runCatching { store.rollback(id, cp.id) } } },
-                        onFinishTask = { scope.launch { runCatching { store.finishTask(id) } } },
+                        onFinishTask = { o -> scope.launch { runCatching { store.finishTask(id, o.openPr, o.notify, o.learning) } } },
                         onSaveCheckpoint = { scope.launch { runCatching { store.saveCheckpoint(id) } } },
+                        onOpenLink = { url -> runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } },
+                        integrations = integrations,
                     )
                 }
                 target == "newtask" -> {
@@ -190,10 +214,15 @@ class MainActivity : ComponentActivity() {
                     var task by remember { mutableStateOf(NewTaskUiState()) }
                     LaunchedEffect(Unit) { store.loadSetup() }
                     // Ask the host for its pick as the user types (debounced).
-                    LaunchedEffect(task.goal, task.template, setup) {
-                        if (task.goal.isBlank() && task.template == null) return@LaunchedEffect
+                    LaunchedEffect(task.goal, task.template, task.issue, setup) {
+                        if (task.routeText.isBlank() && task.template == null) return@LaunchedEffect
                         delay(500)
-                        runCatching { store.route("${task.goal} ${task.input}", task.template) }.getOrNull()?.let { task = task.copy(route = it) }
+                        runCatching { store.route(task.routeText, task.template) }.getOrNull()?.let { task = task.copy(route = it) }
+                    }
+                    val file by picked.collectAsState()
+                    file?.let {
+                        picked.value = null
+                        task = task.copy(files = task.files + it, error = null)
                     }
                     NewTaskScreen(
                         task.copy(setup = setup),
@@ -202,7 +231,8 @@ class MainActivity : ComponentActivity() {
                             task = task.copy(busy = true, error = null)
                             scope.launch {
                                 try {
-                                    val botId = store.startTask(task.goal, task.template, task.input, task.projectPath, task.agentId)
+                                    val botId = store.startTask(task.goal, task.template, task.input, task.projectPath, task.agentId,
+                                        task.files, task.issue)
                                     screen = "chat:$botId"
                                 } catch (e: Exception) {
                                     task = task.copy(busy = false, error = e.message ?: "Couldn't start the task.")
@@ -210,6 +240,30 @@ class MainActivity : ComponentActivity() {
                             }
                         },
                         onBack = { screen = "list" },
+                        onAddImage = { pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                        onPaste = {
+                            // An image on the clipboard becomes an attachment; text goes where the error belongs.
+                            val item = getSystemService(ClipboardManager::class.java).primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)
+                            val uri = item?.uri
+                            val pasted = uri?.takeIf { contentResolver.getType(it)?.startsWith("image/") == true }?.let { readFile(it, "pasted.png") }
+                            if (pasted != null) {
+                                task = task.copy(files = task.files + pasted)
+                            } else {
+                                val text = item?.coerceToText(this@MainActivity)?.toString()?.trim().orEmpty()
+                                if (text.isNotEmpty()) task = if (task.selectedTemplate?.inputLabel != null || task.goal.isNotBlank())
+                                    task.copy(input = listOf(task.input, text).filter { it.isNotBlank() }.joinToString("\n"))
+                                else task.copy(goal = text)
+                            }
+                        },
+                        onPickIssue = {
+                            task = task.copy(pickingIssue = true, issues = null)
+                            scope.launch {
+                                val list = runCatching { store.issues() }.getOrElse {
+                                    com.ragul84.hypurr.model.IssueList(errors = listOf(com.ragul84.hypurr.model.IssueError(message = it.message ?: "Couldn't load issues.")))
+                                }
+                                task = task.copy(issues = list)
+                            }
+                        },
                     )
                 }
                 target == "settings" -> {
@@ -217,10 +271,18 @@ class MainActivity : ComponentActivity() {
                     val dynamic by store.dynamicColor.collectAsState()
                     val notify by store.notifications.collectAsState()
                     val setup by store.setup.collectAsState()
-                    LaunchedEffect(Unit) { store.loadSetup() }
+                    val integrations by store.integrations.collectAsState()
+                    val costs by store.costs.collectAsState()
+                    var tests by remember { mutableStateOf(mapOf<String, String>()) }
+                    LaunchedEffect(Unit) {
+                        store.loadSetup()
+                        store.loadIntegrations()
+                        store.loadCosts()
+                    }
                     SettingsScreen(
                         SettingsUiState(current, linkState, theme, dynamic, notify, app.pushAvailable, BuildConfig.VERSION_NAME,
-                            safety = setup?.safety, customTemplates = setup?.templates.orEmpty().filter { !it.builtin }),
+                            safety = setup?.safety, customTemplates = setup?.templates.orEmpty().filter { !it.builtin },
+                            integrations = integrations, costs = costs, testResults = tests),
                         onBack = { screen = "list" },
                         onTheme = store::setTheme,
                         onDynamic = store::setDynamicColor,
@@ -234,6 +296,20 @@ class MainActivity : ComponentActivity() {
                         onSafety = { scope.launch { runCatching { store.setSafety(it) } } },
                         onAddTemplate = { title, prompt -> scope.launch { runCatching { store.saveTemplate(TaskTemplate(title = title, prompt = prompt)) } } },
                         onDeleteTemplate = { scope.launch { runCatching { store.deleteTemplate(it) } } },
+                        onIntegrations = { patch ->
+                            scope.launch {
+                                runCatching { store.setIntegrations(patch) }.onFailure { e ->
+                                    patch.keys.firstOrNull()?.let { tests = tests + (it to (e.message ?: "Couldn't save.")) }
+                                }
+                            }
+                        },
+                        onTestIntegration = { kind ->
+                            tests = tests + (kind to "Testing…")
+                            scope.launch {
+                                val result = runCatching { store.testIntegration(kind) }.getOrElse { it.message ?: "Test failed." }
+                                tests = tests + (kind to result)
+                            }
+                        },
                     )
                 }
                 else -> BotListScreen(
@@ -249,5 +325,6 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_BOT = "botId"
+        const val MAX_FILE = 100 * 1024 * 1024
     }
 }

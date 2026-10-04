@@ -73,7 +73,12 @@ import androidx.compose.ui.unit.sp
 import com.ragul84.hypurr.model.Bot
 import com.ragul84.hypurr.model.Checkpoint
 import com.ragul84.hypurr.model.Entry
+import com.ragul84.hypurr.model.Integrations
+import com.ragul84.hypurr.model.Learning
 import com.ragul84.hypurr.model.TaskInfo
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
+import androidx.compose.material.icons.rounded.AttachFile
+import androidx.compose.material.icons.rounded.School
 import com.ragul84.hypurr.ui.Pill
 import com.ragul84.hypurr.ui.relativeTime
 import com.ragul84.hypurr.ui.riskColor
@@ -101,9 +106,13 @@ fun ChatScreen(
     onRespond: (Entry, String?) -> Unit,
     onUndo: (Entry) -> Unit = {},
     onRollback: (Checkpoint) -> Unit = {},
-    onFinishTask: () -> Unit = {},
+    onFinishTask: (FinishOptions) -> Unit = {},
     onSaveCheckpoint: () -> Unit = {},
+    onOpenLink: (String) -> Unit = {},
+    /** Work tools on the computer: which finish options to offer. */
+    integrations: Integrations? = null,
     initialCheckpointsOpen: Boolean = false,
+    initialFinishOpen: Boolean = false,
     now: Long = System.currentTimeMillis(),
 ) {
     val c = Hypurr.colors
@@ -126,7 +135,7 @@ fun ChatScreen(
                         "user" -> UserBubble(entry)
                         "agent" -> AgentBubble(entry)
                         "permission" -> PermissionCard(entry, task, onRespond, onUndo)
-                        else -> Notice(entry)
+                        else -> entry.data.learning?.let { LearningCard(it, onOpenLink) } ?: Notice(entry)
                     }
                 }
             }
@@ -152,9 +161,9 @@ fun ChatScreen(
         }
         Composer(draft, onDraftChange, onSend, Modifier.align(Alignment.BottomCenter))
         if (task != null) {
-            CheckpointSheet(checkpointsOpen, task, now, onClose = { checkpointsOpen = false },
+            CheckpointSheet(checkpointsOpen, task, now, integrations, initialFinishOpen, onClose = { checkpointsOpen = false },
                 onRollback = { checkpointsOpen = false; onRollback(it) },
-                onFinish = { checkpointsOpen = false; onFinishTask() }, onSave = onSaveCheckpoint)
+                onFinish = { checkpointsOpen = false; onFinishTask(it) }, onSave = onSaveCheckpoint)
         }
     }
 }
@@ -175,21 +184,33 @@ private fun TaskStrip(task: TaskInfo, onOpen: () -> Unit) {
                 style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             val n = task.checkpoints.size
             Text(when {
-                !task.isActive -> "Finished · kept for review"
+                task.isFinishing -> "Finishing · writing what changed…"
+                !task.isActive -> task.pr?.let { "Finished · pull request #${it.number}" } ?: "Finished · kept for review"
                 safe -> "$n checkpoint${if (n == 1) "" else "s"} · ${task.projectName}"
                 else -> task.projectName
             }, color = c.secondary, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+        }
+        task.usage?.takeIf { it.turns > 0 || it.cost > 0 }?.let {
+            Pill(it.label, c.accent, Modifier.padding(end = 8.dp))
         }
         if (safe) Icon(Icons.Rounded.History, null, tint = c.accent, modifier = Modifier.size(20.dp))
     }
 }
 
+/** How to wrap up a task; unset options follow the computer's Work tools settings. */
+data class FinishOptions(val learning: Boolean, val openPr: Boolean?, val notify: Boolean?)
+
 /** One-tap rollback: every checkpoint, newest first. Going back asks once, inline. */
 @Composable
-private fun CheckpointSheet(open: Boolean, task: TaskInfo, now: Long, onClose: () -> Unit, onRollback: (Checkpoint) -> Unit,
-                            onFinish: () -> Unit, onSave: () -> Unit) {
+private fun CheckpointSheet(open: Boolean, task: TaskInfo, now: Long, integrations: Integrations?, initialFinish: Boolean,
+                            onClose: () -> Unit, onRollback: (Checkpoint) -> Unit, onFinish: (FinishOptions) -> Unit, onSave: () -> Unit) {
     val c = Hypurr.colors
     var confirm by remember { mutableStateOf<String?>(null) }
+    var finishing by remember { mutableStateOf(initialFinish) }
+    val work = integrations ?: Integrations()
+    var learning by remember(work) { mutableStateOf(work.learning) }
+    var openPr by remember(work) { mutableStateOf(work.autoPr && work.github.configured) }
+    var notify by remember(work) { mutableStateOf(work.notify && work.anyChat) }
     Box(Modifier.fillMaxSize()) {
         AnimatedVisibility(open, enter = fadeIn(Motion.effects()), exit = fadeOut(Motion.effects())) {
             Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.32f)).pressable("Close", onClick = onClose))
@@ -233,9 +254,28 @@ private fun CheckpointSheet(open: Boolean, task: TaskInfo, now: Long, onClose: (
                     }
                 }
                 if (task.isActive) {
+                    AnimatedVisibility(finishing) {
+                        Column(Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(c.bg.copy(alpha = 0.5f))
+                            .padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text("Finish the task", color = c.text, style = MaterialTheme.typography.titleSmall)
+                            ToggleRow("Explain what changed", "Learning mode: the agent sums up what it changed, why, and what to check",
+                                learning, true) { learning = it }
+                            ToggleRow("Open a pull request", if (work.github.configured) "Uploads the task branch and opens a PR for review"
+                                else "Set up GitHub in Settings › Work tools", openPr, work.github.configured) { openPr = it }
+                            ToggleRow("Post the result", if (work.anyChat) listOfNotNull("Slack".takeIf { work.slack.configured },
+                                "Teams".takeIf { work.teams.configured }).joinToString(" and ")
+                                else "Set up Slack or Teams in Settings › Work tools", notify, work.anyChat) { notify = it }
+                            SoftButton("Finish", Modifier.fillMaxWidth(), icon = Icons.Rounded.Check, tint = c.success) {
+                                finishing = false
+                                onFinish(FinishOptions(learning, openPr, notify))
+                            }
+                        }
+                    }
                     Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         SoftButton("Save now", Modifier.weight(1f), icon = Icons.Rounded.Bookmark, onClick = onSave)
-                        SoftButton("Finish task", Modifier.weight(1f), icon = Icons.Rounded.Check, tint = c.success, onClick = onFinish)
+                        if (!finishing) {
+                            SoftButton("Finish task", Modifier.weight(1f), icon = Icons.Rounded.Check, tint = c.success) { finishing = true }
+                        }
                     }
                 }
             }
@@ -258,8 +298,11 @@ private fun EmptyChat(bot: Bot) {
 private fun UserBubble(entry: Entry) {
     val c = Hypurr.colors
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
-        SelectionContainer {
-            Text(entry.data.text.orEmpty(), color = c.text, style = MaterialTheme.typography.bodyLarge,
+        entry.data.attachments.orEmpty().forEach { a ->
+            Pill(a.name, c.accent, Modifier.padding(start = 56.dp, bottom = 4.dp), icon = Icons.Rounded.AttachFile)
+        }
+        if (!entry.data.text.isNullOrEmpty()) SelectionContainer {
+            Text(entry.data.text, color = c.text, style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.padding(start = 56.dp).clip(RoundedCornerShape(22.dp, 22.dp, 6.dp, 22.dp))
                     .background(c.bubbleUser).padding(horizontal = 16.dp, vertical = 11.dp))
         }
@@ -355,6 +398,44 @@ private fun PermissionCard(entry: Entry, task: TaskInfo?, onRespond: (Entry, Str
                     SoftButton("Undo", icon = Icons.AutoMirrored.Rounded.Undo, tint = c.warning) { onUndo(entry) }
                 }
             }
+        }
+    }
+}
+
+/** Learning mode: what a finished task changed and why, its files, PR, cost and where it was posted. */
+@Composable
+private fun LearningCard(l: Learning, onOpenLink: (String) -> Unit) {
+    val c = Hypurr.colors
+    Column(Modifier.fillMaxWidth().padding(end = 24.dp).glass(RoundedCornerShape(24.dp), c.success.copy(alpha = 0.10f)).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Rounded.School, null, tint = c.success, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("What changed and why", color = c.success, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f))
+            l.cost?.let { Pill(it.label, c.accent) }
+        }
+        SelectionContainer { Text(l.summary, color = c.text, style = MaterialTheme.typography.bodyLarge) }
+        if (l.files.isNotEmpty()) {
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(c.bg.copy(alpha = 0.55f)).padding(10.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                l.files.take(8).forEach { f ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(f.path, color = c.text, fontFamily = FontFamily.Monospace, fontSize = 13.sp, maxLines = 1,
+                            overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        Text("+${f.added}", color = c.success, style = MaterialTheme.typography.labelMedium)
+                        Spacer(Modifier.width(6.dp))
+                        Text("−${f.removed}", color = c.danger, style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+                if (l.files.size > 8) Text("and ${l.files.size - 8} more", color = c.tertiary, style = MaterialTheme.typography.labelSmall)
+            }
+        }
+        val posted = l.posted.map { when (it) { "slack" -> "Slack"; "teams" -> "Teams"; "jira" -> "Jira"; else -> it } }
+        if (posted.isNotEmpty()) Text("Posted to ${posted.joinToString(", ")}", color = c.secondary, style = MaterialTheme.typography.bodySmall)
+        l.errors.forEach { Text(it, color = c.danger, style = MaterialTheme.typography.bodySmall) }
+        l.pr?.let { pr ->
+            SoftButton("Open pull request #${pr.number}", Modifier.fillMaxWidth(), icon = Icons.AutoMirrored.Rounded.OpenInNew) { onOpenLink(pr.url) }
         }
     }
 }

@@ -13,6 +13,7 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -34,12 +35,20 @@ class TaskStoreTest {
     @Test
     fun startUndoAndSafety() = runBlocking {
         val calls = mutableMapOf<String, JsonObject>()
+        var uploadCalls = 0
         val bot = wire.getValue("bot").jsonObject
         val botId = bot.getValue("id").jsonPrimitive.content
         host.handler = { _, m ->
             val method = m["m"]?.jsonPrimitive?.content ?: m["sub"]?.jsonPrimitive?.content ?: ""
             m["b"]?.jsonObject?.let { synchronized(calls) { calls[method] = it } }
+            if (method == "upload") uploadCalls++
             when (method) {
+                "upload" -> buildJsonObject {
+                    put("attachment", buildJsonObject {
+                        put("id", m["b"]!!.jsonObject.getValue("uploadId"))
+                        put("name", "shot.png")
+                    })
+                }
                 "sync" -> buildJsonObject {
                     put("rev", 1)
                     put("bots", buildJsonArray { })
@@ -81,6 +90,21 @@ class TaskStoreTest {
         val rb = calls.getValue("rollbackTask")
         assertEquals(store.bots.value.getValue(id).task!!.id, rb.getValue("taskId").jsonPrimitive.content)
         assertEquals(cp, rb.getValue("checkpointId").jsonPrimitive.content)
+
+        // A screenshot and an issue: the file goes up as a draft first, then the task names it.
+        val issue = com.ragul84.hypurr.model.Issue("github", "#142", "Checkout button does nothing", project = "/Users/priya/shop")
+        store.startTask("", "fix-error", "", null, "claude", listOf(PickedFile("shot.png", ByteArray(500_000) { 7 }, "image/png")), issue)
+        val uploads = synchronized(calls) { calls.getValue("upload") }
+        val fromTask = calls.getValue("startTask")
+        assertEquals(fromTask.getValue("draftId"), uploads.getValue("draftId"))
+        assertEquals(uploads.getValue("uploadId"), fromTask.getValue("attachments").jsonArray.single())
+        assertEquals("#142", fromTask.getValue("issue").jsonObject.getValue("key").jsonPrimitive.content)
+        assertEquals(2, uploadCalls)
+
+        store.finishTask(id, openPr = true, notify = false, learning = true)
+        val fin = calls.getValue("finishTask")
+        assertEquals("true", fin.getValue("openPr").jsonPrimitive.content)
+        assertEquals("false", fin.getValue("notify").jsonPrimitive.content)
 
         store.setSafety(SafetySettings(alwaysAskHigh = false))
         assertEquals(false, calls.getValue("setSafetySettings").getValue("alwaysAskHigh").jsonPrimitive.content.toBoolean())
