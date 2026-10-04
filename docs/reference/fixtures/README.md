@@ -17,4 +17,9 @@ Consumers:
 - `kit/Tests/HypurrKitTests/RelayVectorsTests.swift`
 - `cloud/test/vectors.test.ts` and `cloud/test/relay.test.ts`
 
+[task-wire.json](task-wire.json) is real `hypurr-host` output for a beginner task: a task bot, a blocked and a pending explained permission card, `taskSetup` and `routeTask` (paths anonymised). Consumers:
+
+- `apps/android/app/src/test/java/com/ragul84/hypurr/model/TaskWireTest.kt` (via the `hypurr.taskWire` system property)
+- `kit/Tests/HypurrKitTests/TaskWireTests.swift`
+
 When moving or changing a fixture, update those paths and the cloud/kit/host CI path filters. Run the affected vector tests; a Markdown link check alone cannot validate executable imports. [Protocol reference](../remote-relay.md).
