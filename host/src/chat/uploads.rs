@@ -21,6 +21,33 @@ pub fn root(cfg: &BotConfig) -> PathBuf {
     }
 }
 
+/// Files attached on the New task screen before the task's bot exists:
+/// `~/.hypurr/task-drafts/<draft id>/`. `startTask` moves them into the bot's uploads.
+pub fn draft_root(draft: &str) -> Result<PathBuf> {
+    uuid::Uuid::parse_str(draft).context("invalid draft id")?;
+    Ok(service::data_dir().join("task-drafts").join(draft.to_ascii_lowercase()))
+}
+
+/// Moves finished draft uploads into `root` (the bot's uploads). Unknown ids are refused.
+pub fn adopt_drafts(draft: &Path, root: &Path, uploads: &[String]) -> Result<()> {
+    std::fs::create_dir_all(root).context("creating the upload folder")?;
+    for id in uploads {
+        let from = dir(draft, id)?;
+        let to = dir(root, id)?;
+        if to.exists() {
+            continue;
+        }
+        if std::fs::rename(&from, &to).is_err() {
+            // Another filesystem: copy, then drop the draft copy.
+            let (path, _) = resolve(draft, id)?;
+            std::fs::create_dir_all(&to).context("creating the upload folder")?;
+            std::fs::copy(&path, to.join(path.file_name().unwrap_or_default())).context("copying the upload")?;
+        }
+    }
+    let _ = std::fs::remove_dir_all(draft);
+    Ok(())
+}
+
 /// `uploads/<upload id>/`, the id checked so it can't leave the folder.
 fn dir(root: &Path, upload: &str) -> Result<PathBuf> {
     uuid::Uuid::parse_str(upload).context("invalid upload id")?;

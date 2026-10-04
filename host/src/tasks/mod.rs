@@ -4,6 +4,8 @@
 //! A task is a bot (its chat is the task's conversation) plus a row in `tasks`;
 //! clients see it as the bot's `task` field. Spec: docs/features/tasks-and-safety.md.
 
+pub mod cost;
+pub mod finish;
 pub mod risk;
 pub mod router;
 pub mod safety;
@@ -66,12 +68,14 @@ pub enum SafetyMode {
     None,
 }
 
-/// Wire values `active` / `finished`.
+/// Wire values `active` / `finishing` / `finished`.
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
 pub enum TaskStatus {
     #[default]
     Active,
+    /// Writing the learning summary, opening the PR, posting the result.
+    Finishing,
     Finished,
 }
 
@@ -128,7 +132,26 @@ impl Task {
         let mut v = serde_json::to_value(self).unwrap_or(Value::Null);
         let n = self.checkpoints.len();
         v["checkpoints"] = json!(self.checkpoints[n.saturating_sub(CHECKPOINTS_ON_BOT)..]);
+        if let Some(o) = v.as_object_mut() {
+            o.remove("finishing");
+            if self.extra.contains_key("usage") {
+                o.insert("usage".into(), self.usage().public());
+            }
+        }
         v
+    }
+
+    /// The GitHub issue or Jira ticket the task started from.
+    pub fn issue(&self) -> Option<crate::integrations::Issue> {
+        self.extra.get("issue").and_then(|v| serde_json::from_value(v.clone()).ok())
+    }
+
+    pub fn usage(&self) -> cost::Usage {
+        self.extra.get("usage").and_then(|v| serde_json::from_value(v.clone()).ok()).unwrap_or_default()
+    }
+
+    fn set_usage(&mut self, u: &cost::Usage) {
+        self.extra.insert("usage".into(), serde_json::to_value(u).unwrap_or(Value::Null));
     }
 
     fn worktree_path(&self) -> Option<PathBuf> {
@@ -233,6 +256,7 @@ pub fn setup(store: &Store) -> Value {
         "projects": projects(store),
         "agents": agents(),
         "safety": SafetySettings::load(store),
+        "integrations": crate::integrations::Integrations::load(store).public(),
     })
 }
 
@@ -254,6 +278,17 @@ fn title_for(goal: &str, template: Option<&templates::Template>) -> String {
 }
 
 /// The rules every task's agent gets with the first message.
+/// The ticket's own words, for the agent.
+fn issue_context(task: &Task) -> String {
+    let Some(i) = task.issue() else { return String::new() };
+    let source = if i.source == "jira" { "Jira ticket" } else { "GitHub issue" };
+    let mut s = format!("\n\n[{source} {}: {}]({})", i.key, i.title, i.url);
+    if !i.body.trim().is_empty() {
+        let _ = write!(s, "\n{}", i.body.trim());
+    }
+    s
+}
+
 fn rules(task: &Task, read_only: bool) -> String {
     let mut r = String::from("\n\n---\nWorking rules from Hypurr (the user's safety net):\n");
     match (&task.branch, &task.worktree) {
@@ -283,6 +318,12 @@ pub async fn start(hub: &Arc<Hub>, b: &Value) -> Result<Value> {
         None => None,
     };
     let input = b["input"].as_str().unwrap_or_default().to_owned();
+    let issue: Option<crate::integrations::Issue> =
+        b.get("issue").filter(|v| v.is_object()).and_then(|v| serde_json::from_value(v.clone()).ok());
+    let goal = match &issue {
+        Some(i) if goal.is_empty() => format!("{} {}", i.key, i.title).trim().to_owned(),
+        _ => goal,
+    };
     if goal.is_empty() && template.is_none() {
         bail!("describe what you need, or pick a template");
     }
@@ -296,7 +337,11 @@ pub async fn start(hub: &Arc<Hub>, b: &Value) -> Result<Value> {
     }
     let read_only = template.as_ref().is_some_and(|t| t.read_only);
     // Route what the user didn't pick.
-    let picked_project = b["project"].as_str().filter(|s| !s.is_empty()).map(str::to_owned);
+    let picked_project = b["project"]
+        .as_str()
+        .filter(|s| !s.is_empty())
+        .map(str::to_owned)
+        .or_else(|| issue.as_ref().and_then(|i| i.project.clone()));
     let picked_backend = b["backend"].as_str().filter(|s| !s.is_empty()).map(str::to_owned);
     let command = b["command"].as_str().filter(|s| !s.trim().is_empty()).map(str::to_owned);
     let (project, backend) = {
@@ -346,6 +391,9 @@ pub async fn start(hub: &Arc<Hub>, b: &Value) -> Result<Value> {
         updated_at: now,
         extra: serde_json::Map::new(),
     };
+    if let Some(i) = &issue {
+        task.extra.insert("issue".into(), serde_json::to_value(i)?);
+    }
     // Isolate on a branch + worktree when the project is a git checkout.
     let isolated = {
         let (repo, id, title, protected) =
@@ -427,7 +475,13 @@ pub async fn start(hub: &Arc<Hub>, b: &Value) -> Result<Value> {
     };
     let uploads: Vec<String> =
         b["attachments"].as_array().into_iter().flatten().filter_map(Value::as_str).map(str::to_owned).collect();
-    let prompt = format!("{body}{}", rules(&task, read_only));
+    if let Some(draft) = b["draftId"].as_str().filter(|_| !uploads.is_empty()) {
+        let draft = crate::chat::uploads::draft_root(draft)?;
+        let root = crate::chat::uploads::root(&hub.store.bot(&bot_id)?.ok_or_else(|| anyhow!("unknown bot"))?.config);
+        let ids = uploads.clone();
+        tokio::task::spawn_blocking(move || crate::chat::uploads::adopt_drafts(&draft, &root, &ids)).await??;
+    }
+    let prompt = format!("{body}{}{}", issue_context(&task), rules(&task, read_only));
     send_first(hub, &bot_id, &shown, &prompt, &uploads)?;
     hub.emit_bot(&bot_id);
     Ok(json!({"task": task.public(), "bot": hub.store.bot(&bot_id)?.map(|r| hub.bot_json(&r))}))
@@ -493,9 +547,20 @@ pub fn checkpoint_bot(hub: &Hub, bot_id: &str, label: &str) -> Result<Option<Che
     }
 }
 
-/// A turn ended: save a checkpoint off the actor's thread.
-pub fn after_turn(hub: &Arc<Hub>, bot_id: &str) {
-    if Task::for_bot(&hub.store, bot_id).is_none() {
+/// A turn ended: record its usage, wrap up a finishing task, or save a checkpoint off
+/// the actor's thread.
+pub fn after_turn(hub: &Arc<Hub>, bot_id: &str, final_text: Option<&str>, usage: Option<&Value>) {
+    let Some(mut task) = Task::for_bot(&hub.store, bot_id) else { return };
+    if let Some(u) = usage.filter(|u| u.is_object()) {
+        let mut acc = task.usage();
+        acc.add_turn(u, cost::rate_for(&task.backend));
+        task.set_usage(&acc);
+        if let Err(e) = task.save(&hub.store) {
+            tracing::warn!(task = task.id, error = format!("{e:#}"), "couldn't record usage");
+        }
+        hub.emit_bot(bot_id);
+    }
+    if finish::after_summary_turn(hub, &task, final_text) || task.status != TaskStatus::Active {
         return;
     }
     let (hub, bot_id) = (hub.clone(), bot_id.to_owned());
@@ -558,18 +623,49 @@ fn target_label(task: &Task, id: &str) -> String {
     task.checkpoints.iter().find(|c| c.id == id).map_or_else(String::new, |c| c.label.clone())
 }
 
-/// Marks a task finished: a last checkpoint, then the branch stays for review.
-pub async fn finish(hub: &Arc<Hub>, task_id: &str) -> Result<Value> {
-    let task = Task::load(&hub.store, task_id).ok_or_else(|| anyhow!("unknown task"))?;
-    {
-        let (h, bot) = (hub.clone(), task.bot_id.clone());
-        tokio::task::spawn_blocking(move || checkpoint_bot(&h, &bot, "Finished")).await??;
+/// `usage_update` from a task's agent: the session's cost so far, when it reports one.
+pub fn usage_update(hub: &Hub, bot_id: &str, u: &Value) {
+    let Some(amount) = u["cost"]["amount"].as_f64() else { return };
+    let Some(mut task) = Task::for_bot(&hub.store, bot_id) else { return };
+    let mut acc = task.usage();
+    acc.set_session_cost(amount, u["cost"]["currency"].as_str().unwrap_or("USD"), cost::rate_for(&task.backend));
+    task.set_usage(&acc);
+    if task.save(&hub.store).is_ok() {
+        hub.emit_bot(bot_id);
     }
-    let mut task = Task::load(&hub.store, task_id).ok_or_else(|| anyhow!("unknown task"))?;
-    task.status = TaskStatus::Finished;
-    task.save(&hub.store)?;
-    hub.emit_bot(&task.bot_id);
-    Ok(json!({"task": task.public()}))
+}
+
+/// The cost tracker: every task's cost, plus totals (all time, last 7 days, today).
+pub fn costs(store: &Store) -> Result<Value> {
+    let day = 86_400_000;
+    let now = now_ms();
+    let today_start = now - now.rem_euclid(day);
+    let mut rows = vec![];
+    let (mut all, mut week, mut today, mut tokens, mut estimated) = (0.0_f64, 0.0_f64, 0.0_f64, 0_u64, false);
+    for t in store.tasks_data(1000)?.into_iter().filter_map(|v| serde_json::from_value::<Task>(v).ok()) {
+        let u = t.usage();
+        if u.is_empty() {
+            continue;
+        }
+        all += u.cost;
+        tokens += u.total_tokens;
+        estimated |= u.estimated;
+        if t.created_at >= now - 7 * day {
+            week += u.cost;
+        }
+        if t.created_at >= today_start {
+            today += u.cost;
+        }
+        rows.push(json!({"taskId": t.id, "botId": t.bot_id, "title": t.title, "createdAt": t.created_at, "usage": u.public()}));
+    }
+    let r = |x: f64| (x * 10_000.0).round() / 10_000.0;
+    Ok(json!({
+        "tasks": rows,
+        "total": {"cost": r(all), "tokens": tokens, "tasks": rows.len(), "estimated": estimated},
+        "week": r(week),
+        "today": r(today),
+        "currency": "USD",
+    }))
 }
 
 /// The task's bot was deleted: remove its folder (the branch and checkpoints stay).
