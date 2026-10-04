@@ -45,6 +45,8 @@ public struct Bot: Codable, Identifiable, Hashable, Sendable {
     public var unread: Int
     public var lastMessage: String?
     public var lastAt: Int64
+    /// Set when this bot runs a beginner task (host `tasks`).
+    public var task: TaskInfo? = nil
 
     public var isGroup: Bool { kind == "group" }
     public var isWorking: Bool { status == "working" || status == "needsInput" }
@@ -135,6 +137,15 @@ public struct EntryData: Codable, Hashable, Sendable {
     public var attachments: [Attachment]?
     /// notice: a finished voice call's length.
     public var callSeconds: Int?
+    /// permission: low | medium | high, from the host's risk rules.
+    public var risk: String?
+    /// permission: one plain sentence ("The agent wants to delete build and everything inside.").
+    public var explain: String?
+    public var riskReasons: [String]?
+    /// permission: the safety net refused it without asking; why, in plain words.
+    public var blocked: String?
+    /// permission: the task checkpoint saved just before it (Undo goes back here).
+    public var checkpoint: String?
 
     public init(text: String? = nil, status: String? = nil, clientNonce: String? = nil) {
         self.text = text
@@ -524,5 +535,36 @@ extension Bot {
         unread = try c.decodeIfPresent(Int.self, forKey: .unread) ?? 0
         lastMessage = try c.decodeIfPresent(String.self, forKey: .lastMessage)
         lastAt = try c.decodeIfPresent(Int64.self, forKey: .lastAt) ?? createdAt
+        task = try? c.decodeIfPresent(TaskInfo.self, forKey: .task)
     }
+}
+
+/// A saved point on a task's branch.
+public struct TaskCheckpoint: Codable, Hashable, Sendable, Identifiable {
+    public var id: String
+    public var label: String?
+    public var at: Int64?
+    public var files: [String]?
+}
+
+/// A beginner task (host `tasks::Task`), carried on its bot. Everything but `id` is optional: lenient.
+public struct TaskInfo: Codable, Hashable, Sendable, Identifiable {
+    public var id: String
+    public var goal: String?
+    public var title: String?
+    public var template: String?
+    public var project: String?
+    public var projectName: String?
+    public var backend: String?
+    /// worktree | none
+    public var safety: String?
+    public var branch: String?
+    public var base: String?
+    public var worktree: String?
+    /// active | finished
+    public var status: String?
+    public var checkpoints: [TaskCheckpoint]?
+
+    public var hasSafetyNet: Bool { safety != "none" && branch != nil && worktree != nil }
+    public var isActive: Bool { status != "finished" }
 }
