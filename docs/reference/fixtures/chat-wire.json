@@ -1,0 +1,250 @@
+{
+  "backends": [
+    {
+      "id": "claude",
+      "name": "Claude Code",
+      "available": true,
+      "installed": true
+    },
+    {
+      "id": "codex",
+      "name": "Codex",
+      "available": true,
+      "installed": true
+    }
+  ],
+  "bot": {
+    "id": "ae7518b0-63f8-4e26-8e04-b9fb62b93ef4",
+    "kind": "agent",
+    "members": [],
+    "name": "Alice",
+    "description": "Alice helps with the shop",
+    "avatarColor": "green",
+    "avatarShape": "blob",
+    "backend": "custom",
+    "command": "python3 -u '/opt/hypurr/host/tests/fixtures/chat_agent.py'",
+    "cwd": "/Users/priya/alice",
+    "permission": "ask",
+    "model": null,
+    "pinned": false,
+    "hidden": false,
+    "notify": false,
+    "connectors": [],
+    "skills": [],
+    "computer": false,
+    "autoName": false,
+    "createdAt": 1791143980589,
+    "managedWorkspace": false,
+    "rev": 75,
+    "deleted": false,
+    "status": "idle",
+    "activity": "",
+    "startedAt": null,
+    "workingChat": null,
+    "workingThread": null,
+    "unread": 1,
+    "lastMessage": "**Alice** here. You said: _- /Users/priya/bots/ae7518b0-63f8-4_\n\n- run `npm test`\n- check [the docs](https://example.com/docs)\n\n```sh\nnpm test\n```\n\nI can see the attached file.",
+    "lastAt": 1791143982015
+  },
+  "group": {
+    "id": "827a6f09-8785-4fb7-aa62-0aaf295df8df",
+    "kind": "group",
+    "members": [
+      "ae7518b0-63f8-4e26-8e04-b9fb62b93ef4",
+      "b9fcf05a-a191-457b-9539-b59782e40078"
+    ],
+    "name": "Shop crew",
+    "description": "Ship the shop",
+    "avatarColor": "blue",
+    "avatarShape": "blob",
+    "backend": "",
+    "command": null,
+    "cwd": "",
+    "permission": "ask",
+    "model": null,
+    "pinned": false,
+    "hidden": false,
+    "notify": null,
+    "connectors": [],
+    "skills": [],
+    "computer": false,
+    "autoName": false,
+    "createdAt": 1791143982114,
+    "managedWorkspace": false,
+    "rev": 82,
+    "deleted": false,
+    "status": "idle",
+    "activity": "",
+    "startedAt": null,
+    "workingChat": null,
+    "workingThread": null,
+    "unread": 3,
+    "lastMessage": "Alice: **Alice** here. You said: _It's your turn, Alice. Reply to the room if you have something worth adding, or _\n\n- run `npm test`\n- check [the docs](https://example.com/docs)\n\n```sh\nnpm test\n```",
+    "lastAt": 1791143982212
+  },
+  "markdownReply": {
+    "id": "50b43e7e-d99d-40c6-a9b6-6bf1887d4261",
+    "seq": 2,
+    "botId": "ae7518b0-63f8-4e26-8e04-b9fb62b93ef4",
+    "threadId": null,
+    "rev": 12,
+    "kind": "agent",
+    "turn": 1,
+    "data": {
+      "text": "**Alice** here. You said: _what should I run?_\n\n- run `npm test`\n- check [the docs](https://example.com/docs)\n\n```sh\nnpm test\n```",
+      "final": true,
+      "author": "ae7518b0-63f8-4e26-8e04-b9fb62b93ef4"
+    },
+    "createdAt": 1791143981098,
+    "updatedAt": 1791143981099
+  },
+  "root": {
+    "id": "50b43e7e-d99d-40c6-a9b6-6bf1887d4261",
+    "seq": 2,
+    "botId": "ae7518b0-63f8-4e26-8e04-b9fb62b93ef4",
+    "threadId": null,
+    "rev": 29,
+    "kind": "agent",
+    "turn": 1,
+    "data": {
+      "text": "**Alice** here. You said: _what should I run?_\n\n- run `npm test`\n- check [the docs](https://example.com/docs)\n\n```sh\nnpm test\n```",
+      "final": true,
+      "author": "ae7518b0-63f8-4e26-8e04-b9fb62b93ef4",
+      "thread": {
+        "count": 2,
+        "lastAt": 1791143981569,
+        "authors": [
+          "user",
+          "ae7518b0-63f8-4e26-8e04-b9fb62b93ef4"
+        ],
+        "unread": 0
+      },
+      "reactions": [
+        "👍"
+      ]
+    },
+    "createdAt": 1791143981098,
+    "updatedAt": 1791143981870
+  },
+  "thread": [
+    {
+      "id": "95b1bd26-49c5-41f8-8c8f-59e83b6af72f",
+      "seq": 3,
+      "botId": "ae7518b0-63f8-4e26-8e04-b9fb62b93ef4",
+      "threadId": "50b43e7e-d99d-40c6-a9b6-6bf1887d4261",
+      "rev": 17,
+      "kind": "user",
+      "turn": 2,
+      "data": {
+        "text": "and after that?",
+        "clientNonce": "c2",
+        "status": "sent",
+        "attachments": []
+      },
+      "createdAt": 1791143981159,
+      "updatedAt": 1791143981161
+    },
+    {
+      "id": "580cee5b-9bcb-4519-96b7-60c2a9627141",
+      "seq": 4,
+      "botId": "ae7518b0-63f8-4e26-8e04-b9fb62b93ef4",
+      "threadId": "50b43e7e-d99d-40c6-a9b6-6bf1887d4261",
+      "rev": 22,
+      "kind": "agent",
+      "turn": 2,
+      "data": {
+        "text": "**Alice** here. You said: _and after that?_\n\n- run `npm test`\n- check [the docs](https://example.com/docs)\n\n```sh\nnpm test\n```",
+        "final": true,
+        "author": "ae7518b0-63f8-4e26-8e04-b9fb62b93ef4"
+      },
+      "createdAt": 1791143981569,
+      "updatedAt": 1791143981570
+    }
+  ],
+  "fileMessage": {
+    "id": "9b5d7d95-7ad0-4f36-a7bc-2e3098725cec",
+    "seq": 5,
+    "botId": "ae7518b0-63f8-4e26-8e04-b9fb62b93ef4",
+    "threadId": null,
+    "rev": 30,
+    "kind": "user",
+    "turn": 3,
+    "data": {
+      "text": "",
+      "clientNonce": "c3",
+      "status": "queued",
+      "attachments": [
+        {
+          "id": "ab73e315-df16-4ac7-b2c4-e5566ee193bf",
+          "name": "shot.png",
+          "size": 1000
+        }
+      ]
+    },
+    "createdAt": 1791143982009,
+    "updatedAt": 1791143982009
+  },
+  "fileReply": {
+    "id": "697ddc09-2015-4976-84bf-c7ad0191943c",
+    "seq": 6,
+    "botId": "ae7518b0-63f8-4e26-8e04-b9fb62b93ef4",
+    "threadId": null,
+    "rev": 36,
+    "kind": "agent",
+    "turn": 3,
+    "data": {
+      "text": "**Alice** here. You said: _- /Users/priya/bots/ae7518b0-63f8-4_\n\n- run `npm test`\n- check [the docs](https://example.com/docs)\n\n```sh\nnpm test\n```\n\nI can see the attached file.",
+      "final": true,
+      "author": "ae7518b0-63f8-4e26-8e04-b9fb62b93ef4"
+    },
+    "createdAt": 1791143982014,
+    "updatedAt": 1791143982015
+  },
+  "readUpload": {
+    "data": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+P0BBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5fYGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn+AgYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq+wsbKztLW2t7i5uru8vb6/wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t/g4eLj5OXm5+jp6uvs7e7v8PHy8/T19vf4+fr7/P3+/wABAgMEBQYHCAkKCwwNDg8QERITFBUWFxgZGhscHR4fICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj9AQUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVpbXF1eX2BhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5ent8fX5/gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp+goaKjpKWmp6ipqqusra6vsLGys7S1tre4ubq7vL2+v8DBwsPExcbHyMnKy8zNzs/Q0dLT1NXW19jZ2tvc3d7f4OHi4+Tl5ufo6err7O3u7/Dx8vP09fb3+Pn6+/z9/v8AAQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8wMTIzNDU2Nzg5Ojs8PT4/QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl9gYWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXp7fH1+f4CBgoOEhYaHiImKi4yNjo+QkZKTlJWWl5iZmpucnZ6foKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr/AwcLDxMXGx8jJysvMzc7P0NHS09TV1tfY2drb3N3e3+Dh4uPk5ebn6Onq6+zt7u/w8fLz9PX29/j5+vv8/f7/AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+P0BBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5fYGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn+AgYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq+wsbKztLW2t7i5uru8vb6/wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t/g4eLj5OXm5w==",
+    "size": 1000
+  },
+  "groupReply": {
+    "id": "1ecf7a1d-b285-4ddf-8598-57117d697b58",
+    "seq": 10,
+    "botId": "827a6f09-8785-4fb7-aa62-0aaf295df8df",
+    "threadId": null,
+    "rev": 74,
+    "kind": "agent",
+    "turn": 4,
+    "data": {
+      "text": "**Alice** here. You said: _It's your turn, Alice. Reply to the room if you have something worth adding, or _\n\n- run `npm test`\n- check [the docs](https://example.com/docs)\n\n```sh\nnpm test\n```",
+      "final": true,
+      "author": "ae7518b0-63f8-4e26-8e04-b9fb62b93ef4"
+    },
+    "createdAt": 1791143982210,
+    "updatedAt": 1791143982212
+  },
+  "dirs": {
+    "path": "/Users/priya",
+    "parent": "/Users",
+    "isGit": false,
+    "dirs": [
+      {
+        "name": "alice",
+        "path": "/Users/priya/alice",
+        "isGit": false
+      },
+      {
+        "name": "bob",
+        "path": "/Users/priya/bob",
+        "isGit": false
+      },
+      {
+        "name": "bots",
+        "path": "/Users/priya/bots",
+        "isGit": false
+      },
+      {
+        "name": "carol",
+        "path": "/Users/priya/carol",
+        "isGit": false
+      }
+    ]
+  }
+}
