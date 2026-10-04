@@ -1,0 +1,287 @@
+{
+  "bot": {
+    "id": "6b9964d2-7b39-42b5-a214-3fa16b53d3fb",
+    "kind": "agent",
+    "members": [],
+    "name": "Write tests: the checkout button",
+    "description": "the checkout button",
+    "avatarColor": "green",
+    "avatarShape": "squircle",
+    "backend": "custom",
+    "command": "python3 /workspace/hypurr/host/tests/fake_task_agent.py",
+    "cwd": "/Users/priya/.hypurr/worktrees/fedd2d32-324f-43d1-a1ae-bc12c3a742bb",
+    "permission": "ask",
+    "model": null,
+    "pinned": false,
+    "hidden": false,
+    "notify": null,
+    "connectors": [],
+    "skills": [],
+    "computer": false,
+    "autoName": false,
+    "createdAt": 1791137998088,
+    "managedWorkspace": false,
+    "rev": 4,
+    "deleted": false,
+    "status": "idle",
+    "activity": "",
+    "startedAt": null,
+    "workingChat": null,
+    "workingThread": null,
+    "unread": 0,
+    "lastMessage": "You: Write tests: the checkout button",
+    "lastAt": 1791137998090,
+    "task": {
+      "id": "fedd2d32-324f-43d1-a1ae-bc12c3a742bb",
+      "botId": "6b9964d2-7b39-42b5-a214-3fa16b53d3fb",
+      "goal": "the checkout button",
+      "title": "Write tests: the checkout button",
+      "template": "write-tests",
+      "project": "/Users/priya/shop",
+      "projectName": "repo",
+      "backend": "custom",
+      "safety": "worktree",
+      "branch": "hypurr/write-tests-the-checkout-button-fedd2d32",
+      "base": "main",
+      "worktree": "/Users/priya/.hypurr/worktrees/fedd2d32-324f-43d1-a1ae-bc12c3a742bb",
+      "status": "active",
+      "checkpoints": [
+        {
+          "id": "de245cf3897d43f2757a9a280b65a783595416f6",
+          "label": "Start (from main)",
+          "at": 1791137998088,
+          "files": []
+        }
+      ],
+      "createdAt": 1791137998071,
+      "updatedAt": 1791137998090
+    }
+  },
+  "blockedCard": {
+    "id": "f6891faf-ec0b-4365-bd9d-c8e39679ade6",
+    "seq": 2,
+    "botId": "6b9964d2-7b39-42b5-a214-3fa16b53d3fb",
+    "threadId": null,
+    "rev": 9,
+    "kind": "permission",
+    "turn": 1,
+    "data": {
+      "title": "Push",
+      "toolKind": "execute",
+      "command": "git push origin main",
+      "detail": "",
+      "diffs": [],
+      "cwd": "/Users/priya/.hypurr/worktrees/fedd2d32-324f-43d1-a1ae-bc12c3a742bb",
+      "options": [
+        {
+          "optionId": "allow",
+          "name": "Allow",
+          "kind": "allow_once"
+        },
+        {
+          "optionId": "no",
+          "name": "Reject",
+          "kind": "reject_once"
+        }
+      ],
+      "status": "answered",
+      "selected": "no",
+      "risk": "high",
+      "explain": "The agent wants to upload commits straight to main on origin.",
+      "riskReasons": [
+        "main is a protected branch; changes should go through a pull request."
+      ],
+      "blocked": "Pushing to main is blocked by the safety net. Open a pull request instead.",
+      "author": "6b9964d2-7b39-42b5-a214-3fa16b53d3fb"
+    },
+    "createdAt": 1791137998526,
+    "updatedAt": 1791137998526
+  },
+  "pendingCard": {
+    "id": "d6173f6b-43b4-48a4-aa2c-79f47626071a",
+    "seq": 3,
+    "botId": "6b9964d2-7b39-42b5-a214-3fa16b53d3fb",
+    "threadId": null,
+    "rev": 10,
+    "kind": "permission",
+    "turn": 1,
+    "data": {
+      "title": "Clean build",
+      "toolKind": "execute",
+      "command": "rm -rf build",
+      "detail": "",
+      "diffs": [],
+      "cwd": "/Users/priya/.hypurr/worktrees/fedd2d32-324f-43d1-a1ae-bc12c3a742bb",
+      "options": [
+        {
+          "optionId": "allow",
+          "name": "Allow",
+          "kind": "allow_once"
+        },
+        {
+          "optionId": "no",
+          "name": "Reject",
+          "kind": "reject_once"
+        }
+      ],
+      "status": "pending",
+      "selected": null,
+      "risk": "high",
+      "explain": "The agent wants to delete build and everything inside.",
+      "riskReasons": [
+        "It deletes files. A checkpoint can bring tracked files back, but not ignored or new ones."
+      ],
+      "checkpoint": "de245cf3897d43f2757a9a280b65a783595416f6",
+      "author": "6b9964d2-7b39-42b5-a214-3fa16b53d3fb"
+    },
+    "createdAt": 1791137998532,
+    "updatedAt": 1791137998532
+  },
+  "setup": {
+    "templates": [
+      {
+        "id": "write-tests",
+        "title": "Write tests",
+        "summary": "Add tests for a feature or file",
+        "icon": "test",
+        "prompt": "Write automated tests for: {goal}\n\nFind the project's existing test setup and follow its style. Cover the main behaviour and the important edge cases, then run the tests. Change only test code; if you find a real bug, describe it instead of changing app code.",
+        "inputLabel": null,
+        "goalHint": "What should be tested? e.g. the login form",
+        "readOnly": false,
+        "builtin": true
+      },
+      {
+        "id": "fix-error",
+        "title": "Fix this error",
+        "summary": "Paste an error or log and get a fix",
+        "icon": "bug",
+        "prompt": "Fix this error. {goal}\n\nError or log:\n```\n{input}\n```\n\nFind the cause, make the smallest safe fix, and run the relevant tests to show it works.",
+        "inputLabel": "Error message or log",
+        "goalHint": "Where did it happen? e.g. when I log in",
+        "readOnly": false,
+        "builtin": true
+      },
+      {
+        "id": "review-pr",
+        "title": "Review my PR",
+        "summary": "Get a plain-language review of changes",
+        "icon": "review",
+        "prompt": "Review these changes: {goal} {input}\n\nDon't change any files. List problems by how serious they are (bugs, security, missing tests, readability), in plain words, with the file and line, and suggest a fix for each.",
+        "inputLabel": "Pull request link or branch (optional)",
+        "goalHint": "Which changes? e.g. my branch, or a PR link",
+        "readOnly": true,
+        "builtin": true
+      },
+      {
+        "id": "update-deps",
+        "title": "Update dependencies",
+        "summary": "Safely update packages and check the build",
+        "icon": "deps",
+        "prompt": "Update this project's dependencies. {goal}\n\nPrefer patch and minor updates; list major updates instead of applying them. Run the build and tests afterwards and fix anything the updates broke. Don't publish anything.",
+        "inputLabel": null,
+        "goalHint": "Anything specific? e.g. only the web app",
+        "readOnly": false,
+        "builtin": true
+      },
+      {
+        "id": "explain-code",
+        "title": "Explain this code",
+        "summary": "Understand a file or feature in plain words",
+        "icon": "explain",
+        "prompt": "Explain {goal} in plain language for someone in their first year of programming: what it does, how the pieces fit together, and anything risky or surprising. Don't change any files.",
+        "inputLabel": null,
+        "goalHint": "Which code? e.g. src/auth or the payment flow",
+        "readOnly": true,
+        "builtin": true
+      }
+    ],
+    "projects": [],
+    "agents": [
+      {
+        "id": "agoragentic-acp",
+        "name": "Agoragentic"
+      },
+      {
+        "id": "autohand",
+        "name": "Autohand Code"
+      },
+      {
+        "id": "corust-agent",
+        "name": "Corust Agent"
+      },
+      {
+        "id": "crow-cli",
+        "name": "crow-cli"
+      },
+      {
+        "id": "deepagents",
+        "name": "DeepAgents"
+      },
+      {
+        "id": "dimcode",
+        "name": "DimCode"
+      },
+      {
+        "id": "dirac",
+        "name": "Dirac"
+      },
+      {
+        "id": "fast-agent",
+        "name": "fast-agent"
+      },
+      {
+        "id": "glm-acp-agent",
+        "name": "GLM Agent"
+      },
+      {
+        "id": "harn",
+        "name": "Harn"
+      },
+      {
+        "id": "kimchi",
+        "name": "Kimchi"
+      },
+      {
+        "id": "minion-code",
+        "name": "Minion Code"
+      },
+      {
+        "id": "nova",
+        "name": "Nova"
+      },
+      {
+        "id": "sigit",
+        "name": "siGit Code"
+      },
+      {
+        "id": "stakpak",
+        "name": "Stakpak"
+      },
+      {
+        "id": "vtcode",
+        "name": "VT Code"
+      }
+    ],
+    "safety": {
+      "protectedBranches": [
+        "main",
+        "master",
+        "production",
+        "prod",
+        "release/*",
+        "develop"
+      ],
+      "blockProtected": true,
+      "alwaysAskHigh": true,
+      "requireGit": false
+    }
+  },
+  "route": {
+    "project": null,
+    "agent": {
+      "id": "agoragentic-acp",
+      "name": "Agoragentic"
+    },
+    "reason": "Add a project folder first; Agoragentic is installed and good at making careful code changes."
+  }
+}

@@ -615,6 +615,43 @@ pub async fn dispatch(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value) -
             hub.send_cmd(bot, Cmd::Permission { entry_id: entry_id.to_owned(), option_id })?;
             json!({})
         }
+        // Beginner tasks and the safety net (`tasks`).
+        "taskSetup" => {
+            let hub = hub.clone();
+            tokio::task::spawn_blocking(move || crate::tasks::setup(&hub.store)).await?
+        }
+        "routeTask" => {
+            let (hub, goal, template) = (
+                hub.clone(),
+                b["goal"].as_str().unwrap_or_default().to_owned(),
+                b["template"].as_str().map(str::to_owned),
+            );
+            json!({"route": tokio::task::spawn_blocking(move || crate::tasks::route(&hub.store, &goal, template.as_deref())).await?})
+        }
+        "startTask" => crate::tasks::start(hub, &b).await?,
+        "tasks" => crate::tasks::list(&hub.store)?,
+        "taskCheckpoint" => {
+            crate::tasks::manual_checkpoint(hub, str_arg(&b, "taskId")?, b["label"].as_str().unwrap_or_default())
+                .await?
+        }
+        "rollbackTask" => crate::tasks::rollback(hub, str_arg(&b, "taskId")?, str_arg(&b, "checkpointId")?).await?,
+        "finishTask" => crate::tasks::finish(hub, str_arg(&b, "taskId")?).await?,
+        "taskTemplates" => json!({"templates": crate::tasks::templates::all(&hub.store)}),
+        "saveTemplate" => {
+            let t: crate::tasks::templates::Template = serde_json::from_value(b).context("invalid template")?;
+            json!({"template": crate::tasks::templates::save(&hub.store, t)?})
+        }
+        "deleteTemplate" => json!({"removed": crate::tasks::templates::delete(&hub.store, str_arg(&b, "id")?)?}),
+        "saveProject" => {
+            let hub = hub.clone();
+            json!({"project": tokio::task::spawn_blocking(move || crate::tasks::save_project(&hub.store, &b)).await??})
+        }
+        "removeProject" => {
+            crate::tasks::remove_project(&hub.store, str_arg(&b, "path")?)?;
+            json!({})
+        }
+        "safetySettings" => json!({"safety": crate::tasks::SafetySettings::load(&hub.store)}),
+        "setSafetySettings" => json!({"safety": crate::tasks::set_safety(&hub.store, &b)?}),
         "registerDevice" => {
             let ticket = str_arg(&b, "ticket")?;
             if let Some(relay) = b["relay"].as_str().filter(|r| r.starts_with("https://")) {

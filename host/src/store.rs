@@ -383,7 +383,10 @@ impl Store {
                 rev INTEGER NOT NULL, kind TEXT NOT NULL, turn INTEGER NOT NULL, data TEXT NOT NULL,
                 created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
              CREATE INDEX IF NOT EXISTS entries_rev ON entries(rev);
-             CREATE INDEX IF NOT EXISTS entries_bot ON entries(bot_id, seq);",
+             CREATE INDEX IF NOT EXISTS entries_bot ON entries(bot_id, seq);
+             CREATE TABLE IF NOT EXISTS tasks(
+                id TEXT PRIMARY KEY, bot_id TEXT NOT NULL, data TEXT NOT NULL, created_at INTEGER NOT NULL);
+             CREATE INDEX IF NOT EXISTS tasks_bot ON tasks(bot_id);",
         )?;
         migrate(&c)?;
         let secret_key = if path == Path::new(":memory:") {
@@ -399,6 +402,45 @@ impl Store {
     /// Durable control state must distinguish a missing key from a failed read.
     pub fn kv_read(&self, k: &str) -> Result<Option<String>> {
         Ok(self.db.locked().query_row("SELECT v FROM kv WHERE k = ?", [k], |r| r.get(0)).optional()?)
+    }
+
+    // MARK: tasks (JSON rows; see `tasks`)
+
+    pub fn save_task(&self, id: &str, bot_id: &str, data: &Value, created_at: i64) -> Result<()> {
+        self.db.locked().execute(
+            "INSERT INTO tasks(id, bot_id, data, created_at) VALUES(?1, ?2, ?3, ?4)
+             ON CONFLICT(id) DO UPDATE SET bot_id = ?2, data = ?3",
+            params![id, bot_id, data.to_string(), created_at],
+        )?;
+        Ok(())
+    }
+
+    pub fn task_data(&self, id: &str) -> Option<Value> {
+        let c = self.db.locked();
+        let s: Option<String> =
+            logged("task", c.query_row("SELECT data FROM tasks WHERE id = ?", [id], |r| r.get(0)).optional()).flatten();
+        s.and_then(|s| serde_json::from_str(&s).ok())
+    }
+
+    pub fn task_data_for_bot(&self, bot_id: &str) -> Option<Value> {
+        let c = self.db.locked();
+        let s: Option<String> = logged(
+            "task",
+            c.query_row("SELECT data FROM tasks WHERE bot_id = ? ORDER BY created_at DESC LIMIT 1", [bot_id], |r| {
+                r.get(0)
+            })
+            .optional(),
+        )
+        .flatten();
+        s.and_then(|s| serde_json::from_str(&s).ok())
+    }
+
+    /// Newest first.
+    pub fn tasks_data(&self, limit: i64) -> Result<Vec<Value>> {
+        let c = self.db.locked();
+        let mut st = c.prepare("SELECT data FROM tasks ORDER BY created_at DESC LIMIT ?")?;
+        let rows = st.query_map([limit], |r| r.get::<_, String>(0))?.collect::<rusqlite::Result<Vec<String>>>()?;
+        Ok(rows.into_iter().filter_map(|s| serde_json::from_str(&s).ok()).collect())
     }
 
     pub fn kv_get(&self, k: &str) -> Option<String> {
