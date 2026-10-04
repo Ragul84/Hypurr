@@ -548,9 +548,15 @@ pub fn list(store: &Store) -> Result<Value> {
     Ok(json!({"tasks": tasks}))
 }
 
+/// Serialises checkpoints and rollbacks (git commits on task worktrees).
+static CHECKPOINTS: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 /// Saves a checkpoint for a task bot now (blocking). Returns the checkpoint the
 /// worktree is at afterwards (a new one, or the latest when nothing changed).
 pub fn checkpoint_bot(hub: &Hub, bot_id: &str, label: &str) -> Result<Option<Checkpoint>> {
+    // One git commit at a time: the after-turn checkpoint can still be running when the
+    // person taps Finish, and two commits racing on one worktree fail ("nothing to commit").
+    let _one = CHECKPOINTS.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let Some(mut task) = Task::for_bot(&hub.store, bot_id) else { return Ok(None) };
     let (Some(wt), Some(branch)) = (task.worktree_path(), task.branch.clone()) else { return Ok(None) };
     if task.status != TaskStatus::Active {
@@ -623,7 +629,11 @@ pub async fn rollback(hub: &Arc<Hub>, task_id: &str, checkpoint_id: &str) -> Res
         bail!("stop the agent before going back");
     }
     let label = target.label.clone();
-    let added = tokio::task::spawn_blocking(move || safety::rollback(&wt, &branch, &target.id, &label)).await??;
+    let added = tokio::task::spawn_blocking(move || {
+        let _one = CHECKPOINTS.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        safety::rollback(&wt, &branch, &target.id, &label)
+    })
+    .await??;
     task.push_checkpoints(added);
     task.save(&hub.store)?;
     let text = format!(
