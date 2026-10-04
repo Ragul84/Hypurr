@@ -15,6 +15,9 @@ import com.ragul84.hypurr.ui.screens.PairingUiState
 import com.ragul84.hypurr.ui.screens.SettingsScreen
 import com.ragul84.hypurr.ui.screens.SettingsUiState
 import com.ragul84.hypurr.ui.screens.rosterOrder
+import com.ragul84.hypurr.ui.screens.AdminTab
+import com.ragul84.hypurr.ui.screens.TeamAdminScreen
+import com.ragul84.hypurr.ui.screens.TeamAdminUiState
 import com.ragul84.hypurr.ui.theme.HypurrTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -139,5 +142,37 @@ class ScreenshotTest {
             notifications = true, pushAvailable = false, version = "2.4.0", dynamicSupported = true, safety = Samples.safety,
             integrations = Samples.integrations, costs = Samples.costs, testResults = mapOf("slack" to "Sent a test message")),
             {}, {}, {}, {}, {})
+    }
+
+    // Stage C: team admin.
+
+    private fun admin(tab: AdminTab, you: com.ragul84.hypurr.model.Actor = Samples.admin) = TeamAdminUiState(
+        you, Samples.team.copy(you = you), Samples.policies, Samples.activity, Samples.auditLog, tab, now = Samples.NOW)
+
+    @Test
+    @Config(qualifiers = "w412dp-h1500dp-xxhdpi")
+    fun adminActivity() = shoot("admin-activity") { TeamAdminScreen(admin(AdminTab.Activity), {}, {}) }
+
+    @Test
+    @Config(qualifiers = "w412dp-h1700dp-xxhdpi")
+    fun adminRules() = shoot("admin-rules") { TeamAdminScreen(admin(AdminTab.Rules), {}, {}) }
+
+    @Test
+    @Config(qualifiers = "w412dp-h1180dp-xxhdpi")
+    fun adminPeople() = shoot("admin-people") { TeamAdminScreen(admin(AdminTab.People), {}, {}) }
+
+    @Test
+    @Config(qualifiers = "w412dp-h1300dp-xxhdpi")
+    fun adminAudit() = shoot("admin-audit") { TeamAdminScreen(admin(AdminTab.Audit), {}, {}) }
+
+    /** What a member sees: read-only rules. */
+    @Test
+    @Config(qualifiers = "w412dp-h1700dp-xxhdpi")
+    fun adminRulesMember() = shoot("admin-rules-member") { TeamAdminScreen(admin(AdminTab.Rules, Samples.member), {}, {}) }
+
+    @Test
+    fun needsAdminCard() = shoot("needs-admin") {
+        ChatScreen(Samples.taskBot.copy(status = "needsInput"), Samples.adminCardChat, "", {}, onBack = {}, onSend = {}, onStop = {},
+            onRespond = { _, _ -> }, you = Samples.member, now = Samples.NOW)
     }
 }

@@ -1,6 +1,11 @@
 package com.ragul84.hypurr.data
 
+import com.ragul84.hypurr.model.Activity
+import com.ragul84.hypurr.model.Actor
+import com.ragul84.hypurr.model.AuditLog
 import com.ragul84.hypurr.model.Bot
+import com.ragul84.hypurr.model.PolicyInfo
+import com.ragul84.hypurr.model.TeamInfo
 import com.ragul84.hypurr.model.Computer
 import com.ragul84.hypurr.model.Entry
 import com.ragul84.hypurr.model.EntryData
@@ -164,6 +169,7 @@ class HypurrStore(
         _entries.value = emptyMap()
         _synced.value = false
         rev = 0
+        _you.value = null
     }
 
     /** Sync, then follow the event stream; a dropped channel resubscribes from the last rev. */
@@ -178,6 +184,7 @@ class HypurrStore(
                 sync.entries.forEach(::upsert)
                 rev = maxOf(rev, sync.rev)
                 _synced.value = true
+                runCatching { c.hello() }.getOrNull()?.you?.let { _you.value = it }
                 if (notifications.value) runCatching { onConnected?.invoke(c) }
                 c.events(rev).collect(::apply)
             } catch (e: CancellationException) {
@@ -365,6 +372,50 @@ class HypurrStore(
     suspend fun setSafety(settings: SafetySettings) {
         val saved = client?.setSafety(settings) ?: return
         _setup.update { it?.copy(safety = saved) ?: TaskSetup(safety = saved) }
+    }
+
+    // MARK: team admin
+
+    private val _you = MutableStateFlow<Actor?>(null)
+    /** This phone's role on the computer (null until the host says). */
+    val you: StateFlow<Actor?> = _you.asStateFlow()
+
+    private val _team = MutableStateFlow<TeamInfo?>(null)
+    val team: StateFlow<TeamInfo?> = _team.asStateFlow()
+    private val _policies = MutableStateFlow<PolicyInfo?>(null)
+    val policies: StateFlow<PolicyInfo?> = _policies.asStateFlow()
+    private val _activity = MutableStateFlow<Activity?>(null)
+    val activity: StateFlow<Activity?> = _activity.asStateFlow()
+    private val _audit = MutableStateFlow<AuditLog?>(null)
+    val audit: StateFlow<AuditLog?> = _audit.asStateFlow()
+
+    /** Loads what the Team admin screen shows; admin-only parts are skipped for others. */
+    suspend fun loadAdmin() {
+        val c = client ?: return
+        runCatching { c.team() }.getOrNull()?.let {
+            _team.value = it
+            _you.value = it.you
+        }
+        runCatching { c.policies() }.getOrNull()?.let { _policies.value = it }
+        if (_you.value?.isAdmin != false) {
+            runCatching { c.activity() }.getOrNull()?.let { _activity.value = it }
+            runCatching { c.auditLog() }.getOrNull()?.let { _audit.value = it }
+        }
+    }
+
+    suspend fun setPolicies(patch: JsonObject) {
+        val saved = client?.setPolicies(patch) ?: throw HostException.unreachable()
+        _policies.value = saved
+        _setup.update { it?.copy(safety = saved.safety) }
+        runCatching { client?.auditLog() }.getOrNull()?.let { _audit.value = it }
+    }
+
+    suspend fun setRole(key: String, role: String?) {
+        _team.value = client?.setRole(key, role) ?: throw HostException.unreachable()
+    }
+
+    suspend fun setDefaultRole(role: String) {
+        _team.value = client?.setTeam(role) ?: throw HostException.unreachable()
     }
 
     val route: Route? get() = (link.value as? LinkState.Ready)?.route
