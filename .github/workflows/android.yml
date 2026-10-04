@@ -3,9 +3,9 @@ name: hypurr-android
 on:
   push:
     branches: [main, v2]
-    paths: ["apps/android/**", "docs/reference/fixtures/remote-relay-vectors.json", "docs/reference/fixtures/task-wire.json", "docs/reference/fixtures/work-wire.json", "docs/reference/fixtures/admin-wire.json", ".github/workflows/android.yml"]
+    paths: ["apps/android/**", "docs/reference/fixtures/remote-relay-vectors.json", "docs/reference/fixtures/task-wire.json", "docs/reference/fixtures/work-wire.json", "docs/reference/fixtures/admin-wire.json", "docs/reference/fixtures/chat-wire.json", ".github/workflows/android.yml"]
   pull_request:
-    paths: ["apps/android/**", "docs/reference/fixtures/remote-relay-vectors.json", "docs/reference/fixtures/task-wire.json", "docs/reference/fixtures/work-wire.json", "docs/reference/fixtures/admin-wire.json", ".github/workflows/android.yml"]
+    paths: ["apps/android/**", "docs/reference/fixtures/remote-relay-vectors.json", "docs/reference/fixtures/task-wire.json", "docs/reference/fixtures/work-wire.json", "docs/reference/fixtures/admin-wire.json", "docs/reference/fixtures/chat-wire.json", ".github/workflows/android.yml"]
 
 jobs:
   android:
