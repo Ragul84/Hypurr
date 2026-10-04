@@ -4,6 +4,7 @@ mod agent;
 mod api;
 mod chat;
 mod hub;
+mod integrations;
 mod market;
 mod mcp;
 mod remote;
