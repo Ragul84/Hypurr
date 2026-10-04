@@ -146,6 +146,8 @@ public struct EntryData: Codable, Hashable, Sendable {
     public var blocked: String?
     /// permission: the task checkpoint saved just before it (Undo goes back here).
     public var checkpoint: String?
+    /// notice: a finished task's "What changed" card (learning mode, PR, cost).
+    public var learning: TaskLearning?
 
     public init(text: String? = nil, status: String? = nil, clientNonce: String? = nil) {
         self.text = text
@@ -561,10 +563,67 @@ public struct TaskInfo: Codable, Hashable, Sendable, Identifiable {
     public var branch: String?
     public var base: String?
     public var worktree: String?
-    /// active | finished
+    /// active | finishing | finished
     public var status: String?
     public var checkpoints: [TaskCheckpoint]?
+    /// The GitHub issue or Jira ticket it started from.
+    public var issue: TaskIssue?
+    public var usage: TaskUsage?
+    /// The learning-mode summary, once finished.
+    public var summary: String?
+    public var pr: TaskPullRequest?
 
     public var hasSafetyNet: Bool { safety != "none" && branch != nil && worktree != nil }
-    public var isActive: Bool { status != "finished" }
+    public var isActive: Bool { status != "finished" && status != "finishing" }
+    public var isFinishing: Bool { status == "finishing" }
+}
+
+public struct TaskIssue: Codable, Hashable, Sendable {
+    /// github | jira
+    public var source: String?
+    public var key: String?
+    public var title: String?
+    public var url: String?
+}
+
+public struct TaskPullRequest: Codable, Hashable, Sendable {
+    public var number: Int?
+    public var url: String?
+}
+
+public struct TaskFileChange: Codable, Hashable, Sendable {
+    public var path: String
+    public var added: Int?
+    public var removed: Int?
+}
+
+/// Per-task tokens and cost (host `tasks::cost`); `estimated` when priced from list rates.
+public struct TaskUsage: Codable, Hashable, Sendable {
+    public var totalTokens: Int?
+    public var cost: Double?
+    public var currency: String?
+    public var estimated: Bool?
+    public var turns: Int?
+
+    /// "$0.12", "≈ $0.12" or "less than $0.01".
+    public var label: String {
+        let c = cost ?? 0
+        let amount = c > 0 && c < 0.01 ? "less than $0.01" : "$" + String(format: "%.2f", c)
+        return estimated == true ? "≈ " + amount : amount
+    }
+}
+
+/// Learning mode: what a finished task changed and why.
+public struct TaskLearning: Codable, Hashable, Sendable {
+    public var title: String?
+    public var summary: String?
+    public var files: [TaskFileChange]?
+    public var added: Int?
+    public var removed: Int?
+    public var branch: String?
+    public var pr: TaskPullRequest?
+    public var cost: TaskUsage?
+    /// slack | teams | jira
+    public var posted: [String]?
+    public var errors: [String]?
 }
