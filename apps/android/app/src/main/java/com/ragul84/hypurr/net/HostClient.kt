@@ -7,7 +7,14 @@ import com.ragul84.hypurr.model.Entry
 import com.ragul84.hypurr.model.Hello
 import com.ragul84.hypurr.model.HypurrJson
 import com.ragul84.hypurr.model.Pairing
+import com.ragul84.hypurr.model.SafetySettings
 import com.ragul84.hypurr.model.SyncResponse
+import com.ragul84.hypurr.model.TaskInfo
+import com.ragul84.hypurr.model.TaskRoute
+import com.ragul84.hypurr.model.TaskSetup
+import com.ragul84.hypurr.model.TaskTemplate
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.mapNotNull
@@ -113,6 +120,66 @@ class HostClient(val transport: ChannelTransport) {
 
     suspend fun unregisterDevice() {
         transport.call("unregisterDevice")
+    }
+
+    // Beginner tasks and the safety net (host `tasks`).
+
+    suspend fun taskSetup(): TaskSetup = call("taskSetup")
+
+    suspend fun routeTask(goal: String, template: String?): TaskRoute {
+        val res = transport.call("routeTask", buildJsonObject {
+            put("goal", goal)
+            template?.let { put("template", it) }
+        })
+        return HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("route"))
+    }
+
+    /** Starts a task; returns its bot (with `task`). */
+    suspend fun startTask(goal: String, template: String?, input: String, project: String?, backend: String?,
+                          attachments: List<String> = emptyList(), command: String? = null): Bot {
+        val res = transport.call("startTask", buildJsonObject {
+            put("goal", goal)
+            template?.let { put("template", it) }
+            if (input.isNotBlank()) put("input", input)
+            project?.let { put("project", it) }
+            backend?.let { put("backend", it) }
+            if (attachments.isNotEmpty()) put("attachments", JsonArray(attachments.map(::JsonPrimitive)))
+            command?.let { put("command", it) }
+        }, timeoutMs = 60_000)
+        return HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("bot"))
+    }
+
+    suspend fun rollbackTask(taskId: String, checkpointId: String): TaskInfo {
+        val res = transport.call("rollbackTask", buildJsonObject {
+            put("taskId", taskId)
+            put("checkpointId", checkpointId)
+        }, timeoutMs = 60_000)
+        return HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("task"))
+    }
+
+    suspend fun taskCheckpoint(taskId: String, label: String) {
+        transport.call("taskCheckpoint", buildJsonObject {
+            put("taskId", taskId)
+            put("label", label)
+        }, timeoutMs = 60_000)
+    }
+
+    suspend fun finishTask(taskId: String) {
+        transport.call("finishTask", buildJsonObject { put("taskId", taskId) }, timeoutMs = 60_000)
+    }
+
+    suspend fun saveTemplate(template: TaskTemplate): TaskTemplate {
+        val res = transport.call("saveTemplate", HypurrJson.encodeToJsonElement(TaskTemplate.serializer(), template).jsonObject)
+        return HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("template"))
+    }
+
+    suspend fun deleteTemplate(id: String) {
+        transport.call("deleteTemplate", buildJsonObject { put("id", id) })
+    }
+
+    suspend fun setSafety(settings: SafetySettings): SafetySettings {
+        val res = transport.call("setSafetySettings", HypurrJson.encodeToJsonElement(SafetySettings.serializer(), settings).jsonObject)
+        return HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("safety"))
     }
 
     fun events(since: Long): Flow<HostEvent> = transport.events(since).mapNotNull(HostEvent::parse)

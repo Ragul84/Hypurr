@@ -54,6 +54,8 @@ data class Bot(
     val lastMessage: String? = null,
     val lastAt: Long = 0,
     val deleted: Boolean? = null,
+    /** Set when this bot runs a beginner task (host `tasks`). */
+    val task: TaskInfo? = null,
 ) {
     val isGroup: Boolean get() = kind == "group"
     val isWorking: Boolean get() = status == "working" || status == "needsInput"
@@ -82,6 +84,15 @@ data class EntryData(
     val style: String? = null,
     val author: String? = null,
     val reactions: List<String>? = null,
+    /** permission: low | medium | high, from the host's risk rules. */
+    val risk: String? = null,
+    /** permission: one plain sentence ("The agent wants to delete build and everything inside."). */
+    val explain: String? = null,
+    val riskReasons: List<String>? = null,
+    /** permission: the safety net refused it without asking; why, in plain words. */
+    val blocked: String? = null,
+    /** permission: the task checkpoint saved just before it (Undo goes back here). */
+    val checkpoint: String? = null,
 )
 
 @Serializable
@@ -132,3 +143,72 @@ data class SyncResponse(
     val bots: List<Bot> = emptyList(),
     val entries: List<Entry> = emptyList(),
 )
+
+/** A saved point on a task's branch. */
+@Serializable
+data class Checkpoint(val id: String, val label: String = "", val at: Long = 0, val files: List<String> = emptyList())
+
+/** A beginner task (host `tasks::Task`), carried on its bot. */
+@Serializable
+data class TaskInfo(
+    val id: String,
+    val botId: String = "",
+    val goal: String = "",
+    val title: String = "",
+    val template: String? = null,
+    val project: String = "",
+    val projectName: String = "",
+    val backend: String = "",
+    /** worktree | none */
+    val safety: String = "worktree",
+    val branch: String? = null,
+    val base: String? = null,
+    val worktree: String? = null,
+    /** active | finished */
+    val status: String = "active",
+    val checkpoints: List<Checkpoint> = emptyList(),
+    val createdAt: Long = 0,
+    val updatedAt: Long = 0,
+) {
+    val hasSafetyNet: Boolean get() = safety == "worktree" && branch != null && worktree != null
+    val isActive: Boolean get() = status == "active"
+}
+
+@Serializable
+data class TaskTemplate(
+    val id: String = "",
+    val title: String,
+    val summary: String = "",
+    /** test | bug | review | deps | explain | custom */
+    val icon: String = "custom",
+    val prompt: String = "",
+    val inputLabel: String? = null,
+    val goalHint: String = "",
+    val readOnly: Boolean = false,
+    val builtin: Boolean = false,
+)
+
+@Serializable
+data class Project(val name: String, val path: String, val keywords: List<String> = emptyList(), val saved: Boolean = false)
+
+@Serializable
+data class Agent(val id: String, val name: String)
+
+@Serializable
+data class SafetySettings(
+    val protectedBranches: List<String> = listOf("main", "master", "production", "prod", "release/*", "develop"),
+    val blockProtected: Boolean = true,
+    val alwaysAskHigh: Boolean = true,
+    val requireGit: Boolean = false,
+)
+
+@Serializable
+data class TaskSetup(
+    val templates: List<TaskTemplate> = emptyList(),
+    val projects: List<Project> = emptyList(),
+    val agents: List<Agent> = emptyList(),
+    val safety: SafetySettings = SafetySettings(),
+)
+
+@Serializable
+data class TaskRoute(val project: Project? = null, val agent: Agent? = null, val reason: String = "")

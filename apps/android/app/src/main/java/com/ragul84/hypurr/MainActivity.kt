@@ -31,6 +31,11 @@ import com.ragul84.hypurr.model.Pairing
 import com.ragul84.hypurr.net.LinkState
 import com.ragul84.hypurr.ui.screens.BotListScreen
 import com.ragul84.hypurr.ui.screens.ChatScreen
+import com.ragul84.hypurr.ui.screens.NewTaskScreen
+import com.ragul84.hypurr.ui.screens.NewTaskUiState
+import com.ragul84.hypurr.model.TaskTemplate
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
 import com.ragul84.hypurr.ui.screens.PairingScreen
 import com.ragul84.hypurr.ui.screens.PairingUiState
 import com.ragul84.hypurr.ui.screens.SettingsScreen
@@ -174,14 +179,48 @@ class MainActivity : ComponentActivity() {
                         },
                         onStop = { scope.launch { runCatching { store.stop(id) } } },
                         onRespond = { entry, option -> scope.launch { runCatching { store.respond(entry.id, option) } } },
+                        onUndo = { entry -> entry.data.checkpoint?.let { cp -> scope.launch { runCatching { store.rollback(id, cp) } } } },
+                        onRollback = { cp -> scope.launch { runCatching { store.rollback(id, cp.id) } } },
+                        onFinishTask = { scope.launch { runCatching { store.finishTask(id) } } },
+                        onSaveCheckpoint = { scope.launch { runCatching { store.saveCheckpoint(id) } } },
+                    )
+                }
+                target == "newtask" -> {
+                    val setup by store.setup.collectAsState()
+                    var task by remember { mutableStateOf(NewTaskUiState()) }
+                    LaunchedEffect(Unit) { store.loadSetup() }
+                    // Ask the host for its pick as the user types (debounced).
+                    LaunchedEffect(task.goal, task.template, setup) {
+                        if (task.goal.isBlank() && task.template == null) return@LaunchedEffect
+                        delay(500)
+                        runCatching { store.route("${task.goal} ${task.input}", task.template) }.getOrNull()?.let { task = task.copy(route = it) }
+                    }
+                    NewTaskScreen(
+                        task.copy(setup = setup),
+                        onChange = { task = it },
+                        onStart = {
+                            task = task.copy(busy = true, error = null)
+                            scope.launch {
+                                try {
+                                    val botId = store.startTask(task.goal, task.template, task.input, task.projectPath, task.agentId)
+                                    screen = "chat:$botId"
+                                } catch (e: Exception) {
+                                    task = task.copy(busy = false, error = e.message ?: "Couldn't start the task.")
+                                }
+                            }
+                        },
+                        onBack = { screen = "list" },
                     )
                 }
                 target == "settings" -> {
                     val theme by store.themeMode.collectAsState()
                     val dynamic by store.dynamicColor.collectAsState()
                     val notify by store.notifications.collectAsState()
+                    val setup by store.setup.collectAsState()
+                    LaunchedEffect(Unit) { store.loadSetup() }
                     SettingsScreen(
-                        SettingsUiState(current, linkState, theme, dynamic, notify, app.pushAvailable, BuildConfig.VERSION_NAME),
+                        SettingsUiState(current, linkState, theme, dynamic, notify, app.pushAvailable, BuildConfig.VERSION_NAME,
+                            safety = setup?.safety, customTemplates = setup?.templates.orEmpty().filter { !it.builtin }),
                         onBack = { screen = "list" },
                         onTheme = store::setTheme,
                         onDynamic = store::setDynamicColor,
@@ -192,6 +231,9 @@ class MainActivity : ComponentActivity() {
                                 screen = "list"
                             }
                         },
+                        onSafety = { scope.launch { runCatching { store.setSafety(it) } } },
+                        onAddTemplate = { title, prompt -> scope.launch { runCatching { store.saveTemplate(TaskTemplate(title = title, prompt = prompt)) } } },
+                        onDeleteTemplate = { scope.launch { runCatching { store.deleteTemplate(it) } } },
                     )
                 }
                 else -> BotListScreen(
@@ -199,6 +241,7 @@ class MainActivity : ComponentActivity() {
                     onOpen = { screen = "chat:${it.id}" },
                     onSettings = { screen = "settings" },
                     onRetry = store::reconnect,
+                    onNewTask = { screen = "newtask" },
                 )
             }
         }

@@ -29,11 +29,16 @@ for _ in $(seq 1 50); do
   sleep 0.3
 done
 bot=$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["bot"]["id"])' "$res")
+# A git project for the beginner-task part (stage A), driven by the host's scripted agent.
+git -C "$home" init -q -b main shop
+echo 'console.log("shop")' >"$home/shop/app.js"
+git -C "$home/shop" add . && git -C "$home/shop" -c user.name=e2e -c user.email=e2e@local commit -qm init
 link=$(HOME=$home "$bin" pair --port "$port" --json | python3 -c 'import json,sys; print(json.load(sys.stdin)["pairingUrl"])')
 echo "host pid $pid · bot $bot · $link"
 
 cd "$root/apps/android"
-HYPURR_E2E_LINK=$link HYPURR_E2E_BOT=$bot ./gradlew testDebugUnitTest --tests '*LocalHostE2ETest*' --rerun --console=plain -q || true
+HYPURR_E2E_LINK=$link HYPURR_E2E_BOT=$bot HYPURR_E2E_PROJECT=$home/shop \
+  HYPURR_E2E_AGENT="python3 $root/host/tests/fake_task_agent.py" ./gradlew testDebugUnitTest --tests '*LocalHostE2ETest*' --rerun --console=plain -q || true
 python3 - <<'PY'
 import re, sys, pathlib
 f = pathlib.Path("app/build/test-results/testDebugUnitTest/TEST-com.ragul84.hypurr.net.LocalHostE2ETest.xml")

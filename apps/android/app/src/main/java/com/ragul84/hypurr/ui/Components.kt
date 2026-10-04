@@ -22,6 +22,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.BugReport
+import androidx.compose.material.icons.rounded.RateReview
+import androidx.compose.material.icons.rounded.School
+import androidx.compose.material.icons.rounded.Science
+import androidx.compose.material.icons.rounded.Update
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -223,4 +229,43 @@ fun relativeTime(ms: Long, now: Long = System.currentTimeMillis()): String {
         s < 7 * 86_400 -> "${s / 86_400}d"
         else -> java.text.SimpleDateFormat("MMM d", java.util.Locale.getDefault()).format(java.util.Date(ms))
     }
+}
+
+/** Risk level colour: low = success, medium = warning, high = danger. */
+@Composable
+fun riskColor(risk: String?): Color = when (risk) {
+    "low" -> Hypurr.colors.success
+    "high" -> Hypurr.colors.danger
+    else -> Hypurr.colors.warning
+}
+
+fun riskLabel(risk: String?): String = when (risk) {
+    "low" -> "Low risk"
+    "high" -> "High risk"
+    else -> "Medium risk"
+}
+
+/** A small tinted pill: risk level, task badge. */
+@Composable
+fun Pill(text: String, color: Color, modifier: Modifier = Modifier, icon: ImageVector? = null) {
+    Row(
+        modifier.clip(RoundedCornerShape(50)).background(color.copy(alpha = 0.14f)).padding(horizontal = 9.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (icon != null) {
+            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(13.dp))
+            Spacer(Modifier.width(4.dp))
+        }
+        Text(text, style = MaterialTheme.typography.labelMedium, color = color, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+/** Template icon ids (host `templates`) → icons. */
+fun templateIcon(id: String): ImageVector = when (id) {
+    "test" -> androidx.compose.material.icons.Icons.Rounded.Science
+    "bug" -> androidx.compose.material.icons.Icons.Rounded.BugReport
+    "review" -> androidx.compose.material.icons.Icons.Rounded.RateReview
+    "deps" -> androidx.compose.material.icons.Icons.Rounded.Update
+    "explain" -> androidx.compose.material.icons.Icons.Rounded.School
+    else -> androidx.compose.material.icons.Icons.Rounded.AutoAwesome
 }

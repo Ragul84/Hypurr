@@ -29,7 +29,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.PushPin
+import androidx.compose.material.icons.rounded.Shield
+import androidx.compose.foundation.layout.navigationBarsPadding
+import com.ragul84.hypurr.ui.FlowButton
+import com.ragul84.hypurr.ui.Pill
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
@@ -74,12 +80,14 @@ fun BotListScreen(
     onOpen: (Bot) -> Unit,
     onSettings: () -> Unit,
     onRetry: () -> Unit,
+    onNewTask: () -> Unit = {},
     now: Long = System.currentTimeMillis(),
 ) {
     val c = Hypurr.colors
     val needsYou = bots.filter { it.needsInput }
     val rest = bots.filter { !it.needsInput }
-    Column(Modifier.fillMaxSize().background(c.bg).safeDrawingPadding()) {
+    Box(Modifier.fillMaxSize().background(c.bg)) {
+    Column(Modifier.fillMaxSize().safeDrawingPadding()) {
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Bots", style = MaterialTheme.typography.headlineLarge, color = c.text)
@@ -106,14 +114,14 @@ fun BotListScreen(
                     .glass(RoundedCornerShape(18.dp), c.warning.copy(alpha = 0.1f), highlight = false).padding(14.dp))
         }
         if (synced && bots.isEmpty()) {
-            EmptyRoster()
+            EmptyRoster(onNewTask)
             return@Column
         }
         if (!synced && bots.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { FlowOrb(56.dp) }
             return@Column
         }
-        LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 32.dp),
+        LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 112.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp)) {
             if (needsYou.isNotEmpty()) {
                 item(key = "needs-header") { SectionLabel("Needs you", c.warning) }
@@ -128,6 +136,12 @@ fun BotListScreen(
             items(rest, key = { it.id }) { bot -> BotRow(bot, now, Modifier.animateItem()) { onOpen(bot) } }
         }
     }
+    // Plain-language tasks: the main way in for someone new to agents.
+    if (!(synced && bots.isEmpty())) {
+        FlowButton("New task", Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(20.dp), icon = Icons.Rounded.Add,
+            onClick = onNewTask)
+    }
+    }
 }
 
 @Composable
@@ -137,16 +151,19 @@ private fun SectionLabel(text: String, color: androidx.compose.ui.graphics.Color
 }
 
 @Composable
-private fun EmptyRoster() {
+private fun EmptyRoster(onNewTask: () -> Unit) {
     val c = Hypurr.colors
     Box(Modifier.fillMaxSize()) {
         FlowBackdrop()
         Column(Modifier.align(Alignment.Center).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             FlowOrb(72.dp, animate = false)
             Spacer(Modifier.height(20.dp))
-            Text("No bots yet", style = MaterialTheme.typography.titleLarge, color = c.text)
+            Text("Start your first task", style = MaterialTheme.typography.titleLarge, color = c.text)
             Spacer(Modifier.height(6.dp))
-            Text("Create a bot on your computer and it shows up here.", color = c.secondary, textAlign = TextAlign.Center)
+            Text("Say what you need in plain words, like “write tests for the login form”. Hypurr picks the agent and keeps your code safe on its own branch.",
+                color = c.secondary, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(20.dp))
+            FlowButton("New task", icon = Icons.Rounded.Add, onClick = onNewTask)
         }
     }
 }
@@ -168,6 +185,14 @@ fun BotRow(bot: Bot, now: Long, modifier: Modifier = Modifier, onClick: () -> Un
                 if (bot.pinned) {
                     Spacer(Modifier.width(6.dp))
                     Icon(Icons.Rounded.PushPin, "Pinned", tint = c.tertiary, modifier = Modifier.size(14.dp))
+                }
+                bot.task?.let { task ->
+                    Spacer(Modifier.width(6.dp))
+                    when {
+                        !task.isActive -> Pill("Done", c.tertiary, icon = Icons.Rounded.Check)
+                        task.hasSafetyNet -> Pill("Task", c.success, icon = Icons.Rounded.Shield)
+                        else -> Pill("Task", c.warning)
+                    }
                 }
                 Spacer(Modifier.weight(1f))
                 Text(relativeTime(bot.lastAt, now), style = MaterialTheme.typography.labelMedium, color = c.tertiary)

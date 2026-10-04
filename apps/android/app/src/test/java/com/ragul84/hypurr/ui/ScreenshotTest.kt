@@ -8,6 +8,8 @@ import com.ragul84.hypurr.net.LinkState
 import com.ragul84.hypurr.net.Route
 import com.ragul84.hypurr.ui.screens.BotListScreen
 import com.ragul84.hypurr.ui.screens.ChatScreen
+import com.ragul84.hypurr.ui.screens.NewTaskScreen
+import com.ragul84.hypurr.ui.screens.NewTaskUiState
 import com.ragul84.hypurr.ui.screens.PairingScreen
 import com.ragul84.hypurr.ui.screens.PairingUiState
 import com.ragul84.hypurr.ui.screens.SettingsScreen
@@ -61,6 +63,45 @@ class ScreenshotTest {
     @Test
     fun settings() = shoot("settings") {
         SettingsScreen(SettingsUiState(Samples.computer, LinkState.Ready(Route.Relay), ThemeMode.System, dynamicColor = false,
-            notifications = true, pushAvailable = false, version = "2.4.0", dynamicSupported = true), {}, {}, {}, {}, {})
+            notifications = true, pushAvailable = false, version = "2.4.0", dynamicSupported = true,
+            safety = Samples.safety, customTemplates = Samples.templates.filter { !it.builtin }), {}, {}, {}, {}, {})
+    }
+
+    // Stage A: plain-language tasks, explained approvals, the safety net, templates.
+
+    @Test
+    fun newTask() = shoot("newtask") {
+        NewTaskScreen(NewTaskUiState(Samples.setup, goal = "Fix the checkout button so it works on small phones", template = "fix-error",
+            input = "TypeError: Cannot read properties of undefined (reading 'total')\n    at Checkout.tsx:42", route = Samples.route), {}, {}, {})
+    }
+
+    /** Tall, so Hypurr's plan (routing + reason + safety promise) is in frame. */
+    @Test
+    @Config(qualifiers = "w412dp-h1520dp-xxhdpi")
+    fun newTaskPlan() = shoot("newtask-plan") {
+        NewTaskScreen(NewTaskUiState(Samples.setup, goal = "The checkout total is wrong when a coupon is applied", route = Samples.route), {}, {}, {})
+    }
+
+    @Test
+    fun taskBots() = shoot("taskbots") {
+        BotListScreen(Samples.computer.name, LinkState.Ready(Route.Direct), rosterOrder(Samples.botsWithTask), synced = true,
+            onOpen = {}, onSettings = {}, onRetry = {}, now = Samples.NOW)
+    }
+
+    @Test
+    fun taskChat() = shoot("taskchat") {
+        ChatScreen(Samples.taskBot, Samples.taskChat, "", {}, onBack = {}, onSend = {}, onStop = {}, onRespond = { _, _ -> }, now = Samples.NOW)
+    }
+
+    @Test
+    fun checkpoints() = shoot("checkpoints") {
+        ChatScreen(Samples.taskBot.copy(status = "idle"), Samples.taskChat.take(3), "", {}, onBack = {}, onSend = {}, onStop = {},
+            onRespond = { _, _ -> }, initialCheckpointsOpen = true, now = Samples.NOW)
+    }
+
+    @Test
+    fun emptyRoster() = shoot("empty") {
+        BotListScreen(Samples.computer.name, LinkState.Ready(Route.Direct), emptyList(), synced = true,
+            onOpen = {}, onSettings = {}, onRetry = {}, now = Samples.NOW)
     }
 }
