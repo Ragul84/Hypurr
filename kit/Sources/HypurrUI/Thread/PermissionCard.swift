@@ -43,7 +43,7 @@ struct PermissionCard: View {
 
     private var headline: String {
         if blocked { return "Blocked by the safety net" }
-        switch d.toolKind {
+        return switch d.toolKind {
         case "execute": "Wants to run a command"
         case "edit", "delete", "move": "Wants to change files"
         case "fetch": "Wants to access the web"
