@@ -271,4 +271,59 @@ object Samples {
             riskReasons = listOf("It deletes files. A checkpoint can bring tracked files back, but not ignored or new ones."),
             checkpoint = "d4e5f6a", needsAdmin = true), NOW - 1 * MIN),
     )
+
+    // Stage D: Markdown, files, groups and threads, bots from the phone, remote screen.
+
+    private fun g(id: String, kind: String, data: EntryData, at: Long, bot: String = "b1", thread: String? = null) =
+        Entry(id = id, seq = ++seq, botId = bot, threadId = thread, kind = kind, data = data, createdAt = at, updatedAt = at)
+
+    val markdownReply = "Here's the plan for the **checkout fix**:\n\n" +
+        "1. Guard `cart.total` before rounding\n2. Add a test for coupons\n   - one with `0.1 + 0.2`\n\n" +
+        "```ts\nconst total = round(cart?.total ?? 0)\n```\n" +
+        "> The VAT rule lives in `pricing.ts`.\n\nSee [the PR guide](https://example.com/guide)."
+
+    val richChat: List<Entry> get() {
+        val shot = screenshot()
+        return listOf(
+            g("m1", "user", EntryData(text = "The total is wrong with a coupon, here's what I see", attachments = listOf(
+                Attachment("u1", "checkout.png", shot.size), Attachment("u2", "console.log", 18_400))), NOW - 12 * MIN),
+            g("m2", "agent", EntryData(text = markdownReply, final = true, reactions = listOf("👍", "🎉"),
+                thread = com.ragul84.hypurr.model.ThreadSummary(3, NOW - 4 * MIN, listOf("user", "b1"), unread = 1)), NOW - 10 * MIN),
+        )
+    }
+
+    val richImages: Map<String, ByteArray> get() = mapOf("u1" to screenshot().bytes)
+
+    val thread: List<Entry> = listOf(
+        g("t1", "user", EntryData(text = "Should the test cover free shipping too?"), NOW - 8 * MIN, thread = "m2"),
+        g("t2", "agent", EntryData(text = "Yes: free shipping changes the **VAT base**. I'll add `freeShipping()` as a second case.", final = true),
+            NOW - 6 * MIN, thread = "m2"),
+        g("t3", "user", EntryData(text = "Great, go ahead"), NOW - 4 * MIN, thread = "m2"),
+    )
+
+    val alice = Bot(id = "a1", name = "Alice", avatarColor = "green", backend = "claude", cwd = "/Users/kevin/shop", description = "Backend and pricing")
+    val bob = Bot(id = "a2", name = "Bob", avatarColor = "orange", avatarShape = "squircle", backend = "codex", cwd = "/Users/kevin/shop",
+        description = "Frontend")
+    val group = Bot(id = "g1", kind = "group", name = "Shop team", members = listOf("a1", "a2"), description = "Ship the coupon fix",
+        lastMessage = "Bob: The button is fixed on small phones.", lastAt = NOW - 3 * MIN, unread = 2)
+    val groupBots: Map<String, Bot> = (bots + listOf(alice, bob, group)).associateBy { it.id }
+
+    val groupChat = listOf(
+        g("gm1", "user", EntryData(text = "@Alice can you check the VAT rounding? Bob, the button on small phones"), NOW - 9 * MIN, bot = "g1"),
+        g("gm2", "agent", EntryData(text = "VAT rounding is fixed in `pricing.ts`: totals now round **once**, at the end.", final = true,
+            author = "a1"), NOW - 7 * MIN, bot = "g1"),
+        g("gm3", "agent", EntryData(text = "The button is fixed on small phones. I also:\n- moved the coupon field above the total\n- added a loading state",
+            final = true, author = "a2", thread = com.ragul84.hypurr.model.ThreadSummary(2, NOW - 2 * MIN, listOf("user", "a2"))), NOW - 3 * MIN, bot = "g1"),
+    )
+
+    val backends = listOf(com.ragul84.hypurr.model.Backend("claude", "Claude Code"), com.ragul84.hypurr.model.Backend("codex", "Codex"),
+        com.ragul84.hypurr.model.Backend("gemini", "Gemini CLI"))
+
+    val dirs = com.ragul84.hypurr.model.DirListing("/Users/kevin/code", "/Users/kevin", false, listOf(
+        com.ragul84.hypurr.model.DirEntry("hypurr", "/Users/kevin/code/hypurr", true),
+        com.ragul84.hypurr.model.DirEntry("shop", "/Users/kevin/code/shop", true),
+        com.ragul84.hypurr.model.DirEntry("notes", "/Users/kevin/code/notes", false)))
+
+    val screenOn = com.ragul84.hypurr.model.ScreenState(enabled = true, connected = true, platform = "macos", capture = true, input = true,
+        displays = listOf(com.ragul84.hypurr.model.ScreenDisplay(1, "Studio Display", 2560.0, 1440.0, true)))
 }

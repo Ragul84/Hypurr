@@ -8,6 +8,10 @@ import com.ragul84.hypurr.model.PolicyInfo
 import com.ragul84.hypurr.model.TeamInfo
 import com.ragul84.hypurr.model.Computer
 import com.ragul84.hypurr.model.Entry
+import com.ragul84.hypurr.model.Attachment
+import com.ragul84.hypurr.model.DirListing
+import com.ragul84.hypurr.model.Hello
+import com.ragul84.hypurr.model.isImage
 import com.ragul84.hypurr.model.EntryData
 import com.ragul84.hypurr.model.HypurrJson
 import com.ragul84.hypurr.model.Pairing
@@ -87,6 +91,19 @@ class HypurrStore(
 
     private val _entries = MutableStateFlow<Map<String, List<Entry>>>(emptyMap())
     val entries: StateFlow<Map<String, List<Entry>>> = _entries.asStateFlow()
+
+    /** Thread replies by root entry id, oldest first (the roots live in [entries]). */
+    private val _threads = MutableStateFlow<Map<String, List<Entry>>>(emptyMap())
+    val threads: StateFlow<Map<String, List<Entry>>> = _threads.asStateFlow()
+
+    /** Sent and fetched files by upload id (image previews). Memory only: gone when the app quits. */
+    private val _files = MutableStateFlow<Map<String, ByteArray>>(emptyMap())
+    val files: StateFlow<Map<String, ByteArray>> = _files.asStateFlow()
+    private val fetching = mutableSetOf<String>()
+
+    private val _hello = MutableStateFlow<Hello?>(null)
+    /** The computer's `hello`: its agents (for New bot), home folder and screen state. */
+    val hello: StateFlow<Hello?> = _hello.asStateFlow()
 
     private val _synced = MutableStateFlow(false)
     /** The first sync finished: the roster is real, not just empty. */
@@ -170,6 +187,9 @@ class HypurrStore(
         _synced.value = false
         rev = 0
         _you.value = null
+        _threads.value = emptyMap()
+        _files.value = emptyMap()
+        _hello.value = null
     }
 
     /** Sync, then follow the event stream; a dropped channel resubscribes from the last rev. */
@@ -184,7 +204,10 @@ class HypurrStore(
                 sync.entries.forEach(::upsert)
                 rev = maxOf(rev, sync.rev)
                 _synced.value = true
-                runCatching { c.hello() }.getOrNull()?.you?.let { _you.value = it }
+                runCatching { c.hello() }.getOrNull()?.let { h ->
+                    _hello.value = h
+                    h.you?.let { _you.value = it }
+                }
                 if (notifications.value) runCatching { onConnected?.invoke(c) }
                 c.events(rev).collect(::apply)
             } catch (e: CancellationException) {
@@ -220,13 +243,15 @@ class HypurrStore(
 
     private fun upsert(entry: Entry) {
         rev = maxOf(rev, entry.rev)
-        if (entry.threadId != null) return
-        _entries.update { all ->
-            val list = all[entry.botId].orEmpty()
-            // A sent message replaces its optimistic copy (same clientNonce).
-            val kept = list.filter { it.id != entry.id && !(entry.data.clientNonce != null && it.data.clientNonce == entry.data.clientNonce) }
-            all + (entry.botId to (kept + entry).sortedWith(compareBy({ it.seq == 0L }, { it.seq }, { it.createdAt })))
-        }
+        val root = entry.threadId
+        if (root != null) _threads.update { all -> all + (root to merged(all[root].orEmpty(), entry)) }
+        else _entries.update { all -> all + (entry.botId to merged(all[entry.botId].orEmpty(), entry)) }
+    }
+
+    /** A sent message replaces its optimistic copy (same clientNonce); host order by seq, local ones last. */
+    private fun merged(list: List<Entry>, entry: Entry): List<Entry> {
+        val kept = list.filter { it.id != entry.id && !(entry.data.clientNonce != null && it.data.clientNonce == entry.data.clientNonce) }
+        return (kept + entry).sortedWith(compareBy({ it.seq == 0L }, { it.seq }, { it.createdAt }))
     }
 
     // MARK: chat actions
@@ -237,28 +262,98 @@ class HypurrStore(
         runCatching { c.markRead(botId) }
     }
 
-    /** Sends now, or queues it in the relay mailbox while the computer is offline. */
-    suspend fun send(botId: String, text: String) {
+    /** Opens a thread: its replies, then marks it read (the main chat's unread stays as it is). */
+    suspend fun openThread(botId: String, rootId: String) {
+        val c = client ?: return
+        runCatching { c.thread(botId, rootId) }.getOrNull()?.let { list ->
+            _threads.update { all -> all + (rootId to list.fold(all[rootId].orEmpty().filter { it.seq == 0L }, ::merged)) }
+        }
+        runCatching { c.markRead(botId, rootId) }
+    }
+
+    /**
+     * Sends now, or queues it in the relay mailbox while the computer is offline. `threadId` replies in
+     * a thread. Files go up first (384 KiB chunks) and never through the mailbox: offline, a message with
+     * files fails and the composer keeps them.
+     */
+    suspend fun send(botId: String, text: String, threadId: String? = null, files: List<PickedFile> = emptyList()) {
         val trimmed = text.trim()
-        if (trimmed.isEmpty()) return
+        if (trimmed.isEmpty() && files.isEmpty()) return
         val nonce = UUID.randomUUID().toString().uppercase()
         val now = System.currentTimeMillis()
-        val local = Entry(id = "local-$nonce", botId = botId, kind = "user", createdAt = now, updatedAt = now,
-            data = EntryData(text = trimmed, status = "queued", clientNonce = nonce))
+        val uploads = files.map { UUID.randomUUID().toString() to it }
+        val local = Entry(id = "local-$nonce", botId = botId, threadId = threadId, kind = "user", createdAt = now, updatedAt = now,
+            data = EntryData(text = trimmed, status = "queued", clientNonce = nonce,
+                attachments = uploads.map { (id, f) -> Attachment(id, f.name, f.size) }.ifEmpty { null }))
         upsertLocal(local)
+        _files.update { all -> all + uploads.filter { it.second.isImage }.associate { (id, f) -> id to f.bytes } }
         val t = transport
         try {
             val c = client ?: throw HostException.unreachable()
-            upsert(c.send(botId, trimmed, nonce))
+            uploads.forEach { (id, f) -> c.upload(id, f.name, f.bytes, botId = botId) }
+            upsert(c.send(botId, trimmed, nonce, threadId, uploads.map { it.first }))
         } catch (e: HostException) {
-            val queued = e.kind == HostException.Kind.Offline && t != null && runCatching { t.enqueue(botId, trimmed, nonce) }.isSuccess
+            val queued = uploads.isEmpty() && e.kind == HostException.Kind.Offline && t != null &&
+                runCatching { t.enqueue(botId, trimmed, nonce, threadId) }.isSuccess
             upsertLocal(local.copy(data = local.data.copy(status = if (queued) "queued" else "failed")))
             if (!queued) throw e
         }
     }
 
-    private fun upsertLocal(entry: Entry) = _entries.update { all ->
-        all + (entry.botId to (all[entry.botId].orEmpty().filter { it.id != entry.id } + entry))
+    private fun upsertLocal(entry: Entry) {
+        val root = entry.threadId
+        if (root != null) _threads.update { all -> all + (root to (all[root].orEmpty().filter { it.id != entry.id } + entry)) }
+        else _entries.update { all -> all + (entry.botId to (all[entry.botId].orEmpty().filter { it.id != entry.id } + entry)) }
+    }
+
+    /** Fetches a sent picture once for its preview (other files show as cards). */
+    suspend fun loadAttachment(botId: String, a: Attachment) {
+        if (!a.isImage || a.size > MAX_PREVIEW || a.id in _files.value || !fetching.add(a.id)) return
+        try {
+            val c = client ?: return
+            runCatching { c.readUpload(botId, a.id, MAX_PREVIEW) }.getOrNull()?.let { bytes -> _files.update { it + (a.id to bytes) } }
+        } finally {
+            fetching.remove(a.id)
+        }
+    }
+
+    /** Fetches any sent file (to open or share it). */
+    suspend fun fileBytes(botId: String, a: Attachment): ByteArray {
+        _files.value[a.id]?.let { return it }
+        val c = client ?: throw HostException.unreachable()
+        return c.readUpload(botId, a.id)
+    }
+
+    suspend fun react(entryId: String, emoji: String) {
+        client?.react(entryId, emoji)?.let(::upsert)
+    }
+
+    // MARK: bots and groups
+
+    /** Creates a bot or a group; returns it (a group with the same bots returns the one they share). */
+    suspend fun createBot(config: JsonObject): Bot {
+        val bot = client?.createBot(config) ?: throw HostException.unreachable()
+        upsert(bot)
+        return bot
+    }
+
+    suspend fun updateBot(patch: JsonObject): Bot {
+        val bot = client?.updateBot(patch) ?: throw HostException.unreachable()
+        upsert(bot)
+        return bot
+    }
+
+    suspend fun deleteBot(botId: String) {
+        (client ?: throw HostException.unreachable()).deleteBot(botId)
+        _bots.update { it - botId }
+    }
+
+    suspend fun listDirs(path: String?): DirListing = (client ?: throw HostException.unreachable()).listDirs(path)
+
+    /** Refreshes `hello` (agents for New bot, screen state). */
+    suspend fun refreshHello(): Hello? {
+        val c = client ?: return _hello.value
+        return runCatching { c.hello() }.getOrNull()?.also { _hello.value = it } ?: _hello.value
     }
 
     suspend fun stop(botId: String) = client?.stop(botId)
@@ -403,6 +498,12 @@ class HypurrStore(
         }
     }
 
+    /** The team's rules (anyone may read them): New bot offers only allowed agents. */
+    suspend fun loadPolicies() {
+        val c = client ?: return
+        runCatching { c.policies() }.getOrNull()?.let { _policies.value = it }
+    }
+
     suspend fun setPolicies(patch: JsonObject) {
         val saved = client?.setPolicies(patch) ?: throw HostException.unreachable()
         _policies.value = saved
@@ -425,5 +526,7 @@ class HypurrStore(
         const val THEME = "theme"
         const val DYNAMIC = "dynamicColor"
         const val NOTIFY = "notifications"
+        /** Pictures larger than this show as file cards instead of previews. */
+        const val MAX_PREVIEW = 20L * 1024 * 1024
     }
 }

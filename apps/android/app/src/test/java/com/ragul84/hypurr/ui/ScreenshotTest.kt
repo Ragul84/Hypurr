@@ -19,6 +19,16 @@ import com.ragul84.hypurr.ui.screens.AdminTab
 import com.ragul84.hypurr.ui.screens.TeamAdminScreen
 import com.ragul84.hypurr.ui.screens.TeamAdminUiState
 import com.ragul84.hypurr.ui.theme.HypurrTheme
+import com.ragul84.hypurr.data.PickedFile
+import com.ragul84.hypurr.screen.ScreenPhase
+import com.ragul84.hypurr.ui.screens.BotEditorScreen
+import com.ragul84.hypurr.ui.screens.BotEditorState
+import com.ragul84.hypurr.ui.screens.ComposerFiles
+import com.ragul84.hypurr.ui.screens.ScreenScreen
+import com.ragul84.hypurr.ui.screens.ScreenUiState
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -174,5 +184,90 @@ class ScreenshotTest {
     fun needsAdminCard() = shoot("needs-admin") {
         ChatScreen(Samples.taskBot.copy(status = "needsInput"), Samples.adminCardChat, "", {}, onBack = {}, onSend = {}, onStop = {},
             onRespond = { _, _ -> }, you = Samples.member, now = Samples.NOW)
+    }
+
+    // Stage D: Android parity.
+
+    @Test
+    @Config(qualifiers = "w412dp-h1250dp-xxhdpi")
+    fun markdownFilesThreads() = shoot("chat-rich") {
+        ChatScreen(Samples.alice, Samples.richChat, "", {}, onBack = {}, onSend = {}, onStop = {}, onRespond = { _, _ -> },
+            bots = Samples.groupBots + ("b1" to Samples.alice), images = Samples.richImages, onEdit = {}, now = Samples.NOW)
+    }
+
+    @Test
+    fun composerFiles() = shoot("composer-files") {
+        ChatScreen(Samples.alice, Samples.richChat.take(1), "Here's the error from the console", {}, onBack = {}, onSend = {}, onStop = {},
+            onRespond = { _, _ -> }, composer = ComposerFiles(listOf(Samples.screenshot(), PickedFile("build.log", ByteArray(2048)))),
+            images = Samples.richImages, now = Samples.NOW)
+    }
+
+    @Test
+    fun messageActions() = shoot("message-actions") {
+        ChatScreen(Samples.alice, Samples.richChat, "", {}, onBack = {}, onSend = {}, onStop = {}, onRespond = { _, _ -> },
+            images = Samples.richImages, initialActionsFor = "m2", now = Samples.NOW)
+    }
+
+    @Test
+    fun threadView() = shoot("thread") {
+        ChatScreen(Samples.alice, Samples.thread, "", {}, onBack = {}, onSend = {}, onStop = {}, onRespond = { _, _ -> },
+            bots = Samples.groupBots, threadRoot = Samples.richChat[1], now = Samples.NOW)
+    }
+
+    @Test
+    fun groupChat() = shoot("group") {
+        ChatScreen(Samples.group, Samples.groupChat, "", {}, onBack = {}, onSend = {}, onStop = {}, onRespond = { _, _ -> },
+            bots = Samples.groupBots, composer = ComposerFiles(canAttach = false), onEdit = {}, now = Samples.NOW)
+    }
+
+    @Test
+    fun rosterGroupsAndMenu() = shoot("bots-groups") {
+        BotListScreen(Samples.computer.name, LinkState.Ready(Route.Direct), rosterOrder(Samples.groupBots.values), synced = true,
+            onOpen = {}, onSettings = {}, onRetry = {}, now = Samples.NOW, byId = Samples.groupBots, initialMenuOpen = true, onScreen = {})
+    }
+
+    @Test
+    @Config(qualifiers = "w412dp-h1600dp-xxhdpi")
+    fun newBot() = shoot("new-bot") {
+        BotEditorScreen(BotEditorState(name = "Reviewer", description = "Reviews pull requests", avatarColor = "violet", backend = "claude",
+            folder = "/Users/kevin/code/shop", browsing = Samples.dirs), Samples.backends, emptyList(), {}, {}, {}, {}, {})
+    }
+
+    @Test
+    @Config(qualifiers = "w412dp-h1250dp-xxhdpi")
+    fun editGroup() = shoot("edit-group") {
+        BotEditorScreen(BotEditorState.of(Samples.group), Samples.backends, listOf(Samples.alice, Samples.bob, Samples.bots[2]), {}, {}, {}, {}, {})
+    }
+
+    @Test
+    fun screenViewer() = shoot("screen") {
+        ScreenScreen(ScreenUiState("Kevin's Mac Studio", Samples.screenOn, ScreenPhase.Live, IntSize(2560, 1440)), {}, {}, {}, {}) { m ->
+            FakeDesktop(m)
+        }
+    }
+
+    @Test
+    fun screenOff() = shoot("screen-off") {
+        ScreenScreen(ScreenUiState("Kevin's Mac Studio", com.ragul84.hypurr.model.ScreenState()), {}, {}, {}, {}) { }
+    }
+}
+
+/** Stands in for the WebRTC video in screenshots: a desktop with a window, letterboxed like the real video. */
+@androidx.compose.runtime.Composable
+private fun FakeDesktop(modifier: androidx.compose.ui.Modifier) {
+    androidx.compose.foundation.layout.Box(modifier, contentAlignment = androidx.compose.ui.Alignment.Center) {
+        androidx.compose.foundation.Canvas(androidx.compose.ui.Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
+            drawRect(androidx.compose.ui.graphics.Brush.linearGradient(listOf(androidx.compose.ui.graphics.Color(0xFF3A1C71),
+                androidx.compose.ui.graphics.Color(0xFFD76D77), androidx.compose.ui.graphics.Color(0xFFFFAF7B))))
+            drawRect(androidx.compose.ui.graphics.Color(0xF0FFFFFF), topLeft = androidx.compose.ui.geometry.Offset(size.width * 0.12f, size.height * 0.14f),
+                size = androidx.compose.ui.geometry.Size(size.width * 0.62f, size.height * 0.66f))
+            drawRect(androidx.compose.ui.graphics.Color(0xFFE8EAED), topLeft = androidx.compose.ui.geometry.Offset(size.width * 0.12f, size.height * 0.14f),
+                size = androidx.compose.ui.geometry.Size(size.width * 0.62f, size.height * 0.07f))
+            for (i in 0 until 6) drawRect(androidx.compose.ui.graphics.Color(0xFFBDC1C6),
+                topLeft = androidx.compose.ui.geometry.Offset(size.width * 0.16f, size.height * (0.28f + i * 0.08f)),
+                size = androidx.compose.ui.geometry.Size(size.width * (0.5f - (i % 3) * 0.08f), size.height * 0.03f))
+            drawRect(androidx.compose.ui.graphics.Color(0xCC1E1E1E), topLeft = androidx.compose.ui.geometry.Offset(0f, size.height * 0.94f),
+                size = androidx.compose.ui.geometry.Size(size.width, size.height * 0.06f))
+        }
     }
 }

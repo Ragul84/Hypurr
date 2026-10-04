@@ -31,6 +31,27 @@ import android.provider.OpenableColumns
 import androidx.activity.result.PickVisualMediaRequest
 import com.ragul84.hypurr.data.HypurrStore
 import com.ragul84.hypurr.data.PickedFile
+import com.ragul84.hypurr.model.Attachment
+import com.ragul84.hypurr.model.ScreenState
+import com.ragul84.hypurr.net.Route
+import com.ragul84.hypurr.screen.ScreenPhase
+import com.ragul84.hypurr.screen.ScreenSession
+import com.ragul84.hypurr.ui.screens.AttachKind
+import com.ragul84.hypurr.ui.screens.BotEditorScreen
+import com.ragul84.hypurr.ui.screens.BotEditorState
+import com.ragul84.hypurr.ui.screens.ComposerFiles
+import com.ragul84.hypurr.ui.screens.ScreenScreen
+import com.ragul84.hypurr.ui.screens.ScreenUiState
+import com.ragul84.hypurr.ui.screens.usableBackends
+import android.webkit.MimeTypeMap
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.key
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.FileProvider
+import androidx.lifecycle.lifecycleScope
+import org.webrtc.RendererCommon
+import org.webrtc.SurfaceViewRenderer
 import com.ragul84.hypurr.model.Pairing
 import com.ragul84.hypurr.net.LinkState
 import com.ragul84.hypurr.ui.screens.BotListScreen
@@ -65,6 +86,36 @@ class MainActivity : ComponentActivity() {
     private val picked = MutableStateFlow<PickedFile?>(null)
     private val pickImage = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         uri?.let { readFile(it, "screenshot.jpg") }?.let { picked.value = it }
+    }
+
+    /** Photos and files picked for the open chat's composer. */
+    private val chatPicked = MutableStateFlow<List<PickedFile>>(emptyList())
+    private val pickChatMedia = registerForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(10)) { uris ->
+        addChatFiles(uris.mapNotNull { readFile(it, "photo.jpg") })
+    }
+    private val pickChatFiles = registerForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        addChatFiles(uris.mapNotNull { readFile(it, "file") })
+    }
+
+    private fun addChatFiles(files: List<PickedFile>) {
+        if (files.isNotEmpty()) chatPicked.value = chatPicked.value + files
+    }
+
+    /** An image on the clipboard, if there is one. */
+    private fun clipboardImage(): PickedFile? {
+        val item = getSystemService(ClipboardManager::class.java).primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)
+        return item?.uri?.takeIf { contentResolver.getType(it)?.startsWith("image/") == true }?.let { readFile(it, "pasted.png") }
+    }
+
+    /** Hands a chat's file to another app: written to the cache, shared read-only through the FileProvider. */
+    private fun openFile(a: Attachment, bytes: ByteArray) {
+        val dir = java.io.File(cacheDir, "shared/${a.id.filter { it.isLetterOrDigit() || it == '-' }}").apply { mkdirs() }
+        val file = java.io.File(dir, a.name.substringAfterLast('/').ifEmpty { "file" })
+        file.writeBytes(bytes)
+        val uri = FileProvider.getUriForFile(this, "$packageName.files", file)
+        val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(file.extension.lowercase()) ?: "application/octet-stream"
+        val view = Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        startActivity(Intent.createChooser(view, a.name))
     }
 
     /** Reads a picked or pasted file (the system photo picker or the clipboard; no storage permission). */
@@ -172,7 +223,7 @@ class MainActivity : ComponentActivity() {
             openBot.value = null
             screen = "chat:$it"
         }
-        BackHandler(screen != "list") { screen = "list" }
+        BackHandler(screen != "list") { screen = parentOf(screen) }
 
         AnimatedContent(
             screen,
@@ -184,24 +235,44 @@ class MainActivity : ComponentActivity() {
             label = "nav",
         ) { target ->
             when {
-                target.startsWith("chat:") -> {
-                    val id = target.removePrefix("chat:")
+                target.startsWith("chat:") || target.startsWith("thread:") -> {
+                    val parts = target.split(':')
+                    val id = parts[1]
+                    val rootId = parts.getOrNull(2)
                     val bot = bots[id]
-                    if (bot == null) {
-                        screen = "list"
+                    val root = rootId?.let { r -> entries[id]?.firstOrNull { it.id == r } }
+                    if (bot == null || (rootId != null && root == null)) {
+                        screen = if (bot == null) "list" else "chat:$id"
                         return@AnimatedContent
                     }
-                    var draft by rememberSaveable(id) { mutableStateOf("") }
+                    var draft by rememberSaveable(target) { mutableStateOf("") }
+                    var files by remember(target) { mutableStateOf(listOf<PickedFile>()) }
                     val integrations by store.integrations.collectAsState()
+                    val threads by store.threads.collectAsState()
+                    val images by store.files.collectAsState()
+                    LaunchedEffect(target) {
+                        chatPicked.value = emptyList()
+                        chatPicked.collect { picked ->
+                            if (picked.isNotEmpty()) {
+                                files = files + picked
+                                chatPicked.value = emptyList()
+                            }
+                        }
+                    }
                     LaunchedEffect(bot.task != null) { if (bot.task != null) store.loadIntegrations() }
-                    androidx.compose.runtime.LaunchedEffect(id, synced) { store.openChat(id) }
+                    LaunchedEffect(target, synced) { if (rootId != null) store.openThread(id, rootId) else store.openChat(id) }
                     ChatScreen(
-                        bot, entries[id].orEmpty(), draft, { draft = it },
-                        onBack = { screen = "list" },
+                        bot, if (rootId != null) threads[rootId].orEmpty() else entries[id].orEmpty(), draft, { draft = it },
+                        onBack = { screen = parentOf(target) },
                         onSend = {
                             val text = draft
+                            val sending = files
                             draft = ""
-                            scope.launch { runCatching { store.send(id, text) } }
+                            files = emptyList()
+                            scope.launch {
+                                // A failed message with files gives them back to the composer for another try.
+                                runCatching { store.send(id, text, rootId, sending) }.onFailure { if (sending.isNotEmpty()) files = sending + files }
+                            }
                         },
                         onStop = { scope.launch { runCatching { store.stop(id) } } },
                         onRespond = { entry, option -> scope.launch { runCatching { store.respond(entry.id, option) } } },
@@ -212,8 +283,82 @@ class MainActivity : ComponentActivity() {
                         onOpenLink = { url -> runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } },
                         integrations = integrations,
                         you = you,
+                        bots = bots,
+                        threadRoot = root,
+                        composer = ComposerFiles(files, canAttach = !bot.isGroup && you?.canAct != false, online = linkState is LinkState.Ready),
+                        onAttach = { kind ->
+                            when (kind) {
+                                AttachKind.Photos -> pickChatMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                AttachKind.Files -> pickChatFiles.launch(arrayOf("*/*"))
+                                AttachKind.Paste -> clipboardImage()?.let { files = files + it }
+                            }
+                        },
+                        onRemoveFile = { i -> files = files.filterIndexed { j, _ -> j != i } },
+                        images = images,
+                        onLoadAttachment = { a -> scope.launch { store.loadAttachment(id, a) } },
+                        onOpenFile = { a -> scope.launch { runCatching { openFile(a, store.fileBytes(id, a)) } } },
+                        onOpenThread = { e -> screen = "thread:$id:${e.id}" },
+                        onReact = { e, emoji -> scope.launch { runCatching { store.react(e.id, emoji) } } },
+                        onEdit = if (you?.canAct != false) ({ screen = "edit:$id" }) else null,
                     )
                 }
+                target == "bot:new" || target == "group:new" || target.startsWith("edit:") -> {
+                    val hello by store.hello.collectAsState()
+                    val policies by store.policies.collectAsState()
+                    val editing = if (target.startsWith("edit:")) bots[target.removePrefix("edit:")] else null
+                    var form by remember(target) {
+                        mutableStateOf(when {
+                            editing != null -> BotEditorState.of(editing)
+                            target == "group:new" -> BotEditorState.newGroup()
+                            else -> BotEditorState()
+                        })
+                    }
+                    LaunchedEffect(target) {
+                        store.refreshHello()
+                        store.loadPolicies()
+                    }
+                    val usable = usableBackends(hello?.backends.orEmpty(), policies?.policies?.allowedAgents.orEmpty())
+                    LaunchedEffect(usable) {
+                        if (form.isNew && !form.group && form.backend == null) usable.singleOrNull()?.let { form = form.copy(backend = it.id) }
+                    }
+                    BotEditorScreen(
+                        form, usable,
+                        agentBots = bots.values.filter { !it.isGroup && !it.hidden }.sortedBy { it.name.lowercase() },
+                        onChange = { form = it },
+                        onSave = {
+                            val body = form.toJson(editing)
+                            form = form.copy(busy = true, error = null)
+                            scope.launch {
+                                try {
+                                    val saved = if (editing == null) store.createBot(body) else store.updateBot(body)
+                                    screen = "chat:${saved.id}"
+                                } catch (e: Exception) {
+                                    form = form.copy(busy = false, error = e.message ?: "Couldn't save.")
+                                }
+                            }
+                        },
+                        onDelete = {
+                            val id = editing?.id ?: return@BotEditorScreen
+                            scope.launch {
+                                try {
+                                    store.deleteBot(id)
+                                    screen = "list"
+                                } catch (e: Exception) {
+                                    form = form.copy(confirmDelete = false, error = e.message ?: "Couldn't delete.")
+                                }
+                            }
+                        },
+                        onBack = { screen = parentOf(target) },
+                        onBrowse = { path ->
+                            scope.launch {
+                                runCatching { store.listDirs(path) }
+                                    .onSuccess { form = form.copy(browsing = it, error = null) }
+                                    .onFailure { form = form.copy(error = it.message ?: "Couldn't list folders.") }
+                            }
+                        },
+                    )
+                }
+                target == "screen" -> ScreenRoute(store, current.name) { screen = "list" }
                 target == "newtask" -> {
                     val setup by store.setup.collectAsState()
                     var task by remember { mutableStateOf(NewTaskUiState()) }
@@ -343,13 +488,93 @@ class MainActivity : ComponentActivity() {
                         onDefaultRole = { role -> save { store.setDefaultRole(role) } },
                     )
                 }
-                else -> BotListScreen(
-                    current.name, linkState, rosterOrder(bots.values), synced,
-                    onOpen = { screen = "chat:${it.id}" },
-                    onSettings = { screen = "settings" },
-                    onRetry = store::reconnect,
-                    onNewTask = { screen = "newtask" },
-                )
+                else -> {
+                    val hello by store.hello.collectAsState()
+                    BotListScreen(
+                        current.name, linkState, rosterOrder(bots.values), synced,
+                        onOpen = { screen = "chat:${it.id}" },
+                        onSettings = { screen = "settings" },
+                        onRetry = store::reconnect,
+                        onNewTask = { screen = "newtask" },
+                        byId = bots,
+                        onNewBot = { screen = "bot:new" },
+                        onNewGroup = { screen = "group:new" },
+                        canCreate = you?.canAct != false,
+                        onScreen = if (hello?.screen?.enabled == true && you?.canAct != false) ({ screen = "screen" }) else null,
+                    )
+                }
+            }
+        }
+    }
+
+    /** Where Back goes: a thread to its chat, a bot's settings to its chat, everything else to the list. */
+    private fun parentOf(screen: String): String = when {
+        screen.startsWith("thread:") -> "chat:" + screen.split(':')[1]
+        screen.startsWith("edit:") -> "chat:" + screen.removePrefix("edit:")
+        screen == "team" -> "settings"
+        else -> "list"
+    }
+
+    /** The computer's screen over WebRTC; the session lives as long as this screen is open. */
+    @Composable
+    private fun ScreenRoute(store: HypurrStore, name: String, onBack: () -> Unit) {
+        val client = store.client
+        var status by remember { mutableStateOf<ScreenState?>(null) }
+        var frame by remember { mutableStateOf(IntSize.Zero) }
+        var session by remember { mutableStateOf<ScreenSession?>(null) }
+        val idle = remember { MutableStateFlow<ScreenPhase>(ScreenPhase.Connecting) }
+        fun begin() {
+            frame = IntSize.Zero
+            lifecycleScope.launch {
+                val st = runCatching { client?.screenStatus() }.getOrNull()
+                status = st ?: ScreenState()
+                session?.release()
+                session = null
+                if (client != null && st?.ready == true) {
+                    val display = st.displays.firstOrNull { it.main } ?: st.displays.firstOrNull()
+                    session = ScreenSession(this@MainActivity, client, store.route == Route.Relay, lifecycleScope, display).also { it.start() }
+                }
+            }
+        }
+        LaunchedEffect(Unit) { begin() }
+        DisposableEffect(Unit) { onDispose { session?.release() } }
+        BackHandler(onBack = onBack)
+        val s = session
+        val phase by (s?.phase ?: idle).collectAsState()
+        val clipboard by (s?.remoteClipboard ?: remember { MutableStateFlow<String?>(null) }).collectAsState()
+        val error by (s?.lastError ?: remember { MutableStateFlow<String?>(null) }).collectAsState()
+        ScreenScreen(
+            ScreenUiState(name, status, phase, frame, clipboard, error),
+            onBack = onBack,
+            onRetry = ::begin,
+            onInput = { s?.send(it) },
+            onTakeClipboard = {
+                clipboard?.let { getSystemService(ClipboardManager::class.java).setPrimaryClip(android.content.ClipData.newPlainText("Computer", it)) }
+                s?.remoteClipboard?.value = null
+            },
+        ) { modifier ->
+            if (s != null) key(s) {
+                val track by s.track.collectAsState()
+                var renderer by remember { mutableStateOf<SurfaceViewRenderer?>(null) }
+                AndroidView(factory = { ctx ->
+                    SurfaceViewRenderer(ctx).apply {
+                        init(s.egl.eglBaseContext, object : RendererCommon.RendererEvents {
+                            override fun onFirstFrameRendered() = Unit
+                            override fun onFrameResolutionChanged(w: Int, h: Int, rotation: Int) {
+                                post { frame = if (rotation % 180 == 0) IntSize(w, h) else IntSize(h, w) }
+                            }
+                        })
+                        setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT)
+                        setEnableHardwareScaler(true)
+                        renderer = this
+                    }
+                }, modifier = modifier, onRelease = { it.release() })
+                DisposableEffect(track, renderer) {
+                    val r = renderer
+                    val t = track
+                    if (r != null) t?.addSink(r)
+                    onDispose { if (r != null) t?.removeSink(r) }
+                }
             }
         }
     }

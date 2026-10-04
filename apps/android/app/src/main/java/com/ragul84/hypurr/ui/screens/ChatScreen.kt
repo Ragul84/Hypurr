@@ -74,6 +74,30 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ragul84.hypurr.model.Bot
+import com.ragul84.hypurr.model.Attachment
+import com.ragul84.hypurr.model.QuickReactions
+import com.ragul84.hypurr.model.ThreadSummary
+import com.ragul84.hypurr.model.isImage
+import com.ragul84.hypurr.model.sizeLabel
+import com.ragul84.hypurr.data.PickedFile
+import com.ragul84.hypurr.ui.MarkdownText
+import com.ragul84.hypurr.ui.Markdown
+import com.ragul84.hypurr.ui.avatarColor
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material.icons.automirrored.rounded.Reply
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.ContentPaste
+import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Image
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.unit.Dp
 import com.ragul84.hypurr.model.Checkpoint
 import com.ragul84.hypurr.model.Entry
 import com.ragul84.hypurr.model.Integrations
@@ -95,6 +119,18 @@ import com.ragul84.hypurr.ui.pressable
 import com.ragul84.hypurr.ui.theme.ColorFlow
 import com.ragul84.hypurr.ui.theme.Hypurr
 import com.ragul84.hypurr.ui.theme.Motion
+
+/** What the composer's + offers. */
+enum class AttachKind { Photos, Files, Paste }
+
+/** Files waiting in the composer, and what the chat can do with them. */
+data class ComposerFiles(
+    val files: List<PickedFile> = emptyList(),
+    /** False in group chats: a group has no folder for files. */
+    val canAttach: Boolean = true,
+    /** Files need the computer online (they don't go through the relay mailbox). */
+    val online: Boolean = true,
+)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -119,32 +155,59 @@ fun ChatScreen(
     /** This phone's role: members can't answer cards that need an admin. */
     you: Actor? = null,
     now: Long = System.currentTimeMillis(),
+    /** Every bot on the computer: group replies show who wrote them. */
+    bots: Map<String, Bot> = emptyMap(),
+    /** Set when this is a thread: its root message (entries are then the replies). */
+    threadRoot: Entry? = null,
+    composer: ComposerFiles = ComposerFiles(),
+    onAttach: (AttachKind) -> Unit = {},
+    onRemoveFile: (Int) -> Unit = {},
+    /** Sent and fetched files by upload id (pictures show inline). */
+    images: Map<String, ByteArray> = emptyMap(),
+    onLoadAttachment: (Attachment) -> Unit = {},
+    onOpenFile: (Attachment) -> Unit = {},
+    onOpenThread: (Entry) -> Unit = {},
+    onReact: (Entry, String) -> Unit = { _, _ -> },
+    /** Opens the bot's (or group's) settings; null hides it. */
+    onEdit: (() -> Unit)? = null,
+    initialActionsFor: String? = null,
 ) {
     val c = Hypurr.colors
+    val inThread = threadRoot != null
     val chat = entries.filter { it.isChat }.reversed()
     val list = rememberLazyListState()
-    val task = bot.task
+    val task = bot.task.takeIf { !inThread }
     var checkpointsOpen by remember { mutableStateOf(initialCheckpointsOpen) }
+    var actionsFor by remember { mutableStateOf(initialActionsFor?.let { id -> (entries + listOfNotNull(threadRoot)).firstOrNull { it.id == id } }) }
+    var viewing by remember { mutableStateOf<Attachment?>(null) }
+    val media = AttachmentUi(images, onLoadAttachment, onOpenFile) { viewing = it }
     Box(Modifier.fillMaxSize().background(c.bg)) {
         LazyColumn(
             Modifier.fillMaxSize(),
             state = list,
             reverseLayout = true,
-            contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = if (task != null) 168.dp else 112.dp, bottom = 108.dp),
+            contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = if (task != null) 168.dp else 112.dp,
+                bottom = if (composer.files.isEmpty()) 108.dp else 176.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            if (bot.status == "working") item(key = "working") { WorkingRow(bot, Modifier.animateItem()) }
+            if (bot.isWorking && (if (inThread) bot.workingThread == threadRoot?.id else bot.workingThread == null)) {
+                item(key = "working") { WorkingRow(bot, bots, Modifier.animateItem()) }
+            }
             items(chat, key = { it.data.clientNonce ?: it.id }) { entry ->
                 Box(Modifier.animateItem(fadeInSpec = Motion.effects(), placementSpec = Motion.offset)) {
-                    when (entry.kind) {
-                        "user" -> UserBubble(entry)
-                        "agent" -> AgentBubble(entry)
-                        "permission" -> PermissionCard(entry, task, onRespond, onUndo, you?.isAdmin != false)
-                        else -> entry.data.learning?.let { LearningCard(it, onOpenLink) } ?: Notice(entry)
-                    }
+                    Message(entry, bot, bots, task, you, media, inThread, onRespond, onUndo, onOpenLink, onOpenThread, onReact) { actionsFor = it }
                 }
             }
-            if (chat.isEmpty()) item(key = "empty") { EmptyChat(bot) }
+            if (threadRoot != null) {
+                item(key = "root-divider") {
+                    val n = chat.count { it.kind == "user" || it.kind == "agent" }
+                    Text(if (n == 1) "1 reply" else "$n replies", color = c.tertiary, style = MaterialTheme.typography.labelMedium,
+                        textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp))
+                }
+                item(key = "root") {
+                    Message(threadRoot, bot, bots, task, you, media, true, onRespond, onUndo, onOpenLink, onOpenThread, onReact) { actionsFor = it }
+                }
+            } else if (chat.isEmpty()) item(key = "empty") { EmptyChat(bot, bots) }
         }
         // Header: frosted glass over the transcript. Compose has no backdrop blur before Android 12,
         // so it is opaque: scrolled text must not show through the title.
@@ -154,24 +217,211 @@ fun ChatScreen(
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconBubble(Icons.AutoMirrored.Rounded.ArrowBack, "Back", fill = c.surface.copy(alpha = 0.6f), onClick = onBack)
             Spacer(Modifier.width(10.dp))
-            BotAvatar(bot, 38.dp)
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                Text(bot.name, style = MaterialTheme.typography.titleMedium, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Box { StatusLine(bot) }
+            Row(Modifier.weight(1f).clip(RoundedCornerShape(20.dp)).then(if (onEdit != null && !inThread) Modifier.pressable("${bot.name} settings", onClick = onEdit) else Modifier),
+                verticalAlignment = Alignment.CenterVertically) {
+                if (bot.isGroup) GroupAvatar(bot, bots, 38.dp) else BotAvatar(bot, 38.dp)
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(if (inThread) "Thread" else bot.name, style = MaterialTheme.typography.titleMedium, color = c.text, maxLines = 1,
+                        overflow = TextOverflow.Ellipsis)
+                    Box {
+                        when {
+                            inThread -> Text("in ${bot.name}", color = c.secondary, style = MaterialTheme.typography.bodyMedium, maxLines = 1,
+                                overflow = TextOverflow.Ellipsis)
+                            bot.isGroup && !bot.isWorking -> Text(groupMembersLine(bot, bots), color = c.secondary,
+                                style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            else -> StatusLine(bot)
+                        }
+                    }
+                }
             }
             AnimatedVisibility(bot.isWorking, enter = scaleIn(Motion.spatialFast()) + fadeIn(), exit = scaleOut() + fadeOut()) {
-                IconBubble(Icons.Rounded.Stop, "Stop", tint = c.danger, fill = c.danger.copy(alpha = 0.12f), onClick = onStop)
+                Row {
+                    Spacer(Modifier.width(6.dp))
+                    IconBubble(Icons.Rounded.Stop, "Stop", tint = c.danger, fill = c.danger.copy(alpha = 0.12f), onClick = onStop)
+                }
             }
         }
         if (task != null) TaskStrip(task) { checkpointsOpen = true }
         }
-        Composer(draft, onDraftChange, onSend, Modifier.align(Alignment.BottomCenter))
+        Composer(draft, onDraftChange, onSend, Modifier.align(Alignment.BottomCenter), composer, images, onAttach, onRemoveFile,
+            if (inThread) "Reply in thread" else if (bot.isGroup) "Message ${bot.name}" else "Message")
         if (task != null) {
             CheckpointSheet(checkpointsOpen, task, now, integrations, initialFinishOpen, onClose = { checkpointsOpen = false },
                 onRollback = { checkpointsOpen = false; onRollback(it) },
                 onFinish = { checkpointsOpen = false; onFinishTask(it) }, onSave = onSaveCheckpoint)
         }
+        MessageActions(actionsFor, canThread = !inThread, onClose = { actionsFor = null },
+            onReact = { e, emoji -> actionsFor = null; onReact(e, emoji) },
+            onThread = { actionsFor = null; onOpenThread(it) })
+        viewing?.let { a -> ImageViewer(a, images[a.id]) { viewing = null } }
+    }
+}
+
+/** How a chat shows files: the cached bytes, and what tapping does. */
+internal class AttachmentUi(
+    val images: Map<String, ByteArray>,
+    val load: (Attachment) -> Unit,
+    val open: (Attachment) -> Unit,
+    val view: (Attachment) -> Unit,
+)
+
+/** One chat message with its author (groups), files, reactions and thread summary. Long-press for actions. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun Message(entry: Entry, bot: Bot, bots: Map<String, Bot>, task: TaskInfo?, you: Actor?, media: AttachmentUi, inThread: Boolean,
+                    onRespond: (Entry, String?) -> Unit, onUndo: (Entry) -> Unit, onOpenLink: (String) -> Unit,
+                    onOpenThread: (Entry) -> Unit, onReact: (Entry, String) -> Unit, onActions: (Entry) -> Unit) {
+    val talk = entry.kind == "user" || entry.kind == "agent"
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = if (entry.kind == "user") Alignment.End else Alignment.Start) {
+        when (entry.kind) {
+            "user" -> UserBubble(entry, media) { onActions(entry) }
+            "agent" -> AgentBubble(entry, if (bot.isGroup) entry.data.author?.let(bots::get) else null) { onActions(entry) }
+            "permission" -> PermissionCard(entry, task, onRespond, onUndo, you?.isAdmin != false)
+            else -> entry.data.learning?.let { LearningCard(it, onOpenLink) } ?: Notice(entry)
+        }
+        if (talk) {
+            val reactions = entry.data.reactions.orEmpty()
+            if (reactions.isNotEmpty()) Reactions(reactions) { onReact(entry, it) }
+            val thread = entry.data.thread
+            if (!inThread && thread != null && thread.count > 0) ThreadSummaryRow(thread, bots) { onOpenThread(entry) }
+        }
+    }
+}
+
+@Composable
+private fun Reactions(reactions: List<String>, onTap: (String) -> Unit) {
+    val c = Hypurr.colors
+    Row(Modifier.padding(top = 4.dp, start = 4.dp, end = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        reactions.forEach { emoji ->
+            Text(emoji, fontSize = 15.sp, modifier = Modifier.clip(RoundedCornerShape(50)).background(c.accent.copy(alpha = 0.12f))
+                .pressable("Remove $emoji") { onTap(emoji) }.padding(horizontal = 9.dp, vertical = 3.dp))
+        }
+    }
+}
+
+/** Under a message with replies: who replied, how many, and how many are new. */
+@Composable
+private fun ThreadSummaryRow(thread: ThreadSummary, bots: Map<String, Bot>, onOpen: () -> Unit) {
+    val c = Hypurr.colors
+    Row(Modifier.padding(top = 4.dp).clip(RoundedCornerShape(50)).background(c.surface).pressable("Open thread", onClick = onOpen)
+        .padding(start = 6.dp, end = 12.dp, top = 5.dp, bottom = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.width((18 + 12 * (thread.authors.take(3).size - 1).coerceAtLeast(0)).dp).height(18.dp)) {
+            thread.authors.take(3).forEachIndexed { i, id ->
+                Box(Modifier.padding(start = (12 * i).dp)) {
+                    bots[id]?.let { BotAvatar(it, 18.dp) } ?: Box(Modifier.size(18.dp).clip(CircleShape).background(c.bubbleUser))
+                }
+            }
+        }
+        Spacer(Modifier.width(8.dp))
+        Text(if (thread.count == 1) "1 reply" else "${thread.count} replies", color = c.accent, style = MaterialTheme.typography.labelLarge)
+        if (thread.unread > 0) {
+            Spacer(Modifier.width(6.dp))
+            Pill("${thread.unread} new", c.accent)
+        }
+    }
+}
+
+/** Long-press on a message: quick reactions, reply in thread, copy. */
+@Composable
+private fun MessageActions(entry: Entry?, canThread: Boolean, onClose: () -> Unit, onReact: (Entry, String) -> Unit, onThread: (Entry) -> Unit) {
+    val c = Hypurr.colors
+    val clipboard = LocalClipboardManager.current
+    Box(Modifier.fillMaxSize()) {
+        AnimatedVisibility(entry != null, enter = fadeIn(Motion.effects()), exit = fadeOut(Motion.effects())) {
+            Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.32f)).pressable("Close", onClick = onClose))
+        }
+        AnimatedVisibility(entry != null, Modifier.align(Alignment.BottomCenter),
+            enter = slideInVertically(Motion.offset) { it } + fadeIn(), exit = slideOutVertically(Motion.offset) { it } + fadeOut()) {
+            val e = entry ?: return@AnimatedVisibility
+            Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp), c.surface).navigationBarsPadding()
+                .padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(Markdown.plain(e.data.text.orEmpty()).ifEmpty { e.data.attachments.orEmpty().joinToString { it.name } }, color = c.secondary,
+                    style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    QuickReactions.forEach { emoji ->
+                        val on = e.data.reactions.orEmpty().contains(emoji)
+                        Box(Modifier.size(46.dp).clip(CircleShape).background(if (on) c.accent.copy(alpha = 0.2f) else c.bg.copy(alpha = 0.6f))
+                            .pressable(if (on) "Remove $emoji" else "React $emoji") { onReact(e, emoji) }, contentAlignment = Alignment.Center) {
+                            Text(emoji, fontSize = 22.sp)
+                        }
+                    }
+                }
+                if (canThread && e.threadId == null && e.seq > 0) {
+                    ActionRow(Icons.AutoMirrored.Rounded.Reply, "Reply in thread") { onThread(e) }
+                }
+                if (!e.data.text.isNullOrEmpty()) ActionRow(Icons.Rounded.ContentCopy, "Copy text") {
+                    clipboard.setText(AnnotatedString(e.data.text))
+                    onClose()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActionRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+    val c = Hypurr.colors
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.bg.copy(alpha = 0.5f)).pressable(label, onClick = onClick)
+        .padding(horizontal = 14.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = c.accent, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(12.dp))
+        Text(label, color = c.text, style = MaterialTheme.typography.titleSmall)
+    }
+}
+
+/** A picture, full size; tap anywhere to close. */
+@Composable
+private fun ImageViewer(a: Attachment, bytes: ByteArray?, onClose: () -> Unit) {
+    val bitmap = rememberBitmap(bytes)
+    Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.92f)).pressable("Close picture", onClick = onClose)
+        .statusBarsPadding().navigationBarsPadding(), contentAlignment = Alignment.Center) {
+        if (bitmap != null) Image(bitmap, a.name, Modifier.fillMaxWidth().padding(12.dp), contentScale = ContentScale.Fit)
+        else FlowOrb(40.dp)
+        Text(a.name, color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.align(Alignment.TopCenter).padding(16.dp))
+    }
+}
+
+/** Decodes picture bytes once, scaled down for the screen. */
+@Composable
+internal fun rememberBitmap(bytes: ByteArray?, maxSide: Int = 1600): ImageBitmap? = remember(bytes) {
+    bytes?.let { b ->
+        runCatching {
+            val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            android.graphics.BitmapFactory.decodeByteArray(b, 0, b.size, bounds)
+            var sample = 1
+            while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxSide) sample *= 2
+            android.graphics.BitmapFactory.decodeByteArray(b, 0, b.size, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
+                ?.asImageBitmap()
+        }.getOrNull()
+    }
+}
+
+/** A group's avatar: its first members, overlapping. */
+@Composable
+fun GroupAvatar(group: Bot, bots: Map<String, Bot>, size: Dp = 48.dp) {
+    val c = Hypurr.colors
+    val members = group.members.mapNotNull(bots::get).take(3)
+    if (members.isEmpty()) {
+        BotAvatar(group, size)
+        return
+    }
+    val small = size * 0.62f
+    Box(Modifier.size(size)) {
+        members.forEachIndexed { i, m ->
+            val align = when (i) { 0 -> Alignment.TopStart; 1 -> Alignment.BottomEnd; else -> Alignment.BottomStart }
+            Box(Modifier.align(align).clip(CircleShape).background(c.bg).padding(1.5.dp)) { BotAvatar(m.copy(status = "idle"), small) }
+        }
+    }
+}
+
+fun groupMembersLine(group: Bot, bots: Map<String, Bot>): String {
+    val names = group.members.mapNotNull { bots[it]?.name }
+    return when {
+        group.description.isNotEmpty() -> group.description
+        names.isEmpty() -> "Group"
+        else -> "You, " + names.joinToString(", ")
     }
 }
 
@@ -291,32 +541,64 @@ private fun CheckpointSheet(open: Boolean, task: TaskInfo, now: Long, integratio
 }
 
 @Composable
-private fun EmptyChat(bot: Bot) {
+private fun EmptyChat(bot: Bot, bots: Map<String, Bot>) {
     val c = Hypurr.colors
     Column(Modifier.fillMaxWidth().padding(top = 80.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        BotAvatar(bot, 72.dp)
+        if (bot.isGroup) GroupAvatar(bot, bots, 72.dp) else BotAvatar(bot, 72.dp)
         Text(bot.name, style = MaterialTheme.typography.titleLarge, color = c.text, modifier = Modifier.padding(top = 12.dp))
-        Text(bot.description.ifEmpty { bot.folderName }, color = c.secondary, textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 4.dp))
+        Text(if (bot.isGroup) "${groupMembersLine(bot, bots)}\nEveryone answers; @mention someone to ask just them."
+            else bot.description.ifEmpty { bot.folderName }, color = c.secondary, textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 4.dp, start = 24.dp, end = 24.dp))
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun UserBubble(entry: Entry) {
+private fun UserBubble(entry: Entry, media: AttachmentUi, onLongPress: () -> Unit) {
     val c = Hypurr.colors
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
         entry.data.attachments.orEmpty().forEach { a ->
-            Pill(a.name, c.accent, Modifier.padding(start = 56.dp, bottom = 4.dp), icon = Icons.Rounded.AttachFile)
+            AttachmentView(a, media, Modifier.padding(start = 56.dp, bottom = 4.dp), onLongPress)
         }
-        if (!entry.data.text.isNullOrEmpty()) SelectionContainer {
+        if (!entry.data.text.isNullOrEmpty()) {
             Text(entry.data.text, color = c.text, style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.padding(start = 56.dp).clip(RoundedCornerShape(22.dp, 22.dp, 6.dp, 22.dp))
-                    .background(c.bubbleUser).padding(horizontal = 16.dp, vertical = 11.dp))
+                    .background(c.bubbleUser).combinedClickable(onClick = {}, onLongClick = onLongPress, onLongClickLabel = "Message actions")
+                    .padding(horizontal = 16.dp, vertical = 11.dp))
         }
         when (entry.data.status) {
-            "queued" -> Meta(Icons.Rounded.Schedule, "Queued", c.tertiary)
+            "queued" -> Meta(Icons.Rounded.Schedule, if (entry.data.attachments.isNullOrEmpty()) "Queued" else "Sending…", c.tertiary)
             "failed" -> Meta(Icons.Rounded.ErrorOutline, "Not sent", c.danger)
             "cancelled" -> Meta(Icons.Rounded.ErrorOutline, "Cancelled", c.tertiary)
+        }
+    }
+}
+
+/** A sent file: a picture inline (tap for full size) or a card with its name and size (tap to open). */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun AttachmentView(a: Attachment, media: AttachmentUi, modifier: Modifier, onLongPress: () -> Unit) {
+    val c = Hypurr.colors
+    if (a.isImage) {
+        LaunchedEffect(a.id) { media.load(a) }
+        val bitmap = rememberBitmap(media.images[a.id], 900)
+        if (bitmap != null) {
+            Image(bitmap, a.name, modifier.widthIn(max = 240.dp).heightIn(max = 260.dp).clip(RoundedCornerShape(18.dp))
+                .combinedClickable(onClickLabel = "View ${a.name}", onClick = { media.view(a) }, onLongClick = onLongPress),
+                contentScale = ContentScale.Fit)
+            return
+        }
+    }
+    Row(modifier.widthIn(max = 260.dp).clip(RoundedCornerShape(18.dp)).background(c.surface)
+        .combinedClickable(onClickLabel = "Open ${a.name}", onClick = { if (a.isImage) media.view(a) else media.open(a) }, onLongClick = onLongPress)
+        .padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(c.accent.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
+            Icon(if (a.isImage) Icons.Rounded.Image else Icons.Rounded.Description, null, tint = c.accent, modifier = Modifier.size(20.dp))
+        }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f, fill = false)) {
+            Text(a.name, color = c.text, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(sizeLabel(a.size), color = c.tertiary, style = MaterialTheme.typography.labelSmall)
         }
     }
 }
@@ -330,13 +612,20 @@ private fun Meta(icon: androidx.compose.ui.graphics.vector.ImageVector, text: St
     }
 }
 
+/** An agent's reply, rendered as Markdown. In a group, its author's avatar and name sit above it. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun AgentBubble(entry: Entry) {
+private fun AgentBubble(entry: Entry, author: Bot?, onLongPress: () -> Unit) {
     val c = Hypurr.colors
-    SelectionContainer {
-        Text(entry.data.text.orEmpty(), color = c.text, style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.padding(end = 40.dp).clip(RoundedCornerShape(22.dp, 22.dp, 22.dp, 6.dp))
-                .background(c.bubbleAgent).padding(horizontal = 16.dp, vertical = 11.dp))
+    Column(Modifier.padding(end = 40.dp)) {
+        if (author != null) Row(Modifier.padding(start = 6.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            BotAvatar(author.copy(status = "idle"), 20.dp)
+            Spacer(Modifier.width(6.dp))
+            Text(author.name, color = avatarColor(author.avatarColor), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+        }
+        MarkdownText(entry.data.text.orEmpty(), Modifier.clip(RoundedCornerShape(22.dp, 22.dp, 22.dp, 6.dp)).background(c.bubbleAgent)
+            .combinedClickable(onClick = {}, onLongClick = onLongPress, onLongClickLabel = "Message actions")
+            .padding(horizontal = 16.dp, vertical = 11.dp))
     }
 }
 
@@ -467,7 +756,7 @@ private fun Notice(entry: Entry) {
 }
 
 @Composable
-private fun WorkingRow(bot: Bot, modifier: Modifier = Modifier) {
+private fun WorkingRow(bot: Bot, bots: Map<String, Bot>, modifier: Modifier = Modifier) {
     val c = Hypurr.colors
     Row(modifier.padding(start = 4.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         FlowOrb(22.dp)
@@ -477,30 +766,66 @@ private fun WorkingRow(bot: Bot, modifier: Modifier = Modifier) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Composer(draft: String, onDraftChange: (String) -> Unit, onSend: () -> Unit, modifier: Modifier) {
+private fun Composer(draft: String, onDraftChange: (String) -> Unit, onSend: () -> Unit, modifier: Modifier, composer: ComposerFiles,
+                     images: Map<String, ByteArray>, onAttach: (AttachKind) -> Unit, onRemoveFile: (Int) -> Unit, hint: String) {
     val c = Hypurr.colors
-    val canSend = draft.isNotBlank()
+    val files = composer.files
+    val canSend = (draft.isNotBlank() || files.isNotEmpty()) && (files.isEmpty() || composer.online)
     val sendScale by animateFloatAsState(if (canSend) 1f else 0.85f, Motion.bouncy(), label = "send")
-    Row(
-        modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(horizontal = 12.dp, vertical = 10.dp)
-            .glass(RoundedCornerShape(30.dp), c.glass).padding(start = 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(Modifier.weight(1f).padding(vertical = 8.dp)) {
-            if (draft.isEmpty()) Text("Message", color = c.tertiary, style = MaterialTheme.typography.bodyLarge)
-            BasicTextField(draft, onDraftChange, textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.text),
-                cursorBrush = SolidColor(c.accent), maxLines = 6, modifier = Modifier.fillMaxWidth().heightIn(min = 22.dp))
+    var menu by remember { mutableStateOf(false) }
+    Column(modifier.fillMaxWidth().navigationBarsPadding().imePadding().padding(horizontal = 12.dp, vertical = 10.dp)) {
+        AnimatedVisibility(menu && composer.canAttach) {
+            Row(Modifier.padding(bottom = 8.dp).glass(RoundedCornerShape(22.dp), c.surface).padding(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                listOf(Triple(AttachKind.Photos, "Photos", Icons.Rounded.Image), Triple(AttachKind.Files, "Files", Icons.Rounded.Description),
+                    Triple(AttachKind.Paste, "Paste", Icons.Rounded.ContentPaste)).forEach { (kind, label, icon) ->
+                    SoftButton(label, icon = icon) { menu = false; onAttach(kind) }
+                }
+            }
         }
-        Spacer(Modifier.width(8.dp))
-        Box(
-            Modifier.size(44.dp).scale(sendScale).clip(CircleShape)
-                .background(if (canSend) ColorFlow.linear() else SolidColor(c.border))
-                .pressable("Send", enabled = canSend, onClick = onSend),
-            contentAlignment = Alignment.Center,
+        if (files.isNotEmpty()) {
+            FlowRow(Modifier.padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                files.forEachIndexed { i, f ->
+                    Row(Modifier.clip(RoundedCornerShape(16.dp)).background(c.surface).padding(start = 6.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        val thumb = if (f.isImage) rememberBitmap(f.bytes, 200) else null
+                        if (thumb != null) Image(thumb, null, Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)), contentScale = ContentScale.Crop)
+                        else Icon(Icons.Rounded.Description, null, tint = c.accent, modifier = Modifier.size(22.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(f.name, color = c.text, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.widthIn(max = 140.dp))
+                        IconBubble(Icons.Rounded.Close, "Remove ${f.name}", fill = androidx.compose.ui.graphics.Color.Transparent, size = 30.dp) { onRemoveFile(i) }
+                    }
+                }
+            }
+            if (!composer.online) Text("Files send when your computer is online.", color = c.warning, style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(start = 8.dp, bottom = 6.dp))
+        }
+        Row(
+            Modifier.fillMaxWidth().glass(RoundedCornerShape(30.dp), c.glass).padding(start = if (composer.canAttach) 6.dp else 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Icons.Rounded.ArrowUpward, null, tint = if (canSend) ColorFlow.FlowInk else c.tertiary, modifier = Modifier.size(22.dp))
+            if (composer.canAttach) {
+                IconBubble(if (menu) Icons.Rounded.Close else Icons.Rounded.Add, if (menu) "Close" else "Add files",
+                    fill = androidx.compose.ui.graphics.Color.Transparent, tint = c.secondary, size = 40.dp) { menu = !menu }
+                Spacer(Modifier.width(4.dp))
+            }
+            Box(Modifier.weight(1f).padding(vertical = 8.dp)) {
+                if (draft.isEmpty()) Text(hint, color = c.tertiary, style = MaterialTheme.typography.bodyLarge)
+                BasicTextField(draft, onDraftChange, textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.text),
+                    cursorBrush = SolidColor(c.accent), maxLines = 6, modifier = Modifier.fillMaxWidth().heightIn(min = 22.dp))
+            }
+            Spacer(Modifier.width(8.dp))
+            Box(
+                Modifier.size(44.dp).scale(sendScale).clip(CircleShape)
+                    .background(if (canSend) ColorFlow.linear() else SolidColor(c.border))
+                    .pressable("Send", enabled = canSend, onClick = onSend),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Rounded.ArrowUpward, null, tint = if (canSend) ColorFlow.FlowInk else c.tertiary, modifier = Modifier.size(22.dp))
+            }
         }
     }
 }
-

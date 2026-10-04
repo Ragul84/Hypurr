@@ -630,7 +630,7 @@ class ChannelTransport(
     // MARK: mailbox (§6.4, §7.4)
 
     /** Queues a message in the relay for an offline computer; it runs when the computer is back. */
-    suspend fun enqueue(botId: String, text: String, clientNonce: String) {
+    suspend fun enqueue(botId: String, text: String, clientNonce: String, threadId: String? = null) {
         val c = _computer.value
         val bk = c.boxKey?.let(B64::decode)?.takeIf { it.size == 32 }
         if (pairingCode != null || bk == null) throw HostException(HostException.Kind.Offline, "Your computer is offline.")
@@ -641,6 +641,7 @@ class ChannelTransport(
                 put("botId", botId)
                 put("text", text)
                 put("clientNonce", clientNonce)
+                threadId?.let { put("threadId", it) }
             })
             put("ts", System.currentTimeMillis())
         }

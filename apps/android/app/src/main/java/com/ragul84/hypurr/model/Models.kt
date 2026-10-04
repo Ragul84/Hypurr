@@ -56,6 +56,9 @@ data class Bot(
     val deleted: Boolean? = null,
     /** Set when this bot runs a beginner task (host `tasks`). */
     val task: TaskInfo? = null,
+    /** Where the running turn talks: a chat (bot or group id) and maybe a thread root. */
+    val workingChat: String? = null,
+    val workingThread: String? = null,
 ) {
     val isGroup: Boolean get() = kind == "group"
     val isWorking: Boolean get() = status == "working" || status == "needsInput"
@@ -99,7 +102,37 @@ data class EntryData(
     val learning: Learning? = null,
     /** permission: the team's rules say an admin approves this one. */
     val needsAdmin: Boolean? = null,
+    /** A main-chat message with replies in its thread (host-maintained summary). */
+    val thread: ThreadSummary? = null,
 )
+
+/** `authors`: bot ids and `"user"`, first reply first; `unread`: replies newer than the thread was last read. */
+@Serializable
+data class ThreadSummary(val count: Int = 0, val lastAt: Long = 0, val authors: List<String> = emptyList(), val unread: Int = 0)
+
+/** A folder on the computer (`listDirs`), for a new bot's working folder. */
+@Serializable
+data class DirEntry(val name: String, val path: String, val isGit: Boolean = false)
+
+@Serializable
+data class DirListing(val path: String = "", val parent: String? = null, val isGit: Boolean = false, val dirs: List<DirEntry> = emptyList())
+
+/** Quick reactions under a message (the iPhone's long-press row). */
+val QuickReactions = listOf("👍", "❤️", "😂", "🎉", "👀", "✅")
+
+/** Avatar palette ids, in the order the iPhone's picker shows them. */
+val AvatarColors = listOf("blue", "cyan", "green", "yellow", "orange", "red", "magenta", "violet", "brown", "gray", "black")
+
+private val imageExtensions = setOf("png", "jpg", "jpeg", "gif", "webp", "heic", "heif", "bmp")
+
+val Attachment.isImage: Boolean get() = name.substringAfterLast('.', "").lowercase() in imageExtensions
+
+/** 1.2 MB · 340 KB · 12 B */
+fun sizeLabel(bytes: Long): String = when {
+    bytes >= 1_000_000 -> String.format(java.util.Locale.US, "%.1f MB", bytes / 1_000_000.0)
+    bytes >= 1_000 -> "${bytes / 1_000} KB"
+    else -> "$bytes B"
+}
 
 @Serializable
 data class Attachment(val id: String, val name: String = "", val size: Long = 0)
@@ -233,7 +266,8 @@ data class Entry(
 }
 
 @Serializable
-data class Backend(val id: String, val name: String = "", val available: Boolean = true)
+data class Backend(val id: String, val name: String = "", val available: Boolean = true, val installed: Boolean = true,
+                   val description: String = "")
 
 @Serializable
 data class Hello(
@@ -250,7 +284,39 @@ data class Hello(
     val cloud: String? = null,
     /** Who this phone is on the computer (team admin). */
     val you: Actor? = null,
+    /** Agents the computer knows; `available` ones can run a new bot. */
+    val backends: List<Backend> = emptyList(),
+    val home: String? = null,
+    val screen: ScreenState? = null,
 )
+
+/** The computer's remote screen (`screenStatus`, `hello.screen`). */
+@Serializable
+data class ScreenState(
+    val enabled: Boolean = false,
+    /** The screen helper is running. */
+    val connected: Boolean = false,
+    val platform: String = "",
+    /** Screen recording is permitted. */
+    val capture: Boolean = false,
+    /** Input injection is permitted. */
+    val input: Boolean = false,
+    val displays: List<ScreenDisplay> = emptyList(),
+    val userControl: Boolean = false,
+    val viewers: Int = 0,
+) {
+    val ready: Boolean get() = enabled && connected && capture
+}
+
+/** A screen session the host reserved, with its short-lived ICE servers (never stored). */
+@Serializable
+data class ScreenConnection(val session: String, val iceServers: List<IceServer> = emptyList(), val expiresAt: Long = 0)
+
+@Serializable
+data class IceServer(val urls: List<String> = emptyList(), val username: String? = null, val credential: String? = null)
+
+@Serializable
+data class ScreenDisplay(val id: Long = 0, val name: String = "", val width: Double = 0.0, val height: Double = 0.0, val main: Boolean = false)
 
 @Serializable
 data class SyncResponse(
