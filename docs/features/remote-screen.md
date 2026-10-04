@@ -27,6 +27,22 @@ The iPad already supports all orientations. macOS, Linux GTK and the TUI do not
 use the iPhone viewer or its orientation policy; the capture helpers stream the
 computer display without choosing the phone's orientation.
 
+## Android viewer
+
+`apps/android/app/src/main/java/com/ragul84/hypurr/screen/` ports the kit's `ScreenSession.swift`
+with `io.getstream:stream-webrtc-android`: `screenPrepare` (relay ICE servers when not direct),
+a receive-only video transceiver plus the `input` / `input-fast` data channels, a non-trickle offer
+(up to 10 s of ICE gathering), `screenOffer` → answer, a 30 s connect timeout, renewal five minutes
+before expiry and up to three reconnects. Touch: tap = click, double tap = double click, long-press =
+right click, drag = scroll; a keyboard panel sends text and keys; the computer's clipboard can be
+copied. The roster shows the screen icon when `hello.screen.enabled`.
+
+Status: signaling shapes and touch mapping are unit-tested (`ScreenInputTest`), and the screenshots use
+a stand-in for the video. **It has not been tested against a live helper on a real phone yet.**
+Missing next to iPhone: the modifier bar, display switching, crop/zoom (`view` messages) and the
+take-over toggle. The helper streams H.264, so the phone needs a hardware or software H.264 decoder
+(the WebRTC library ships both).
+
 ## Boundaries
 
 - `host/src/screen.rs` coordinates access to the local helper and owns viewer sessions. Another device cannot renegotiate or close a session it does not own.
@@ -61,6 +77,8 @@ Run cloud tests/type checking, host formatting/Clippy/tests, Swift package tests
 Live acceptance requires the configured Worker and fresh host/helper/phone builds:
 
 - Check screen-recording and input permissions, capture, click/type/scroll, clipboard, display changes and closing the viewer.
+- On Android: open the viewer from the roster, check tap/double tap/long-press/drag, the keyboard
+  panel, clipboard, rotation, and reconnect after the app goes to the background.
 - Open the iPhone viewer while upright and while already held sideways, then rotate
   in both directions. Check video fitting and direct taps after each turn. Repeat
   with rotation lock on and with the Rotate button; closing returns to portrait.
