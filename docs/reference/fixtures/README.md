@@ -27,4 +27,9 @@ Consumers:
 - `apps/android/app/src/test/java/com/ragul84/hypurr/model/WorkWireTest.kt` (via the `hypurr.workWire` system property)
 - `kit/Tests/HypurrKitTests/WorkWireTests.swift`
 
+[admin-wire.json](admin-wire.json) is real `hypurr-host` output from `host/tests/e2e.rs` (`HYPURR_WIRE_OUT`) for team admin: a viewer's `hello.you`, `team`, `policies`, a card that needs an admin, `auditLog` and `activity` (paths anonymised). Consumers:
+
+- `apps/android/app/src/test/java/com/ragul84/hypurr/model/AdminWireTest.kt` and `data/AdminStoreTest.kt` (via the `hypurr.adminWire` system property)
+- `kit/Tests/HypurrKitTests/AdminWireTests.swift`
+
 When moving or changing a fixture, update those paths and the cloud/kit/host CI path filters. Run the affected vector tests; a Markdown link check alone cannot validate executable imports. [Protocol reference](../remote-relay.md).

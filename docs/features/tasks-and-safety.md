@@ -69,6 +69,10 @@ clients hide checkpoint controls.
 
 ## Settings (kv `safety`, `setSafetySettings`)
 
+Team rules (allowed agents, spending limits, approval levels) build on these and are edited
+together with them in [team admin](team-admin.md); `setSafetySettings` is admin-only.
+
+
 - `protectedBranches` (default `main`, `master`, `production`, `prod`, `release/*`, `develop`)
 - `blockProtected` (default on): pushes/commits to those are blocked without asking.
 - `alwaysAskHigh` (default on): even bots set to auto-approve ask for high-risk requests.
