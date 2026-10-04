@@ -3,15 +3,15 @@ import Testing
 @testable import HypurrKit
 
 /// docs/reference/fixtures/task-wire.json: real `hypurr-host` output for a beginner task (shared with Android).
-private let wire: [String: Any] = {
+private let wireData: Data = {
     let url = URL(filePath: #filePath).deletingLastPathComponent()
         .appending(path: "../../../docs/reference/fixtures/task-wire.json").standardized
-    let data = (try? Data(contentsOf: url)) ?? Data()
-    return (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+    return (try? Data(contentsOf: url)) ?? Data()
 }()
 
 private func decode<T: Decodable>(_ type: T.Type, _ key: String) throws -> T {
-    let data = try JSONSerialization.data(withJSONObject: wire[key] ?? [:])
+    let wire = try #require(try JSONSerialization.jsonObject(with: wireData) as? [String: Any])
+    let data = try JSONSerialization.data(withJSONObject: try #require(wire[key]))
     return try JSONDecoder().decode(T.self, from: data)
 }
 
