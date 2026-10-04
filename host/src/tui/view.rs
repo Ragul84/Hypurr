@@ -1357,6 +1357,20 @@ fn permission_card(out: &mut Built, app: &App, e: &Entry, b: &Bot, width: usize)
         spans.push(Span::styled(" │", t.amber));
         Line::from(spans)
     };
+    // Explain-as-you-go: the host's risk level and plain sentence lead (host/src/tasks/risk.rs).
+    if let Some(explain) = e.data["explain"].as_str() {
+        let (label, style) = risk_label(e.data["risk"].as_str());
+        let mut first = vec![Span::styled(format!("{label} "), style.add_modifier(Modifier::BOLD))];
+        first.push(Span::styled(explain.to_owned(), t.text));
+        for l in md::wrap(&first, inner, &[], &[]).into_iter().take(4) {
+            out.lines.push(row(l.spans));
+        }
+        if let Some(why) = e.data["riskReasons"][0].as_str() {
+            for l in md::wrap(&[Span::styled(why.to_owned(), t.secondary)], inner, &[], &[]).into_iter().take(3) {
+                out.lines.push(row(l.spans));
+            }
+        }
+    }
     if let Some(cmd) = e.data["command"].as_str().filter(|c| !c.is_empty()) {
         for (i, l) in md::wrap(&[Span::styled(cmd.to_owned(), t.bold)], inner.saturating_sub(2), &[], &[])
             .into_iter()
@@ -1454,9 +1468,28 @@ fn permission_card(out: &mut Built, app: &App, e: &Entry, b: &Bot, width: usize)
     ]));
 }
 
+fn risk_label(risk: Option<&str>) -> (&'static str, Style) {
+    let t = theme();
+    match risk {
+        Some("low") => ("Low risk ·", t.green),
+        Some("high") => ("High risk ·", t.red),
+        _ => ("Medium risk ·", t.amber),
+    }
+}
+
 fn decided_line(out: &mut Built, e: &Entry) {
     let t = theme();
-    let title = e.data["title"].as_str().unwrap_or("Use a tool");
+    if let Some(why) = e.data["blocked"].as_str() {
+        // Refused by the safety net without asking.
+        out.lines.push(Line::from(vec![
+            Span::styled(" × ", t.red),
+            Span::styled("Blocked by the safety net", t.red.add_modifier(Modifier::BOLD)),
+            Span::styled(format!(" · {why}"), t.dim),
+            Span::styled(format!(" · {}", clock(e.created_at)), t.dim),
+        ]));
+        return;
+    }
+    let title = e.data["explain"].as_str().or(e.data["title"].as_str()).unwrap_or("Use a tool");
     let sel = e.data["selected"].as_str();
     let chosen = sel.and_then(|s| e.options().into_iter().find(|o| o.0 == s));
     let (g, gs, what) = match (e.data["status"].as_str(), chosen) {
