@@ -108,6 +108,11 @@ struct PermissionCard: View {
                 }
             }
 
+            if pending && d.needsAdmin == true {
+                Label("Your team's rules: an admin approves this", systemImage: "person.badge.shield.checkmark")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(Palette.accent)
+            }
             if pending {
                 buttons
             } else if !blocked {
