@@ -1,5 +1,6 @@
 //! `hypurr-host`: runs coding-agent bots over ACP and serves the Hypurr apps.
 
+mod admin;
 mod agent;
 mod api;
 mod chat;
