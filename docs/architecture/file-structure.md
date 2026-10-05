@@ -68,7 +68,8 @@ Hypurr/
 | CLI and background service | `host/src/main.rs`, `service.rs` |
 | API, caller permissions, event ordering | `host/src/api/`, `hub.rs` |
 | SQLite transcript, bots, lanes and sessions | `host/src/store.rs` |
-| Agent process, ACP, queue and session lifecycle | `host/src/agent/bot.rs`, `acp.rs` |
+| Agent process, ACP, queue and session lifecycle | `host/src/agent/ (incl. `builtin.rs` — managed OpenCode)
+bot.rs`, `acp.rs` |
 | Beginner tasks: router, templates, safety net, risk rules, finish, cost | `host/src/tasks/` |
 | Work tools: GitHub, Jira, Slack / Teams webhooks | `host/src/integrations/` |
 | Team admin: roles, rules, audit log, activity | `host/src/admin/` (gate in `api::dispatch`) |
@@ -76,7 +77,8 @@ Hypurr/
 | Prompt snapshots and memory keeper | `host/src/chat/context.rs`, `memory.rs` |
 | Identity, encryption and direct channel | `host/src/remote/identity.rs`, `crypto.rs`, `channel.rs` |
 | Host cloud state and relay connection | `host/src/remote/cloud.rs`, `relay.rs` |
-| Agent discovery, sign-in, setup terminal | `host/src/agent/backends.rs`, `registry.rs`, `auth.rs`, `term.rs` |
+| Agent discovery, sign-in, setup terminal | `host/src/agent/ (incl. `builtin.rs` — managed OpenCode)
+backends.rs`, `registry.rs`, `auth.rs`, `term.rs` |
 | Marketplace, Composio, connector OAuth | `host/src/market/` |
 | Screen bridge and built-in MCP tools | `host/src/screen.rs`, `mcp.rs` |
 | Swift transport and cloud API | `kit/Sources/HypurrKit/Client/` |

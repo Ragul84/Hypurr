@@ -23,12 +23,13 @@ Android 12+ wallpaper colours are an opt-in toggle in Settings; the Hypurr palet
 | Files | **+** in the composer: Photos (system photo picker, up to 10), Files (any document), Paste an image. Chips show thumbnails before sending; files upload in chunks (`upload`), then `send` carries `attachments`. Images show inline (tap for full screen), other files as cards that open in another app. Files need the computer online (they are not queued in the mailbox); a failed send puts them back in the composer. See [file attachments](../features/file-attachments.md) |
 | Groups and threads | Groups in the roster (stacked avatars), group chats with each bot's name and colour, @mentions go to the host as text. Thread summaries ("3 replies", unread) under messages; the thread view shows the root and its replies and sends with `threadId`. See [groups and threads](../features/groups-and-threads.md) |
 | Create and edit bots | **+** in the roster: **New bot** (name, description, colour, agent from the computer's installed agents, folder: personal workspace or browse the computer's folders with `listDirs`, approvals ask / automatic) and **New group** (name, members). Tap a chat's header to edit; pin, delete (with confirm). Phones whose role can't act don't see **+** |
+| Built-in agent | **Hypurr built-in (OpenCode)**: Free badge, free Zen model picker, roster install card with consent (`installBuiltinAgent`). See [built-in agent](../features/builtin-agent.md) |
 | Remote screen | The screen icon in the roster (when Remote screen is on in the computer's menu): WebRTC viewer (`screenPrepare` → non-trickle `screenOffer` → answer, receive-only video, `input` data channels), tap = click, double tap, long-press = right click, drag = scroll, keyboard panel with keys, the computer's clipboard. Reconnects and renews the session before it expires. **Not yet tested on a real device**: see [remote screen](../features/remote-screen.md) |
 
 Not on Android yet: voice calls, account sign-in / SAS approval (pair with the QR instead), Live
-Activity–style ongoing notifications. Editing a bot can't change its folder, connectors, skills or model.
-Groups don't take files (a host rule). Remote screen has no modifier bar, display switching or
-takeover toggle yet.
+Activity–style ongoing notifications. Editing a bot can't change its folder, connectors or skills
+(the built-in agent's free model can be changed). Groups don't take files (a host rule). Remote
+screen has no modifier bar, display switching or takeover toggle yet.
 
 ## Build and test
 
