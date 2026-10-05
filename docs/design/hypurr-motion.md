@@ -1,7 +1,11 @@
+# Hypurr motion — Sunfield Panel
+
+Friendlier restyle of the motion catalogue. Palette follows docs/design/hypurr-design-system.md (no teal).
+
 # Hypurr motion language
 
-Wet-asphalt neon motion: **sharp, dark, electric**. Outside-app refs stay Linear
-(calm density), Leica (precision body), neon in rain (one lit signal). Flat cyan
+Sunfield Panel motion: **sharp, dark, electric**. Outside-app refs stay Linear
+(calm density), Leica (precision body), neon in rain (one lit signal). Flat forest/sunflower
 light only — **no glow blobs, no purple, no bouncing three-dots, no confetti**.
 
 Every moment honours **Reduce Motion / `prefers-reduced-motion`**: swap loops for
@@ -52,14 +56,14 @@ introduces soft squircles.
 ## Catalogue
 
 ### 1. Thinking — Scan line
-A 2–4px cyan band sweeps left→right across a short rule under the bot’s working
+A 2–4px forest/sunflower band sweeps left→right across a short rule under the bot’s working
 row (or across the orb rail), like a neon tube flickering on in rain. Beside it,
 mono phase text cross-fades (“Reading files” → “Planning” → “Editing App.tsx”)
 on a ticker of `snap`ms. Loop `1600`ms. Reduced: static band at 40% + static phase.
 
 ### 2. Streaming text
 Incoming agent text resolves word/chunk from `ink-3` to `ink` over `snap`ms.
-A **1px cyan caret** leads the frontier; blink `snap` half-cycle when idle at end.
+A **1px forest/sunflower caret** leads the frontier; blink `snap` half-cycle when idle at end.
 Reduced: instant ink, no caret blink (steady caret ok).
 
 ### 3. Tool running
@@ -82,7 +86,7 @@ Plate drops in from top (~8px + fade, `emphasized`/`settle`); amber **Needs you*
 label does a 4px left-to-right strike. Light haptic where available. Reduced: fade only.
 
 ### 7. Signal strike (Allow)
-Exists: press 96% → 4px cyan band full-width (`strike` 120ms) → plate collapses to
+Exists: press 96% → 4px forest/sunflower band full-width (`strike` 120ms) → plate collapses to
 live row (`signalStrike` ~280ms) → 3px left rail remains. Reduced: 150ms crossfade.
 
 ### 8. Deny
@@ -90,7 +94,7 @@ Plate shears sideways 4px (`snap`) and dims to 55%; a 1px `negative` hairline
 draws on the leading edge. Reduced: dim crossfade, no shear.
 
 ### 9. Task done
-A cyan rule draws L→R under the summary (`draw` 420ms); checkpoint chip settles
+A forest/sunflower rule draws L→R under the summary (`draw` 420ms); checkpoint chip settles
 with `spatialFast`. Reduced: rule + chip appear static.
 
 ### 10. Screen transitions
@@ -98,7 +102,7 @@ Shared-axis: 8px slide + fade, `emphasized` / `settle`. No bouncy scale.
 Reduced: 150ms fade.
 
 ### 11. Pull-to-refresh / skeletons
-**Rain-streak shimmer**: diagonal 1px cyan strokes drift across raised plates at
+**Rain-streak shimmer**: diagonal 1px forest/sunflower strokes drift across raised plates at
 low opacity (not grey pulse). Reduced: static plate, no drift.
 
 ### 12. App launch

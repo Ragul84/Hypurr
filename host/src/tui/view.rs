@@ -93,7 +93,7 @@ pub fn theme() -> &'static Theme {
             )
         } else {
             (
-                0xE8FFFC, 0x7FA8A3, 0x3D5552, 0x14201E, 0x0E1614, 0x12302C, 0x0B1211, 0x12302C, 0x5EAD8A, 0xFF6B5A,
+                0xE8FFFC, 0x7FA8A3, 0x3D5552, 0x14201E, 0x0E1614, 0x12302C, 0x0B1211, 0x12302C, 0xE8C46A, 0xFF6B5A,
                 0x10261E, 0x2E1424,
             )
         };
@@ -116,7 +116,7 @@ pub fn theme() -> &'static Theme {
             btn: s.bg(rgb(btn)),
             btn_primary: s
                 .fg(rgb(if light { 0xF4F6F5 } else { 0x021412 }))
-                .bg(rgb(if light { 0x007A73 } else { 0x00D4C8 }))
+                .bg(rgb(if light { 0x0E4A38 } else { 0xF2B90D }))
                 .add_modifier(Modifier::BOLD),
             added: s.fg(rgb(green)).bg(rgb(add_bg)),
             removed: s.fg(rgb(red)).bg(rgb(rm_bg)),
@@ -134,10 +134,10 @@ pub fn bot_color(name: &str) -> Color {
         "red" => 0xFF6B5A,
         "orange" | "attention" => 0xFFB020,
         "yellow" => 0xC9A227,
-        "green" => 0x5EAD8A,
+        "green" => 0xE8C46A,
         "violet" | "ink" | "gray" => 0x3D5552,
         // "cyan" / "teal" and unknown ids → signal teal
-        _ => 0x00D4C8,
+        _ => 0xF2B90D,
     };
     rgb(hex)
 }
@@ -156,7 +156,7 @@ fn scan_line(app: &App) -> &'static str {
 }
 
 /// Hypurr teal signal stops (looping).
-const FLOW: [u32; 3] = [0x00D4C8, 0x007A73, 0x5EAD8A];
+const FLOW: [u32; 3] = [0xF2B90D, 0x0E4A38, 0xE8C46A];
 
 /// The flow colour at `pos` per-mille along the loop (wraps).
 pub(super) fn flow_color(pos: u32) -> Color {
@@ -506,7 +506,7 @@ fn status_line(buf: &mut Buffer, r: Rect, app: &mut App) {
     let insert = app.typing && app.overlays.is_empty();
     let pill = if insert { " INSERT " } else { " NAV " };
     let pill_style = if insert {
-        Style::default().fg(t.on_color).bg(rgb(0x00D4C8)).add_modifier(Modifier::BOLD)
+        Style::default().fg(t.on_color).bg(rgb(0xF2B90D)).add_modifier(Modifier::BOLD)
     } else {
         t.btn_primary
     };

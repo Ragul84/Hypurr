@@ -42,6 +42,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -99,14 +102,14 @@ fun IconBubble(icon: ImageVector, label: String, modifier: Modifier = Modifier, 
     }
 }
 
-/** The primary action: flat teal signal fill, ink text, sharp plate. */
+/** The primary action: forest (light) / sunflower (dark) fill, chunky round. */
 @Composable
 fun FlowButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, icon: ImageVector? = null, onClick: () -> Unit) {
     val c = Hypurr.colors
     val alpha by animateFloatAsState(if (enabled) 1f else 0.45f, Motion.effects(), label = "enabled")
     Row(
         modifier
-            .clip(RoundedCornerShape(4.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(c.accent.copy(alpha = alpha))
             .pressable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 22.dp, vertical = 14.dp),
@@ -117,7 +120,7 @@ fun FlowButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = t
             Icon(icon, contentDescription = null, tint = c.onAccent, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
         }
-        Text(text, color = c.onAccent, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+        Text(text, color = c.onAccent, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
     }
 }
 
@@ -126,7 +129,7 @@ fun FlowButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = t
 fun SoftButton(text: String, modifier: Modifier = Modifier, icon: ImageVector? = null, tint: Color = Hypurr.colors.accent, onClick: () -> Unit) {
     Row(
         modifier
-            .clip(RoundedCornerShape(4.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(tint.copy(alpha = 0.12f))
             .pressable(onClick = onClick)
             .padding(horizontal = 18.dp, vertical = 12.dp),
@@ -137,7 +140,7 @@ fun SoftButton(text: String, modifier: Modifier = Modifier, icon: ImageVector? =
             Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
         }
-        Text(text, color = tint, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+        Text(text, color = tint, fontWeight = FontWeight.Bold, fontSize = 15.sp)
     }
 }
 
@@ -161,48 +164,63 @@ fun FlowOrb(size: Dp, modifier: Modifier = Modifier, animate: Boolean = true) {
 
 /** Avatar palette ids (kit AvatarPalette) → colour. */
 fun avatarColor(id: String): Color = when (id) {
-    "black" -> Color(0xFF05070A)
-    "asphalt" -> Color(0xFF0B1211)
-    "brown" -> Color(0xFF5A4A3A)
-    "red" -> Color(0xFFFF6B5A)
-    "orange", "attention" -> Color(0xFFFFB020)
-    "yellow" -> Color(0xFFC9A227)
-    "green" -> Color(0xFF5EAD8A)
-    "cyan", "teal" -> Color(0xFF00D4C8)
-    "violet", "ink" -> Color(0xFF3D5552)
-    "magenta" -> Color(0xFF7FA8A3)
-    "gray" -> Color(0xFF3D5552)
-    "blue" -> Color(0xFF2A6B66)
-    else -> Color(0xFF00D4C8)
+    "black", "asphalt", "ink" -> Color(0xFF17140A)
+    "green", "forest" -> Color(0xFF0E4A38)
+    "cyan", "teal", "sunflower", "yellow" -> Color(0xFFF2B90D)
+    "violet", "cream" -> Color(0xFFFFE7A8)
+    "magenta", "amber" -> Color(0xFFE8C46A)
+    "gray" -> Color(0xFF5C5640)
+    "blue" -> Color(0xFF143D30)
+    else -> Color(0xFF17140A)
 }
 
 private fun avatarShape(id: String): Shape = when (id) {
-    "squircle", "tablet" -> RoundedCornerShape(30)
+    "circle" -> CircleShape
     "pebble" -> RoundedCornerShape(topStartPercent = 50, topEndPercent = 40, bottomEndPercent = 50, bottomStartPercent = 45)
-    "wedge", "teardrop" -> RoundedCornerShape(topStartPercent = 50, topEndPercent = 50, bottomEndPercent = 20, bottomStartPercent = 50)
-    "hex" -> RoundedCornerShape(26)
-    else -> CircleShape
+    else -> RoundedCornerShape(30) // Sunfield cat tile
 }
 
 @Composable
 fun BotAvatar(bot: Bot, size: Dp = 48.dp, modifier: Modifier = Modifier) {
     val color = avatarColor(bot.avatarColor)
+    val on = if (color.luminance() > 0.55f) Color(0xFF17140A) else Color(0xFFFFF8E8)
     Box(modifier.size(size), contentAlignment = Alignment.Center) {
         Box(
-            Modifier.size(size).clip(avatarShape(bot.avatarShape))
-                .background(Brush.linearGradient(listOf(color.copy(alpha = 0.95f), color.copy(alpha = 0.7f)))),
+            Modifier.size(size).clip(avatarShape(bot.avatarShape)).background(color),
             contentAlignment = Alignment.Center,
         ) {
-            Text(bot.name.take(1).uppercase().ifEmpty { "?" }, color = Color.White, fontWeight = FontWeight.Bold,
-                fontSize = (size.value * 0.42f).sp)
+            CatFace(on, size * 0.62f)
         }
         if (bot.isWorking) {
-            // Working: a flow ring; needs you: the warning dot.
             val dot by animateColorAsState(if (bot.needsInput) Hypurr.colors.warning else Hypurr.colors.accent, Motion.effects(), label = "dot")
-            Box(Modifier.align(Alignment.BottomEnd).size(size * 0.32f).clip(CircleShape).background(Hypurr.colors.bg).padding(2.dp)) {
+            Box(Modifier.align(Alignment.BottomEnd).size(size * 0.28f).clip(CircleShape).background(Hypurr.colors.bg).padding(2.dp)) {
                 Box(Modifier.matchParentSize().clip(CircleShape).background(dot))
             }
         }
+    }
+}
+
+/** Sunfield cat glyph drawn in [ink] stroke. */
+@Composable
+fun CatFace(ink: Color, size: Dp, modifier: Modifier = Modifier) {
+    Canvas(modifier.size(size)) {
+        val s = this.size.minDimension
+        val stroke = androidx.compose.ui.graphics.drawscope.Stroke(width = s * 0.09f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+        val path = androidx.compose.ui.graphics.Path().apply {
+            moveTo(s * 0.18f, s * 0.42f)
+            lineTo(s * 0.30f, s * 0.08f)
+            lineTo(s * 0.42f, s * 0.34f)
+            lineTo(s * 0.58f, s * 0.34f)
+            lineTo(s * 0.70f, s * 0.08f)
+            lineTo(s * 0.82f, s * 0.42f)
+            lineTo(s * 0.82f, s * 0.62f)
+            cubicTo(s * 0.82f, s * 0.92f, s * 0.18f, s * 0.92f, s * 0.18f, s * 0.62f)
+            close()
+        }
+        drawPath(path, color = ink, style = stroke)
+        drawCircle(ink, radius = s * 0.05f, center = Offset(s * 0.38f, s * 0.52f))
+        drawCircle(ink, radius = s * 0.05f, center = Offset(s * 0.62f, s * 0.52f))
+        drawLine(ink, Offset(s * 0.42f, s * 0.68f), Offset(s * 0.58f, s * 0.68f), strokeWidth = s * 0.07f, cap = StrokeCap.Round)
     }
 }
 
@@ -283,7 +301,7 @@ fun templateIcon(id: String): ImageVector = when (id) {
 
 
 /**
- * Signature "Signal strike" on Allow: press → 4px cyan band flash (~120ms) → invoke [onAllow].
+ * Signature "Press Allow" on Allow: press-down → forest/sunflower band flash (~120ms) → invoke [onAllow].
  * The approval plate then collapses via host status update; a 3px left rail marks the live row.
  */
 @Composable

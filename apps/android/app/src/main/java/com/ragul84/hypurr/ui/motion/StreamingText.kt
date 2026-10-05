@@ -19,7 +19,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import com.ragul84.hypurr.ui.theme.Hypurr
 
-/** Streaming: per-word resolve from ink-3 → ink with 1px cyan caret. */
+/** Streaming: per-word resolve from ink-3 → ink with 1px ink caret. */
 @Composable
 fun StreamingText(
     text: String,

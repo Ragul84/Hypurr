@@ -192,7 +192,7 @@ fun BotListScreen(
 
 @Composable
 private fun SectionLabel(text: String, color: androidx.compose.ui.graphics.Color) {
-    Text(text, color = color, style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.4.sp, fontWeight = FontWeight.SemiBold),
+    Text(text, color = color, style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.sp, fontWeight = FontWeight.Bold),
         modifier = Modifier.padding(start = 12.dp, top = 14.dp, bottom = 6.dp))
 }
 
@@ -218,8 +218,12 @@ private fun EmptyRoster(onNewTask: () -> Unit) {
 fun BotRow(bot: Bot, now: Long, modifier: Modifier = Modifier, byId: Map<String, Bot> = emptyMap(), onClick: () -> Unit) {
     val c = Hypurr.colors
     Row(
-        modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)).pressable(bot.name, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 10.dp).animateContentSize(Motion.spatialDefault()),
+        modifier.fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(c.surface)
+            .pressable(bot.name, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp).animateContentSize(Motion.spatialDefault()),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (bot.isGroup) GroupAvatar(bot, byId) else BotAvatar(bot)
@@ -294,7 +298,7 @@ data class BuiltinInstallPrompt(
 @Composable
 private fun BuiltinInstallCard(prompt: BuiltinInstallPrompt, onInstall: () -> Unit, modifier: Modifier = Modifier) {
     val c = Hypurr.colors
-    Column(modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)).background(c.surface).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(c.surface).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(prompt.title, color = c.text, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             Pill("Free", c.success)

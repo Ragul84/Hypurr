@@ -1,74 +1,76 @@
 @import "tailwindcss";
 
 /*
- * Hypurr wet-asphalt neon tokens (docs/design/hypurr-design-system.md).
- * Fixed hex roles — no violet seed OKLCH system. Accent = flat electric teal.
+ * Hypurr Sunfield Panel tokens (docs/design/hypurr-design-system.md).
+ * Sunflower ground, cream plates, forest primary. No teal. No purple.
  */
 :root {
-  color-scheme: dark;
-  --seed-h: 175; /* teal; kept for any leftover seed reads */
-  --surface: #05070A;
-  --surface-dim: #030405;
-  --surface-container-low: #080C0B;
-  --surface-container: #0B1211;
-  --surface-container-high: #0E1614;
-  --surface-container-highest: #12302C;
-  --on-surface: #E8FFFC;
-  --on-surface-variant: #7FA8A3;
-  --outline: #3D5552;
-  --outline-variant: #14201E;
-  --primary: #00D4C8;
-  --on-primary: #021412;
-  --primary-container: #12302C;
-  --on-primary-container: #E8FFFC;
-  --secondary: #5EAD8A;
-  --secondary-container: #0E1614;
-  --on-secondary-container: #E8FFFC;
-  --tertiary: #00D4C8;
-  --tertiary-container: #0B1211;
-  --on-tertiary-container: #E8FFFC;
-  --attention: #FFB020;
-  --negative: #FF6B5A;
-  --flow-1: #00D4C8;
-  --flow-2: #007A73;
-  --flow-3: #5EAD8A;
-  --glass: color-mix(in srgb, #0B1211 72%, transparent);
-  --glass-strong: color-mix(in srgb, #0E1614 85%, transparent);
-  --glass-edge: color-mix(in srgb, #00D4C8 12%, transparent);
-  --shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.75);
+  color-scheme: light;
+  --seed-h: 48; /* sunflower */
+  --surface: #F2B90D;
+  --surface-dim: #E0A80A;
+  --surface-container-low: #F5C42E;
+  --surface-container: #FFF8E8;
+  --surface-container-high: #FFF8E8;
+  --surface-container-highest: #FFE7A8;
+  --on-surface: #17140A;
+  --on-surface-variant: #5C5640;
+  --outline: #8A8168;
+  --outline-variant: rgba(23,20,10,0.12);
+  --primary: #0E4A38;
+  --on-primary: #FFF8E8;
+  --primary-container: #17140A;
+  --on-primary-container: #FFF8E8;
+  --secondary: #0E4A38;
+  --secondary-container: #FFF8E8;
+  --on-secondary-container: #17140A;
+  --tertiary: #0E4A38;
+  --tertiary-container: #FFF8E8;
+  --on-tertiary-container: #17140A;
+  --attention: #0E4A38;
+  --negative: #A1281C;
+  --flow-1: #F2B90D;
+  --flow-2: #0E4A38;
+  --flow-3: #E8C46A;
+  --glass: color-mix(in srgb, #17140A 88%, transparent);
+  --glass-strong: color-mix(in srgb, #17140A 92%, transparent);
+  --glass-edge: color-mix(in srgb, #17140A 12%, transparent);
+  --shadow: 0 4px 0 rgba(23, 20, 10, 0.12);
+  --radius-card: 20px;
+  --font-display: "Cabinet Grotesk", "Bricolage Grotesque", system-ui, sans-serif;
 }
 
-:root[data-theme="light"] {
-  color-scheme: light;
-  --surface: #F4F6F5;
-  --surface-dim: #E8EEEC;
-  --surface-container-low: #F0F3F2;
-  --surface-container: #FFFFFF;
-  --surface-container-high: #E8EEEC;
-  --surface-container-highest: #D5E8E5;
-  --on-surface: #0A1210;
-  --on-surface-variant: #4A5E5A;
-  --outline: #8A9995;
-  --outline-variant: #D5DEDB;
-  --primary: #007A73;
-  --on-primary: #F4F6F5;
-  --primary-container: #D5E8E5;
-  --on-primary-container: #0A1210;
-  --secondary: #1F7A55;
-  --secondary-container: #E8EEEC;
-  --on-secondary-container: #0A1210;
-  --tertiary: #007A73;
-  --tertiary-container: #FFFFFF;
-  --on-tertiary-container: #0A1210;
-  --attention: #B86A00;
-  --negative: #C23B2E;
-  --flow-1: #007A73;
-  --flow-2: #00D4C8;
-  --flow-3: #1F7A55;
-  --glass: color-mix(in srgb, white 70%, transparent);
-  --glass-strong: color-mix(in srgb, white 85%, transparent);
-  --glass-edge: color-mix(in srgb, #007A73 10%, transparent);
-  --shadow: 0 24px 50px -28px rgba(10, 18, 16, 0.18);
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface: #0E4A38;
+  --surface-dim: #0A3428;
+  --surface-container-low: #123D30;
+  --surface-container: #143D30;
+  --surface-container-high: #1A4A3A;
+  --surface-container-highest: #1F5542;
+  --on-surface: #FFF8E8;
+  --on-surface-variant: #C8E0D4;
+  --outline: #7A9E8E;
+  --outline-variant: rgba(255,248,232,0.12);
+  --primary: #F2B90D;
+  --on-primary: #0E4A38;
+  --primary-container: #F2B90D;
+  --on-primary-container: #0E4A38;
+  --secondary: #5DDB9A;
+  --secondary-container: #1A4A3A;
+  --on-secondary-container: #FFF8E8;
+  --tertiary: #F2B90D;
+  --tertiary-container: #143D30;
+  --on-tertiary-container: #FFF8E8;
+  --attention: #F2B90D;
+  --negative: #F5A090;
+  --flow-1: #F2B90D;
+  --flow-2: #0E4A38;
+  --flow-3: #5DDB9A;
+  --glass: color-mix(in srgb, #143D30 88%, transparent);
+  --glass-strong: color-mix(in srgb, #143D30 92%, transparent);
+  --glass-edge: color-mix(in srgb, #F2B90D 18%, transparent);
+  --shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
 }
 
 @theme inline {

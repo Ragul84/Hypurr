@@ -1,8 +1,8 @@
-# Hypurr brand
+# Hypurr brand — Sunfield Panel
 
-- `hypurr-icon.svg`: app icon (asphalt square, cyan rain, flat cyan cat, top signal band)
-- `hypurr-glyph.svg`: the cat glyph on transparent (macOS Icon Composer layer)
-- `hypurr-menubar.svg`: monochrome template mark for the macOS menu bar
+- `hypurr-icon.svg` — app icon (sunflower field + ink cat plate)
+- `hypurr-glyph.svg` — cat mark on ink tile
+- `icons/` — chunky rounded stroke set (bots, tasks, spend, you, needs-you, allow, deny, host, search, more, new, settings, back, send, activity, team, qr, credits, cat)
 
-Palette: wet-asphalt neon — ground `#05070A`, accent `#00D4C8`, on-accent `#021412`.
-No violet/magenta mesh. Raster icons (iOS/macOS app icons, menu bar, web favicon/touch icons, Linux SVG) are rendered from these files.
+Colours: sunflower `#F2B90D`, forest `#0E4A38`, cream `#FFF8E8`, ink `#17140A`.
+No teal. No purple.

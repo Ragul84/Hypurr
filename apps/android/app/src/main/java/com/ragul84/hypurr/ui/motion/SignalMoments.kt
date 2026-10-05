@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.dp
 import com.ragul84.hypurr.ui.theme.Hypurr
 import kotlinx.coroutines.delay
 
-/** 4px cyan signal band across a plate. */
+/** 4px forest signal band across a plate. */
 @Composable
 fun SignalBand(modifier: Modifier = Modifier, alpha: Float = 1f) {
     Box(modifier.fillMaxWidth().height(4.dp).background(Hypurr.colors.accent.copy(alpha = alpha)))

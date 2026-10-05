@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.sp
 import com.ragul84.hypurr.ui.theme.Hypurr
 import kotlinx.coroutines.delay
 
-/** Thinking: cyan scan band with flat opacity falloff trail + mono phase + elapsed. */
+/** Thinking: forest scan band with flat opacity falloff trail + mono phase + elapsed. */
 @Composable
 fun ThinkingScan(
     phases: List<String> = listOf("Reading files", "Planning", "Editing"),

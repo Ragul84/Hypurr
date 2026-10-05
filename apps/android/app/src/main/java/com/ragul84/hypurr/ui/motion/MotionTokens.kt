@@ -11,8 +11,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
 /**
- * Wet-asphalt neon motion tokens — see docs/design/hypurr-motion.md.
- * Flat cyan light, no glow, no bounce-dots. Honour reduced motion everywhere.
+ * Sunfield Panel motion tokens — see docs/design/hypurr-motion.md.
+ * Forest/sunflower light, no glow, no bounce-dots. Honour reduced motion everywhere.
  */
 object HypurrMotion {
     const val STRIKE_MS = 120

@@ -18,7 +18,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.dp
 import com.ragul84.hypurr.ui.theme.Hypurr
 
-/** Skeleton / refresh: diagonal 1px cyan rain streaks drifting (never grey pulse). */
+/** Skeleton / refresh: diagonal 1px cream rain streaks drifting (never grey pulse). */
 @Composable
 fun RainShimmer(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit = {}) {
     val c = Hypurr.colors
