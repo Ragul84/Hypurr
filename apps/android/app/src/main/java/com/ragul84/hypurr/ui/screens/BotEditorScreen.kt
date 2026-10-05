@@ -156,7 +156,7 @@ fun BotEditorScreen(
             if (!state.group) {
                 Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.Center) {
                     if (state.isNew && !state.group) {
-                        CatAssemble(playing = true, size = 72.dp)
+                        CatAssemble(playing = true, size = 96.dp, name = state.name.ifBlank { "New bot" })
                     } else {
                         BotAvatar(Bot(id = "preview", name = state.name.ifBlank { "?" }, avatarColor = state.avatarColor), 72.dp)
                     }

@@ -6,11 +6,11 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -19,11 +19,11 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import com.ragul84.hypurr.ui.theme.Hypurr
 
-/** Streaming: resolved ink + 1px cyan caret at the frontier. */
+/** Streaming: per-word resolve from ink-3 → ink with 1px cyan caret. */
 @Composable
 fun StreamingText(
     text: String,
-    revealed: Int = text.length,
+    revealedWords: Int = Int.MAX_VALUE,
     style: TextStyle,
     modifier: Modifier = Modifier,
     showCaret: Boolean = true,
@@ -36,11 +36,13 @@ fun StreamingText(
         infiniteRepeatable(tween(HypurrMotion.SNAP_MS, easing = LinearEasing), RepeatMode.Reverse),
         label = "a",
     )
-    val shown = text.take(revealed.coerceIn(0, text.length))
-    val pending = text.drop(shown.length)
+    val words = rememberWords(text)
+    val n = revealedWords.coerceIn(0, words.size)
+    val shown = words.take(n).joinToString(" ")
+    val pending = words.drop(n).joinToString(" ")
     Row(modifier) {
-        if (shown.isNotEmpty()) Text(shown, style = style, color = c.text)
-        if (pending.isNotEmpty()) Text(pending.take(24), style = style, color = c.tertiary)
+        if (shown.isNotEmpty()) Text(shown + if (pending.isNotEmpty()) " " else "", style = style, color = c.text)
+        if (pending.isNotEmpty()) Text(pending, style = style, color = c.tertiary)
         if (showCaret) {
             Box(
                 Modifier
@@ -51,3 +53,7 @@ fun StreamingText(
         }
     }
 }
+
+@Composable
+private fun rememberWords(text: String): List<String> =
+    androidx.compose.runtime.remember(text) { text.split(Regex("\\s+")).filter { it.isNotEmpty() } }

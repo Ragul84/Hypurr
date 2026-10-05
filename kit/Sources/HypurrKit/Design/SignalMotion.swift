@@ -24,10 +24,16 @@ public struct ScanLineView: View {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Rectangle().fill(Palette.border).frame(height: 1)
-                    Rectangle()
-                        .fill(Palette.accentFill.opacity(reduceMotion ? 0.4 : 0.95))
-                        .frame(width: geo.size.width * 0.22, height: 3)
-                        .offset(x: reduceMotion ? geo.size.width * 0.35 : x * (geo.size.width + geo.size.width * 0.22) - geo.size.width * 0.22)
+                    // Flat colour-step trail (no glow blobs)
+                    ForEach([0.18, 0.40, 0.95], id: \.self) { a in
+                        Rectangle()
+                            .fill(Palette.accentFill.opacity(reduceMotion ? a * 0.35 : a))
+                            .frame(width: geo.size.width * (0.28 - Double(a) * 0.08), height: 3)
+                            .offset(x: reduceMotion
+                                ? geo.size.width * 0.35
+                                : x * (geo.size.width + geo.size.width * 0.28) - geo.size.width * 0.28
+                                    - geo.size.width * (0.12 * (1 - a)))
+                    }
                 }
                 .frame(maxHeight: .infinity, alignment: .center)
             }
