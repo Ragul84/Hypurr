@@ -97,7 +97,8 @@ async fn builtin_status_install_models_and_fake_turn() {
     assert_eq!(builtin["free"], true);
     assert_eq!(builtin["defaultModel"], "hypurr/hypurr-free");
     assert!(builtin["needsInstall"] == true || builtin["installed"] == true);
-    assert!(builtin["freeModels"].as_array().unwrap().len() >= 1);
+    let free_models = builtin["freeModels"].as_array().unwrap();
+    assert_ne!(free_models.len(), 0);
 
     let backends = hello["backends"].as_array().unwrap();
     let oc = backends.iter().find(|b| b["id"] == "hypurr-agent").expect("hypurr-agent backend");

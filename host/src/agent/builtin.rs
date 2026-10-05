@@ -229,14 +229,14 @@ fn extract(archive: &Path, dir: &Path, cmd: &Path) -> Result<()> {
     }
     let _ = std::fs::remove_file(archive);
     let exe = dir.join(cmd);
-    if !exe.exists() {
-        if let Ok(entries) = std::fs::read_dir(dir) {
-            for e in entries.flatten() {
-                let nested = e.path().join(cmd);
-                if nested.is_file() {
-                    std::fs::rename(&nested, &exe)?;
-                    break;
-                }
+    if !exe.exists()
+        && let Ok(entries) = std::fs::read_dir(dir)
+    {
+        for e in entries.flatten() {
+            let nested = e.path().join(cmd);
+            if nested.is_file() {
+                std::fs::rename(&nested, &exe)?;
+                break;
             }
         }
     }
@@ -288,7 +288,8 @@ mod tests {
         assert_eq!(s["free"], true);
         assert_eq!(s["agentName"], "Hypurr Agent");
         assert_eq!(s["defaultModel"], DEFAULT_MODEL);
-        assert!(s["freeModels"].as_array().unwrap().len() >= 1);
+        let free_models = s["freeModels"].as_array().unwrap();
+        assert_ne!(free_models.len(), 0);
         let blob = s.to_string().to_lowercase();
         assert!(!blob.contains("opencode"), "user-visible status must not say opencode: {blob}");
     }
@@ -319,6 +320,7 @@ mod tests {
 
         let home = std::env::temp_dir().join(format!("hypurr-ha-home-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&home).unwrap();
+        // SAFETY: test-only, single-threaded here.
         unsafe { std::env::set_var("HYPURR_HOME", &home) };
 
         let path = install_from_bytes_for_test(&bytes, "hypurr-agent-linux-x64.tar.gz", &sum, "hypurr-agent").unwrap();
