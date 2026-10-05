@@ -7,6 +7,9 @@ import com.ragul84.hypurr.data.ThemeMode
 import com.ragul84.hypurr.net.LinkState
 import com.ragul84.hypurr.net.Route
 import com.ragul84.hypurr.ui.screens.BotListScreen
+import com.ragul84.hypurr.ui.screens.HomeTab
+import com.ragul84.hypurr.ui.screens.TasksScreen
+import com.ragul84.hypurr.ui.screens.SpendScreen
 import com.ragul84.hypurr.ui.screens.NeedsYouAsk
 import com.ragul84.hypurr.ui.screens.ChatScreen
 import com.ragul84.hypurr.ui.screens.NewTaskScreen
@@ -76,6 +79,26 @@ class ScreenshotTest {
                 ),
             ),
         )
+    }
+
+    @Test
+    fun spend() = shoot("spend") {
+        SpendScreen(Samples.computer.name, LinkState.Ready(Route.Direct), Samples.costs,
+            bots = Samples.bots.associateBy { it.id })
+    }
+
+    @Test
+    fun tasks() = shoot("tasks") {
+        TasksScreen(Samples.computer.name, LinkState.Ready(Route.Direct), Samples.templates,
+            recent = rosterOrder(Samples.botsWithTask), now = Samples.NOW)
+    }
+
+    @Test
+    fun you() = shoot("you") {
+        SettingsScreen(SettingsUiState(Samples.computer, LinkState.Ready(Route.Relay), ThemeMode.System, dynamicColor = false,
+            notifications = true, pushAvailable = false, version = "2.4.0", dynamicSupported = true,
+            safety = Samples.safety, customTemplates = Samples.templates.filter { !it.builtin }, costs = Samples.costs),
+            {}, {}, {}, {}, {}, showHomeTabs = true)
     }
 
     @Test

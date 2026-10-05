@@ -211,11 +211,17 @@ object Samples {
 
     val costs = TaskCosts(
         tasks = listOf(
-            CostRow("t2", "b7", workTask.title, NOW - 20 * MIN, usage),
-            CostRow("t1", "b6", task.title, NOW - 14 * MIN, TaskUsage(totalTokens = 31_400, cost = 0.18, estimated = true, turns = 3)),
-            CostRow("t0", "b8", "Update dependencies", NOW - 26 * 60 * MIN, TaskUsage(totalTokens = 92_700, cost = 0.64, estimated = false, turns = 6)),
+            CostRow("t2", "b2", "Frontend", NOW - 20 * MIN, TaskUsage(totalTokens = 48_200, cost = 4.20, estimated = false, turns = 12)),
+            CostRow("t1", "b1", "Reviewer", NOW - 14 * MIN, TaskUsage(totalTokens = 22_100, cost = 2.10, estimated = false, turns = 6)),
+            CostRow("t0", "b5", "Host", NOW - 26 * 60 * MIN, TaskUsage(totalTokens = 92_700, cost = 0.64, estimated = false, turns = 6)),
         ),
-        total = CostTotal(1.13, 179_240, 3, estimated = true), week = 1.13, today = 0.49,
+        total = CostTotal(6.94, 163_000, 3, estimated = false), week = 6.94, today = 6.30,
+        gatewayFreeRemaining = "18 / 40 turns",
+        gatewayCreditsLabel = "$12.40",
+        buyCreditsUrl = "https://checkout.stripe.com/c/pay/cs_test_placeholder",
+        freeTurnsLeft = 18,
+        freeTurnsLimit = 40,
+        freeResetLabel = "Resets at midnight IST",
     )
 
     // Stage C: team admin.

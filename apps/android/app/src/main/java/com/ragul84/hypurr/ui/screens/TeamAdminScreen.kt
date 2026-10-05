@@ -1,4 +1,6 @@
 package com.ragul84.hypurr.ui.screens
+import com.ragul84.hypurr.ui.SunfieldIcons
+import com.ragul84.hypurr.ui.sunfieldVector
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
@@ -19,14 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Block
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Computer
-import androidx.compose.material.icons.rounded.ErrorOutline
-import androidx.compose.material.icons.rounded.PhoneAndroid
-import androidx.compose.material.icons.rounded.VerifiedUser
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -99,7 +93,7 @@ fun TeamAdminScreen(
     val tab = state.tab.takeIf { it in tabs } ?: tabs.first()
     Column(Modifier.fillMaxSize().background(c.bg).safeDrawingPadding().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
         Row(Modifier.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconBubble(Icons.AutoMirrored.Rounded.ArrowBack, "Back", onClick = onBack)
+            IconBubble(sunfieldVector(SunfieldIcons.Back), "Back", onClick = onBack)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text("Team admin", style = MaterialTheme.typography.headlineMedium, color = c.text)
@@ -175,7 +169,7 @@ private fun ActivityTab(a: Activity, now: Long) {
     Section("People") {
         a.people.forEach { p ->
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(if (p.key == "local") Icons.Rounded.Computer else Icons.Rounded.PhoneAndroid, null, tint = c.secondary,
+                Icon(if (p.key == "local") sunfieldVector(SunfieldIcons.Host) else sunfieldVector(SunfieldIcons.You), null, tint = c.secondary,
                     modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
@@ -267,7 +261,7 @@ private fun RulesTab(info: PolicyInfo, admin: Boolean, onSave: (JsonObject) -> U
                             })
                         }.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (on) {
-                            Icon(Icons.Rounded.Check, null, tint = c.accent, modifier = Modifier.size(16.dp))
+                            Icon(sunfieldVector(SunfieldIcons.Check), null, tint = c.accent, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
                         }
                         Text(name, color = if (on) c.accent else c.secondary, style = MaterialTheme.typography.labelLarge)
@@ -365,7 +359,7 @@ private fun PeopleTab(team: TeamInfo, admin: Boolean, now: Long, onRole: (String
         team.people.forEach { p ->
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(if (p.fixed) Icons.Rounded.Computer else Icons.Rounded.PhoneAndroid, null, tint = c.secondary, modifier = Modifier.size(20.dp))
+                    Icon(if (p.fixed) sunfieldVector(SunfieldIcons.Host) else sunfieldVector(SunfieldIcons.You), null, tint = c.secondary, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
                         Text(p.name + if (p.you) " (you)" else "", color = c.text, style = MaterialTheme.typography.titleSmall)
@@ -382,7 +376,7 @@ private fun PeopleTab(team: TeamInfo, admin: Boolean, now: Long, onRole: (String
         }
     }
     Row(Modifier.padding(start = 8.dp, top = 14.dp, end = 8.dp)) {
-        Icon(Icons.Rounded.VerifiedUser, null, tint = c.tertiary, modifier = Modifier.size(16.dp))
+        Icon(sunfieldVector(SunfieldIcons.Shield), null, tint = c.tertiary, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(8.dp))
         Text("Each person pairs their own phone with the QR code on the computer. Single sign-on (SSO) with your company account is planned.",
             color = c.tertiary, style = MaterialTheme.typography.bodySmall)
@@ -395,7 +389,7 @@ private fun AuditTab(log: AuditLog, now: Long) {
     val ok = log.intact
     Row(Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(18.dp))
         .background((if (ok) c.success else c.danger).copy(alpha = 0.12f)).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(if (ok) Icons.Rounded.VerifiedUser else Icons.Rounded.ErrorOutline, null, tint = if (ok) c.success else c.danger)
+        Icon(if (ok) sunfieldVector(SunfieldIcons.Shield) else sunfieldVector(SunfieldIcons.Deny), null, tint = if (ok) c.success else c.danger)
         Spacer(Modifier.width(10.dp))
         Column {
             Text(if (ok) "Intact: nothing edited or removed" else "Changed at record ${log.brokenAt}", color = c.text,
@@ -415,7 +409,7 @@ private fun AuditRow(e: AuditEntry, now: Long) {
     val c = Hypurr.colors
     val bad = e.action == "blocked" || e.action == "approval.blocked" || e.action == "policy.limit"
     Row(verticalAlignment = Alignment.Top) {
-        Icon(if (bad) Icons.Rounded.Block else Icons.Rounded.Check, null, tint = if (bad) c.danger else c.success,
+        Icon(if (bad) sunfieldVector(SunfieldIcons.Deny) else sunfieldVector(SunfieldIcons.Check), null, tint = if (bad) c.danger else c.success,
             modifier = Modifier.padding(top = 2.dp).size(16.dp))
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {

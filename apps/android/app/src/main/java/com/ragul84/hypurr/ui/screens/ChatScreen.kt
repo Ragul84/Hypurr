@@ -1,4 +1,6 @@
 package com.ragul84.hypurr.ui.screens
+import com.ragul84.hypurr.ui.SunfieldIcons
+import com.ragul84.hypurr.ui.sunfieldVector
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -34,22 +36,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.Undo
-import androidx.compose.material.icons.rounded.ArrowUpward
-import androidx.compose.material.icons.rounded.Block
-import androidx.compose.material.icons.rounded.AdminPanelSettings
 import androidx.compose.ui.graphics.Color
 import com.ragul84.hypurr.model.Actor
-import androidx.compose.material.icons.rounded.Bookmark
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.History
-import androidx.compose.material.icons.rounded.ErrorOutline
-import androidx.compose.material.icons.rounded.Schedule
-import androidx.compose.material.icons.rounded.Shield
-import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -85,12 +73,6 @@ import com.ragul84.hypurr.ui.Markdown
 import com.ragul84.hypurr.ui.avatarColor
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.material.icons.automirrored.rounded.Reply
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.ContentCopy
-import androidx.compose.material.icons.rounded.ContentPaste
-import androidx.compose.material.icons.rounded.Description
-import androidx.compose.material.icons.rounded.Image
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -103,9 +85,6 @@ import com.ragul84.hypurr.model.Entry
 import com.ragul84.hypurr.model.Integrations
 import com.ragul84.hypurr.model.Learning
 import com.ragul84.hypurr.model.TaskInfo
-import androidx.compose.material.icons.automirrored.rounded.OpenInNew
-import androidx.compose.material.icons.rounded.AttachFile
-import androidx.compose.material.icons.rounded.School
 import com.ragul84.hypurr.ui.Pill
 import com.ragul84.hypurr.ui.relativeTime
 import com.ragul84.hypurr.ui.riskColor
@@ -115,6 +94,8 @@ import com.ragul84.hypurr.ui.BotAvatar
 import com.ragul84.hypurr.ui.FlowOrb
 import com.ragul84.hypurr.ui.CatFace
 import com.ragul84.hypurr.ui.CreamPlate
+import com.ragul84.hypurr.ui.motion.ApprovalDropIn
+import com.ragul84.hypurr.ui.motion.DenyHeadshake
 import com.ragul84.hypurr.ui.InkTile
 import com.ragul84.hypurr.ui.WorkingPhase
 import com.ragul84.hypurr.ui.motion.DoneRule
@@ -217,7 +198,7 @@ fun ChatScreen(
         // Sunfield header: sunflower ground, chunky ink tiles — no glass scrim.
         Column(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            InkTile(Icons.AutoMirrored.Rounded.ArrowBack, "Back", onClick = onBack)
+            InkTile(sunfieldVector(SunfieldIcons.Back), "Back", onClick = onBack)
             Spacer(Modifier.width(8.dp))
             Row(Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).then(if (onEdit != null && !inThread) Modifier.pressable("${bot.name} settings", onClick = onEdit) else Modifier),
                 verticalAlignment = Alignment.CenterVertically) {
@@ -241,7 +222,7 @@ fun ChatScreen(
             AnimatedVisibility(bot.status == "working", enter = scaleIn(Motion.spatialFast()) + fadeIn(), exit = scaleOut() + fadeOut()) {
                 Row {
                     Spacer(Modifier.width(6.dp))
-                    InkTile(Icons.Rounded.Stop, "Stop", onClick = onStop)
+                    InkTile(sunfieldVector(SunfieldIcons.Stop), "Stop", onClick = onStop)
                 }
             }
         }
@@ -351,9 +332,9 @@ private fun MessageActions(entry: Entry?, canThread: Boolean, onClose: () -> Uni
                     }
                 }
                 if (canThread && e.threadId == null && e.seq > 0) {
-                    ActionRow(Icons.AutoMirrored.Rounded.Reply, "Reply in thread") { onThread(e) }
+                    ActionRow(sunfieldVector(SunfieldIcons.Back), "Reply in thread") { onThread(e) }
                 }
-                if (!e.data.text.isNullOrEmpty()) ActionRow(Icons.Rounded.ContentCopy, "Copy text") {
+                if (!e.data.text.isNullOrEmpty()) ActionRow(sunfieldVector(SunfieldIcons.Paste), "Copy text") {
                     clipboard.setText(AnnotatedString(e.data.text))
                     onClose()
                 }
@@ -437,7 +418,7 @@ private fun TaskStrip(task: TaskInfo, onOpen: () -> Unit) {
     Row(Modifier.padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(tint.copy(alpha = 0.10f))
         .pressable("Checkpoints", onClick = onOpen).padding(horizontal = 12.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically) {
-        Icon(if (safe) Icons.Rounded.Shield else Icons.Rounded.ErrorOutline, null, tint = tint, modifier = Modifier.size(17.dp))
+        Icon(if (safe) sunfieldVector(SunfieldIcons.Shield) else sunfieldVector(SunfieldIcons.Deny), null, tint = tint, modifier = Modifier.size(17.dp))
         Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
             Text(if (safe) "Safe branch · ${task.branch}" else "No safety net · not a git project", color = c.text,
@@ -453,7 +434,7 @@ private fun TaskStrip(task: TaskInfo, onOpen: () -> Unit) {
         task.usage?.takeIf { it.turns > 0 || it.cost > 0 }?.let {
             Pill(it.label, c.accent, Modifier.padding(end = 8.dp))
         }
-        if (safe) Icon(Icons.Rounded.History, null, tint = c.accent, modifier = Modifier.size(20.dp))
+        if (safe) Icon(sunfieldVector(SunfieldIcons.Activity), null, tint = c.accent, modifier = Modifier.size(20.dp))
     }
 }
 
@@ -485,7 +466,7 @@ private fun CheckpointSheet(open: Boolean, task: TaskInfo, now: Long, integratio
                         Text("Go back to any point. What's there now is saved first, so nothing is lost.", color = c.secondary,
                             style = MaterialTheme.typography.bodySmall)
                     }
-                    IconBubble(Icons.Rounded.Close, "Close", onClick = onClose)
+                    IconBubble(sunfieldVector(SunfieldIcons.Close), "Close", onClick = onClose)
                 }
                 Spacer(Modifier.height(12.dp))
                 LazyColumn(Modifier.heightIn(max = 340.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -525,16 +506,16 @@ private fun CheckpointSheet(open: Boolean, task: TaskInfo, now: Long, integratio
                             ToggleRow("Post the result", if (work.anyChat) listOfNotNull("Slack".takeIf { work.slack.configured },
                                 "Teams".takeIf { work.teams.configured }).joinToString(" and ")
                                 else "Set up Slack or Teams in Settings › Work tools", notify, work.anyChat) { notify = it }
-                            SoftButton("Finish", Modifier.fillMaxWidth(), icon = Icons.Rounded.Check, tint = c.success) {
+                            SoftButton("Finish", Modifier.fillMaxWidth(), icon = sunfieldVector(SunfieldIcons.Check), tint = c.success) {
                                 finishing = false
                                 onFinish(FinishOptions(learning, openPr, notify))
                             }
                         }
                     }
                     Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SoftButton("Save now", Modifier.weight(1f), icon = Icons.Rounded.Bookmark, onClick = onSave)
+                        SoftButton("Save now", Modifier.weight(1f), icon = sunfieldVector(SunfieldIcons.Docs), onClick = onSave)
                         if (!finishing) {
-                            SoftButton("Finish task", Modifier.weight(1f), icon = Icons.Rounded.Check, tint = c.success) { finishing = true }
+                            SoftButton("Finish task", Modifier.weight(1f), icon = sunfieldVector(SunfieldIcons.Check), tint = c.success) { finishing = true }
                         }
                     }
                 }
@@ -572,9 +553,9 @@ private fun UserBubble(entry: Entry, media: AttachmentUi, onLongPress: () -> Uni
                     .padding(horizontal = 16.dp, vertical = 11.dp))
         }
         when (entry.data.status) {
-            "queued" -> Meta(Icons.Rounded.Schedule, if (entry.data.attachments.isNullOrEmpty()) "Queued" else "Sending…", c.tertiary)
-            "failed" -> Meta(Icons.Rounded.ErrorOutline, "Not sent", c.danger)
-            "cancelled" -> Meta(Icons.Rounded.ErrorOutline, "Cancelled", c.tertiary)
+            "queued" -> Meta(sunfieldVector(SunfieldIcons.Activity), if (entry.data.attachments.isNullOrEmpty()) "Queued" else "Sending…", c.tertiary)
+            "failed" -> Meta(sunfieldVector(SunfieldIcons.Deny), "Not sent", c.danger)
+            "cancelled" -> Meta(sunfieldVector(SunfieldIcons.Deny), "Cancelled", c.tertiary)
         }
     }
 }
@@ -598,7 +579,7 @@ private fun AttachmentView(a: Attachment, media: AttachmentUi, modifier: Modifie
         .combinedClickable(onClickLabel = "Open ${a.name}", onClick = { if (a.isImage) media.view(a) else media.open(a) }, onLongClick = onLongPress)
         .padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(c.accent.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) {
-            Icon(if (a.isImage) Icons.Rounded.Image else Icons.Rounded.Description, null, tint = c.accent, modifier = Modifier.size(20.dp))
+            Icon(if (a.isImage) sunfieldVector(SunfieldIcons.Image) else sunfieldVector(SunfieldIcons.Docs), null, tint = c.accent, modifier = Modifier.size(20.dp))
         }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f, fill = false)) {
@@ -658,7 +639,8 @@ private fun PermissionCard(entry: Entry, task: TaskInfo?, onRespond: (Entry, Str
         d.detail?.takeIf { it.isNotBlank() && it != d.command },
     ).firstOrNull()
     val detail = d.command ?: d.detail
-    CreamPlate(Modifier.fillMaxWidth().padding(end = 20.dp).animateContentSize(Motion.spatialDefault())) {
+    ApprovalDropIn(Modifier.fillMaxWidth().padding(end = 20.dp)) {
+    CreamPlate(Modifier.fillMaxWidth().animateContentSize(Motion.spatialDefault())) {
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
             val pillLabel = when {
                 blocked -> "Blocked"
@@ -694,7 +676,7 @@ private fun PermissionCard(entry: Entry, task: TaskInfo?, onRespond: (Entry, Str
             if (pending && d.needsAdmin == true) {
                 Row(Modifier.padding(top = 10.dp).clip(RoundedCornerShape(12.dp)).background(c.accent.copy(alpha = 0.10f))
                     .padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.AdminPanelSettings, null, tint = c.accent, modifier = Modifier.size(16.dp))
+                    Icon(sunfieldVector(SunfieldIcons.Shield), null, tint = c.accent, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(if (isAdmin) "Your team's rules: an admin approves this" else "Needs an admin: your team's rules say an admin approves this",
                         color = c.accent, style = MaterialTheme.typography.labelMedium)
@@ -709,7 +691,7 @@ private fun PermissionCard(entry: Entry, task: TaskInfo?, onRespond: (Entry, Str
                         style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                     val approved = option != null && !option.kind.startsWith("reject")
                     if (approved && d.checkpoint != null && task?.hasSafetyNet == true && task.isActive) {
-                        SoftButton("Undo", icon = Icons.AutoMirrored.Rounded.Undo, tint = c.warning) { onUndo(entry) }
+                        SoftButton("Undo", icon = sunfieldVector(SunfieldIcons.Back), tint = c.warning) { onUndo(entry) }
                     }
                 }
             }
@@ -717,6 +699,7 @@ private fun PermissionCard(entry: Entry, task: TaskInfo?, onRespond: (Entry, Str
                 Text(riskLabel(d.risk), color = risk, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 8.dp))
             }
         }
+    }
     }
 }
 
@@ -727,7 +710,7 @@ private fun LearningCard(l: Learning, onOpenLink: (String) -> Unit) {
     Column(Modifier.fillMaxWidth().padding(end = 24.dp).glass(RoundedCornerShape(20.dp), c.success.copy(alpha = 0.10f)).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Rounded.School, null, tint = c.success, modifier = Modifier.size(18.dp))
+            Icon(sunfieldVector(SunfieldIcons.Explain), null, tint = c.success, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text("What changed and why", color = c.success, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f))
@@ -754,7 +737,7 @@ private fun LearningCard(l: Learning, onOpenLink: (String) -> Unit) {
         if (posted.isNotEmpty()) Text("Posted to ${posted.joinToString(", ")}", color = c.secondary, style = MaterialTheme.typography.bodySmall)
         l.errors.forEach { Text(it, color = c.danger, style = MaterialTheme.typography.bodySmall) }
         l.pr?.let { pr ->
-            SoftButton("Open pull request #${pr.number}", Modifier.fillMaxWidth(), icon = Icons.AutoMirrored.Rounded.OpenInNew) { onOpenLink(pr.url) }
+            SoftButton("Open pull request #${pr.number}", Modifier.fillMaxWidth(), icon = sunfieldVector(SunfieldIcons.Link)) { onOpenLink(pr.url) }
         }
     }
 }
@@ -794,8 +777,8 @@ private fun Composer(draft: String, onDraftChange: (String) -> Unit, onSend: () 
         AnimatedVisibility(menu && composer.canAttach) {
             Row(Modifier.padding(bottom = 8.dp).glass(RoundedCornerShape(22.dp), c.surface).padding(6.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf(Triple(AttachKind.Photos, "Photos", Icons.Rounded.Image), Triple(AttachKind.Files, "Files", Icons.Rounded.Description),
-                    Triple(AttachKind.Paste, "Paste", Icons.Rounded.ContentPaste)).forEach { (kind, label, icon) ->
+                listOf(Triple(AttachKind.Photos, "Photos", sunfieldVector(SunfieldIcons.Image)), Triple(AttachKind.Files, "Files", sunfieldVector(SunfieldIcons.Docs)),
+                    Triple(AttachKind.Paste, "Paste", sunfieldVector(SunfieldIcons.Paste))).forEach { (kind, label, icon) ->
                     SoftButton(label, icon = icon) { menu = false; onAttach(kind) }
                 }
             }
@@ -807,11 +790,11 @@ private fun Composer(draft: String, onDraftChange: (String) -> Unit, onSend: () 
                         verticalAlignment = Alignment.CenterVertically) {
                         val thumb = if (f.isImage) rememberBitmap(f.bytes, 200) else null
                         if (thumb != null) Image(thumb, null, Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)), contentScale = ContentScale.Crop)
-                        else Icon(Icons.Rounded.Description, null, tint = c.accent, modifier = Modifier.size(22.dp))
+                        else Icon(sunfieldVector(SunfieldIcons.Docs), null, tint = c.accent, modifier = Modifier.size(22.dp))
                         Spacer(Modifier.width(6.dp))
                         Text(f.name, color = c.text, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.widthIn(max = 140.dp))
-                        IconBubble(Icons.Rounded.Close, "Remove ${f.name}", fill = androidx.compose.ui.graphics.Color.Transparent, size = 30.dp) { onRemoveFile(i) }
+                        IconBubble(sunfieldVector(SunfieldIcons.Close), "Remove ${f.name}", fill = androidx.compose.ui.graphics.Color.Transparent, size = 30.dp) { onRemoveFile(i) }
                     }
                 }
             }
@@ -824,7 +807,7 @@ private fun Composer(draft: String, onDraftChange: (String) -> Unit, onSend: () 
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (composer.canAttach) {
-                IconBubble(if (menu) Icons.Rounded.Close else Icons.Rounded.Add, if (menu) "Close" else "Add files",
+                IconBubble(if (menu) sunfieldVector(SunfieldIcons.Close) else sunfieldVector(SunfieldIcons.Plus), if (menu) "Close" else "Add files",
                     fill = androidx.compose.ui.graphics.Color.Transparent, tint = c.secondary, size = 40.dp) { menu = !menu }
                 Spacer(Modifier.width(4.dp))
             }
@@ -840,7 +823,7 @@ private fun Composer(draft: String, onDraftChange: (String) -> Unit, onSend: () 
                     .pressable("Send", enabled = canSend, onClick = onSend),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Rounded.ArrowUpward, null, tint = if (canSend) c.onAccent else c.tertiary, modifier = Modifier.size(22.dp))
+                Icon(sunfieldVector(SunfieldIcons.Send), null, tint = if (canSend) c.onAccent else c.tertiary, modifier = Modifier.size(22.dp))
             }
         }
     }

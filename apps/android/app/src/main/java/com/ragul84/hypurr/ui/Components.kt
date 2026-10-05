@@ -22,12 +22,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.rounded.AutoAwesome
-import androidx.compose.material.icons.rounded.BugReport
-import androidx.compose.material.icons.rounded.RateReview
-import androidx.compose.material.icons.rounded.School
-import androidx.compose.material.icons.rounded.Science
-import androidx.compose.material.icons.rounded.Update
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -39,9 +33,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.StrokeCap
@@ -233,24 +230,29 @@ fun CatFace(ink: Color, size: Dp, modifier: Modifier = Modifier) {
 @Composable
 fun LinkPill(state: LinkState, modifier: Modifier = Modifier) {
     val c = Hypurr.colors
-    val (label, color) = when (state) {
-        is LinkState.Ready -> (if (state.route == Route.Direct) "Direct" else "Cloud relay") to c.success
-        LinkState.Connecting -> "Connecting" to c.tertiary
-        is LinkState.HostOffline -> "Computer offline" to c.warning
-        is LinkState.Unauthorized -> "Not allowed" to c.danger
-        is LinkState.Failed -> "Can't reach" to c.danger
+    val (label, dot, ink, fill) = when (state) {
+        is LinkState.Ready -> {
+            val name = if (state.route == Route.Direct) "Direct" else "Cloud relay"
+            // Forest dot + ink text on a darker-yellow / forest-tinted plate — never blue-ish on sunflower.
+            Quadruple(name, c.accent, c.text, if (c.dark) c.surface else Color(0xFFE8C46A))
+        }
+        LinkState.Connecting -> Quadruple("Connecting", c.tertiary, c.secondary, c.surface.copy(alpha = 0.7f))
+        is LinkState.HostOffline -> Quadruple("Computer offline", c.warning, c.text, c.warning.copy(alpha = 0.14f))
+        is LinkState.Unauthorized -> Quadruple("Not allowed", c.danger, c.danger, c.danger.copy(alpha = 0.12f))
+        is LinkState.Failed -> Quadruple("Can't reach", c.danger, c.danger, c.danger.copy(alpha = 0.12f))
     }
     Row(
-        modifier.clip(RoundedCornerShape(50)).background(color.copy(alpha = 0.14f)).padding(horizontal = 10.dp, vertical = 5.dp),
+        modifier.clip(RoundedCornerShape(50)).background(fill).padding(horizontal = 10.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(7.dp).clip(CircleShape).background(color))
+        Box(Modifier.size(7.dp).clip(CircleShape).background(dot))
         Spacer(Modifier.width(6.dp))
-        CompositionLocalProvider(LocalContentColor provides color) {
-            Text(label, style = MaterialTheme.typography.labelMedium, color = color)
-        }
+        Text(label, style = MaterialTheme.typography.labelMedium, color = ink, fontWeight = FontWeight.Bold)
     }
 }
+
+/** Tiny helper so LinkPill stays local without a data class import. */
+private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 
 /** Grok-style compact age: now · 5m · 3h · 2d · Sep 3. */
 fun relativeTime(ms: Long, now: Long = System.currentTimeMillis()): String {
@@ -295,43 +297,35 @@ fun Pill(text: String, color: Color, modifier: Modifier = Modifier, icon: ImageV
 }
 
 /** Template icon ids (host `templates`) → icons. */
-fun templateIcon(id: String): ImageVector = when (id) {
-    "test" -> androidx.compose.material.icons.Icons.Rounded.Science
-    "bug" -> androidx.compose.material.icons.Icons.Rounded.BugReport
-    "review" -> androidx.compose.material.icons.Icons.Rounded.RateReview
-    "deps" -> androidx.compose.material.icons.Icons.Rounded.Update
-    "explain" -> androidx.compose.material.icons.Icons.Rounded.School
-    else -> androidx.compose.material.icons.Icons.Rounded.AutoAwesome
-}
+/** @deprecated use templateIconRes + painterResource / sunfieldVector */
+@Composable
+fun templateIcon(id: String): ImageVector = sunfieldVector(templateIconRes(id))
 
 
 /**
  * Signature "Press Allow" on Allow: press-down → forest/sunflower band flash (~120ms) → invoke [onAllow].
  * The approval plate then collapses via host status update; a 3px left rail marks the live row.
  */
-/** Solid forest/sunflower Allow — Sunfield primary CTA (replaces pale SoftButton strike). */
+/** Solid forest/sunflower Allow — presses into chunky shadow then fires [onAllow]. */
 @Composable
 fun SignalAllowButton(text: String, modifier: Modifier = Modifier, onAllow: () -> Unit) {
     val c = Hypurr.colors
-    val reduce = reduceMotion()
     var striking by remember { mutableStateOf(false) }
-    LaunchedEffect(striking) {
-        if (!striking) return@LaunchedEffect
-        delay((if (reduce) HypurrMotion.REDUCED_MS else HypurrMotion.STRIKE_MS).toLong())
-        onAllow()
-        striking = false
-    }
     val label = sunfieldOptionLabel(text)
-    Row(
-        modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(c.accent)
-            .pressable(enabled = !striking, onClick = { if (!striking) striking = true })
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        Text(label, color = c.onAccent, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
+    com.ragul84.hypurr.ui.motion.AllowPressEffect(striking = striking, onSettled = {
+        if (striking) { onAllow(); striking = false }
+    }) {
+        Row(
+            modifier
+                .clip(RoundedCornerShape(14.dp))
+                .background(c.accent)
+                .pressable(enabled = !striking, onClick = { if (!striking) striking = true })
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            Text(label, color = c.onAccent, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
+        }
     }
 }
 
@@ -360,17 +354,23 @@ fun CreamButton(text: String, modifier: Modifier = Modifier, onClick: () -> Unit
     }
 }
 
-/** Text-only Deny. */
+/** Text-only Deny — gentle headshake then dim. */
 @Composable
 fun TextDenyButton(text: String = "Deny", modifier: Modifier = Modifier, onClick: () -> Unit) {
     val c = Hypurr.colors
-    Text(
-        sunfieldOptionLabel(text),
-        color = c.secondary,
-        fontWeight = FontWeight.Bold,
-        fontSize = 14.sp,
-        modifier = modifier.pressable(onClick = onClick).padding(horizontal = 10.dp, vertical = 10.dp),
-    )
+    var denying by remember { mutableStateOf(false) }
+    com.ragul84.hypurr.ui.motion.DenyHeadshake(denying, modifier) {
+        Text(
+            sunfieldOptionLabel(text),
+            color = c.secondary,
+            fontWeight = FontWeight.Bold,
+            fontSize = 14.sp,
+            modifier = Modifier.pressable(onClick = {
+                denying = true
+                onClick()
+            }).padding(horizontal = 10.dp, vertical = 10.dp),
+        )
+    }
 }
 
 /**
@@ -411,31 +411,33 @@ fun InkTile(icon: ImageVector, label: String, modifier: Modifier = Modifier, siz
     }
 }
 
-/** Cream plate with a chunky offset press shadow (Sunfield cards). */
+/** Cream plate with a chunky press shadow: same size as the card, offset 4dp down only. */
 @Composable
 fun CreamPlate(modifier: Modifier = Modifier, shape: RoundedCornerShape = RoundedCornerShape(20.dp), content: @Composable () -> Unit) {
     val c = Hypurr.colors
-    Box(modifier) {
-        Box(Modifier.matchParentSize().padding(top = 4.dp).clip(shape).background(c.press.copy(alpha = if (c.dark) 0.45f else 0.22f)))
-        Box(Modifier.clip(shape).background(c.surface)) { content() }
-    }
+    val shadow = c.press.copy(alpha = if (c.dark) 0.55f else 0.28f)
+    // Shadow matches the cream surface exactly — same width/height, 4dp down only.
+    Box(
+        modifier
+            .padding(bottom = 4.dp)
+            .drawBehind {
+                val r = shape.topStart.toPx(size, this)
+                drawRoundRect(
+                    color = shadow,
+                    topLeft = Offset(0f, 4.dp.toPx()),
+                    size = Size(size.width, size.height),
+                    cornerRadius = CornerRadius(r, r),
+                )
+            }
+            .clip(shape)
+            .background(c.surface),
+    ) { content() }
 }
 
-/** Friendly working phase: Cabinet text + ink-dot blink (no mono scanner). */
+/** Friendly working phase — delegates to Sunfield ThinkingCatRow. */
 @Composable
 fun WorkingPhase(text: String, modifier: Modifier = Modifier, animate: Boolean = true) {
-    val c = Hypurr.colors
-    val still = LocalInspectionMode.current || !animate || reduceMotion()
-    val t = rememberInfiniteTransition(label = "blink")
-    val alpha by t.animateFloat(0.25f, 1f, infiniteRepeatable(tween(700), RepeatMode.Reverse), label = "dot")
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            Modifier.size(8.dp).clip(CircleShape)
-                .background(c.accent.copy(alpha = if (still) 0.85f else alpha)),
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(text, color = c.secondary, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1)
-    }
+    com.ragul84.hypurr.ui.motion.ThinkingCatRow(phase = text, modifier = modifier, animate = animate)
 }
 
 /** 4px forest/sunflower signal band across a plate (Needs-you / live). */

@@ -55,6 +55,9 @@ import org.webrtc.SurfaceViewRenderer
 import com.ragul84.hypurr.model.Pairing
 import com.ragul84.hypurr.net.LinkState
 import com.ragul84.hypurr.ui.screens.BotListScreen
+import com.ragul84.hypurr.ui.screens.HomeTab
+import com.ragul84.hypurr.ui.screens.TasksScreen
+import com.ragul84.hypurr.ui.screens.SpendScreen
 import com.ragul84.hypurr.ui.screens.NeedsYouAsk
 import com.ragul84.hypurr.ui.screens.BuiltinInstallPrompt
 import com.ragul84.hypurr.ui.screens.ChatScreen
@@ -420,6 +423,41 @@ class MainActivity : ComponentActivity() {
                         },
                     )
                 }
+
+                target == "spend" -> {
+                    val costs by store.costs.collectAsState()
+                    LaunchedEffect(Unit) { store.loadCosts() }
+                    fun go(tab: HomeTab) {
+                        screen = when (tab) {
+                            HomeTab.Bots -> "list"
+                            HomeTab.Tasks -> "tasks"
+                            HomeTab.Spend -> "spend"
+                            HomeTab.You -> "settings"
+                        }
+                    }
+                    SpendScreen(current.name, linkState, costs, bots, onTab = ::go)
+                }
+                target == "tasks" -> {
+                    val setup by store.setup.collectAsState()
+                    LaunchedEffect(Unit) { store.loadSetup() }
+                    fun go(tab: HomeTab) {
+                        screen = when (tab) {
+                            HomeTab.Bots -> "list"
+                            HomeTab.Tasks -> "tasks"
+                            HomeTab.Spend -> "spend"
+                            HomeTab.You -> "settings"
+                        }
+                    }
+                    TasksScreen(
+                        current.name, linkState,
+                        templates = setup?.templates.orEmpty(),
+                        recent = rosterOrder(bots.values),
+                        onNewTask = { screen = "newtask" },
+                        onOpenTemplate = { screen = "newtask" },
+                        onOpenBot = { screen = "chat:${it.id}" },
+                        onTab = ::go,
+                    )
+                }
                 target == "settings" -> {
                     val theme by store.themeMode.collectAsState()
                     val dynamic by store.dynamicColor.collectAsState()
@@ -439,6 +477,15 @@ class MainActivity : ComponentActivity() {
                             integrations = integrations, costs = costs, testResults = tests, you = you),
                         onTeamAdmin = { screen = "team" },
                         onBack = { screen = "list" },
+                        showHomeTabs = true,
+                        onTab = { tab ->
+                            screen = when (tab) {
+                                HomeTab.Bots -> "list"
+                                HomeTab.Tasks -> "tasks"
+                                HomeTab.Spend -> "spend"
+                                HomeTab.You -> "settings"
+                            }
+                        },
                         onTheme = store::setTheme,
                         onDynamic = store::setDynamicColor,
                         onNotifications = store::setNotifications,
@@ -545,7 +592,8 @@ class MainActivity : ComponentActivity() {
                         onRespondAsk = { _, entryId, optionId ->
                             if (entryId != null) scope.launch { runCatching { store.respond(entryId, optionId) } }
                         },
-                        onSpend = { screen = "settings" },
+                        onSpend = { screen = "spend" },
+                        onTasks = { screen = "tasks" },
                     )
                 }
             }
@@ -557,6 +605,7 @@ class MainActivity : ComponentActivity() {
         screen.startsWith("thread:") -> "chat:" + screen.split(':')[1]
         screen.startsWith("edit:") -> "chat:" + screen.removePrefix("edit:")
         screen == "team" -> "settings"
+        screen == "spend" || screen == "tasks" -> "list"
         else -> "list"
     }
 
