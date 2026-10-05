@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+@font-face { font-family: "Cabinet Grotesk"; src: url("/fonts/CabinetGrotesk-400.ttf") format("truetype"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Cabinet Grotesk"; src: url("/fonts/CabinetGrotesk-500.ttf") format("truetype"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "Cabinet Grotesk"; src: url("/fonts/CabinetGrotesk-700.ttf") format("truetype"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "Cabinet Grotesk"; src: url("/fonts/CabinetGrotesk-800.ttf") format("truetype"); font-weight: 800; font-display: swap; }
+
+
 /*
  * Hypurr Sunfield Panel tokens (docs/design/hypurr-design-system.md).
  * Sunflower ground, cream plates, forest primary. No teal. No purple.

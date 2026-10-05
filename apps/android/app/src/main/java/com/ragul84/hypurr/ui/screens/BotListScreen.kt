@@ -148,7 +148,7 @@ fun BotListScreen(
             }
             Text(text, color = c.warning, style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth()
-                    .clip(RoundedCornerShape(4.dp)).background(c.warning.copy(alpha = 0.1f)).padding(14.dp))
+                    .clip(RoundedCornerShape(20.dp)).background(c.warning.copy(alpha = 0.1f)).padding(14.dp))
         }
         if (synced && bots.isEmpty()) {
             builtinInstall?.let { BuiltinInstallCard(it, onInstallBuiltin, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
@@ -171,7 +171,7 @@ fun BotListScreen(
             if (needsYou.isNotEmpty()) {
                 item(key = "needs-header") { SectionLabel("Needs you", c.warning) }
                 item(key = "needs") {
-                    Column(Modifier.fillMaxWidth().animateItem().clip(RoundedCornerShape(4.dp)).background(c.surface)
+                    Column(Modifier.fillMaxWidth().animateItem().clip(RoundedCornerShape(20.dp)).background(c.surface)
                         .padding(vertical = 4.dp)) {
                         Box(Modifier.fillMaxWidth().height(4.dp).background(c.accent))
                         needsYou.forEach { BotRow(it, now, byId = byId) { onOpen(it) } }

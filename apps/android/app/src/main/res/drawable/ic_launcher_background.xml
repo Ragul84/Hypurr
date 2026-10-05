@@ -1,15 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp" android:height="108dp"
-    android:viewportWidth="108" android:viewportHeight="108">
-    <path android:pathData="M0,0h108v108h-108z" android:fillColor="#05070A"/>
-    <!-- thin diagonal rain streaks (flat cyan, low opacity) -->
-    <path android:pathData="M10,0 L30,108" android:strokeWidth="0.7" android:strokeColor="#2900D4C8"/>
-    <path android:pathData="M28,0 L48,108" android:strokeWidth="0.7" android:strokeColor="#2200D4C8"/>
-    <path android:pathData="M46,0 L66,108" android:strokeWidth="0.7" android:strokeColor="#2900D4C8"/>
-    <path android:pathData="M64,0 L84,108" android:strokeWidth="0.7" android:strokeColor="#1F00D4C8"/>
-    <path android:pathData="M82,0 L102,108" android:strokeWidth="0.7" android:strokeColor="#2900D4C8"/>
-    <path android:pathData="M100,0 L120,108" android:strokeWidth="0.7" android:strokeColor="#2200D4C8"/>
-    <!-- top signal band -->
-    <path android:pathData="M0,0h108v4h-108z" android:fillColor="#00D4C8"/>
-</vector>
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <solid android:color="#F2B90D"/>
+</shape>

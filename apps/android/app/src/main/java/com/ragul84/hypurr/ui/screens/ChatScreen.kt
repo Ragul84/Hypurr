@@ -565,7 +565,7 @@ private fun UserBubble(entry: Entry, media: AttachmentUi, onLongPress: () -> Uni
         }
         if (!entry.data.text.isNullOrEmpty()) {
             Text(entry.data.text, color = c.text, style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(start = 56.dp).clip(RoundedCornerShape(4.dp))
+                modifier = Modifier.padding(start = 56.dp).clip(RoundedCornerShape(20.dp))
                     .background(c.bubbleUser).combinedClickable(onClick = {}, onLongClick = onLongPress, onLongClickLabel = "Message actions")
                     .padding(horizontal = 16.dp, vertical = 11.dp))
         }
@@ -626,7 +626,7 @@ private fun AgentBubble(entry: Entry, author: Bot?, onLongPress: () -> Unit) {
             Spacer(Modifier.width(6.dp))
             Text(author.name, color = avatarColor(author.avatarColor), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
         }
-        MarkdownText(entry.data.text.orEmpty(), Modifier.clip(RoundedCornerShape(4.dp)).background(c.bubbleAgent)
+        MarkdownText(entry.data.text.orEmpty(), Modifier.clip(RoundedCornerShape(20.dp)).background(c.bubbleAgent)
             .combinedClickable(onClick = {}, onLongClick = onLongPress, onLongClickLabel = "Message actions")
             .padding(horizontal = 16.dp, vertical = 11.dp))
     }
@@ -651,7 +651,7 @@ private fun PermissionCard(entry: Entry, task: TaskInfo?, onRespond: (Entry, Str
         else -> c.tertiary
     }, Motion.effects(), label = "perm")
     var details by remember(entry.id) { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().padding(end = 24.dp).clip(RoundedCornerShape(4.dp)).background(c.surface)
+    Column(Modifier.fillMaxWidth().padding(end = 24.dp).clip(RoundedCornerShape(20.dp)).background(c.surface)
         .animateContentSize(Motion.spatialDefault())) {
         if (pending) Box(Modifier.fillMaxWidth().height(4.dp).background(c.accent.copy(alpha = 0.9f)))
         Column(Modifier.fillMaxWidth().background(tint.copy(alpha = 0.10f)).padding(16.dp)) {
@@ -723,7 +723,7 @@ private fun PermissionCard(entry: Entry, task: TaskInfo?, onRespond: (Entry, Str
 @Composable
 private fun LearningCard(l: Learning, onOpenLink: (String) -> Unit) {
     val c = Hypurr.colors
-    Column(Modifier.fillMaxWidth().padding(end = 24.dp).glass(RoundedCornerShape(4.dp), c.success.copy(alpha = 0.10f)).padding(16.dp),
+    Column(Modifier.fillMaxWidth().padding(end = 24.dp).glass(RoundedCornerShape(20.dp), c.success.copy(alpha = 0.10f)).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Rounded.School, null, tint = c.success, modifier = Modifier.size(18.dp))

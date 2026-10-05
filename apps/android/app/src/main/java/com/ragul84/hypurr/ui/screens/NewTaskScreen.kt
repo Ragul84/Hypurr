@@ -230,7 +230,7 @@ private fun Plan(state: NewTaskUiState, onChange: (NewTaskUiState) -> Unit) {
     var choosing by remember { mutableStateOf<String?>(null) }
     Text("HYPURR'S PLAN", color = c.tertiary, style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
         modifier = Modifier.padding(start = 6.dp, top = 20.dp, bottom = 8.dp))
-    Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(4.dp), c.surface).padding(16.dp).animateContentSize(Motion.spatialDefault()),
+    Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(20.dp), c.surface).padding(16.dp).animateContentSize(Motion.spatialDefault()),
         verticalArrangement = Arrangement.spacedBy(10.dp)) {
         PlanRow(Icons.Rounded.Folder, "Project", state.projectName ?: "Pick a project") { choosing = if (choosing == "project") null else "project" }
         AnimatedVisibility(choosing == "project") {
@@ -263,7 +263,7 @@ private fun Plan(state: NewTaskUiState, onChange: (NewTaskUiState) -> Unit) {
             else -> state.route?.reason
         }
         if (!reason.isNullOrEmpty()) Text(reason, color = c.secondary, style = MaterialTheme.typography.bodySmall)
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)).background(c.success.copy(alpha = 0.10f)).padding(12.dp),
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.success.copy(alpha = 0.10f)).padding(12.dp),
             verticalAlignment = Alignment.Top) {
             Icon(Icons.Rounded.Shield, null, tint = c.success, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(10.dp))
@@ -314,7 +314,7 @@ private fun FileChip(file: PickedFile, onRemove: () -> Unit) {
     val bitmap = remember(file) {
         if (file.isImage) runCatching { BitmapFactory.decodeByteArray(file.bytes, 0, file.bytes.size)?.asImageBitmap() }.getOrNull() else null
     }
-    Box(Modifier.size(width = if (bitmap != null) 76.dp else 150.dp, height = 76.dp).glass(RoundedCornerShape(4.dp), c.surface)) {
+    Box(Modifier.size(width = if (bitmap != null) 76.dp else 150.dp, height = 76.dp).glass(RoundedCornerShape(20.dp), c.surface)) {
         if (bitmap != null) {
             Image(bitmap, file.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         } else {
@@ -342,7 +342,7 @@ private fun SourceTag(source: String) {
 @Composable
 private fun IssueRow(issue: Issue, modifier: Modifier = Modifier, onRemove: (() -> Unit)? = null, onClick: (() -> Unit)? = null) {
     val c = Hypurr.colors
-    Row(modifier.fillMaxWidth().glass(RoundedCornerShape(4.dp), c.surface)
+    Row(modifier.fillMaxWidth().glass(RoundedCornerShape(20.dp), c.surface)
         .then(if (onClick != null) Modifier.pressable("${issue.key} ${issue.title}", onClick = onClick) else Modifier)
         .padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
