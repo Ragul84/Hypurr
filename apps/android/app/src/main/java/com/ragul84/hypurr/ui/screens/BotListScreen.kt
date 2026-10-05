@@ -66,6 +66,7 @@ import com.ragul84.hypurr.model.Bot
 import com.ragul84.hypurr.net.LinkState
 import com.ragul84.hypurr.ui.ApprovalActions
 import com.ragul84.hypurr.ui.BotAvatar
+import com.ragul84.hypurr.ui.CatFace
 import com.ragul84.hypurr.ui.CreamPlate
 import com.ragul84.hypurr.ui.FlowOrb
 import com.ragul84.hypurr.ui.WorkingPhase
@@ -130,6 +131,7 @@ fun BotListScreen(
     asks: Map<String, NeedsYouAsk> = emptyMap(),
     onRespondAsk: (botId: String, entryId: String?, optionId: String?) -> Unit = { _, _, _ -> },
     onSpend: () -> Unit = {},
+    onTasks: () -> Unit = {},
     showTabBar: Boolean = true,
 ) {
     val c = Hypurr.colors
@@ -188,7 +190,7 @@ fun BotListScreen(
         }
         if (synced && bots.isEmpty()) {
             builtinInstall?.let { BuiltinInstallCard(it, onInstallBuiltin, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
-            EmptyRoster(onNewTask)
+            EmptyRoster(onNewTask, onPair = onSettings, onInstall = onInstallBuiltin)
             return@Column
         }
         if (!synced && bots.isEmpty()) {
@@ -227,14 +229,14 @@ fun BotListScreen(
             items(rest, key = { it.id }) { bot -> BotRow(bot, now, Modifier.animateItem(), byId) { onOpen(bot) } }
         }
     }
-    if (showTabBar && !(synced && bots.isEmpty())) {
+    if (showTabBar) {
         HypurrTabBar(
             selected = HomeTab.Bots,
             modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp),
             onSelect = { tab ->
                 when (tab) {
                     HomeTab.Bots -> Unit
-                    HomeTab.Tasks -> onNewTask()
+                    HomeTab.Tasks -> onTasks()
                     HomeTab.Spend -> onSpend()
                     HomeTab.You -> onSettings()
                 }
@@ -282,15 +284,23 @@ private fun NeedsYouCard(
 fun HypurrTabBar(selected: HomeTab, modifier: Modifier = Modifier, onSelect: (HomeTab) -> Unit) {
     val c = Hypurr.colors
     val fill = if (c.dark) Color(0xFF0A2E24) else Color(0xFF15130F)
+    val h = androidx.compose.ui.platform.LocalHapticFeedback.current
     Row(
         modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(fill).padding(horizontal = 8.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        TabItem("Bots", Icons.Rounded.GridView, selected == HomeTab.Bots) { onSelect(HomeTab.Bots) }
-        TabItem("Tasks", Icons.Rounded.Description, selected == HomeTab.Tasks) { onSelect(HomeTab.Tasks) }
-        TabItem("Spend", Icons.Rounded.Schedule, selected == HomeTab.Spend) { onSelect(HomeTab.Spend) }
-        TabItem("You", Icons.Rounded.Person, selected == HomeTab.You) { onSelect(HomeTab.You) }
+        listOf(
+            Triple(HomeTab.Bots, "Bots", Icons.Rounded.GridView),
+            Triple(HomeTab.Tasks, "Tasks", Icons.Rounded.Description),
+            Triple(HomeTab.Spend, "Spend", Icons.Rounded.Schedule),
+            Triple(HomeTab.You, "You", Icons.Rounded.Person),
+        ).forEach { (tab, label, icon) ->
+            TabItem(label, icon, selected == tab) {
+                h.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                onSelect(tab)
+            }
+        }
     }
 }
 
@@ -315,22 +325,40 @@ private fun SectionLabel(text: String, color: androidx.compose.ui.graphics.Color
 }
 
 @Composable
-private fun EmptyRoster(onNewTask: () -> Unit) {
+private fun EmptyRoster(onNewTask: () -> Unit, onPair: () -> Unit = {}, onInstall: () -> Unit = {}) {
     val c = Hypurr.colors
-    Box(Modifier.fillMaxSize()) {
-        FlowBackdrop()
-        Column(Modifier.align(Alignment.Center).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            LaunchFlicker(play = true) { FlowOrb(72.dp, animate = false) }
-            Spacer(Modifier.height(20.dp))
-            Text("Start your first task", style = MaterialTheme.typography.titleLarge, color = c.text)
-            Spacer(Modifier.height(6.dp))
-            Text("Say what you need in plain words, like “write tests for the login form”. Hypurr picks the agent and keeps your code safe on its own branch.",
-                color = c.secondary, textAlign = TextAlign.Center)
-            Spacer(Modifier.height(20.dp))
-            FlowButton("New task", icon = Icons.Rounded.Add, onClick = onNewTask)
+    Column(
+        Modifier.fillMaxSize().padding(horizontal = 28.dp).padding(bottom = 100.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        // Chunky ink cat tile with press shadow (Sunfield hero)
+        Box {
+            Box(Modifier.size(92.dp).padding(top = 5.dp).clip(RoundedCornerShape(28.dp)).background(c.press.copy(alpha = if (c.dark) 0.5f else 0.25f)))
+            Box(
+                Modifier.size(92.dp).clip(RoundedCornerShape(28.dp))
+                    .background(if (c.dark) c.surface else androidx.compose.ui.graphics.Color(0xFF15130F)),
+                contentAlignment = Alignment.Center,
+            ) {
+                CatFace(if (c.dark) c.text else androidx.compose.ui.graphics.Color(0xFFFFF8E8), 56.dp)
+            }
         }
+        Spacer(Modifier.height(22.dp))
+        Text("Meet Hypurr", style = MaterialTheme.typography.headlineMedium, color = c.text, fontWeight = FontWeight.ExtraBold)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "AI coding agents, safe enough for anyone. Install the agent on your computer, then pair this phone.",
+            color = c.secondary, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge,
+        )
+        Spacer(Modifier.height(24.dp))
+        FlowButton("Install Hypurr Agent", Modifier.fillMaxWidth(), onClick = onInstall)
+        Spacer(Modifier.height(12.dp))
+        SoftButton("Pair with QR", Modifier.fillMaxWidth(), tint = c.text, onClick = onPair)
+        Spacer(Modifier.height(16.dp))
+        SoftButton("Or start a task", Modifier.fillMaxWidth(), tint = c.accent, icon = Icons.Rounded.Add, onClick = onNewTask)
     }
 }
+
 
 @Composable
 fun BotRow(bot: Bot, now: Long, modifier: Modifier = Modifier, byId: Map<String, Bot> = emptyMap(), onClick: () -> Unit) {

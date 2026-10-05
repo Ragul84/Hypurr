@@ -246,6 +246,11 @@ data class TaskCosts(
     val gatewayCreditsLabel: String? = null,
     /** Stripe Checkout URL (placeholder until live). */
     val buyCreditsUrl: String? = null,
+    /** Free daily turns left / limit for the gauge (Sunfield Spend). */
+    val freeTurnsLeft: Int? = null,
+    val freeTurnsLimit: Int? = null,
+    /** e.g. "Resets at midnight IST". */
+    val freeResetLabel: String? = null,
 )
 
 @Serializable

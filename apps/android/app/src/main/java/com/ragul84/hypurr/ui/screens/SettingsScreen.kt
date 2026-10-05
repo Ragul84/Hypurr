@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -104,14 +105,19 @@ fun SettingsScreen(
     onIntegrations: (JsonObject) -> Unit = {},
     onTestIntegration: (String) -> Unit = {},
     onTeamAdmin: () -> Unit = {},
+    showHomeTabs: Boolean = false,
+    onTab: (HomeTab) -> Unit = {},
 ) {
     val admin = state.you?.isAdmin != false
     val c = Hypurr.colors
-    Column(Modifier.fillMaxSize().background(c.bg).safeDrawingPadding().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+    Box(Modifier.fillMaxSize().background(c.bg)) {
+    Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = if (showHomeTabs) 100.dp else 16.dp)) {
         Row(Modifier.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconBubble(Icons.AutoMirrored.Rounded.ArrowBack, "Back", onClick = onBack)
-            Spacer(Modifier.width(12.dp))
-            Text("Settings", style = MaterialTheme.typography.headlineMedium, color = c.text)
+            if (!showHomeTabs) {
+                IconBubble(Icons.AutoMirrored.Rounded.ArrowBack, "Back", onClick = onBack)
+                Spacer(Modifier.width(12.dp))
+            }
+            Text(if (showHomeTabs) "You" else "Settings", style = MaterialTheme.typography.headlineMedium, color = c.text, fontWeight = FontWeight.ExtraBold)
         }
         Section("Computer") {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -201,6 +207,14 @@ fun SettingsScreen(
             Detail("Remote screen", "Not on Android yet. Use the iPhone or Mac app.")
         }
         Spacer(Modifier.height(24.dp))
+    }
+    if (showHomeTabs) {
+        HypurrTabBar(
+            selected = HomeTab.You,
+            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp),
+            onSelect = onTab,
+        )
+    }
     }
 }
 

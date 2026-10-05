@@ -309,29 +309,26 @@ fun templateIcon(id: String): ImageVector = when (id) {
  * Signature "Press Allow" on Allow: press-down → forest/sunflower band flash (~120ms) → invoke [onAllow].
  * The approval plate then collapses via host status update; a 3px left rail marks the live row.
  */
-/** Solid forest/sunflower Allow — Sunfield primary CTA (replaces pale SoftButton strike). */
+/** Solid forest/sunflower Allow — presses into chunky shadow then fires [onAllow]. */
 @Composable
 fun SignalAllowButton(text: String, modifier: Modifier = Modifier, onAllow: () -> Unit) {
     val c = Hypurr.colors
-    val reduce = reduceMotion()
     var striking by remember { mutableStateOf(false) }
-    LaunchedEffect(striking) {
-        if (!striking) return@LaunchedEffect
-        delay((if (reduce) HypurrMotion.REDUCED_MS else HypurrMotion.STRIKE_MS).toLong())
-        onAllow()
-        striking = false
-    }
     val label = sunfieldOptionLabel(text)
-    Row(
-        modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(c.accent)
-            .pressable(enabled = !striking, onClick = { if (!striking) striking = true })
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        Text(label, color = c.onAccent, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
+    com.ragul84.hypurr.ui.motion.AllowPressEffect(striking = striking, onSettled = {
+        if (striking) { onAllow(); striking = false }
+    }) {
+        Row(
+            modifier
+                .clip(RoundedCornerShape(14.dp))
+                .background(c.accent)
+                .pressable(enabled = !striking, onClick = { if (!striking) striking = true })
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            Text(label, color = c.onAccent, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
+        }
     }
 }
 
@@ -421,21 +418,10 @@ fun CreamPlate(modifier: Modifier = Modifier, shape: RoundedCornerShape = Rounde
     }
 }
 
-/** Friendly working phase: Cabinet text + ink-dot blink (no mono scanner). */
+/** Friendly working phase — delegates to Sunfield ThinkingCatRow. */
 @Composable
 fun WorkingPhase(text: String, modifier: Modifier = Modifier, animate: Boolean = true) {
-    val c = Hypurr.colors
-    val still = LocalInspectionMode.current || !animate || reduceMotion()
-    val t = rememberInfiniteTransition(label = "blink")
-    val alpha by t.animateFloat(0.25f, 1f, infiniteRepeatable(tween(700), RepeatMode.Reverse), label = "dot")
-    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            Modifier.size(8.dp).clip(CircleShape)
-                .background(c.accent.copy(alpha = if (still) 0.85f else alpha)),
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(text, color = c.secondary, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1)
-    }
+    com.ragul84.hypurr.ui.motion.ThinkingCatRow(phase = text, modifier = modifier, animate = animate)
 }
 
 /** 4px forest/sunflower signal band across a plate (Needs-you / live). */

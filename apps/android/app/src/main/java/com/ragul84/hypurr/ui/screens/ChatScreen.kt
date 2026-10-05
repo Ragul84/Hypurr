@@ -115,6 +115,8 @@ import com.ragul84.hypurr.ui.BotAvatar
 import com.ragul84.hypurr.ui.FlowOrb
 import com.ragul84.hypurr.ui.CatFace
 import com.ragul84.hypurr.ui.CreamPlate
+import com.ragul84.hypurr.ui.motion.ApprovalDropIn
+import com.ragul84.hypurr.ui.motion.DenyHeadshake
 import com.ragul84.hypurr.ui.InkTile
 import com.ragul84.hypurr.ui.WorkingPhase
 import com.ragul84.hypurr.ui.motion.DoneRule
@@ -658,7 +660,8 @@ private fun PermissionCard(entry: Entry, task: TaskInfo?, onRespond: (Entry, Str
         d.detail?.takeIf { it.isNotBlank() && it != d.command },
     ).firstOrNull()
     val detail = d.command ?: d.detail
-    CreamPlate(Modifier.fillMaxWidth().padding(end = 20.dp).animateContentSize(Motion.spatialDefault())) {
+    ApprovalDropIn(Modifier.fillMaxWidth().padding(end = 20.dp)) {
+    CreamPlate(Modifier.fillMaxWidth().animateContentSize(Motion.spatialDefault())) {
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
             val pillLabel = when {
                 blocked -> "Blocked"
@@ -717,6 +720,7 @@ private fun PermissionCard(entry: Entry, task: TaskInfo?, onRespond: (Entry, Str
                 Text(riskLabel(d.risk), color = risk, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 8.dp))
             }
         }
+    }
     }
 }
 
