@@ -513,7 +513,7 @@ class MainActivity : ComponentActivity() {
                             builtinBusy = true; builtinError = null
                             lifecycleScope.launch {
                                 runCatching { store.installBuiltinAgent() }
-                                    .onFailure { builtinError = it.message ?: "Couldn't install OpenCode" }
+                                    .onFailure { builtinError = it.message ?: "Couldn't install Hypurr Agent" }
                                 builtinBusy = false
                             }
                         },

@@ -156,7 +156,7 @@ class HostClient(val transport: ChannelTransport) {
 
     // Bots and groups.
 
-    /** Downloads the pinned OpenCode build into `~/.hypurr/agents/opencode` (user must have consented). */
+    /** Downloads the pinned Hypurr Agent build into `~/.hypurr/agents/hypurr-agent` (user must have consented). */
     suspend fun installBuiltinAgent(): Backend {
         val res = transport.call("installBuiltinAgent", buildJsonObject { put("consent", true) }, timeoutMs = 600_000)
         return HypurrJson.decodeFromJsonElement(res)

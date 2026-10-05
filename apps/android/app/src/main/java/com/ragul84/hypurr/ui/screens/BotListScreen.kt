@@ -99,7 +99,7 @@ fun BotListScreen(
     initialMenuOpen: Boolean = false,
     /** Opens the computer's screen; null when the computer doesn't offer it. */
     onScreen: (() -> Unit)? = null,
-    /** When set, show the built-in agent install card (OpenCode free models). */
+    /** When set, show the built-in agent install card (Hypurr Agent free models). */
     builtinInstall: BuiltinInstallPrompt? = null,
     onInstallBuiltin: () -> Unit = {},
 ) {
@@ -277,11 +277,11 @@ fun StatusLine(bot: Bot) {
     }
 }
 
-/** Offer to install Hypurr's built-in OpenCode agent (free Zen models). */
+/** Offer to install Hypurr's built-in Hypurr Agent (free Zen models). */
 data class BuiltinInstallPrompt(
-    val title: String = "Hypurr built-in agent",
-    val body: String = "Install OpenCode into ~/.hypurr/agents/opencode and start with free models (Big Pickle and others). No other AI account needed.",
-    val consent: String = "Free Zen models are provided by OpenCode for a limited time; some may use prompts to improve the model.",
+    val title: String = "Hypurr Agent agent",
+    val body: String = "Install Hypurr Agent into ~/.hypurr/agents/hypurr-agent and start with free models via the Hypurr gateway. No other AI account needed.",
+    val consent: String = "Free models use the Hypurr gateway with a daily allowance; paid models use credits. Bring-your-own-key is also supported.",
     val busy: Boolean = false,
     val error: String? = null,
 )
@@ -297,6 +297,6 @@ private fun BuiltinInstallCard(prompt: BuiltinInstallPrompt, onInstall: () -> Un
         Text(prompt.body, color = c.secondary, style = MaterialTheme.typography.bodyMedium)
         Text(prompt.consent, color = c.tertiary, style = MaterialTheme.typography.bodySmall)
         prompt.error?.let { Text(it, color = c.danger, style = MaterialTheme.typography.bodySmall) }
-        FlowButton(if (prompt.busy) "Installing…" else "Install OpenCode", enabled = !prompt.busy, onClick = onInstall)
+        FlowButton(if (prompt.busy) "Installing…" else "Install Hypurr Agent", enabled = !prompt.busy, onClick = onInstall)
     }
 }

@@ -887,7 +887,7 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
         "installBuiltinAgent" => {
             // Consent: the client must pass `consent: true` after showing the notice.
             if b["consent"] != true {
-                bail!("Confirm installing OpenCode (Hypurr's built-in agent) first.");
+                bail!("Confirm installing Hypurr Agent first.");
             }
             crate::agent::builtin::install(|line| tracing::info!(%line, "builtin install")).await?
         }
@@ -919,7 +919,10 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
                 }
                 Ok(v) => v,
                 Err(e) if backend == crate::agent::builtin::BACKEND_ID => {
-                    tracing::info!(error = format!("{e:#}"), "opencode model probe failed; using free Zen list");
+                    tracing::info!(
+                        error = format!("{e:#}"),
+                        "hypurr-agent model probe failed; using free gateway list"
+                    );
                     json!({"models": crate::agent::builtin::free_models_json(), "currentModelId": crate::agent::builtin::DEFAULT_MODEL, "free": true})
                 }
                 Err(e) => return Err(e),

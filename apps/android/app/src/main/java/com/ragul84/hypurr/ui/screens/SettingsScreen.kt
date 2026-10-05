@@ -382,6 +382,7 @@ private fun Service(name: String, status: String, configured: Boolean, test: Str
 private fun Spending(costs: TaskCosts) {
     val c = Hypurr.colors
     val est = costs.total.estimated
+    val ctx = androidx.compose.ui.platform.LocalContext.current
     Section("Spending") {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("Today" to costs.today, "7 days" to costs.week, "All time" to costs.total.cost).forEach { (label, v) ->
@@ -406,5 +407,28 @@ private fun Spending(costs: TaskCosts) {
         }
         if (est) Text("≈ means an estimate from list prices; the agent didn't report its exact cost.", color = c.tertiary,
             style = MaterialTheme.typography.labelSmall)
+        Spacer(Modifier.height(12.dp))
+        Text("Hypurr gateway", color = c.text, style = MaterialTheme.typography.titleSmall)
+        Text(
+            "Free allowance and paid credits for Hypurr Agent. Team admin spending limits also apply.",
+            color = c.secondary,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Spacer(Modifier.height(6.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Free remaining (today)", color = c.secondary, style = MaterialTheme.typography.bodySmall)
+            Text(costs.gatewayFreeRemaining ?: "—", color = c.text, style = MaterialTheme.typography.bodyMedium)
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Credits balance", color = c.secondary, style = MaterialTheme.typography.bodySmall)
+            Text(costs.gatewayCreditsLabel ?: "—", color = c.text, style = MaterialTheme.typography.bodyMedium)
+        }
+        Spacer(Modifier.height(8.dp))
+        SoftButton("Buy credits", Modifier.fillMaxWidth()) {
+            val url = costs.buyCreditsUrl ?: "https://checkout.stripe.com/c/pay/cs_test_placeholder"
+            try {
+                ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+            } catch (_: Exception) { }
+        }
     }
 }

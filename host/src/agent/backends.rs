@@ -39,7 +39,7 @@ pub enum Install {
     Script(&'static str),
     /// A global npm package.
     Npm(&'static str),
-    /// Hypurr downloads a pinned build into `~/.hypurr/agents` (OpenCode).
+    /// Hypurr downloads a pinned build into `~/.hypurr/agents` (Hypurr Agent).
     Managed,
 }
 
@@ -126,13 +126,24 @@ pub const HARNESSES: &[Harness] = &[
         signed_in: None,
     },
     Harness {
+        id: "hypurr-agent",
+        name: "Hypurr Agent",
+        bins: &["hypurr-agent"],
+        local: Some("{bin} acp"),
+        registry: Some("hypurr-agent"),
+        setup: "Hypurr can install Hypurr Agent for you (free models via the Hypurr gateway).",
+        install: Some(Install::Managed),
+        login: "{bin} auth login",
+        signed_in: None,
+    },
+    Harness {
         id: "opencode",
-        name: "Hypurr built-in",
+        name: "OpenCode",
         bins: &["opencode"],
         local: Some("{bin} acp"),
         registry: Some("opencode"),
-        setup: "Hypurr can install OpenCode for you (free Zen models). Or install it yourself: curl -fsSL https://opencode.ai/install | bash.",
-        install: Some(Install::Managed),
+        setup: "Optional: install OpenCode yourself if you already use it (curl -fsSL https://opencode.ai/install | bash). Not the default Hypurr agent.",
+        install: None,
         login: "{bin} auth login",
         signed_in: None,
     },
@@ -419,7 +430,7 @@ fn node_version(dir: &Path) -> Vec<u32> {
 fn well_known_dirs() -> Vec<PathBuf> {
     let Some(home) = dirs::home_dir() else { return vec![] };
     let mut dirs: Vec<PathBuf> = Vec::new();
-    // Managed OpenCode first so the built-in agent wins over a random PATH copy.
+    // Managed Hypurr Agent first so the built-in agent wins over a random PATH copy.
     if let Some(d) = crate::agent::builtin::bin_dir() {
         dirs.push(d);
     }
@@ -439,7 +450,7 @@ fn well_known_dirs() -> Vec<PathBuf> {
         ".local/share/pnpm",
         "Library/pnpm",
         ".npm-global/bin",
-        ".opencode/bin",
+        ".hypurr/agent/bin",
         ".deno/bin",
         "go/bin",
     ] {
@@ -526,7 +537,7 @@ pub fn list() -> Vec<Value> {
                 "available": (path.is_some() && runnable) || (managed && (crate::agent::builtin::is_installed() || crate::agent::builtin::release_ok())),
                 "path": path.as_ref().map(|p| p.to_string_lossy().into_owned()),
                 "description": if managed {
-                    "OpenCode with free Zen models — Hypurr's built-in agent.".into()
+                    "Hypurr Agent with free models via the Hypurr gateway.".into()
                 } else {
                     reg.and_then(|a| a["description"].as_str()).unwrap_or_default().to_owned()
                 },
@@ -545,7 +556,7 @@ pub fn list() -> Vec<Value> {
                 row["name"] = if crate::agent::builtin::is_installed() || path.is_some() {
                     json!(crate::agent::builtin::DISPLAY_NAME)
                 } else {
-                    json!("Hypurr built-in (OpenCode, free models)")
+                    json!("Hypurr Agent (free models)")
                 };
                 // Managed binary path when we installed it.
                 if crate::agent::builtin::is_installed() {

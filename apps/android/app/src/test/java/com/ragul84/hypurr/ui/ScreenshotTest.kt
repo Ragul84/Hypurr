@@ -257,7 +257,7 @@ class ScreenshotTest {
     fun newBotBuiltin() = shoot("new-bot-builtin") {
         BotEditorScreen(
             BotEditorState(name = "Helper", description = "First bot on a new computer", avatarColor = "violet",
-                backend = "opencode", model = "opencode/big-pickle"),
+                backend = "hypurr-agent", model = "hypurr/hypurr-free"),
             Samples.backends, emptyList(), {}, {}, {}, {}, {})
     }
 
