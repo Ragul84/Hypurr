@@ -129,16 +129,14 @@ pub fn theme() -> &'static Theme {
 
 pub fn bot_color(name: &str) -> Color {
     let hex = match name {
-        "black" | "asphalt" => 0x7FA8A3,
+        "black" | "asphalt" | "magenta" => 0x7FA8A3,
         "brown" => 0x5A4A3A,
         "red" => 0xFF6B5A,
         "orange" | "attention" => 0xFFB020,
         "yellow" => 0xC9A227,
         "green" => 0x5EAD8A,
-        "cyan" | "teal" => 0x00D4C8,
-        "violet" | "ink" => 0x3D5552,
-        "magenta" => 0x7FA8A3,
-        "gray" => 0x3D5552,
+        "violet" | "ink" | "gray" => 0x3D5552,
+        // "cyan" / "teal" and unknown ids → signal teal
         _ => 0x00D4C8,
     };
     rgb(hex)
