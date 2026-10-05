@@ -435,6 +435,7 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
                 "device": tokio::task::spawn_blocking(crate::service::device).await?,
                 "home": dirs::home_dir().map(|p| p.to_string_lossy().into_owned()),
                 "backends": backends::list(),
+                "builtinAgent": crate::agent::builtin::status(),
                 "rev": hub.store.current_rev(),
                 "screen": hub.screen.state(),
                 // Shells out to `tailscale`: keep it off the async workers.
@@ -883,13 +884,47 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
             market::remove_skill(&hub.store, str_arg(&b, "id")?)?;
             json!({})
         }
+        "installBuiltinAgent" => {
+            // Consent: the client must pass `consent: true` after showing the notice.
+            if b["consent"] != true {
+                bail!("Confirm installing OpenCode (Hypurr's built-in agent) first.");
+            }
+            crate::agent::builtin::install(|line| tracing::info!(%line, "builtin install")).await?
+        }
+        "builtinAgent" => crate::agent::builtin::status(),
         "agentSetup" => {
             let step: crate::agent::term::Step =
                 serde_json::from_value(b["step"].clone()).context("`step` is install or login")?;
             let (cols, rows) = term_size(&b);
             json!({"term": hub.terms.start(str_arg(&b, "backend")?, step, b["method"].as_str(), cols, rows).await?})
         }
-        "agentModels" => crate::agent::auth::models(&hub.store, str_arg(&b, "backend")?).await?,
+        "agentModels" => {
+            let backend = str_arg(&b, "backend")?;
+            match crate::agent::auth::models(&hub.store, backend).await {
+                Ok(v) if backend == crate::agent::builtin::BACKEND_ID => {
+                    // Keep ACP's live list, but always surface the curated free models first.
+                    let mut models = crate::agent::builtin::free_models_json().as_array().cloned().unwrap_or_default();
+                    for m in v["models"].as_array().into_iter().flatten() {
+                        if !models.iter().any(|x| x["id"] == m["id"]) {
+                            models.push(m.clone());
+                        }
+                    }
+                    {
+                        let current = v["currentModelId"]
+                            .as_str()
+                            .filter(|s| !s.is_empty())
+                            .map_or_else(|| json!(crate::agent::builtin::DEFAULT_MODEL), |s| json!(s));
+                        json!({"models": models, "currentModelId": current, "free": true})
+                    }
+                }
+                Ok(v) => v,
+                Err(e) if backend == crate::agent::builtin::BACKEND_ID => {
+                    tracing::info!(error = format!("{e:#}"), "opencode model probe failed; using free Zen list");
+                    json!({"models": crate::agent::builtin::free_models_json(), "currentModelId": crate::agent::builtin::DEFAULT_MODEL, "free": true})
+                }
+                Err(e) => return Err(e),
+            }
+        }
         "agentAuth" => crate::agent::auth::check(&hub.store, str_arg(&b, "backend")?).await?,
         "agentAuthenticate" => {
             crate::agent::auth::authenticate(&hub.store, str_arg(&b, "backend")?, str_arg(&b, "method")?).await?

@@ -221,6 +221,10 @@ impl Hub {
     pub fn create_bot(self: &Arc<Self>, mut cfg: BotConfig) -> Result<Value> {
         cfg.id = uuid::Uuid::new_v4().to_string();
         cfg.created_at = crate::store::now_ms();
+        // Built-in OpenCode: default to a free Zen model when the client didn't pick one.
+        if cfg.backend == crate::agent::builtin::BACKEND_ID && cfg.model.as_deref().unwrap_or("").is_empty() {
+            cfg.model = Some(crate::agent::builtin::DEFAULT_MODEL.to_owned());
+        }
         // No name yet (Grok Bot's flow): it gets one after its first few conversations.
         cfg.auto_name = !cfg.is_group() && cfg.name.trim().is_empty();
         if cfg.auto_name {

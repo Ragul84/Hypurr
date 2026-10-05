@@ -36,7 +36,10 @@ pub struct Rate {
 /// Rough list prices by agent family, for estimates only.
 pub fn rate_for(backend: &str) -> Rate {
     let b = backend.to_ascii_lowercase();
-    if b.contains("codex") || b.contains("openai") || b.contains("gemini") || b.contains("cursor") {
+    if b.contains("opencode") {
+        // Free Zen models are $0; paid OpenCode Zen models report their own cost via usage_update.
+        Rate { input: 0.0, output: 0.0 }
+    } else if b.contains("codex") || b.contains("openai") || b.contains("gemini") || b.contains("cursor") {
         Rate { input: 1.25, output: 10.0 }
     } else {
         // Claude Sonnet-class pricing; also the default for unknown agents.

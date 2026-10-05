@@ -248,6 +248,10 @@ fn pick_agents(all: &[Value]) -> Vec<Agent> {
     if !installed.is_empty() {
         return installed;
     }
+    // Brand-new computer: offer the built-in agent (OpenCode) so New task can start after install.
+    if let Some(a) = all.iter().find(|b| b["builtin"] == true && b["available"] == true).and_then(to_agent) {
+        return vec![a];
+    }
     all.iter().filter(|b| b["curated"] == true && b["available"] == true).filter_map(to_agent).collect()
 }
 
