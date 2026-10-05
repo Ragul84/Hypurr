@@ -319,7 +319,6 @@ object Samples {
     val freeModels = listOf(
         com.ragul84.hypurr.model.AgentModel("hypurr/hypurr-free", "Hypurr Free", "Daily free allowance", free = true),
         com.ragul84.hypurr.model.AgentModel("hypurr/hypurr-fast", "Hypurr Fast", free = true),
-        com.ragul84.hypurr.model.
     )
     val builtinHypurrAgent = com.ragul84.hypurr.model.Backend(
         "hypurr-agent", "Hypurr Agent", available = true, installed = true, builtin = true, free = true,
