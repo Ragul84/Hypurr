@@ -1,4 +1,6 @@
 package com.ragul84.hypurr.ui.screens
+import com.ragul84.hypurr.ui.SunfieldIcons
+import com.ragul84.hypurr.ui.sunfieldVector
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -24,10 +26,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ContentPaste
-import androidx.compose.material.icons.rounded.Link
-import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -79,7 +77,7 @@ fun PairingScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Spacer(Modifier.height(48.dp))
-            PairingSuccessFlip(success = state.success || state.computerName != null && state.busy.not() && state.link.isEmpty() && false) {
+            PairingSuccessFlip(success = state.success) {
                 // Chunky ink cat hero
                 Box {
                     Box(Modifier.size(96.dp).padding(top = 5.dp).clip(RoundedCornerShape(28.dp))
@@ -125,21 +123,21 @@ fun PairingScreen(
                             }
                         }
                         Spacer(Modifier.height(20.dp))
-                        FlowButton("Pair with QR", Modifier.fillMaxWidth(), icon = Icons.Rounded.QrCodeScanner, onClick = onScan)
+                        FlowButton("Pair with QR", Modifier.fillMaxWidth(), icon = sunfieldVector(SunfieldIcons.Qr), onClick = onScan)
                         Spacer(Modifier.height(12.dp))
                         SoftButton("Install Hypurr Agent", Modifier.fillMaxWidth(), tint = c.text, onClick = onInstallAgent)
                         Spacer(Modifier.height(16.dp))
                         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(c.surface)
                             .padding(start = 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
                             verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Rounded.Link, null, tint = c.tertiary, modifier = Modifier.size(20.dp))
+                            Icon(sunfieldVector(SunfieldIcons.Link), null, tint = c.tertiary, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(10.dp))
                             Box(Modifier.weight(1f)) {
                                 if (state.link.isEmpty()) Text("hypurr://pair?…", color = c.secondary, style = MaterialTheme.typography.bodyLarge)
                                 BasicTextField(state.link, onLinkChange, singleLine = true, cursorBrush = SolidColor(c.accent),
                                     textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.text), modifier = Modifier.fillMaxWidth())
                             }
-                            IconBubble(Icons.Rounded.ContentPaste, "Paste pairing link", fill = c.bg, size = 40.dp, onClick = onPaste)
+                            IconBubble(sunfieldVector(SunfieldIcons.Paste), "Paste pairing link", fill = c.bg, size = 40.dp, onClick = onPaste)
                         }
                         AnimatedVisibility(state.link.isNotBlank(), enter = fadeIn() + slideInVertically()) {
                             SoftButton("Pair", Modifier.padding(top = 14.dp).fillMaxWidth(), onClick = onPair)

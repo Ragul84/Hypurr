@@ -1,4 +1,6 @@
 package com.ragul84.hypurr.ui.screens
+import com.ragul84.hypurr.ui.SunfieldIcons
+import com.ragul84.hypurr.ui.sunfieldVector
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -18,8 +20,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -71,7 +71,7 @@ fun TasksScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 item {
-                    FlowButton("New task", Modifier.fillMaxWidth(), icon = Icons.Rounded.Add, onClick = onNewTask)
+                    FlowButton("New task", Modifier.fillMaxWidth(), icon = sunfieldVector(SunfieldIcons.Plus), onClick = onNewTask)
                 }
                 if (templates.isNotEmpty()) {
                     item {

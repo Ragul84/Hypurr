@@ -1,4 +1,6 @@
 package com.ragul84.hypurr.ui.screens
+import com.ragul84.hypurr.ui.SunfieldIcons
+import com.ragul84.hypurr.ui.sunfieldVector
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -28,12 +30,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Folder
-import androidx.compose.material.icons.rounded.PlayArrow
-import androidx.compose.material.icons.rounded.Shield
-import androidx.compose.material.icons.rounded.SmartToy
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -56,11 +52,6 @@ import androidx.compose.ui.unit.sp
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.ContentPaste
-import androidx.compose.material.icons.rounded.Description
-import androidx.compose.material.icons.rounded.Image
-import androidx.compose.material.icons.rounded.TaskAlt
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import com.ragul84.hypurr.data.PickedFile
@@ -124,7 +115,7 @@ fun NewTaskScreen(
     val template = state.selectedTemplate
     Column(Modifier.fillMaxSize().background(c.bg).safeDrawingPadding().imePadding()) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconBubble(Icons.AutoMirrored.Rounded.ArrowBack, "Back", onClick = onBack)
+            IconBubble(sunfieldVector(SunfieldIcons.Back), "Back", onClick = onBack)
             Spacer(Modifier.width(12.dp))
             Text("New task", style = MaterialTheme.typography.headlineMedium, color = c.text)
         }
@@ -137,9 +128,9 @@ fun NewTaskScreen(
             // Screenshot / error paste, and tickets.
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ActionChip(Icons.Rounded.Image, "Add screenshot", onAddImage)
-                ActionChip(Icons.Rounded.ContentPaste, "Paste", onPaste)
-                if (state.setup?.integrations?.anyIssues == true) ActionChip(Icons.Rounded.TaskAlt, "From an issue", onPickIssue)
+                ActionChip(sunfieldVector(SunfieldIcons.Image), "Add screenshot", onAddImage)
+                ActionChip(sunfieldVector(SunfieldIcons.Paste), "Paste", onPaste)
+                if (state.setup?.integrations?.anyIssues == true) ActionChip(sunfieldVector(SunfieldIcons.Check), "From an issue", onPickIssue)
             }
             AnimatedVisibility(state.files.isNotEmpty(), enter = expandVertically(Motion.spatialDefault()) + fadeIn(),
                 exit = shrinkVertically() + fadeOut()) {
@@ -191,7 +182,7 @@ fun NewTaskScreen(
             Spacer(Modifier.height(16.dp))
         }
         FlowButton(if (state.busy) "Starting…" else "Start task", Modifier.fillMaxWidth().padding(16.dp),
-            enabled = state.canStart, icon = Icons.Rounded.PlayArrow, onClick = onStart)
+            enabled = state.canStart, icon = sunfieldVector(SunfieldIcons.Play), onClick = onStart)
     }
 }
 
@@ -232,7 +223,7 @@ private fun Plan(state: NewTaskUiState, onChange: (NewTaskUiState) -> Unit) {
         modifier = Modifier.padding(start = 6.dp, top = 20.dp, bottom = 8.dp))
     Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(20.dp), c.surface).padding(16.dp).animateContentSize(Motion.spatialDefault()),
         verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        PlanRow(Icons.Rounded.Folder, "Project", state.projectName ?: "Pick a project") { choosing = if (choosing == "project") null else "project" }
+        PlanRow(sunfieldVector(SunfieldIcons.Folder), "Project", state.projectName ?: "Pick a project") { choosing = if (choosing == "project") null else "project" }
         AnimatedVisibility(choosing == "project") {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 state.setup?.projects.orEmpty().forEach { p ->
@@ -247,7 +238,7 @@ private fun Plan(state: NewTaskUiState, onChange: (NewTaskUiState) -> Unit) {
                 }
             }
         }
-        PlanRow(Icons.Rounded.SmartToy, "Agent", state.agentName ?: "No agent installed") { choosing = if (choosing == "agent") null else "agent" }
+        PlanRow(sunfieldVector(SunfieldIcons.Bots), "Agent", state.agentName ?: "No agent installed") { choosing = if (choosing == "agent") null else "agent" }
         AnimatedVisibility(choosing == "agent") {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 state.setup?.agents.orEmpty().forEach { a ->
@@ -265,7 +256,7 @@ private fun Plan(state: NewTaskUiState, onChange: (NewTaskUiState) -> Unit) {
         if (!reason.isNullOrEmpty()) Text(reason, color = c.secondary, style = MaterialTheme.typography.bodySmall)
         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.success.copy(alpha = 0.10f)).padding(12.dp),
             verticalAlignment = Alignment.Top) {
-            Icon(Icons.Rounded.Shield, null, tint = c.success, modifier = Modifier.size(18.dp))
+            Icon(sunfieldVector(SunfieldIcons.Shield), null, tint = c.success, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(10.dp))
             Text("Runs on its own branch with a checkpoint after every step. You can go back with one tap, and main stays untouched.",
                 color = c.text, style = MaterialTheme.typography.bodySmall)
@@ -319,14 +310,14 @@ private fun FileChip(file: PickedFile, onRemove: () -> Unit) {
             Image(bitmap, file.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         } else {
             Row(Modifier.fillMaxSize().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.Description, null, tint = c.accent, modifier = Modifier.size(20.dp))
+                Icon(sunfieldVector(SunfieldIcons.Docs), null, tint = c.accent, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(file.name, color = c.text, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
         Box(Modifier.align(Alignment.TopEnd).padding(4.dp).size(22.dp).clip(RoundedCornerShape(50))
             .background(c.bg.copy(alpha = 0.85f)).pressable("Remove ${file.name}", onClick = onRemove), contentAlignment = Alignment.Center) {
-            Icon(Icons.Rounded.Close, null, tint = c.text, modifier = Modifier.size(14.dp))
+            Icon(sunfieldVector(SunfieldIcons.Close), null, tint = c.text, modifier = Modifier.size(14.dp))
         }
     }
 }
@@ -354,7 +345,7 @@ private fun IssueRow(issue: Issue, modifier: Modifier = Modifier, onRemove: (() 
             Text(issue.title, color = c.text, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 4.dp))
         }
-        if (onRemove != null) IconBubble(Icons.Rounded.Close, "Remove the issue", onClick = onRemove)
+        if (onRemove != null) IconBubble(sunfieldVector(SunfieldIcons.Close), "Remove the issue", onClick = onRemove)
     }
 }
 
@@ -366,7 +357,7 @@ private fun IssuePicker(list: IssueList?, onPick: (Issue) -> Unit, onClose: () -
         verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Pick an issue", color = c.text, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-            IconBubble(Icons.Rounded.Close, "Close", onClick = onClose)
+            IconBubble(sunfieldVector(SunfieldIcons.Close), "Close", onClick = onClose)
         }
         when {
             list == null -> Box(Modifier.fillMaxWidth().height(64.dp), contentAlignment = Alignment.Center) { FlowOrb(28.dp) }

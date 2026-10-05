@@ -1,4 +1,7 @@
 package com.ragul84.hypurr.ui.screens
+import com.ragul84.hypurr.ui.SunfieldIcons
+import com.ragul84.hypurr.ui.motion.BotCreatePop
+import com.ragul84.hypurr.ui.sunfieldVector
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -21,13 +24,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.Folder
-import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -149,7 +145,7 @@ fun BotEditorScreen(
         Column(Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)
             .padding(bottom = 120.dp)) {
             Row(Modifier.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconBubble(Icons.AutoMirrored.Rounded.ArrowBack, "Back", onClick = onBack)
+                IconBubble(sunfieldVector(SunfieldIcons.Back), "Back", onClick = onBack)
                 Spacer(Modifier.width(12.dp))
                 Text(title, style = MaterialTheme.typography.headlineSmall, color = c.text, modifier = Modifier.weight(1f))
             }
@@ -177,7 +173,7 @@ fun BotEditorScreen(
                             Box(Modifier.size(34.dp).clip(CircleShape).background(avatarColor(id))
                                 .pressable("Colour $id", role = Role.RadioButton) { onChange(state.copy(avatarColor = id)) },
                                 contentAlignment = Alignment.Center) {
-                                if (on) Icon(Icons.Rounded.Check, null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(18.dp))
+                                if (on) Icon(sunfieldVector(SunfieldIcons.Check), null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(18.dp))
                             }
                         }
                     }
@@ -200,7 +196,7 @@ fun BotEditorScreen(
                                     maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                             Box(Modifier.size(24.dp).clip(CircleShape).background(if (on) c.accent else c.border), contentAlignment = Alignment.Center) {
-                                if (on) Icon(Icons.Rounded.Check, null, tint = c.onAccent, modifier = Modifier.size(16.dp))
+                                if (on) Icon(sunfieldVector(SunfieldIcons.Check), null, tint = c.onAccent, modifier = Modifier.size(16.dp))
                             }
                         }
                     }
@@ -244,11 +240,11 @@ fun BotEditorScreen(
                 }
                 Section("Folder") {
                     if (state.isNew) {
-                        Choice("Personal workspace", state.folder == null, Modifier.fillMaxWidth(), Icons.Rounded.Home) {
+                        Choice("Personal workspace", state.folder == null, Modifier.fillMaxWidth(), sunfieldVector(SunfieldIcons.Host)) {
                             onChange(state.copy(folder = null, browsing = null))
                         }
                         Choice(state.folder?.substringAfterLast('/')?.let { "Folder: $it" } ?: "A folder on the computer…", state.folder != null,
-                            Modifier.fillMaxWidth(), Icons.Rounded.Folder) {
+                            Modifier.fillMaxWidth(), sunfieldVector(SunfieldIcons.Folder)) {
                             onBrowse(state.folder ?: state.browsing?.path)
                         }
                         state.browsing?.let { FolderBrowser(it, state.folder, onPick = { onChange(state.copy(folder = it)) }, onBrowse = onBrowse) }
@@ -269,7 +265,7 @@ fun BotEditorScreen(
                 Section("More") {
                     ToggleRow("Pin to the top", "Keeps it first in the list", state.pinned, true) { onChange(state.copy(pinned = it)) }
                     AnimatedVisibility(!state.confirmDelete) {
-                        SoftButton(if (state.group) "Delete group" else "Delete bot", Modifier.fillMaxWidth(), icon = Icons.Rounded.Delete, tint = c.danger) {
+                        SoftButton(if (state.group) "Delete group" else "Delete bot", Modifier.fillMaxWidth(), icon = sunfieldVector(SunfieldIcons.Close), tint = c.danger) {
                             onChange(state.copy(confirmDelete = true))
                         }
                     }
@@ -287,13 +283,21 @@ fun BotEditorScreen(
             }
             state.error?.let { Text(it, color = c.danger, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 12.dp, start = 8.dp)) }
         }
+        if (state.isNew && !state.group && state.busy) {
+            Box(
+                Modifier.align(Alignment.Center).clip(RoundedCornerShape(20.dp)).background(c.surface)
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+            ) {
+                BotCreatePop(name = state.name.ifBlank { "New bot" }, play = true)
+            }
+        }
         FlowButton(when {
             state.busy -> "Saving…"
             state.isNew && state.group -> "Create group"
             state.isNew -> "Create bot"
             else -> "Save"
         }, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(20.dp).fillMaxWidth(), enabled = state.canSave,
-            icon = Icons.Rounded.Check, onClick = onSave)
+            icon = sunfieldVector(SunfieldIcons.Check), onClick = onSave)
     }
 }
 
@@ -322,19 +326,19 @@ private fun FolderBrowser(listing: DirListing, picked: String?, onPick: (String)
     val c = Hypurr.colors
     Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(18.dp), c.bg.copy(alpha = 0.5f)).padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            listing.parent?.let { IconBubble(Icons.Rounded.KeyboardArrowUp, "Up one folder", size = 34.dp) { onBrowse(it) } }
+            listing.parent?.let { IconBubble(sunfieldVector(SunfieldIcons.Back), "Up one folder", size = 34.dp) { onBrowse(it) } }
             Spacer(Modifier.width(8.dp))
             Text(listing.path, color = c.text, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall, maxLines = 1,
                 overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             if (listing.isGit) Pill("git", c.success)
         }
-        SoftButton(if (picked == listing.path) "Using this folder" else "Use this folder", Modifier.fillMaxWidth(), icon = Icons.Rounded.Check,
+        SoftButton(if (picked == listing.path) "Using this folder" else "Use this folder", Modifier.fillMaxWidth(), icon = sunfieldVector(SunfieldIcons.Check),
             tint = if (picked == listing.path) c.success else c.accent) { onPick(listing.path) }
         Column(Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState())) {
             listing.dirs.forEach { d ->
                 Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).pressable(d.name) { onBrowse(d.path) }.padding(horizontal = 8.dp, vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.Folder, null, tint = c.accent, modifier = Modifier.size(18.dp))
+                    Icon(sunfieldVector(SunfieldIcons.Folder), null, tint = c.accent, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(10.dp))
                     Text(d.name, color = c.text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), maxLines = 1,
                         overflow = TextOverflow.Ellipsis)

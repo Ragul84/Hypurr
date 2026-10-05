@@ -1,4 +1,12 @@
 package com.ragul84.hypurr.ui.screens
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import com.ragul84.hypurr.ui.motion.CatPeek
+import com.ragul84.hypurr.ui.sunfieldVector
+import com.ragul84.hypurr.ui.SunfieldIcons
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -28,24 +36,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.DesktopWindows
-import androidx.compose.material.icons.rounded.Groups
-import androidx.compose.material.icons.rounded.SmartToy
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.ragul84.hypurr.ui.SoftButton
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.PushPin
-import androidx.compose.material.icons.rounded.Shield
 import androidx.compose.foundation.layout.navigationBarsPadding
 import com.ragul84.hypurr.ui.FlowButton
 import com.ragul84.hypurr.ui.Pill
-import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -54,6 +52,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalInspectionMode
@@ -79,10 +81,6 @@ import com.ragul84.hypurr.ui.relativeTime
 import com.ragul84.hypurr.ui.theme.Hypurr
 import com.ragul84.hypurr.ui.theme.Motion
 import com.ragul84.hypurr.model.PermissionOption
-import androidx.compose.material.icons.rounded.GridView
-import androidx.compose.material.icons.rounded.Description
-import androidx.compose.material.icons.rounded.Schedule
-import androidx.compose.material.icons.rounded.Person
 import androidx.compose.ui.graphics.vector.ImageVector
 
 /** Roster order: pinned first, then the latest activity. Hidden bots stay off the list. */
@@ -103,7 +101,7 @@ data class NeedsYouAsk(
 
 enum class HomeTab { Bots, Tasks, Spend, You }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun BotListScreen(
     computerName: String,
@@ -136,6 +134,9 @@ fun BotListScreen(
 ) {
     val c = Hypurr.colors
     var menu by remember { mutableStateOf(initialMenuOpen) }
+    var refreshing by remember { mutableStateOf(false) }
+    val pullState = rememberPullToRefreshState()
+    val scope = rememberCoroutineScope()
     val needsYou = bots.filter { it.needsInput }
     val rest = bots.filter { !it.needsInput }
     Box(Modifier.fillMaxSize().background(c.bg)) {
@@ -152,31 +153,41 @@ fun BotListScreen(
                         overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp),
                     )
                 }
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
-                    Text(computerName, style = MaterialTheme.typography.labelMedium, color = c.tertiary, maxLines = 1,
-                        overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 160.dp))
-                    Spacer(Modifier.width(8.dp))
-                    LinkPill(link)
+                if (synced && bots.isEmpty()) {
+                    Text(
+                        "Not connected",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = c.secondary,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
+                        Text(computerName, style = MaterialTheme.typography.labelMedium, color = c.tertiary, maxLines = 1,
+                            overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 160.dp))
+                        Spacer(Modifier.width(8.dp))
+                        LinkPill(link)
+                    }
                 }
             }
             if (link is LinkState.Failed || link is LinkState.HostOffline) {
-                IconBubble(Icons.Rounded.Refresh, "Reconnect", onClick = onRetry)
+                IconBubble(sunfieldVector(SunfieldIcons.Refresh), "Reconnect", onClick = onRetry)
                 Spacer(Modifier.width(8.dp))
             }
             if (onScreen != null) {
-                IconBubble(Icons.Rounded.DesktopWindows, "Computer screen", onClick = onScreen)
+                IconBubble(sunfieldVector(SunfieldIcons.Host), "Computer screen", onClick = onScreen)
                 Spacer(Modifier.width(8.dp))
             }
             if (canCreate) {
-                IconBubble(if (menu) Icons.Rounded.Close else Icons.Rounded.Add, if (menu) "Close" else "New bot or group") { menu = !menu }
+                IconBubble(if (menu) sunfieldVector(SunfieldIcons.Close) else sunfieldVector(SunfieldIcons.Plus), if (menu) "Close" else "New bot or group") { menu = !menu }
                 Spacer(Modifier.width(8.dp))
             }
-            IconBubble(Icons.Rounded.Settings, "Settings", onClick = onSettings)
+            IconBubble(sunfieldVector(SunfieldIcons.Settings), "Settings", onClick = onSettings)
         }
         AnimatedVisibility(menu) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SoftButton("New bot", Modifier.weight(1f), icon = Icons.Rounded.SmartToy) { menu = false; onNewBot() }
-                SoftButton("New group", Modifier.weight(1f), icon = Icons.Rounded.Groups) { menu = false; onNewGroup() }
+                SoftButton("New bot", Modifier.weight(1f), icon = sunfieldVector(SunfieldIcons.Bots)) { menu = false; onNewBot() }
+                SoftButton("New group", Modifier.weight(1f), icon = sunfieldVector(SunfieldIcons.Team)) { menu = false; onNewGroup() }
             }
         }
         AnimatedVisibility(link is LinkState.HostOffline || link is LinkState.Unauthorized) {
@@ -199,34 +210,57 @@ fun BotListScreen(
             }
             return@Column
         }
-        LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 120.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            builtinInstall?.let { prompt ->
-                item(key = "builtin-install") {
-                    BuiltinInstallCard(prompt, onInstallBuiltin, Modifier.padding(horizontal = 4.dp, vertical = 8.dp))
+        PullToRefreshBox(
+            isRefreshing = refreshing,
+            onRefresh = {
+                refreshing = true
+                scope.launch {
+                    delay(900)
+                    refreshing = false
+                    onRetry()
                 }
-            }
-            if (needsYou.isNotEmpty()) {
-                item(key = "needs-header") { SectionLabel("Needs you", c.accent) }
-                items(needsYou, key = { "need-${it.id}" }) { bot ->
-                    NeedsYouCard(
-                        bot = bot,
-                        ask = asks[bot.id] ?: NeedsYouAsk(
-                            title = plainAsk(bot.activity),
-                            meta = "${bot.name} · $computerName",
-                        ),
-                        modifier = Modifier.animateItem().padding(horizontal = 4.dp, vertical = 6.dp),
-                        onOpen = { onOpen(bot) },
-                        onChoose = { optionId ->
-                            val ask = asks[bot.id]
-                            if (ask?.entryId != null) onRespondAsk(bot.id, ask.entryId, optionId)
-                            else onOpen(bot)
-                        },
-                    )
+            },
+            state = pullState,
+            modifier = Modifier.fillMaxSize(),
+            indicator = {
+                CatPeek(
+                    progress = when {
+                        refreshing -> 1f
+                        else -> (pullState.distanceFraction).coerceIn(0f, 1f)
+                    },
+                    modifier = Modifier.align(Alignment.TopCenter),
+                )
+            },
+        ) {
+            LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 120.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                builtinInstall?.let { prompt ->
+                    item(key = "builtin-install") {
+                        BuiltinInstallCard(prompt, onInstallBuiltin, Modifier.padding(horizontal = 4.dp, vertical = 8.dp))
+                    }
                 }
-                item(key = "all-header") { SectionLabel("Your bots", c.tertiary) }
+                if (needsYou.isNotEmpty()) {
+                    item(key = "needs-header") { SectionLabel("Needs you", c.accent) }
+                    items(needsYou, key = { "need-${it.id}" }) { bot ->
+                        NeedsYouCard(
+                            bot = bot,
+                            ask = asks[bot.id] ?: NeedsYouAsk(
+                                title = plainAsk(bot.activity),
+                                meta = "${bot.name} · $computerName",
+                            ),
+                            modifier = Modifier.animateItem().padding(horizontal = 4.dp, vertical = 6.dp),
+                            onOpen = { onOpen(bot) },
+                            onChoose = { optionId ->
+                                val ask = asks[bot.id]
+                                if (ask?.entryId != null) onRespondAsk(bot.id, ask.entryId, optionId)
+                                else onOpen(bot)
+                            },
+                        )
+                    }
+                    item(key = "all-header") { SectionLabel("Your bots", c.tertiary) }
+                }
+                items(rest, key = { it.id }) { bot -> BotRow(bot, now, Modifier.animateItem(), byId) { onOpen(bot) } }
             }
-            items(rest, key = { it.id }) { bot -> BotRow(bot, now, Modifier.animateItem(), byId) { onOpen(bot) } }
         }
     }
     if (showTabBar) {
@@ -243,7 +277,7 @@ fun BotListScreen(
             },
         )
     } else if (!(synced && bots.isEmpty())) {
-        FlowButton("New task", Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(20.dp), icon = Icons.Rounded.Add,
+        FlowButton("New task", Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(20.dp), icon = sunfieldVector(SunfieldIcons.Plus),
             onClick = onNewTask)
     }
     }
@@ -291,10 +325,10 @@ fun HypurrTabBar(selected: HomeTab, modifier: Modifier = Modifier, onSelect: (Ho
         verticalAlignment = Alignment.CenterVertically,
     ) {
         listOf(
-            Triple(HomeTab.Bots, "Bots", Icons.Rounded.GridView),
-            Triple(HomeTab.Tasks, "Tasks", Icons.Rounded.Description),
-            Triple(HomeTab.Spend, "Spend", Icons.Rounded.Schedule),
-            Triple(HomeTab.You, "You", Icons.Rounded.Person),
+            Triple(HomeTab.Bots, "Bots", sunfieldVector(SunfieldIcons.Bots)),
+            Triple(HomeTab.Tasks, "Tasks", sunfieldVector(SunfieldIcons.Tasks)),
+            Triple(HomeTab.Spend, "Spend", sunfieldVector(SunfieldIcons.Spend)),
+            Triple(HomeTab.You, "You", sunfieldVector(SunfieldIcons.You)),
         ).forEach { (tab, label, icon) ->
             TabItem(label, icon, selected == tab) {
                 h.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
@@ -333,15 +367,24 @@ private fun EmptyRoster(onNewTask: () -> Unit, onPair: () -> Unit = {}, onInstal
         verticalArrangement = Arrangement.Center,
     ) {
         // Chunky ink cat tile with press shadow (Sunfield hero)
-        Box {
-            Box(Modifier.size(92.dp).padding(top = 5.dp).clip(RoundedCornerShape(28.dp)).background(c.press.copy(alpha = if (c.dark) 0.5f else 0.25f)))
-            Box(
-                Modifier.size(92.dp).clip(RoundedCornerShape(28.dp))
-                    .background(if (c.dark) c.surface else androidx.compose.ui.graphics.Color(0xFF15130F)),
-                contentAlignment = Alignment.Center,
-            ) {
-                CatFace(if (c.dark) c.text else androidx.compose.ui.graphics.Color(0xFFFFF8E8), 56.dp)
-            }
+        Box(
+            Modifier
+                .padding(bottom = 5.dp)
+                .drawBehind {
+                    val r = 28.dp.toPx()
+                    drawRoundRect(
+                        color = c.press.copy(alpha = if (c.dark) 0.5f else 0.25f),
+                        topLeft = Offset(0f, 5.dp.toPx()),
+                        size = Size(size.width, size.height),
+                        cornerRadius = CornerRadius(r, r),
+                    )
+                }
+                .size(92.dp)
+                .clip(RoundedCornerShape(28.dp))
+                .background(if (c.dark) c.surface else androidx.compose.ui.graphics.Color(0xFF15130F)),
+            contentAlignment = Alignment.Center,
+        ) {
+            CatFace(if (c.dark) c.text else androidx.compose.ui.graphics.Color(0xFFFFF8E8), 56.dp)
         }
         Spacer(Modifier.height(22.dp))
         Text("Meet Hypurr", style = MaterialTheme.typography.headlineMedium, color = c.text, fontWeight = FontWeight.ExtraBold)
@@ -373,7 +416,7 @@ private fun EmptyRoster(onNewTask: () -> Unit, onPair: () -> Unit = {}, onInstal
         Spacer(Modifier.height(10.dp))
         SoftButton("Pair with QR", Modifier.fillMaxWidth(), tint = c.text, onClick = onPair)
         Spacer(Modifier.height(10.dp))
-        SoftButton("Or start a task", Modifier.fillMaxWidth(), tint = c.accent, icon = Icons.Rounded.Add, onClick = onNewTask)
+        SoftButton("Or start a task", Modifier.fillMaxWidth(), tint = c.accent, icon = sunfieldVector(SunfieldIcons.Plus), onClick = onNewTask)
     }
 }
 
@@ -398,17 +441,17 @@ fun BotRow(bot: Bot, now: Long, modifier: Modifier = Modifier, byId: Map<String,
                     overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                 if (bot.isGroup) {
                     Spacer(Modifier.width(6.dp))
-                    Icon(Icons.Rounded.Groups, "Group", tint = c.tertiary, modifier = Modifier.size(15.dp))
+                    Icon(sunfieldVector(SunfieldIcons.Team), "Group", tint = c.tertiary, modifier = Modifier.size(15.dp))
                 }
                 if (bot.pinned) {
                     Spacer(Modifier.width(6.dp))
-                    Icon(Icons.Rounded.PushPin, "Pinned", tint = c.tertiary, modifier = Modifier.size(14.dp))
+                    Icon(sunfieldVector(SunfieldIcons.NeedsYou), "Pinned", tint = c.tertiary, modifier = Modifier.size(14.dp))
                 }
                 bot.task?.let { task ->
                     Spacer(Modifier.width(6.dp))
                     when {
-                        !task.isActive -> Pill("Done", c.tertiary, icon = Icons.Rounded.Check)
-                        task.hasSafetyNet -> Pill("Task", c.success, icon = Icons.Rounded.Shield)
+                        !task.isActive -> Pill("Done", c.tertiary, icon = sunfieldVector(SunfieldIcons.Check))
+                        task.hasSafetyNet -> Pill("Task", c.success, icon = sunfieldVector(SunfieldIcons.Shield))
                         else -> Pill("Task", c.warning)
                     }
                 }

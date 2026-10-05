@@ -1,4 +1,6 @@
 package com.ragul84.hypurr.ui.screens
+import com.ragul84.hypurr.ui.SunfieldIcons
+import com.ragul84.hypurr.ui.sunfieldVector
 
 import android.os.Build
 import androidx.compose.animation.animateColorAsState
@@ -24,13 +26,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.AdminPanelSettings
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.rounded.Computer
-import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -111,10 +106,10 @@ fun SettingsScreen(
     val admin = state.you?.isAdmin != false
     val c = Hypurr.colors
     Box(Modifier.fillMaxSize().background(c.bg)) {
-    Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = if (showHomeTabs) 100.dp else 16.dp)) {
+    Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = if (showHomeTabs) (56.dp + 24.dp + 16.dp) else 16.dp)) {
         Row(Modifier.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             if (!showHomeTabs) {
-                IconBubble(Icons.AutoMirrored.Rounded.ArrowBack, "Back", onClick = onBack)
+                IconBubble(sunfieldVector(SunfieldIcons.Back), "Back", onClick = onBack)
                 Spacer(Modifier.width(12.dp))
             }
             Text(if (showHomeTabs) "You" else "Settings", style = MaterialTheme.typography.headlineMedium, color = c.text, fontWeight = FontWeight.ExtraBold)
@@ -122,7 +117,7 @@ fun SettingsScreen(
         Section("Computer") {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(44.dp).clip(RoundedCornerShape(20.dp)).background(c.accent), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Rounded.Computer, null, tint = c.onAccent)
+                    Icon(sunfieldVector(SunfieldIcons.Host), null, tint = c.onAccent)
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
@@ -138,7 +133,7 @@ fun SettingsScreen(
         Section("Team") {
             Row(Modifier.fillMaxWidth().pressable("Team admin", onClick = onTeamAdmin), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(44.dp).clip(RoundedCornerShape(20.dp)).background(c.accent.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Rounded.AdminPanelSettings, null, tint = c.accent)
+                    Icon(sunfieldVector(SunfieldIcons.Shield), null, tint = c.accent)
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
@@ -147,7 +142,7 @@ fun SettingsScreen(
                         color = c.secondary, style = MaterialTheme.typography.bodySmall)
                 }
                 state.you?.let { com.ragul84.hypurr.ui.Pill(it.role, if (it.isAdmin) c.accent else c.success) }
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = c.tertiary)
+                Icon(sunfieldVector(SunfieldIcons.Link), null, tint = c.tertiary)
             }
         }
         Section("Appearance") {
@@ -187,7 +182,7 @@ fun SettingsScreen(
                             Text(t.prompt, color = c.secondary, style = MaterialTheme.typography.bodySmall, maxLines = 1,
                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                         }
-                        IconBubble(Icons.Rounded.Delete, "Delete ${t.title}", tint = c.danger, fill = c.danger.copy(alpha = 0.1f), size = 34.dp) {
+                        IconBubble(sunfieldVector(SunfieldIcons.Close), "Delete ${t.title}", tint = c.danger, fill = c.danger.copy(alpha = 0.1f), size = 34.dp) {
                             onDeleteTemplate(t.id)
                         }
                     }
@@ -225,7 +220,7 @@ private fun AddTemplate(onAdd: (String, String) -> Unit) {
     var title by remember { mutableStateOf("") }
     var prompt by remember { mutableStateOf("") }
     if (!open) {
-        SoftButton("Add a template", Modifier.fillMaxWidth(), icon = Icons.Rounded.Add) { open = true }
+        SoftButton("Add a template", Modifier.fillMaxWidth(), icon = sunfieldVector(SunfieldIcons.Plus)) { open = true }
         return
     }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

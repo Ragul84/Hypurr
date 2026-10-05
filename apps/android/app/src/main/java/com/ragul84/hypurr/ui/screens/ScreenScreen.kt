@@ -1,4 +1,6 @@
 package com.ragul84.hypurr.ui.screens
+import com.ragul84.hypurr.ui.SunfieldIcons
+import com.ragul84.hypurr.ui.sunfieldVector
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -22,12 +24,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.ContentPaste
-import androidx.compose.material.icons.rounded.DesktopAccessDisabled
-import androidx.compose.material.icons.rounded.Keyboard
-import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -112,7 +108,7 @@ fun ScreenScreen(
         }
         // Header: back, the computer, the connection.
         Row(Modifier.fillMaxWidth().statusBarsPadding().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconBubble(Icons.AutoMirrored.Rounded.ArrowBack, "Back", fill = Color.Black.copy(alpha = 0.5f), tint = Color.White, onClick = onBack)
+            IconBubble(sunfieldVector(SunfieldIcons.Back), "Back", fill = Color.Black.copy(alpha = 0.5f), tint = Color.White, onClick = onBack)
             Spacer(Modifier.width(10.dp))
             Text(state.computerName, color = Color.White, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f), maxLines = 1)
             when (state.phase) {
@@ -123,22 +119,22 @@ fun ScreenScreen(
             }
             if (state.clipboard != null) {
                 Spacer(Modifier.width(8.dp))
-                IconBubble(Icons.Rounded.ContentPaste, "Copy the computer's clipboard", fill = Color.Black.copy(alpha = 0.5f), tint = Color.White,
+                IconBubble(sunfieldVector(SunfieldIcons.Paste), "Copy the computer's clipboard", fill = Color.Black.copy(alpha = 0.5f), tint = Color.White,
                     onClick = onTakeClipboard)
             }
             if (state.phase == ScreenPhase.Live) {
                 Spacer(Modifier.width(8.dp))
-                IconBubble(Icons.Rounded.Keyboard, if (typing) "Hide keyboard" else "Type", fill = Color.Black.copy(alpha = 0.5f),
+                IconBubble(sunfieldVector(SunfieldIcons.Docs), if (typing) "Hide keyboard" else "Type", fill = Color.Black.copy(alpha = 0.5f),
                     tint = if (typing) c.accent else Color.White) { typing = !typing }
             }
         }
         val failed = state.phase as? ScreenPhase.Failed
         when {
-            off -> Message(Icons.Rounded.DesktopAccessDisabled, "Remote screen is off",
+            off -> Message(sunfieldVector(SunfieldIcons.Host), "Remote screen is off",
                 if (state.status?.enabled != true) "Turn on Remote screen in Hypurr's menu on the computer. It stays off until you do there."
                 else "The computer's screen helper isn't running or doesn't have screen recording permission yet. Finish its setup on the computer.",
                 null, onRetry)
-            failed != null -> Message(Icons.Rounded.DesktopAccessDisabled, "Couldn't show the screen", failed.message, "Try again", onRetry)
+            failed != null -> Message(sunfieldVector(SunfieldIcons.Host), "Couldn't show the screen", failed.message, "Try again", onRetry)
             state.phase == ScreenPhase.Connecting || state.phase == ScreenPhase.Reconnecting || state.frame == IntSize.Zero ->
                 Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                     FlowOrb(48.dp)
@@ -182,7 +178,7 @@ private fun androidx.compose.foundation.layout.BoxScope.Message(icon: androidx.c
         Icon(icon, null, tint = c.secondary)
         Text(title, color = c.text, style = MaterialTheme.typography.titleMedium)
         Text(body, color = c.secondary, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
-        if (action != null) SoftButton(action, icon = Icons.Rounded.Refresh, onClick = onAction)
-        else SoftButton("Check again", icon = Icons.Rounded.Refresh, tint = c.secondary, onClick = onAction)
+        if (action != null) SoftButton(action, icon = sunfieldVector(SunfieldIcons.Refresh), onClick = onAction)
+        else SoftButton("Check again", icon = sunfieldVector(SunfieldIcons.Refresh), tint = c.secondary, onClick = onAction)
     }
 }
