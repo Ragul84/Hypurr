@@ -202,7 +202,15 @@ pub async fn install(progress: impl Fn(&str)) -> Result<Value> {
     }
     progress("Installing…");
     let dir = install_dir();
-    let (dir2, archive_name, cmd) = (dir.clone(), rel.archive.to_owned(), PathBuf::from(rel.cmd));
+    // Name the on-disk archive by content so a test override (tar.gz) works on every OS.
+    let archive_name = if bytes.starts_with(&[0x1f, 0x8b]) {
+        "opencode.tar.gz".to_owned()
+    } else if bytes.starts_with(b"PK") {
+        "opencode.zip".to_owned()
+    } else {
+        rel.archive.to_owned()
+    };
+    let (dir2, cmd) = (dir.clone(), PathBuf::from(rel.cmd));
     tokio::task::spawn_blocking(move || -> Result<()> {
         let _ = std::fs::remove_dir_all(&dir2);
         std::fs::create_dir_all(&dir2)?;
