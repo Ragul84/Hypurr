@@ -1,6 +1,6 @@
 # File attachments
 
-Photos and files sent with a message, from the iPhone and the Mac.
+Photos and files sent with a message, from the iPhone, the Mac and Android.
 
 - Composer: the **+** button left of the message box. iPhone: a menu with Photos (sent as JPEG) and
   Files (plus Paste when the clipboard has an image); Mac: an open panel. Files and images can
@@ -9,6 +9,12 @@ Photos and files sent with a message, from the iPhone and the Mac.
   HEIC/TIFF/BMP become JPEG (`OutgoingFile.prepared`, `Thread/Attachments.swift`). Picked files show as chips above
   the text and can be removed; a message can be files only. Not in group chats (a group has no
   folder of its own). Up to 100 MB per file.
+- Android: **+** opens Photos (system photo picker, up to 10, sent as picked), Files (any
+  document) and Paste (an image on the clipboard). Chips with thumbnails, files-only messages,
+  not in groups. Files need the computer online: a message with files is never put in the relay
+  mailbox, and a failed send returns the files to the composer. Received images load with
+  `readUpload` (up to 20 MB, kept in memory); other files open in another app through a
+  `FileProvider`.
 - Upload: `upload {botId, uploadId, name, offset, data (base64), done}`, 384 KiB per call so each
   stays under the channel's 1 MiB message limit. A repeated chunk is accepted (retry); anything out
   of order is refused. Then `send {…, attachments: [uploadId]}`; the text may be empty.

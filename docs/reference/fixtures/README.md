@@ -32,4 +32,8 @@ Consumers:
 - `apps/android/app/src/test/java/com/ragul84/hypurr/model/AdminWireTest.kt` and `data/AdminStoreTest.kt` (via the `hypurr.adminWire` system property)
 - `kit/Tests/HypurrKitTests/AdminWireTests.swift`
 
+[chat-wire.json](chat-wire.json) is real `hypurr-host` output from `host/tests/chat_e2e.rs` (`HYPURR_WIRE_OUT`) for chat on phones: `hello.backends`, a bot and a group created by a client, a Markdown reply, a thread root with its `data.thread` summary and replies, a message with attachments and the agent's reply, `readUpload`, a group reply with `author`, and `listDirs` (paths anonymised). Consumers:
+
+- `apps/android/app/src/test/java/com/ragul84/hypurr/model/ChatWireTest.kt` and `data/ChatStoreTest.kt` (via the `hypurr.chatWire` system property)
+
 When moving or changing a fixture, update those paths and the cloud/kit/host CI path filters. Run the affected vector tests; a Markdown link check alone cannot validate executable imports. [Protocol reference](../remote-relay.md).

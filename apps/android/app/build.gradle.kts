@@ -48,6 +48,7 @@ android {
                 it.systemProperty("hypurr.taskWire", rootProject.file("../../docs/reference/fixtures/task-wire.json").path)
                 it.systemProperty("hypurr.workWire", rootProject.file("../../docs/reference/fixtures/work-wire.json").path)
                 it.systemProperty("hypurr.adminWire", rootProject.file("../../docs/reference/fixtures/admin-wire.json").path)
+                it.systemProperty("hypurr.chatWire", rootProject.file("../../docs/reference/fixtures/chat-wire.json").path)
                 listOf("HYPURR_E2E_LINK", "HYPURR_E2E_BOT", "HYPURR_E2E_PROJECT", "HYPURR_E2E_AGENT").forEach { key ->
                     System.getenv(key)?.let { value -> it.environment(key, value) }
                 }
@@ -81,6 +82,8 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.messaging)
     implementation(libs.zxing.embedded)
+    // Remote screen: WebRTC (Google's libwebrtc, packaged by Stream), receive-only video + data channels.
+    implementation(libs.webrtc)
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
 

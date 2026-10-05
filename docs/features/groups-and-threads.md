@@ -72,3 +72,8 @@ Roster row for groups (member avatars), a trace per lane (main chat, or one thre
 under a root (opens the thread; "N new" while `unread > 0`), "Reply in thread" on any main-chat message (Mac: while the pointer is over a message, its footer beside the time shows quick reactions, reply, copy — never on the bubble; iPhone: long-press, reactions on top of the menu), reactions under a message (tap to take back), a thread view
 (root, replies, composer sending `threadId`), group create/edit (name, members), Stop in a
 group calls `stop` with the group id.
+
+Android (`apps/android`, `ChatScreen.kt`, `BotEditorScreen.kt`): group rows with stacked avatars, author labels in
+group chats, thread summaries and a thread view (`thread:<botId>:<rootId>` route), long-press for
+quick reactions / Reply in thread / Copy, and group create/edit from the roster's **+**. Tested
+against real host output in `docs/reference/fixtures/chat-wire.json` (`host/tests/chat_e2e.rs`).

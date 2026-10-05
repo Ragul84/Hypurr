@@ -30,6 +30,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.DesktopWindows
+import androidx.compose.material.icons.rounded.Groups
+import androidx.compose.material.icons.rounded.SmartToy
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import com.ragul84.hypurr.ui.SoftButton
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Shield
@@ -82,8 +90,18 @@ fun BotListScreen(
     onRetry: () -> Unit,
     onNewTask: () -> Unit = {},
     now: Long = System.currentTimeMillis(),
+    /** Every bot by id: group rows show their members. */
+    byId: Map<String, Bot> = emptyMap(),
+    onNewBot: () -> Unit = {},
+    onNewGroup: () -> Unit = {},
+    /** Viewers only look: no new bots or groups. */
+    canCreate: Boolean = true,
+    initialMenuOpen: Boolean = false,
+    /** Opens the computer's screen; null when the computer doesn't offer it. */
+    onScreen: (() -> Unit)? = null,
 ) {
     val c = Hypurr.colors
+    var menu by remember { mutableStateOf(initialMenuOpen) }
     val needsYou = bots.filter { it.needsInput }
     val rest = bots.filter { !it.needsInput }
     Box(Modifier.fillMaxSize().background(c.bg)) {
@@ -102,7 +120,21 @@ fun BotListScreen(
                 IconBubble(Icons.Rounded.Refresh, "Reconnect", onClick = onRetry)
                 Spacer(Modifier.width(8.dp))
             }
+            if (onScreen != null) {
+                IconBubble(Icons.Rounded.DesktopWindows, "Computer screen", onClick = onScreen)
+                Spacer(Modifier.width(8.dp))
+            }
+            if (canCreate) {
+                IconBubble(if (menu) Icons.Rounded.Close else Icons.Rounded.Add, if (menu) "Close" else "New bot or group") { menu = !menu }
+                Spacer(Modifier.width(8.dp))
+            }
             IconBubble(Icons.Rounded.Settings, "Settings", onClick = onSettings)
+        }
+        AnimatedVisibility(menu) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SoftButton("New bot", Modifier.weight(1f), icon = Icons.Rounded.SmartToy) { menu = false; onNewBot() }
+                SoftButton("New group", Modifier.weight(1f), icon = Icons.Rounded.Groups) { menu = false; onNewGroup() }
+            }
         }
         AnimatedVisibility(link is LinkState.HostOffline || link is LinkState.Unauthorized) {
             val text = when (link) {
@@ -128,12 +160,12 @@ fun BotListScreen(
                 item(key = "needs") {
                     Column(Modifier.fillMaxWidth().animateItem().glass(RoundedCornerShape(24.dp), c.warning.copy(alpha = if (c.dark) 0.12f else 0.08f))
                         .padding(vertical = 4.dp)) {
-                        needsYou.forEach { BotRow(it, now) { onOpen(it) } }
+                        needsYou.forEach { BotRow(it, now, byId = byId) { onOpen(it) } }
                     }
                 }
                 item(key = "all-header") { SectionLabel("All bots", c.tertiary) }
             }
-            items(rest, key = { it.id }) { bot -> BotRow(bot, now, Modifier.animateItem()) { onOpen(bot) } }
+            items(rest, key = { it.id }) { bot -> BotRow(bot, now, Modifier.animateItem(), byId) { onOpen(bot) } }
         }
     }
     // Plain-language tasks: the main way in for someone new to agents.
@@ -169,19 +201,23 @@ private fun EmptyRoster(onNewTask: () -> Unit) {
 }
 
 @Composable
-fun BotRow(bot: Bot, now: Long, modifier: Modifier = Modifier, onClick: () -> Unit) {
+fun BotRow(bot: Bot, now: Long, modifier: Modifier = Modifier, byId: Map<String, Bot> = emptyMap(), onClick: () -> Unit) {
     val c = Hypurr.colors
     Row(
         modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).pressable(bot.name, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp).animateContentSize(Motion.spatialDefault()),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        BotAvatar(bot)
+        if (bot.isGroup) GroupAvatar(bot, byId) else BotAvatar(bot)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(bot.name, style = MaterialTheme.typography.titleMedium, color = c.text, maxLines = 1,
                     overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                if (bot.isGroup) {
+                    Spacer(Modifier.width(6.dp))
+                    Icon(Icons.Rounded.Groups, "Group", tint = c.tertiary, modifier = Modifier.size(15.dp))
+                }
                 if (bot.pinned) {
                     Spacer(Modifier.width(6.dp))
                     Icon(Icons.Rounded.PushPin, "Pinned", tint = c.tertiary, modifier = Modifier.size(14.dp))

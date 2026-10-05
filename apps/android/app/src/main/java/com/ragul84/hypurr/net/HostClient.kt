@@ -5,6 +5,9 @@ import com.ragul84.hypurr.model.Bot
 import com.ragul84.hypurr.model.Computer
 import com.ragul84.hypurr.model.Entry
 import com.ragul84.hypurr.model.Hello
+import com.ragul84.hypurr.model.DirListing
+import com.ragul84.hypurr.model.ScreenConnection
+import com.ragul84.hypurr.model.ScreenState
 import com.ragul84.hypurr.model.TeamInfo
 import com.ragul84.hypurr.model.PolicyInfo
 import com.ragul84.hypurr.model.AuditLog
@@ -85,11 +88,15 @@ class HostClient(val transport: ChannelTransport) {
         return HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("entries"))
     }
 
-    suspend fun send(botId: String, text: String, clientNonce: String): Entry {
+    /** `threadId` replies in that root's thread; `attachments` are upload ids sent first with [upload]. */
+    suspend fun send(botId: String, text: String, clientNonce: String, threadId: String? = null,
+                     attachments: List<String> = emptyList()): Entry {
         val res = transport.call("send", buildJsonObject {
             put("botId", botId)
             put("text", text)
             put("clientNonce", clientNonce)
+            threadId?.let { put("threadId", it) }
+            if (attachments.isNotEmpty()) put("attachments", JsonArray(attachments.map(::JsonPrimitive)))
         })
         return HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("entry"))
     }
@@ -102,11 +109,90 @@ class HostClient(val transport: ChannelTransport) {
         transport.call("newSession", buildJsonObject { put("botId", botId) })
     }
 
-    suspend fun markRead(botId: String) {
+    /** The main chat, or one thread (`threadId`). */
+    suspend fun markRead(botId: String, threadId: String? = null) {
         transport.call("markRead", buildJsonObject {
             put("botId", botId)
+            threadId?.let { put("threadId", it) }
             put("all", false)
         })
+    }
+
+    /** A thread's replies, oldest first (the root is in the main chat). */
+    suspend fun thread(botId: String, rootId: String): List<Entry> {
+        val res = transport.call("thread", buildJsonObject {
+            put("botId", botId)
+            put("rootId", rootId)
+        })
+        return HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("entries"))
+    }
+
+    /** Toggles this user's reaction; returns the updated message. */
+    suspend fun react(entryId: String, emoji: String): Entry {
+        val res = transport.call("react", buildJsonObject {
+            put("entryId", entryId)
+            put("emoji", emoji)
+        })
+        return HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("entry"))
+    }
+
+    /** A sent file, fetched back in 384 KiB chunks (for previews on this phone). */
+    suspend fun readUpload(botId: String, uploadId: String, maxBytes: Long = 100L * 1024 * 1024): ByteArray {
+        val out = java.io.ByteArrayOutputStream()
+        while (true) {
+            val res = transport.call("readUpload", buildJsonObject {
+                put("botId", botId)
+                put("uploadId", uploadId)
+                put("offset", out.size().toLong())
+            }, timeoutMs = 60_000).jsonObject
+            val chunk = java.util.Base64.getDecoder().decode(res.str("data") ?: "")
+            out.write(chunk)
+            val size = res["size"]?.jsonPrimitive?.longOrNull ?: out.size().toLong()
+            if (chunk.isEmpty() || out.size() >= size || out.size() >= maxBytes) break
+        }
+        return out.toByteArray()
+    }
+
+    // Bots and groups.
+
+    /** A bot (`backend`, `cwd` empty = a personal workspace, `permission`) or a group (`kind: "group"`, `members`). */
+    suspend fun createBot(config: JsonObject): Bot {
+        val res = transport.call("createBot", config, timeoutMs = 30_000)
+        return HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("bot"))
+    }
+
+    /** Partial update: `id` plus the fields that change. */
+    suspend fun updateBot(patch: JsonObject): Bot {
+        val res = transport.call("updateBot", patch, timeoutMs = 30_000)
+        return HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("bot"))
+    }
+
+    suspend fun deleteBot(botId: String) {
+        transport.call("deleteBot", buildJsonObject { put("botId", botId) })
+    }
+
+    /** Folders on the computer (`path` null = home). */
+    suspend fun listDirs(path: String?): DirListing = call("listDirs", buildJsonObject { path?.let { put("path", it) } })
+
+    // Remote screen (host `screen`; video and input go over WebRTC).
+
+    suspend fun screenStatus(): ScreenState = call("screenStatus")
+
+    /** `relay`: the channel goes through the cloud, so the host fetches TURN servers. */
+    suspend fun screenPrepare(relay: Boolean): ScreenConnection = call("screenPrepare", buildJsonObject { put("relay", relay) })
+
+    /** Non-trickle: the offer carries every candidate; returns `{session, sdp}` (the answer). */
+    suspend fun screenOffer(sdp: String, session: String?, display: Long?): Pair<String, String> {
+        val res = transport.call("screenOffer", buildJsonObject {
+            put("sdp", sdp)
+            session?.let { put("session", it) }
+            display?.let { put("display", it) }
+        }, timeoutMs = 30_000).jsonObject
+        return (res.str("session") ?: session.orEmpty()) to (res.str("sdp") ?: throw HostException(HostException.Kind.Http, "No answer from the screen helper."))
+    }
+
+    suspend fun screenClose(session: String) {
+        transport.call("screenClose", buildJsonObject { put("session", session) })
     }
 
     suspend fun respondPermission(entryId: String, optionId: String?) {
