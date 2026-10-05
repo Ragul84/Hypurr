@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- docs/brand/hypurr-glyph.svg, scaled into the adaptive-icon safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="1024" android:viewportHeight="1024">
+    <group android:pivotX="512" android:pivotY="512" android:scaleX="0.62" android:scaleY="0.62" android:translateY="-30">
+        <path android:strokeWidth="30" android:strokeLineCap="round" android:strokeAlpha="0.9"
+            android:pathData="M820 540 Q862 640 820 740 M204 540 Q162 640 204 740">
+            <aapt:attr name="android:strokeColor">
+                <gradient android:type="linear" android:startX="0" android:startY="0" android:endX="1024" android:endY="0"
+                    android:startColor="#22D3EE" android:endColor="#F472B6" />
+            </aapt:attr>
+        </path>
+        <path android:strokeWidth="30" android:strokeLineCap="round" android:strokeAlpha="0.5"
+            android:pathData="M884 500 Q944 640 884 780 M140 500 Q80 640 140 780">
+            <aapt:attr name="android:strokeColor">
+                <gradient android:type="linear" android:startX="0" android:startY="0" android:endX="1024" android:endY="0"
+                    android:startColor="#22D3EE" android:endColor="#F472B6" />
+            </aapt:attr>
+        </path>
+        <path android:pathData="M262 640 C262 470 296 300 330 214 L452 352 C492 344 532 344 572 352 L694 214 C728 300 762 470 762 640 C762 792 650 864 512 864 C374 864 262 792 262 640 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="linear" android:startX="300" android:startY="214" android:endX="720" android:endY="864">
+                    <item android:offset="0" android:color="#A78BFA" />
+                    <item android:offset="0.5" android:color="#F472B6" />
+                    <item android:offset="1" android:color="#22D3EE" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <path android:strokeColor="#150A33" android:strokeWidth="34" android:strokeLineCap="round" android:strokeLineJoin="round"
+            android:pathData="M372 604 Q414 556 456 604 M568 604 Q610 556 652 604" />
+        <path android:fillColor="#150A33" android:pathData="M490 660 h44 l-22 24 z" />
+        <path android:strokeColor="#150A33" android:strokeWidth="26" android:strokeLineCap="round" android:strokeLineJoin="round"
+            android:pathData="M446 704 q33 40 66 0 q33 40 66 0" />
+    </group>
+</vector>
