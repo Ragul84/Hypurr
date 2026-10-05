@@ -424,7 +424,7 @@ private fun Spending(costs: TaskCosts) {
             Text(costs.gatewayCreditsLabel ?: "—", color = c.text, style = MaterialTheme.typography.bodyMedium)
         }
         Spacer(Modifier.height(8.dp))
-        FlowButton("Buy credits") {
+        SoftButton("Buy credits", Modifier.fillMaxWidth()) {
             val url = costs.buyCreditsUrl ?: "https://checkout.stripe.com/c/pay/cs_test_placeholder"
             try {
                 ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
