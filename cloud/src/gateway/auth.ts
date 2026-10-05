@@ -1,5 +1,3 @@
-import { createHash, randomBytes } from "node:crypto";
-
 export type GatewaySubject = {
   subjectId: string;
   userId?: string;
@@ -8,13 +6,25 @@ export type GatewaySubject = {
   keyId: string;
 };
 
-export function hashKey(secret: string): string {
-  return createHash("sha256").update(secret, "utf8").digest("hex");
+function bytesToHex(bytes: Uint8Array): string {
+  return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-export function mintKeySecret(): { secret: string; prefix: string; hash: string } {
-  const secret = `hk_${randomBytes(24).toString("base64url")}`;
-  return { secret, prefix: secret.slice(0, 10), hash: hashKey(secret) };
+function randomId(bytes = 16): string {
+  const buf = new Uint8Array(bytes);
+  crypto.getRandomValues(buf);
+  return bytesToHex(buf);
+}
+
+export async function hashKey(secret: string): Promise<string> {
+  const data = new TextEncoder().encode(secret);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return bytesToHex(new Uint8Array(digest));
+}
+
+export async function mintKeySecret(): Promise<{ secret: string; prefix: string; hash: string }> {
+  const secret = `hk_${randomId(24)}`;
+  return { secret, prefix: secret.slice(0, 10), hash: await hashKey(secret) };
 }
 
 /** Extract Bearer token from Authorization header. */
@@ -30,7 +40,7 @@ export async function resolveSubject(
   secret: string | undefined,
 ): Promise<GatewaySubject | null> {
   if (!secret) return null;
-  const hash = hashKey(secret);
+  const hash = await hashKey(secret);
   const row = await db
     .prepare(
       `SELECT id, user_id, host_id, kind FROM gateway_api_keys
@@ -56,7 +66,6 @@ export async function resolveSubject(
   };
 }
 
-/** Issue a trial key bound to a host install id (abuse-limited). */
 export async function issueTrialKey(db: D1Database, hostId: string, now = Date.now()) {
   const existing = await db
     .prepare(
@@ -68,8 +77,8 @@ export async function issueTrialKey(db: D1Database, hostId: string, now = Date.n
   if (existing) {
     return { id: existing.id, secret: null as string | null, prefix: existing.key_prefix, reused: true };
   }
-  const { secret, prefix, hash } = mintKeySecret();
-  const id = `key_${randomBytes(8).toString("hex")}`;
+  const { secret, prefix, hash } = await mintKeySecret();
+  const id = `key_${randomId(8)}`;
   await db
     .prepare(
       `INSERT INTO gateway_api_keys (id, user_id, host_id, key_hash, key_prefix, label, kind, created_at)
@@ -80,10 +89,9 @@ export async function issueTrialKey(db: D1Database, hostId: string, now = Date.n
   return { id, secret, prefix, reused: false };
 }
 
-/** Issue a user API key (Clerk-authenticated account). */
 export async function issueUserKey(db: D1Database, userId: string, label = "default", now = Date.now()) {
-  const { secret, prefix, hash } = mintKeySecret();
-  const id = `key_${randomBytes(8).toString("hex")}`;
+  const { secret, prefix, hash } = await mintKeySecret();
+  const id = `key_${randomId(8)}`;
   await db
     .prepare(
       `INSERT INTO gateway_api_keys (id, user_id, host_id, key_hash, key_prefix, label, kind, created_at)

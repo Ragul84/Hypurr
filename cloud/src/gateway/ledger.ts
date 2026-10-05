@@ -1,4 +1,3 @@
-import { randomBytes } from "node:crypto";
 import type { GatewayConfig } from "./config";
 
 export type Allowance = {
@@ -7,6 +6,12 @@ export type Allowance = {
   periodStart: number;
   remaining: number;
 };
+
+function randomId(bytes = 8): string {
+  const buf = new Uint8Array(bytes);
+  crypto.getRandomValues(buf);
+  return [...buf].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
 
 function dayBucket(now: number): number {
   const d = new Date(now);
@@ -51,9 +56,7 @@ export async function getAllowance(
 
 export async function consumeAllowance(db: D1Database, subjectId: string, tokens: number, now = Date.now()) {
   await db
-    .prepare(
-      `UPDATE gateway_allowance SET tokens_used = tokens_used + ?, updated_at = ? WHERE subject_id = ?`,
-    )
+    .prepare(`UPDATE gateway_allowance SET tokens_used = tokens_used + ?, updated_at = ? WHERE subject_id = ?`)
     .bind(tokens, now, subjectId)
     .run();
 }
@@ -82,7 +85,7 @@ export async function topUp(
     )
     .bind(subjectId, next, now, next, now)
     .run();
-  const id = `led_${randomBytes(8).toString("hex")}`;
+  const id = `led_${randomId()}`;
   await db
     .prepare(
       `INSERT INTO gateway_ledger (id, subject_id, kind, amount_cents, balance_after, meta, created_at)
@@ -114,7 +117,7 @@ export async function spendCredits(
     .prepare(`UPDATE gateway_credits SET balance_cents = ?, updated_at = ? WHERE subject_id = ?`)
     .bind(next, now, subjectId)
     .run();
-  const id = `led_${randomBytes(8).toString("hex")}`;
+  const id = `led_${randomId()}`;
   await db
     .prepare(
       `INSERT INTO gateway_ledger (id, subject_id, kind, amount_cents, balance_after, meta, created_at)
@@ -137,7 +140,7 @@ export async function recordUsage(
   },
   now = Date.now(),
 ) {
-  const id = `use_${randomBytes(8).toString("hex")}`;
+  const id = `use_${randomId()}`;
   await db
     .prepare(
       `INSERT INTO gateway_usage (id, subject_id, model, prompt_tokens, completion_tokens, cost_cents, source, created_at)

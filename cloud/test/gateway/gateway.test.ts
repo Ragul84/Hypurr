@@ -4,16 +4,16 @@ import { estimateCostCents, tokensFromMessages } from "../../src/gateway/meter";
 import { DEFAULT_GATEWAY_CONFIG } from "../../src/gateway/config";
 
 describe("gateway auth", () => {
-  it("hashes keys stably", () => {
-    expect(hashKey("hk_test")).toEqual(hashKey("hk_test"));
-    expect(hashKey("a")).not.toEqual(hashKey("b"));
+  it("hashes keys stably", async () => {
+    expect(await hashKey("hk_test")).toEqual(await hashKey("hk_test"));
+    expect(await hashKey("a")).not.toEqual(await hashKey("b"));
   });
 
-  it("mints unique secrets", () => {
-    const a = mintKeySecret();
-    const b = mintKeySecret();
+  it("mints unique secrets", async () => {
+    const a = await mintKeySecret();
+    const b = await mintKeySecret();
     expect(a.secret.startsWith("hk_")).toBe(true);
-    expect(a.hash).toEqual(hashKey(a.secret));
+    expect(a.hash).toEqual(await hashKey(a.secret));
     expect(a.secret).not.toEqual(b.secret);
   });
 });
@@ -186,7 +186,7 @@ describe("streaming passthrough with fake upstream", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const db = memoryDb();
-    const { secret, hash, prefix } = mintKeySecret();
+    const { secret, hash, prefix } = await mintKeySecret();
     (db as any)._tables.gateway_api_keys.push({
       id: "key_1",
       user_id: "u1",
@@ -220,7 +220,7 @@ describe("streaming passthrough with fake upstream", () => {
       now: Date.UTC(2026, 9, 5, 12),
     });
     expect(res.status).toBe(200);
-    const data = await res.json();
+    const data = (await res.json()) as { choices: Array<{ message: { content: string } }> };
     expect(data.choices[0].message.content).toBe("ok");
     expect(fetchMock).toHaveBeenCalled();
     vi.unstubAllGlobals();

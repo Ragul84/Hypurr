@@ -54,7 +54,7 @@ function rateLimit(subjectId: string, limit: number, now: number): boolean {
 }
 
 function secretForAdapter(env: GatewayEnv, apiKeyEnv: string): string | undefined {
-  return (env as Record<string, string | undefined>)[apiKeyEnv];
+  return (env as unknown as Record<string, string | undefined>)[apiKeyEnv];
 }
 
 export async function listModels(c: Ctx) {
@@ -348,8 +348,9 @@ export async function stripeWebhook(c: Ctx): Promise<Response> {
 
   if (event.type === "checkout.session.completed") {
     const obj = event.data?.object ?? {};
-    const subjectId = String(obj.client_reference_id || obj.metadata?.subjectId || "");
-    const amount = Number(obj.amount_total || obj.metadata?.amountCents || 0);
+    const meta = (obj.metadata ?? {}) as Record<string, unknown>;
+    const subjectId = String(obj.client_reference_id || meta.subjectId || "");
+    const amount = Number(obj.amount_total || meta.amountCents || 0);
     if (subjectId && amount > 0) {
       await topUp(c.env.DB, subjectId, amount, { stripeEvent: event.id }, c.now);
     }
