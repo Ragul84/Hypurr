@@ -332,7 +332,7 @@ fun SignalAllowButton(text: String, modifier: Modifier = Modifier, onAllow: () -
     }
 }
 
-/** 4px cyan signal band across a plate (Needs-you / live). */
+/** 4px forest/sunflower signal band across a plate (Needs-you / live). */
 @Composable
 fun SignalBand(modifier: Modifier = Modifier, alpha: Float = 1f) {
     Box(modifier.fillMaxWidth().height(4.dp).background(Hypurr.colors.accent.copy(alpha = alpha)))
