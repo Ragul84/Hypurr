@@ -1,5 +1,17 @@
 package com.ragul84.hypurr.ui
 
+import com.ragul84.hypurr.model.Activity
+import com.ragul84.hypurr.model.ActivityPerson
+import com.ragul84.hypurr.model.ActivityTask
+import com.ragul84.hypurr.model.ActivityTotals
+import com.ragul84.hypurr.model.Actor
+import com.ragul84.hypurr.model.AuditEntry
+import com.ragul84.hypurr.model.AuditLog
+import com.ragul84.hypurr.model.Policies
+import com.ragul84.hypurr.model.PolicyInfo
+import com.ragul84.hypurr.model.StartedBy
+import com.ragul84.hypurr.model.TeamInfo
+import com.ragul84.hypurr.model.TeamPerson
 import com.ragul84.hypurr.model.Bot
 import com.ragul84.hypurr.model.Computer
 import com.ragul84.hypurr.model.Entry
@@ -195,5 +207,68 @@ object Samples {
             CostRow("t0", "b8", "Update dependencies", NOW - 26 * 60 * MIN, TaskUsage(totalTokens = 92_700, cost = 0.64, estimated = false, turns = 6)),
         ),
         total = CostTotal(1.13, 179_240, 3, estimated = true), week = 1.13, today = 0.49,
+    )
+
+    // Stage C: team admin.
+
+    val admin = Actor("k-arjun", "Arjun's Pixel", "admin")
+    val member = Actor("k-priya", "Priya's phone", "member")
+
+    val team = TeamInfo(admin, "member", listOf(
+        TeamPerson("local", "This computer", "macos", "admin", fixed = true),
+        TeamPerson("k-arjun", "Arjun's Pixel", "android", "admin", ownRole = true, lastSeenAt = NOW - 10_000, you = true),
+        TeamPerson("k-priya", "Priya's phone", "android", "member", lastSeenAt = NOW - 25 * MIN),
+        TeamPerson("k-sam", "Sam's iPhone", "ios", "viewer", ownRole = true, lastSeenAt = NOW - 3 * 60 * MIN),
+    ))
+
+    val policies = PolicyInfo(
+        Policies(allowedAgents = listOf("claude", "codex"), dailyLimit = 5.0, taskLimit = 1.0, askFrom = "medium", adminApprovesFrom = "high"),
+        SafetySettings(protectedBranches = listOf("main", "release/*", "production")),
+        spentToday = 3.42,
+        agents = listOf(Agent("claude", "Claude Code"), Agent("codex", "Codex"), Agent("gemini", "Gemini CLI"), Agent("cursor", "Cursor")),
+    )
+
+    private fun audit(seq: Long, ago: Long, who: Actor?, action: String, target: String, detail: String = "{}") = AuditEntry(
+        seq, NOW - ago, who?.key ?: "hypurr", who?.name ?: "Hypurr safety net", who?.role ?: "system", action, target,
+        com.ragul84.hypurr.model.HypurrJson.parseToJsonElement(detail), "h$seq")
+
+    val auditLog = AuditLog(listOf(
+        audit(14, 2 * MIN, admin, "approval.answer", "Delete the build folder", """{"risk":"high","answer":"allow_once"}"""),
+        audit(13, 3 * MIN, member, "blocked", "respondPermission", """{"reason":"Your team's rules say an admin approves high risk requests."}"""),
+        audit(12, 9 * MIN, null, "approval.blocked", "git push origin main", """{"risk":"high","reason":"Pushing to main is blocked by the safety net."}"""),
+        audit(11, 14 * MIN, member, "task.start", "#142 Checkout button does nothing on Safari"),
+        audit(10, 40 * MIN, null, "policy.limit", "Update dependencies", """{"reason":"This task reached its spending limit ($1.00)."}"""),
+        audit(9, 62 * MIN, admin, "policy.change", "Team rules"),
+        audit(8, 65 * MIN, admin, "role.change", "Sam's iPhone", """{"role":"viewer"}"""),
+        audit(7, 2 * 60 * MIN, Actor("local", "This computer", "admin"), "role.default", "New devices"),
+    ), count = 14, intact = true)
+
+    val activity = Activity(
+        days = 7,
+        people = listOf(
+            ActivityPerson("local", "This computer", "admin", tasks = 1, spend = 0.64),
+            ActivityPerson("k-arjun", "Arjun's Pixel", "admin", NOW - 10_000, tasks = 2, spend = 0.49, approvals = 4),
+            ActivityPerson("k-priya", "Priya's phone", "member", NOW - 25 * MIN, tasks = 5, spend = 2.29, approvals = 2, blocked = 1),
+            ActivityPerson("k-sam", "Sam's iPhone", "viewer", NOW - 3 * 60 * MIN),
+        ),
+        tasks = listOf(
+            ActivityTask("t9", "b9", "#142 Checkout button does nothing on Safari", "finished", "shop", "claude", StartedBy("k-priya", "Priya's phone"),
+                usage, PullRequest(57, "https://github.com/acme/shop/pull/57"), NOW - 14 * MIN),
+            ActivityTask("t8", "b8", "Write tests: the checkout button", "active", "shop", "codex", StartedBy("k-arjun", "Arjun's Pixel"),
+                TaskUsage(totalTokens = 31_400, cost = 0.18, estimated = true, turns = 3), null, NOW - 50 * MIN),
+            ActivityTask("t7", "b7", "Update dependencies", "finished", "api", "claude", StartedBy("local", "This computer"),
+                TaskUsage(totalTokens = 92_700, cost = 0.64, turns = 6), null, NOW - 26 * 60 * MIN),
+        ),
+        events = auditLog.entries,
+        totals = ActivityTotals(spend = 3.42, todaySpend = 3.42, todayTasks = 6, approvals = 6, blocked = 3),
+    )
+
+    /** A high-risk card a member can see but only an admin answers. */
+    val adminCardChat = listOf(
+        t("user", EntryData(text = "Write tests: the checkout button"), NOW - 6 * MIN),
+        t("permission", EntryData(title = "Clean build", command = "rm -rf build", status = "pending", options = options, risk = "high",
+            explain = "The agent wants to delete build and everything inside.",
+            riskReasons = listOf("It deletes files. A checkpoint can bring tracked files back, but not ignored or new ones."),
+            checkpoint = "d4e5f6a", needsAdmin = true), NOW - 1 * MIN),
     )
 }

@@ -235,6 +235,12 @@ pub fn agents() -> Vec<Agent> {
     pick_agents(&crate::agent::backends::list())
 }
 
+/// The agents the team's rules allow (`admin::Policies::allowed_agents`).
+pub fn allowed_agents(store: &Store) -> Vec<Agent> {
+    let p = crate::admin::Policies::load(store);
+    agents().into_iter().filter(|a| p.agent_allowed(&a.id)).collect()
+}
+
 fn pick_agents(all: &[Value]) -> Vec<Agent> {
     let to_agent = |b: &Value| Some(Agent { id: b["id"].as_str()?.to_owned(), name: b["name"].as_str()?.to_owned() });
     let installed: Vec<Agent> =
@@ -254,7 +260,7 @@ pub fn setup(store: &Store) -> Value {
     json!({
         "templates": templates::all(store),
         "projects": projects(store),
-        "agents": agents(),
+        "agents": allowed_agents(store),
         "safety": SafetySettings::load(store),
         "integrations": crate::integrations::Integrations::load(store).public(),
     })
@@ -262,7 +268,7 @@ pub fn setup(store: &Store) -> Value {
 
 pub fn route(store: &Store, goal: &str, template: Option<&str>) -> Value {
     let read_only = template.and_then(|t| templates::get(store, t)).is_some_and(|t| t.read_only);
-    let r = router::route(goal, read_only, &projects(store), &agents(), last_project(store).as_deref());
+    let r = router::route(goal, read_only, &projects(store), &allowed_agents(store), last_project(store).as_deref());
     serde_json::to_value(r).unwrap_or(Value::Null)
 }
 
@@ -350,7 +356,13 @@ pub async fn start(hub: &Arc<Hub>, b: &Value) -> Result<Value> {
             let hub = hub.clone();
             tokio::task::spawn_blocking(move || projects(&hub.store)).await?
         };
-        let r = router::route(&store_goal, read_only, &projects_now, &agents(), last_project(store).as_deref());
+        let r = router::route(
+            &store_goal,
+            read_only,
+            &projects_now,
+            &allowed_agents(store),
+            last_project(store).as_deref(),
+        );
         let project = match picked_project {
             Some(path) => projects_now.into_iter().find(|p| p.path == path).unwrap_or_else(|| Project {
                 name: Path::new(&path).file_name().map_or_else(|| path.clone(), |n| n.to_string_lossy().into_owned()),
@@ -360,9 +372,13 @@ pub async fn start(hub: &Arc<Hub>, b: &Value) -> Result<Value> {
             }),
             None => r.project.ok_or_else(|| anyhow!("pick the project this task is about"))?,
         };
-        let backend = picked_backend
-            .or_else(|| r.agent.map(|a| a.id))
-            .ok_or_else(|| anyhow!("no coding agent is installed on this computer"))?;
+        let backend = picked_backend.or_else(|| r.agent.map(|a| a.id)).ok_or_else(|| {
+            if crate::admin::Policies::load(store).allowed_agents.is_empty() {
+                anyhow!("no coding agent is installed on this computer")
+            } else {
+                anyhow!("none of the agents your team allows is installed on this computer")
+            }
+        })?;
         (project, backend)
     };
     if !Path::new(&project.path).is_dir() {
@@ -393,6 +409,10 @@ pub async fn start(hub: &Arc<Hub>, b: &Value) -> Result<Value> {
     };
     if let Some(i) = &issue {
         task.extra.insert("issue".into(), serde_json::to_value(i)?);
+    }
+    // Set by `admin::authorize`, never taken from the client.
+    if b["startedBy"].is_object() {
+        task.extra.insert("startedBy".into(), b["startedBy"].clone());
     }
     // Isolate on a branch + worktree when the project is a git checkout.
     let isolated = {
@@ -528,9 +548,15 @@ pub fn list(store: &Store) -> Result<Value> {
     Ok(json!({"tasks": tasks}))
 }
 
+/// Serialises checkpoints and rollbacks (git commits on task worktrees).
+static CHECKPOINTS: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 /// Saves a checkpoint for a task bot now (blocking). Returns the checkpoint the
 /// worktree is at afterwards (a new one, or the latest when nothing changed).
 pub fn checkpoint_bot(hub: &Hub, bot_id: &str, label: &str) -> Result<Option<Checkpoint>> {
+    // One git commit at a time: the after-turn checkpoint can still be running when the
+    // person taps Finish, and two commits racing on one worktree fail ("nothing to commit").
+    let _one = CHECKPOINTS.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let Some(mut task) = Task::for_bot(&hub.store, bot_id) else { return Ok(None) };
     let (Some(wt), Some(branch)) = (task.worktree_path(), task.branch.clone()) else { return Ok(None) };
     if task.status != TaskStatus::Active {
@@ -558,6 +584,7 @@ pub fn after_turn(hub: &Arc<Hub>, bot_id: &str, final_text: Option<&str>, usage:
         if let Err(e) = task.save(&hub.store) {
             tracing::warn!(task = task.id, error = format!("{e:#}"), "couldn't record usage");
         }
+        crate::admin::after_usage(hub, &mut task);
         hub.emit_bot(bot_id);
     }
     if finish::after_summary_turn(hub, &task, final_text) || task.status != TaskStatus::Active {
@@ -602,7 +629,11 @@ pub async fn rollback(hub: &Arc<Hub>, task_id: &str, checkpoint_id: &str) -> Res
         bail!("stop the agent before going back");
     }
     let label = target.label.clone();
-    let added = tokio::task::spawn_blocking(move || safety::rollback(&wt, &branch, &target.id, &label)).await??;
+    let added = tokio::task::spawn_blocking(move || {
+        let _one = CHECKPOINTS.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        safety::rollback(&wt, &branch, &target.id, &label)
+    })
+    .await??;
     task.push_checkpoints(added);
     task.save(&hub.store)?;
     let text = format!(
@@ -631,8 +662,25 @@ pub fn usage_update(hub: &Hub, bot_id: &str, u: &Value) {
     acc.set_session_cost(amount, u["cost"]["currency"].as_str().unwrap_or("USD"), cost::rate_for(&task.backend));
     task.set_usage(&acc);
     if task.save(&hub.store).is_ok() {
+        crate::admin::after_usage(hub, &mut task);
         hub.emit_bot(bot_id);
     }
+}
+
+/// What all tasks started today (UTC) cost so far, in USD.
+pub fn spent_today(store: &Store) -> f64 {
+    let now = now_ms();
+    let start = now - now.rem_euclid(86_400_000);
+    let total: f64 = store
+        .tasks_data(1000)
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|v| serde_json::from_value::<Task>(v).ok())
+        .filter(|t| t.created_at >= start)
+        .map(|t| t.usage().cost)
+        .sum();
+    // An empty float sum is -0.0.
+    (total * 10_000.0).round() / 10_000.0 + 0.0
 }
 
 /// The cost tracker: every task's cost, plus totals (all time, last 7 days, today).

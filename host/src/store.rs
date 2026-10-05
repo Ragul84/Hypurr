@@ -344,6 +344,41 @@ pub struct PushTicket {
     pub ctx: Option<String>,
 }
 
+/// One audit-log record to append (`admin::audit`).
+pub struct AuditRecord {
+    pub at: i64,
+    pub actor: String,
+    pub actor_name: String,
+    pub role: String,
+    pub action: String,
+    pub target: String,
+    pub detail: Value,
+}
+
+#[allow(clippy::too_many_arguments)]
+fn audit_hash(
+    prev: &str,
+    at: i64,
+    actor: &str,
+    actor_name: &str,
+    role: &str,
+    action: &str,
+    target: &str,
+    detail: &str,
+) -> String {
+    use sha2::{Digest, Sha256};
+    let mut h = Sha256::new();
+    for part in [prev, &at.to_string(), actor, actor_name, role, action, target, detail] {
+        h.update(part.as_bytes());
+        h.update([0u8]);
+    }
+    let mut out = String::with_capacity(64);
+    for byte in h.finalize() {
+        let _ = write!(out, "{byte:02x}");
+    }
+    out
+}
+
 const DEVICE_COLS: &str = "key, name, platform, source, grant_id, scopes, lease_until, created_at, last_seen_at";
 
 fn row_device(r: &rusqlite::Row) -> rusqlite::Result<Device> {
@@ -386,7 +421,15 @@ impl Store {
              CREATE INDEX IF NOT EXISTS entries_bot ON entries(bot_id, seq);
              CREATE TABLE IF NOT EXISTS tasks(
                 id TEXT PRIMARY KEY, bot_id TEXT NOT NULL, data TEXT NOT NULL, created_at INTEGER NOT NULL);
-             CREATE INDEX IF NOT EXISTS tasks_bot ON tasks(bot_id);",
+             CREATE INDEX IF NOT EXISTS tasks_bot ON tasks(bot_id);
+             CREATE TABLE IF NOT EXISTS audit(
+                seq INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, actor TEXT NOT NULL,
+                actor_name TEXT NOT NULL, role TEXT NOT NULL, action TEXT NOT NULL, target TEXT NOT NULL,
+                detail TEXT NOT NULL, prev TEXT NOT NULL, hash TEXT NOT NULL);
+             CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON audit
+                BEGIN SELECT RAISE(ABORT, 'the audit log is append-only'); END;
+             CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit
+                BEGIN SELECT RAISE(ABORT, 'the audit log is append-only'); END;",
         )?;
         migrate(&c)?;
         let secret_key = if path == Path::new(":memory:") {
@@ -441,6 +484,79 @@ impl Store {
         let mut st = c.prepare("SELECT data FROM tasks ORDER BY created_at DESC LIMIT ?")?;
         let rows = st.query_map([limit], |r| r.get::<_, String>(0))?.collect::<rusqlite::Result<Vec<String>>>()?;
         Ok(rows.into_iter().filter_map(|s| serde_json::from_str(&s).ok()).collect())
+    }
+
+    #[cfg(test)]
+    pub fn raw_for_tests(&self) -> std::sync::MutexGuard<'_, Connection> {
+        self.db.locked()
+    }
+
+    // MARK: audit log (append-only; triggers refuse UPDATE and DELETE)
+
+    /// Appends one audit record, chained to the previous one by hash. Returns its `seq`.
+    pub fn audit_append(&self, rec: &AuditRecord) -> Result<i64> {
+        let c = self.db.locked();
+        let prev: String = c
+            .query_row("SELECT hash FROM audit ORDER BY seq DESC LIMIT 1", [], |r| r.get(0))
+            .optional()?
+            .unwrap_or_default();
+        let detail = serde_json::to_string(&rec.detail)?;
+        let hash = audit_hash(&prev, rec.at, &rec.actor, &rec.actor_name, &rec.role, &rec.action, &rec.target, &detail);
+        c.execute(
+            "INSERT INTO audit(at, actor, actor_name, role, action, target, detail, prev, hash)
+             VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+            params![rec.at, rec.actor, rec.actor_name, rec.role, rec.action, rec.target, detail, prev, hash],
+        )?;
+        Ok(c.last_insert_rowid())
+    }
+
+    /// Newest first, before `before` (exclusive).
+    pub fn audit_list(&self, before: i64, limit: i64, since: i64) -> Result<Vec<Value>> {
+        let c = self.db.locked();
+        let mut st = c.prepare(
+            "SELECT seq, at, actor, actor_name, role, action, target, detail, hash FROM audit
+             WHERE seq < ?1 AND at >= ?3 ORDER BY seq DESC LIMIT ?2",
+        )?;
+        let rows = st.query_map(params![before, limit, since], |r| {
+            let detail: String = r.get(7)?;
+            Ok(serde_json::json!({
+                "seq": r.get::<_, i64>(0)?, "at": r.get::<_, i64>(1)?, "actor": r.get::<_, String>(2)?,
+                "actorName": r.get::<_, String>(3)?, "role": r.get::<_, String>(4)?,
+                "action": r.get::<_, String>(5)?, "target": r.get::<_, String>(6)?,
+                "detail": serde_json::from_str::<Value>(&detail).unwrap_or(Value::Null),
+                "hash": r.get::<_, String>(8)?,
+            }))
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Re-computes the hash chain: `(records, first broken seq)`.
+    pub fn audit_verify(&self) -> Result<(i64, Option<i64>)> {
+        let c = self.db.locked();
+        let mut st = c.prepare(
+            "SELECT seq, at, actor, actor_name, role, action, target, detail, prev, hash FROM audit ORDER BY seq",
+        )?;
+        let mut rows = st.query([])?;
+        let (mut n, mut last) = (0_i64, String::new());
+        while let Some(r) = rows.next()? {
+            n += 1;
+            let (seq, prev, hash): (i64, String, String) = (r.get(0)?, r.get(8)?, r.get(9)?);
+            let want = audit_hash(
+                &last,
+                r.get(1)?,
+                &r.get::<_, String>(2)?,
+                &r.get::<_, String>(3)?,
+                &r.get::<_, String>(4)?,
+                &r.get::<_, String>(5)?,
+                &r.get::<_, String>(6)?,
+                &r.get::<_, String>(7)?,
+            );
+            if prev != last || hash != want {
+                return Ok((n, Some(seq)));
+            }
+            last = hash;
+        }
+        Ok((n, None))
     }
 
     pub fn kv_get(&self, k: &str) -> Option<String> {

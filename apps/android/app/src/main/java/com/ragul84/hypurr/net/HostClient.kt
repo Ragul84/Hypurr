@@ -5,6 +5,10 @@ import com.ragul84.hypurr.model.Bot
 import com.ragul84.hypurr.model.Computer
 import com.ragul84.hypurr.model.Entry
 import com.ragul84.hypurr.model.Hello
+import com.ragul84.hypurr.model.TeamInfo
+import com.ragul84.hypurr.model.PolicyInfo
+import com.ragul84.hypurr.model.AuditLog
+import com.ragul84.hypurr.model.Activity
 import com.ragul84.hypurr.model.HypurrJson
 import com.ragul84.hypurr.model.Pairing
 import com.ragul84.hypurr.model.Attachment
@@ -245,6 +249,30 @@ class HostClient(val transport: ChannelTransport) {
         val res = transport.call("setSafetySettings", HypurrJson.encodeToJsonElement(SafetySettings.serializer(), settings).jsonObject)
         return HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("safety"))
     }
+
+    // Team admin (host `admin`).
+
+    suspend fun team(): TeamInfo = call("team")
+
+    /** `role: null` goes back to the default role. */
+    suspend fun setRole(key: String, role: String?): TeamInfo = call("setRole", buildJsonObject {
+        put("key", key)
+        if (role == null) put("role", kotlinx.serialization.json.JsonNull) else put("role", role)
+    })
+
+    suspend fun setTeam(defaultRole: String): TeamInfo = call("setTeam", buildJsonObject { put("defaultRole", defaultRole) })
+
+    suspend fun policies(): PolicyInfo = call("policies")
+
+    /** Partial update of the team rules and the safety net settings. */
+    suspend fun setPolicies(patch: JsonObject): PolicyInfo = call("setPolicies", patch)
+
+    suspend fun auditLog(before: Long? = null, limit: Int = 100): AuditLog = call("auditLog", buildJsonObject {
+        before?.let { put("before", it) }
+        put("limit", limit)
+    })
+
+    suspend fun activity(days: Int = 7): Activity = call("activity", buildJsonObject { put("days", days) })
 
     fun events(since: Long): Flow<HostEvent> = transport.events(since).mapNotNull(HostEvent::parse)
 }

@@ -242,6 +242,17 @@ impl Phone {
         }
     }
 
+    /// The whole reply: `{ok}` or `{err: {status, message}}`.
+    async fn try_call(&mut self, id: u64, m: &str, b: Value) -> Value {
+        self.send(json!({"id": id, "m": m, "b": b})).await;
+        loop {
+            let v = self.inner().await;
+            if v["id"] == id && v.get("ev").is_none() {
+                return v;
+            }
+        }
+    }
+
     async fn call(&mut self, id: u64, m: &str, b: Value) -> Value {
         self.send(json!({"id": id, "m": m, "b": b})).await;
         loop {
@@ -358,4 +369,144 @@ async fn personal_workspaces_are_unique_persistent_and_optional() {
     let group = host.call("createBot", json!({"name": "Group", "kind": "group", "members": [second["id"]]})).await;
     assert_eq!(group["bot"]["cwd"], "");
     assert_eq!(group["bot"]["managedWorkspace"], false);
+}
+
+/// Pairs a new phone and returns it connected.
+async fn pair_phone(host: &Host, name: &str) -> Phone {
+    let qr = host.call("pairing", json!({})).await;
+    let url = qr["pairingUrl"].as_str().unwrap();
+    let sk: [u8; 32] = crypto::unb64_n(&query_param(url, "sk")).unwrap();
+    let key = SigningKey::from_bytes(&crypto::random());
+    let mut phone = Phone::connect(host, &key, &sk, true).await;
+    phone
+        .send(
+            json!({"id": 1, "m": "pair", "b": {"code": query_param(url, "code"), "name": name, "platform": "android"}}),
+        )
+        .await;
+    assert!(phone.inner().await["ok"].is_object());
+    assert!(matches!(phone.recv().await, Frame::Closed(4100)));
+    Phone::connect(host, &key, &sk, false).await
+}
+
+#[tokio::test]
+async fn team_roles_policies_approvals_and_audit_log() {
+    if Command::new("python3").arg("--version").output().is_err() {
+        eprintln!("skipping: python3 not available");
+        return;
+    }
+    let host = start_host().await;
+    let mut lead = pair_phone(&host, "Arjun's Pixel").await;
+    let mut dev = pair_phone(&host, "Priya's phone").await;
+    // A lone phone is an admin until the computer turns this into a team.
+    assert_eq!(dev.call(2, "hello", json!({})).await["you"]["role"], "admin");
+    let team = host.call("team", json!({})).await;
+    let key_of = |name: &str| {
+        team["people"].as_array().unwrap().iter().find(|p| p["name"] == name).unwrap()["key"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    let (lead_key, dev_key) = (key_of("Arjun's Pixel"), key_of("Priya's phone"));
+    host.call("setTeam", json!({"defaultRole": "member"})).await;
+    host.call("setRole", json!({"key": lead_key, "role": "admin"})).await;
+    assert_eq!(dev.call(3, "hello", json!({})).await["you"]["role"], "member");
+    assert_eq!(lead.call(3, "hello", json!({})).await["you"]["role"], "admin");
+
+    // Members can't change the rules; admins can.
+    let refused = dev.try_call(4, "setPolicies", json!({"dailyLimit": 100})).await;
+    assert_eq!(refused["err"]["status"], 403, "{refused}");
+    assert!(refused["err"]["message"].as_str().unwrap().contains("member"), "{refused}");
+    let p = lead
+        .call(
+            4,
+            "setPolicies",
+            json!({"allowedAgents": ["custom"], "adminApprovesFrom": "low", "protectedBranches": ["main"]}),
+        )
+        .await;
+    assert_eq!(p["policies"]["allowedAgents"], json!(["custom"]));
+    assert_eq!(
+        dev.call(5, "policies", json!({})).await["policies"]["adminApprovesFrom"],
+        "low",
+        "members can read them"
+    );
+
+    // Allowed agents.
+    let agent = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fake_agent.py");
+    let refused = dev
+        .try_call(6, "createBot", json!({"name": "X", "backend": "claude", "cwd": host.home.to_string_lossy()}))
+        .await;
+    assert_eq!(refused["err"]["status"], 403, "{refused}");
+    let bot = dev
+        .call(
+            7,
+            "createBot",
+            json!({"name": "Tester", "backend": "custom", "command": format!("python3 '{}'", agent.display()),
+                   "cwd": host.home.to_string_lossy(), "permission": "ask"}),
+        )
+        .await["bot"]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+
+    // Approval levels: this card needs an admin.
+    dev.call(8, "send", json!({"botId": bot, "text": "go", "clientNonce": "n1"})).await;
+    let card = host.wait_for(&bot, |e| e["kind"] == "permission" && e["data"]["status"] == "pending").await;
+    assert_eq!(card["data"]["needsAdmin"], true, "{card}");
+    let refused = dev.try_call(9, "respondPermission", json!({"entryId": card["id"], "optionId": "allow"})).await;
+    assert_eq!(refused["err"]["status"], 403, "{refused}");
+    assert!(refused["err"]["message"].as_str().unwrap().contains("admin"), "{refused}");
+    lead.call(9, "respondPermission", json!({"entryId": card["id"], "optionId": "allow"})).await;
+    host.wait_for(&bot, |e| e["kind"] == "agent" && e["data"]["final"] == true).await;
+
+    // Viewers only look.
+    host.call("setRole", json!({"key": dev_key, "role": "viewer"})).await;
+    assert_eq!(dev.try_call(10, "send", json!({"botId": bot, "text": "again"})).await["err"]["status"], 403);
+    assert!(dev.call(11, "history", json!({"botId": bot})).await["entries"].is_array());
+    assert_eq!(dev.try_call(12, "auditLog", json!({})).await["err"]["status"], 403);
+
+    // The audit log: who did what, chained and intact.
+    let log = lead.call(12, "auditLog", json!({})).await;
+    assert_eq!(log["intact"], true, "{log}");
+    let entries = log["entries"].as_array().unwrap();
+    let find = |action: &str, actor: &str| {
+        entries
+            .iter()
+            .find(|e| e["action"] == action && e["actorName"] == actor)
+            .cloned()
+            .unwrap_or_else(|| panic!("no {action} by {actor}: {log}"))
+    };
+    assert_eq!(find("role.default", "This computer")["detail"]["defaultRole"], "member");
+    for target in ["setPolicies", "createBot", "respondPermission", "send", "auditLog"] {
+        assert!(
+            entries
+                .iter()
+                .any(|e| e["action"] == "blocked" && e["target"] == target && e["actorName"] == "Priya's phone"),
+            "blocked {target} is recorded: {log}"
+        );
+    }
+    assert_eq!(find("policy.change", "Arjun's Pixel")["role"], "admin");
+    assert_eq!(find("bot.create", "Priya's phone")["target"], "Tester");
+    let answer = find("approval.answer", "Arjun's Pixel");
+    assert_eq!(answer["detail"]["answer"], "allow_once");
+    assert!(answer["detail"]["risk"].is_string());
+
+    // The activity view counts it per person.
+    let act = host.call("activity", json!({})).await;
+    let priya = act["people"].as_array().unwrap().iter().find(|p| p["name"] == "Priya's phone").unwrap().clone();
+    assert_eq!(priya["role"], "viewer");
+    assert!(priya["blocked"].as_i64().unwrap() >= 3, "{priya}");
+    assert!(act["totals"]["approvals"].as_i64().unwrap() >= 1);
+
+    // `HYPURR_WIRE_OUT=path`: dump real output for docs/reference/fixtures/admin-wire.json.
+    if let Ok(out) = std::env::var("HYPURR_WIRE_OUT") {
+        let wire = json!({
+            "hello": {"you": dev.call(13, "hello", json!({})).await["you"]},
+            "team": host.call("team", json!({})).await,
+            "policies": host.call("policies", json!({})).await,
+            "card": card,
+            "auditLog": log,
+            "activity": act,
+        });
+        std::fs::write(out, serde_json::to_string_pretty(&wire).unwrap()).unwrap();
+    }
 }

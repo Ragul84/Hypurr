@@ -26,6 +26,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.AdminPanelSettings
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Computer
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.runtime.mutableStateOf
@@ -85,6 +87,8 @@ data class SettingsUiState(
     val costs: TaskCosts? = null,
     /** The last "Test" result per kind (github, jira, slack, teams). */
     val testResults: Map<String, String> = emptyMap(),
+    /** This phone's role on the computer; null until the host says. */
+    val you: com.ragul84.hypurr.model.Actor? = null,
 )
 
 @Composable
@@ -100,7 +104,9 @@ fun SettingsScreen(
     onDeleteTemplate: (String) -> Unit = {},
     onIntegrations: (JsonObject) -> Unit = {},
     onTestIntegration: (String) -> Unit = {},
+    onTeamAdmin: () -> Unit = {},
 ) {
+    val admin = state.you?.isAdmin != false
     val c = Hypurr.colors
     Column(Modifier.fillMaxSize().background(c.bg).safeDrawingPadding().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
         Row(Modifier.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -124,6 +130,21 @@ fun SettingsScreen(
             Detail("Cloud relay", state.computer.cloud ?: "Off on this computer")
             SoftButton("Forget this computer", Modifier.fillMaxWidth().padding(top = 6.dp), tint = c.danger, onClick = onForget)
         }
+        Section("Team") {
+            Row(Modifier.fillMaxWidth().pressable("Team admin", onClick = onTeamAdmin), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(c.accent.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Rounded.AdminPanelSettings, null, tint = c.accent)
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Team admin", style = MaterialTheme.typography.titleMedium, color = c.text)
+                    Text(if (admin) "Activity, rules, people and the audit log" else "The team's rules and who can do what",
+                        color = c.secondary, style = MaterialTheme.typography.bodySmall)
+                }
+                state.you?.let { com.ragul84.hypurr.ui.Pill(it.role, if (it.isAdmin) c.accent else c.success) }
+                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = c.tertiary)
+            }
+        }
         Section("Appearance") {
             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(c.bg.copy(alpha = 0.6f)).padding(4.dp)) {
                 ThemeMode.entries.forEach { mode ->
@@ -143,11 +164,11 @@ fun SettingsScreen(
             Section("Safety net") {
                 Detail("Protected", safety.protectedBranches.joinToString(", ").ifEmpty { "None" })
                 ToggleRow("Block pushes to protected branches", "Agents can't push to these branches or force-push; they're refused without asking",
-                    safety.blockProtected, true) { onSafety(safety.copy(blockProtected = it)) }
+                    safety.blockProtected, admin) { onSafety(safety.copy(blockProtected = it)) }
                 ToggleRow("Always ask for high risk", "Even bots set to approve automatically ask before risky actions",
-                    safety.alwaysAskHigh, true) { onSafety(safety.copy(alwaysAskHigh = it)) }
+                    safety.alwaysAskHigh, admin) { onSafety(safety.copy(alwaysAskHigh = it)) }
                 ToggleRow("Only git projects", "Refuse tasks in folders without git, where Hypurr can't save checkpoints",
-                    safety.requireGit, true) { onSafety(safety.copy(requireGit = it)) }
+                    safety.requireGit, admin) { onSafety(safety.copy(requireGit = it)) }
             }
             Section("My templates") {
                 if (state.customTemplates.isEmpty()) {
@@ -169,7 +190,8 @@ fun SettingsScreen(
                 AddTemplate(onAddTemplate)
             }
         }
-        state.integrations?.let { work -> WorkTools(work, state.testResults, onIntegrations, onTestIntegration) }
+        // Work tools hold the team's keys: admins only.
+        if (admin) state.integrations?.let { work -> WorkTools(work, state.testResults, onIntegrations, onTestIntegration) }
         state.costs?.let { Spending(it) }
         Section("Notifications") {
             ToggleRow("Alerts", if (state.pushAvailable) "Needs you, done and failed, sealed end to end"
@@ -209,7 +231,7 @@ private fun AddTemplate(onAdd: (String, String) -> Unit) {
 }
 
 @Composable
-private fun SmallField(value: String, hint: String, minLines: Int = 1, secret: Boolean = false, onChange: (String) -> Unit) {
+internal fun SmallField(value: String, hint: String, minLines: Int = 1, secret: Boolean = false, onChange: (String) -> Unit) {
     val c = Hypurr.colors
     Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.bg.copy(alpha = 0.6f)).padding(12.dp)) {
         if (value.isEmpty()) Text(hint, color = c.tertiary, style = MaterialTheme.typography.bodyMedium)
@@ -221,7 +243,7 @@ private fun SmallField(value: String, hint: String, minLines: Int = 1, secret: B
 }
 
 @Composable
-private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {
+internal fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {
     val c = Hypurr.colors
     Text(title.uppercase(), color = c.tertiary, style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
         modifier = Modifier.padding(start = 8.dp, top = 18.dp, bottom = 8.dp))
@@ -230,7 +252,7 @@ private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) 
 }
 
 @Composable
-private fun Detail(label: String, value: String) {
+internal fun Detail(label: String, value: String) {
     val c = Hypurr.colors
     Row {
         Text(label, color = c.secondary, modifier = Modifier.width(120.dp), style = MaterialTheme.typography.bodyMedium)

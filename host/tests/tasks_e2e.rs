@@ -428,4 +428,33 @@ async fn workplace_task_from_issue_with_screenshot_summary_pr_and_cost() {
     let costs = host.call("taskCosts", json!({})).await;
     assert_eq!(costs["total"]["tasks"], 2);
     assert!(costs["total"]["cost"].as_f64().unwrap() >= 0.1 - 1e-9, "{costs}");
+
+    // Team spending limits: a task over its limit is stopped and can't take more messages.
+    host.call("setPolicies", json!({"taskLimit": 0.01})).await;
+    let started = host
+        .call(
+            "startTask",
+            json!({"goal": "fix the checkout", "project": repo_path, "backend": "custom", "command": command}),
+        )
+        .await;
+    let limited = started["bot"]["id"].as_str().unwrap().to_owned();
+    let stopped = host.wait_for(&limited, |e| e["kind"] == "notice" && e["data"]["style"] == "error").await;
+    assert!(stopped["data"]["text"].as_str().unwrap().contains("spending limit ($0.01)"), "{stopped}");
+    let (ok, err) = host.try_call("send", json!({"botId": limited, "text": "keep going"})).await;
+    assert!(!ok && err["error"].as_str().unwrap().contains("spending limit"), "{err}");
+    // A daily limit stops new tasks.
+    host.call("setPolicies", json!({"taskLimit": 0, "dailyLimit": 0.05})).await;
+    let (ok, err) =
+        host.try_call("startTask", json!({"goal": "another", "project": repo_path, "backend": "custom"})).await;
+    assert!(!ok && err["error"].as_str().unwrap().contains("Today's spending limit"), "{err}");
+    let log = host.call("auditLog", json!({})).await;
+    assert_eq!(log["intact"], true);
+    let actions: Vec<&str> = log["entries"].as_array().unwrap().iter().filter_map(|e| e["action"].as_str()).collect();
+    for a in ["task.start", "task.finish", "policy.change", "policy.limit", "blocked"] {
+        assert!(actions.contains(&a), "{a} in {actions:?}");
+    }
+    let act = host.call("activity", json!({})).await;
+    assert_eq!(act["tasks"].as_array().unwrap().len(), 3);
+    assert_eq!(act["tasks"][0]["startedBy"]["name"], "This computer");
+    assert_eq!(act["people"][0]["tasks"], 3);
 }

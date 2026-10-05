@@ -84,7 +84,7 @@ impl std::error::Error for UnknownMethod {}
 pub fn error_status(e: &anyhow::Error) -> (StatusCode, String) {
     if e.is::<UnknownMethod>() {
         (StatusCode::NOT_FOUND, e.to_string())
-    } else if e.is::<Forbidden>() {
+    } else if e.is::<Forbidden>() || e.is::<crate::admin::NotAllowed>() {
         (StatusCode::FORBIDDEN, e.to_string())
     } else if e.is::<crate::remote::cloud::Conflict>() {
         (StatusCode::CONFLICT, e.to_string())
@@ -242,8 +242,35 @@ fn enable_new_connectors(hub: &Hub, before: &[String]) -> Result<()> {
 }
 
 /// Runs one API method for `caller` (permissions per spec §6.6).
-pub async fn dispatch(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value) -> Result<Value> {
+pub async fn dispatch(hub: &Arc<Hub>, caller: &Caller, method: &str, mut b: Value) -> Result<Value> {
     devices::permit(caller, method)?;
+    // Team admin: the caller's role and the team's rules, then the audit log.
+    let actor = crate::admin::actor(&hub.store, caller);
+    if let Err(e) = crate::admin::authorize(&hub.store, &actor, method, &mut b) {
+        crate::admin::audit::blocked(&hub.store, &actor, method, &e);
+        return Err(e.into());
+    }
+    if !crate::admin::audit::audited(method) {
+        let mut out = run(hub, caller, &actor, method, b).await?;
+        if method == "hello" {
+            out["you"] = actor.json();
+        }
+        return Ok(out);
+    }
+    let before = crate::admin::audit::before(&hub.store, method, &b);
+    let result = run(hub, caller, &actor, method, b.clone()).await;
+    match &result {
+        Ok(out) => crate::admin::audit::after(&hub.store, &actor, method, &b, out, &before),
+        Err(e) => {
+            if let Some(na) = e.downcast_ref::<crate::admin::NotAllowed>() {
+                crate::admin::audit::blocked(&hub.store, &actor, method, na);
+            }
+        }
+    }
+    result
+}
+
+async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, method: &str, b: Value) -> Result<Value> {
     if method.contains("onnector")
         || method.starts_with("composio")
         || method == "setComposioKey"
@@ -671,6 +698,14 @@ pub async fn dispatch(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value) -
             json!({})
         }
         "safetySettings" => json!({"safety": crate::tasks::SafetySettings::load(&hub.store)}),
+        // Team admin (`admin`).
+        "team" => crate::admin::team(&hub.store, actor)?,
+        "setRole" => crate::admin::set_role(&hub.store, actor, &b)?,
+        "setTeam" => crate::admin::set_team(&hub.store, actor, &b)?,
+        "policies" => crate::admin::policies(&hub.store),
+        "setPolicies" => crate::admin::set_policies(&hub.store, &b)?,
+        "auditLog" => crate::admin::audit::list(&hub.store, &b)?,
+        "activity" => crate::admin::activity::activity(&hub.store, &b)?,
         "setSafetySettings" => json!({"safety": crate::tasks::set_safety(&hub.store, &b)?}),
         "registerDevice" => {
             let ticket = str_arg(&b, "ticket")?;

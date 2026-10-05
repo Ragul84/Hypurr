@@ -97,6 +97,8 @@ data class EntryData(
     val attachments: List<Attachment>? = null,
     /** notice: a finished task's "What changed" card (learning mode, PR, cost). */
     val learning: Learning? = null,
+    /** permission: the team's rules say an admin approves this one. */
+    val needsAdmin: Boolean? = null,
 )
 
 @Serializable
@@ -246,6 +248,8 @@ data class Hello(
     val signKey: String? = null,
     val boxKey: String? = null,
     val cloud: String? = null,
+    /** Who this phone is on the computer (team admin). */
+    val you: Actor? = null,
 )
 
 @Serializable
@@ -331,3 +335,163 @@ data class TaskSetup(
 
 @Serializable
 data class TaskRoute(val project: Project? = null, val agent: Agent? = null, val reason: String = "")
+
+// MARK: team admin (host `admin`)
+
+/** A person (device) and their role: admin | member | viewer. */
+@Serializable
+data class Actor(val key: String = "", val name: String = "", val role: String = "admin") {
+    val isAdmin get() = role == "admin"
+    val canAct get() = role != "viewer"
+}
+
+@Serializable
+data class TeamPerson(
+    val key: String = "",
+    val name: String = "",
+    val platform: String = "",
+    val role: String = "member",
+    /** This computer itself: always an admin. */
+    val fixed: Boolean = false,
+    /** Has its own role (otherwise the default). */
+    val ownRole: Boolean = false,
+    val lastSeenAt: Long? = null,
+    val you: Boolean = false,
+)
+
+@Serializable
+data class TeamInfo(val you: Actor = Actor(), val defaultRole: String = "admin", val people: List<TeamPerson> = emptyList())
+
+@Serializable
+data class Policies(
+    val allowedAgents: List<String> = emptyList(),
+    val dailyLimit: Double = 0.0,
+    val taskLimit: Double = 0.0,
+    /** low | medium | high | never: at or above, even auto-approve bots ask. */
+    val askFrom: String = "high",
+    /** low | medium | high | off: at or above, only an admin approves. */
+    val adminApprovesFrom: String = "off",
+)
+
+@Serializable
+data class PolicyInfo(
+    val policies: Policies = Policies(),
+    val safety: SafetySettings = SafetySettings(),
+    val spentToday: Double = 0.0,
+    val agents: List<Agent> = emptyList(),
+)
+
+@Serializable
+data class AuditEntry(
+    val seq: Long = 0,
+    val at: Long = 0,
+    val actor: String = "",
+    val actorName: String = "",
+    val role: String = "",
+    val action: String = "",
+    val target: String = "",
+    val detail: kotlinx.serialization.json.JsonElement? = null,
+    val hash: String = "",
+) {
+    /** One plain line: "started a task", "was blocked: setPolicies". */
+    val summary: String get() = when (action) {
+        "task.start" -> "started a task"
+        "task.finish" -> "finished a task"
+        "task.rollback" -> "went back to a checkpoint"
+        "task.checkpoint" -> "saved a checkpoint"
+        "approval.answer" -> "answered an approval"
+        "approval.auto" -> "approved automatically"
+        "approval.blocked" -> "blocked a request"
+        "policy.limit" -> "stopped a task at its spending limit"
+        "policy.change" -> "changed the team rules"
+        "role.change" -> "changed a role"
+        "role.default" -> "changed the role for new devices"
+        "integrations.change" -> "changed work tools"
+        "bot.create" -> "created a bot"
+        "bot.update" -> "changed a bot"
+        "bot.delete" -> "deleted a bot"
+        "bot.stop" -> "stopped an agent"
+        "blocked" -> "was blocked"
+        else -> action.replace('.', ' ')
+    }
+
+    /** What it was about, in plain words (a refused method becomes what the person tried to do). */
+    val targetLabel: String get() = if (action != "blocked") target else when (target) {
+        "respondPermission" -> "Answering an approval"
+        "setPolicies", "setSafetySettings" -> "Changing the team rules"
+        "setRole", "setTeam" -> "Changing roles"
+        "send" -> "Sending a message"
+        "startTask" -> "Starting a task"
+        "createBot" -> "Creating a bot"
+        "updateBot" -> "Changing a bot"
+        "auditLog" -> "Opening the audit log"
+        "activity" -> "Opening the activity view"
+        "setIntegrations" -> "Changing work tools"
+        else -> target
+    }
+
+    val reason: String? get() = (detail as? kotlinx.serialization.json.JsonObject)?.get("reason")
+        ?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
+    val risk: String? get() = (detail as? kotlinx.serialization.json.JsonObject)?.get("risk")
+        ?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
+}
+
+@Serializable
+data class AuditLog(
+    val entries: List<AuditEntry> = emptyList(),
+    val count: Long = 0,
+    /** The hash chain checks out: nothing was edited or removed. */
+    val intact: Boolean = true,
+    val brokenAt: Long? = null,
+)
+
+@Serializable
+data class ActivityPerson(
+    val key: String = "",
+    val name: String = "",
+    val role: String = "member",
+    val lastSeenAt: Long? = null,
+    val tasks: Int = 0,
+    val spend: Double = 0.0,
+    val approvals: Int = 0,
+    val blocked: Int = 0,
+    val removed: Boolean = false,
+)
+
+@Serializable
+data class StartedBy(val key: String = "", val name: String = "")
+
+@Serializable
+data class ActivityTask(
+    val taskId: String = "",
+    val botId: String = "",
+    val title: String = "",
+    val status: String = "active",
+    val projectName: String = "",
+    val backend: String = "",
+    val startedBy: StartedBy = StartedBy(),
+    val usage: TaskUsage? = null,
+    val pr: PullRequest? = null,
+    val createdAt: Long = 0,
+)
+
+@Serializable
+data class ActivityTotals(
+    val spend: Double = 0.0,
+    val todaySpend: Double = 0.0,
+    val todayTasks: Int = 0,
+    val approvals: Int = 0,
+    val blocked: Int = 0,
+)
+
+@Serializable
+data class Activity(
+    val days: Int = 7,
+    val people: List<ActivityPerson> = emptyList(),
+    val tasks: List<ActivityTask> = emptyList(),
+    val events: List<AuditEntry> = emptyList(),
+    val totals: ActivityTotals = ActivityTotals(),
+)
+
+/** "$4.20" for a limit; "No limit" for 0. */
+fun limitLabel(x: Double): String = if (x <= 0.0) "No limit" else "$" + String.format(java.util.Locale.US, "%.2f", x)

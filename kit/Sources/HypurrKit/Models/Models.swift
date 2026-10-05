@@ -148,6 +148,8 @@ public struct EntryData: Codable, Hashable, Sendable {
     public var checkpoint: String?
     /// notice: a finished task's "What changed" card (learning mode, PR, cost).
     public var learning: TaskLearning?
+    /// permission: the team's rules say an admin approves this one.
+    public var needsAdmin: Bool?
 
     public init(text: String? = nil, status: String? = nil, clientNonce: String? = nil) {
         self.text = text
@@ -346,6 +348,19 @@ public struct Hello: Codable, Sendable {
     public var `protocol`: Int?
     /// The cloud relay the host uses; nil = cloud off.
     public var cloud: String?
+    /// Who this device is on the computer (team admin); missing from older hosts.
+    public var you: TeamActor?
+}
+
+/// A person (device) on the computer and their role: `admin` | `member` | `viewer`.
+public struct TeamActor: Codable, Hashable, Sendable {
+    public var key: String
+    public var name: String
+    public var role: String
+
+    public var isAdmin: Bool { role == "admin" }
+    /// Viewers can only look.
+    public var canAct: Bool { role != "viewer" }
 }
 
 /// The computer's remote screen: whether phones can view/control it, and who's in control.

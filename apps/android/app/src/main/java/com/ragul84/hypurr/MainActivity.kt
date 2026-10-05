@@ -43,6 +43,9 @@ import kotlinx.coroutines.delay
 import com.ragul84.hypurr.ui.screens.PairingScreen
 import com.ragul84.hypurr.ui.screens.PairingUiState
 import com.ragul84.hypurr.ui.screens.SettingsScreen
+import com.ragul84.hypurr.ui.screens.AdminTab
+import com.ragul84.hypurr.ui.screens.TeamAdminScreen
+import com.ragul84.hypurr.ui.screens.TeamAdminUiState
 import com.ragul84.hypurr.ui.screens.SettingsUiState
 import com.ragul84.hypurr.ui.screens.rosterOrder
 import com.ragul84.hypurr.ui.theme.HypurrTheme
@@ -163,6 +166,7 @@ class MainActivity : ComponentActivity() {
         val entries by store.entries.collectAsState()
         val synced by store.synced.collectAsState()
         val requested by openBot.collectAsState()
+        val you by store.you.collectAsState()
         var screen by rememberSaveable { mutableStateOf("list") }
         requested?.let {
             openBot.value = null
@@ -207,6 +211,7 @@ class MainActivity : ComponentActivity() {
                         onSaveCheckpoint = { scope.launch { runCatching { store.saveCheckpoint(id) } } },
                         onOpenLink = { url -> runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } },
                         integrations = integrations,
+                        you = you,
                     )
                 }
                 target == "newtask" -> {
@@ -282,7 +287,8 @@ class MainActivity : ComponentActivity() {
                     SettingsScreen(
                         SettingsUiState(current, linkState, theme, dynamic, notify, app.pushAvailable, BuildConfig.VERSION_NAME,
                             safety = setup?.safety, customTemplates = setup?.templates.orEmpty().filter { !it.builtin },
-                            integrations = integrations, costs = costs, testResults = tests),
+                            integrations = integrations, costs = costs, testResults = tests, you = you),
+                        onTeamAdmin = { screen = "team" },
                         onBack = { screen = "list" },
                         onTheme = store::setTheme,
                         onDynamic = store::setDynamicColor,
@@ -310,6 +316,31 @@ class MainActivity : ComponentActivity() {
                                 tests = tests + (kind to result)
                             }
                         },
+                    )
+                }
+                target == "team" -> {
+                    val team by store.team.collectAsState()
+                    val policies by store.policies.collectAsState()
+                    val activity by store.activity.collectAsState()
+                    val audit by store.audit.collectAsState()
+                    var tab by rememberSaveable { mutableStateOf(AdminTab.Activity) }
+                    var error by remember { mutableStateOf<String?>(null) }
+                    LaunchedEffect(Unit) { store.loadAdmin() }
+                    fun save(block: suspend () -> Unit) {
+                        error = null
+                        scope.launch { runCatching { block() }.onFailure { error = it.message ?: "Couldn't save." } }
+                    }
+                    BackHandler { screen = "settings" }
+                    TeamAdminScreen(
+                        TeamAdminUiState(you, team, policies, activity, audit, tab, error),
+                        onBack = { screen = "settings" },
+                        onTab = {
+                            tab = it
+                            scope.launch { store.loadAdmin() }
+                        },
+                        onPolicies = { patch -> save { store.setPolicies(patch) } },
+                        onRole = { key, role -> save { store.setRole(key, role) } },
+                        onDefaultRole = { role -> save { store.setDefaultRole(role) } },
                     )
                 }
                 else -> BotListScreen(

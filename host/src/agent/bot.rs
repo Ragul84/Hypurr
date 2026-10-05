@@ -1308,13 +1308,23 @@ impl Actor {
             }
             data["status"] = "answered".into();
             data["selected"] = reject.map_or(Value::Null, |o| o["optionId"].clone());
+            crate::admin::audit::system(
+                &self.hub.store,
+                "approval.blocked",
+                &title,
+                json!({"botId": self.cfg.id, "bot": self.cfg.name, "risk": assessment.risk, "reason": reason}),
+            );
             data["blocked"] = reason.into();
             self.close_seg();
             self.add(EntryKind::Permission, turn, data);
             return;
         }
-        let settings = crate::tasks::SafetySettings::load(&self.hub.store);
-        let must_ask = settings.always_ask_high && assessment.risk == crate::tasks::risk::Risk::High;
+        // The team's approval level: at or above it, even auto-approve bots ask.
+        let policies = crate::admin::Policies::load(&self.hub.store);
+        let must_ask = policies.ask_from_risk(&self.hub.store).is_some_and(|from| assessment.risk >= from);
+        if crate::admin::needs_admin(&self.hub.store, assessment.risk) {
+            data["needsAdmin"] = true.into();
+        }
         if self.cfg.permission == Permission::Auto && !must_ask {
             let pick = ["allow_once", "allow_always"]
                 .iter()
@@ -1325,6 +1335,14 @@ impl Actor {
                     .acp
                     .respond(rpc_id, json!({"outcome": {"outcome": "selected", "optionId": o["optionId"]}}))
                     .await;
+                if assessment.risk > crate::tasks::risk::Risk::Low {
+                    crate::admin::audit::system(
+                        &self.hub.store,
+                        "approval.auto",
+                        &title,
+                        json!({"botId": self.cfg.id, "bot": self.cfg.name, "risk": assessment.risk}),
+                    );
+                }
                 return;
             }
         }

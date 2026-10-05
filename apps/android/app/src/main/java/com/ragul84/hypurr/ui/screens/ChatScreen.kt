@@ -39,6 +39,9 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Block
+import androidx.compose.material.icons.rounded.AdminPanelSettings
+import androidx.compose.ui.graphics.compositeOver
+import com.ragul84.hypurr.model.Actor
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
@@ -113,6 +116,8 @@ fun ChatScreen(
     integrations: Integrations? = null,
     initialCheckpointsOpen: Boolean = false,
     initialFinishOpen: Boolean = false,
+    /** This phone's role: members can't answer cards that need an admin. */
+    you: Actor? = null,
     now: Long = System.currentTimeMillis(),
 ) {
     val c = Hypurr.colors
@@ -134,15 +139,17 @@ fun ChatScreen(
                     when (entry.kind) {
                         "user" -> UserBubble(entry)
                         "agent" -> AgentBubble(entry)
-                        "permission" -> PermissionCard(entry, task, onRespond, onUndo)
+                        "permission" -> PermissionCard(entry, task, onRespond, onUndo, you?.isAdmin != false)
                         else -> entry.data.learning?.let { LearningCard(it, onOpenLink) } ?: Notice(entry)
                     }
                 }
             }
             if (chat.isEmpty()) item(key = "empty") { EmptyChat(bot) }
         }
-        // Header: glass, floating over the transcript.
-        Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp), c.glass).statusBarsPadding()
+        // Header: frosted glass over the transcript. Compose has no backdrop blur before Android 12,
+        // so it is opaque: scrolled text must not show through the title.
+        val headerFill = c.glass.compositeOver(c.bg)
+        Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp), headerFill).statusBarsPadding()
             .padding(horizontal = 10.dp, vertical = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconBubble(Icons.AutoMirrored.Rounded.ArrowBack, "Back", fill = c.surface.copy(alpha = 0.6f), onClick = onBack)
@@ -339,7 +346,8 @@ private fun AgentBubble(entry: Entry) {
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun PermissionCard(entry: Entry, task: TaskInfo?, onRespond: (Entry, String?) -> Unit, onUndo: (Entry) -> Unit) {
+private fun PermissionCard(entry: Entry, task: TaskInfo?, onRespond: (Entry, String?) -> Unit, onUndo: (Entry) -> Unit,
+                           isAdmin: Boolean = true) {
     val c = Hypurr.colors
     val d = entry.data
     val pending = d.status == null || d.status == "pending"
@@ -358,6 +366,7 @@ private fun PermissionCard(entry: Entry, task: TaskInfo?, onRespond: (Entry, Str
             Spacer(Modifier.width(8.dp))
             Text(when {
                 blocked -> "Blocked by the safety net"
+                pending && d.needsAdmin == true && !isAdmin -> "Waiting for an admin"
                 pending -> "Needs you"
                 else -> "Answered"
             }, color = tint, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
@@ -381,14 +390,23 @@ private fun PermissionCard(entry: Entry, task: TaskInfo?, onRespond: (Entry, Str
                 d.riskReasons?.drop(1)?.forEach { Text("• $it", color = c.secondary, style = MaterialTheme.typography.bodySmall) }
             }
         }
-        if (pending) {
+        if (pending && d.needsAdmin == true) {
+            Row(Modifier.padding(top = 10.dp).clip(RoundedCornerShape(12.dp)).background(c.accent.copy(alpha = 0.10f))
+                .padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.AdminPanelSettings, null, tint = c.accent, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(if (isAdmin) "Your team's rules: an admin approves this" else "Needs an admin: your team's rules say an admin approves this",
+                    color = c.accent, style = MaterialTheme.typography.labelMedium)
+            }
+        }
+        if (pending && (d.needsAdmin != true || isAdmin)) {
             FlowRow(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 d.options.orEmpty().forEach { option ->
                     val reject = option.kind.startsWith("reject")
                     SoftButton(option.name, tint = if (reject) c.danger else c.accent) { onRespond(entry, option.optionId) }
                 }
             }
-        } else if (!blocked) {
+        } else if (!blocked && !pending) {
             val option = d.options?.firstOrNull { it.optionId == d.selected }
             Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(option?.name ?: d.status.orEmpty().replaceFirstChar(Char::uppercase), color = c.secondary,

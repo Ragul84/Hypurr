@@ -47,6 +47,7 @@ android {
                 it.systemProperty("hypurr.vectors", rootProject.file("../../docs/reference/fixtures/remote-relay-vectors.json").path)
                 it.systemProperty("hypurr.taskWire", rootProject.file("../../docs/reference/fixtures/task-wire.json").path)
                 it.systemProperty("hypurr.workWire", rootProject.file("../../docs/reference/fixtures/work-wire.json").path)
+                it.systemProperty("hypurr.adminWire", rootProject.file("../../docs/reference/fixtures/admin-wire.json").path)
                 listOf("HYPURR_E2E_LINK", "HYPURR_E2E_BOT", "HYPURR_E2E_PROJECT", "HYPURR_E2E_AGENT").forEach { key ->
                     System.getenv(key)?.let { value -> it.environment(key, value) }
                 }

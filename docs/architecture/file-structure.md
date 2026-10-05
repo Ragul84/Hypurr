@@ -71,6 +71,7 @@ Hypurr/
 | Agent process, ACP, queue and session lifecycle | `host/src/agent/bot.rs`, `acp.rs` |
 | Beginner tasks: router, templates, safety net, risk rules, finish, cost | `host/src/tasks/` |
 | Work tools: GitHub, Jira, Slack / Teams webhooks | `host/src/integrations/` |
+| Team admin: roles, rules, audit log, activity | `host/src/admin/` (gate in `api::dispatch`) |
 | Group room turns / bot-to-bot requests | `host/src/chat/group.rs` / `team.rs` |
 | Prompt snapshots and memory keeper | `host/src/chat/context.rs`, `memory.rs` |
 | Identity, encryption and direct channel | `host/src/remote/identity.rs`, `crypto.rs`, `channel.rs` |
