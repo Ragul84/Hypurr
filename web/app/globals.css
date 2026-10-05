@@ -134,7 +134,7 @@ body {
 }
 @keyframes flow { to { background-position: 300% 0; } }
 
-/* Thin teal ring (no rainbow conic). */
+/* Thin forest ring. */
 .flow-ring { position: relative; isolation: isolate; }
 .flow-ring::before {
   content: ""; position: absolute; inset: -1.5px; border-radius: inherit; z-index: -1;
@@ -144,7 +144,7 @@ body {
 @property --angle { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
 @keyframes flow-spin { to { --angle: 360deg; } }
 
-/* Subtle rain / asphalt field — no purple aurora blobs. */
+/* Subtle sunflower field texture. */
 .aurora { position: fixed; inset: 0; z-index: -10; overflow: hidden; pointer-events: none;
   background:
     repeating-linear-gradient(

@@ -347,14 +347,32 @@ private fun EmptyRoster(onNewTask: () -> Unit, onPair: () -> Unit = {}, onInstal
         Text("Meet Hypurr", style = MaterialTheme.typography.headlineMedium, color = c.text, fontWeight = FontWeight.ExtraBold)
         Spacer(Modifier.height(8.dp))
         Text(
-            "AI coding agents, safe enough for anyone. Install the agent on your computer, then pair this phone.",
+            "AI coding agents, safe enough for anyone.",
             color = c.secondary, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge,
         )
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(18.dp))
+        CreamPlate(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                listOf(
+                    "Install Hypurr Agent on your computer",
+                    "Scan the QR, or paste the pairing link",
+                    "Run your first task",
+                ).forEachIndexed { i, line ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(26.dp).clip(CircleShape).background(c.accent), contentAlignment = Alignment.Center) {
+                            Text("${i + 1}", color = c.onAccent, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Text(line, color = c.text, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(18.dp))
         FlowButton("Install Hypurr Agent", Modifier.fillMaxWidth(), onClick = onInstall)
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(10.dp))
         SoftButton("Pair with QR", Modifier.fillMaxWidth(), tint = c.text, onClick = onPair)
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(10.dp))
         SoftButton("Or start a task", Modifier.fillMaxWidth(), tint = c.accent, icon = Icons.Rounded.Add, onClick = onNewTask)
     }
 }
