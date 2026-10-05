@@ -230,7 +230,7 @@ class ScreenshotTest {
     @Test
     @Config(qualifiers = "w412dp-h1600dp-xxhdpi")
     fun newBot() = shoot("new-bot") {
-        BotEditorScreen(BotEditorState(name = "Reviewer", description = "Reviews pull requests", avatarColor = "violet", backend = "claude",
+        BotEditorScreen(BotEditorState(name = "Reviewer", description = "Reviews pull requests", avatarColor = "teal", backend = "claude",
             folder = "/Users/kevin/code/shop", browsing = Samples.dirs), Samples.backends, emptyList(), {}, {}, {}, {}, {})
     }
 
@@ -256,7 +256,7 @@ class ScreenshotTest {
     @Config(qualifiers = "w412dp-h1600dp-xxhdpi")
     fun newBotBuiltin() = shoot("new-bot-builtin") {
         BotEditorScreen(
-            BotEditorState(name = "Helper", description = "First bot on a new computer", avatarColor = "violet",
+            BotEditorState(name = "Helper", description = "First bot on a new computer", avatarColor = "teal",
                 backend = "hypurr-agent", model = "hypurr/hypurr-free"),
             Samples.backends, emptyList(), {}, {}, {}, {}, {})
     }

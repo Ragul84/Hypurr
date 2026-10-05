@@ -5,5 +5,5 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
-    <color name="hypurr_bg">#FCFAFF</color>
+    <color name="hypurr_bg">#F4F6F5</color>
 </resources>

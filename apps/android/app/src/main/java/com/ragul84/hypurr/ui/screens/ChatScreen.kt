@@ -114,9 +114,9 @@ import com.ragul84.hypurr.ui.BotAvatar
 import com.ragul84.hypurr.ui.FlowOrb
 import com.ragul84.hypurr.ui.IconBubble
 import com.ragul84.hypurr.ui.SoftButton
+import com.ragul84.hypurr.ui.SignalAllowButton
 import com.ragul84.hypurr.ui.glass
 import com.ragul84.hypurr.ui.pressable
-import com.ragul84.hypurr.ui.theme.ColorFlow
 import com.ragul84.hypurr.ui.theme.Hypurr
 import com.ragul84.hypurr.ui.theme.Motion
 
@@ -562,7 +562,7 @@ private fun UserBubble(entry: Entry, media: AttachmentUi, onLongPress: () -> Uni
         }
         if (!entry.data.text.isNullOrEmpty()) {
             Text(entry.data.text, color = c.text, style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.padding(start = 56.dp).clip(RoundedCornerShape(22.dp, 22.dp, 6.dp, 22.dp))
+                modifier = Modifier.padding(start = 56.dp).clip(RoundedCornerShape(4.dp))
                     .background(c.bubbleUser).combinedClickable(onClick = {}, onLongClick = onLongPress, onLongClickLabel = "Message actions")
                     .padding(horizontal = 16.dp, vertical = 11.dp))
         }
@@ -623,7 +623,7 @@ private fun AgentBubble(entry: Entry, author: Bot?, onLongPress: () -> Unit) {
             Spacer(Modifier.width(6.dp))
             Text(author.name, color = avatarColor(author.avatarColor), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
         }
-        MarkdownText(entry.data.text.orEmpty(), Modifier.clip(RoundedCornerShape(22.dp, 22.dp, 22.dp, 6.dp)).background(c.bubbleAgent)
+        MarkdownText(entry.data.text.orEmpty(), Modifier.clip(RoundedCornerShape(4.dp)).background(c.bubbleAgent)
             .combinedClickable(onClick = {}, onLongClick = onLongPress, onLongClickLabel = "Message actions")
             .padding(horizontal = 16.dp, vertical = 11.dp))
     }
@@ -648,8 +648,10 @@ private fun PermissionCard(entry: Entry, task: TaskInfo?, onRespond: (Entry, Str
         else -> c.tertiary
     }, Motion.effects(), label = "perm")
     var details by remember(entry.id) { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().padding(end = 24.dp).glass(RoundedCornerShape(24.dp), tint.copy(alpha = 0.10f)).padding(16.dp)
+    Column(Modifier.fillMaxWidth().padding(end = 24.dp).clip(RoundedCornerShape(4.dp)).background(c.surface)
         .animateContentSize(Motion.spatialDefault())) {
+        if (pending) Box(Modifier.fillMaxWidth().height(4.dp).background(c.accent.copy(alpha = 0.9f)))
+        Column(Modifier.fillMaxWidth().background(tint.copy(alpha = 0.10f)).padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(if (blocked) Icons.Rounded.Block else Icons.Rounded.Shield, null, tint = tint, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
@@ -692,7 +694,11 @@ private fun PermissionCard(entry: Entry, task: TaskInfo?, onRespond: (Entry, Str
             FlowRow(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 d.options.orEmpty().forEach { option ->
                     val reject = option.kind.startsWith("reject")
-                    SoftButton(option.name, tint = if (reject) c.danger else c.accent) { onRespond(entry, option.optionId) }
+                    if (reject) {
+                        SoftButton(option.name, tint = c.danger) { onRespond(entry, option.optionId) }
+                    } else {
+                        SignalAllowButton(option.name) { onRespond(entry, option.optionId) }
+                    }
                 }
             }
         } else if (!blocked && !pending) {
@@ -707,13 +713,14 @@ private fun PermissionCard(entry: Entry, task: TaskInfo?, onRespond: (Entry, Str
             }
         }
     }
+    }
 }
 
 /** Learning mode: what a finished task changed and why, its files, PR, cost and where it was posted. */
 @Composable
 private fun LearningCard(l: Learning, onOpenLink: (String) -> Unit) {
     val c = Hypurr.colors
-    Column(Modifier.fillMaxWidth().padding(end = 24.dp).glass(RoundedCornerShape(24.dp), c.success.copy(alpha = 0.10f)).padding(16.dp),
+    Column(Modifier.fillMaxWidth().padding(end = 24.dp).glass(RoundedCornerShape(4.dp), c.success.copy(alpha = 0.10f)).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Rounded.School, null, tint = c.success, modifier = Modifier.size(18.dp))
@@ -761,7 +768,7 @@ private fun WorkingRow(bot: Bot, bots: Map<String, Bot>, modifier: Modifier = Mo
     Row(modifier.padding(start = 4.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         FlowOrb(22.dp)
         Spacer(Modifier.width(10.dp))
-        Text(bot.activity.ifEmpty { "Thinking…" }, style = MaterialTheme.typography.bodyMedium.copy(brush = ColorFlow.linear()),
+        Text(bot.activity.ifEmpty { "Thinking…" }, color = Hypurr.colors.accent, style = MaterialTheme.typography.bodyMedium,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
@@ -820,11 +827,11 @@ private fun Composer(draft: String, onDraftChange: (String) -> Unit, onSend: () 
             Spacer(Modifier.width(8.dp))
             Box(
                 Modifier.size(44.dp).scale(sendScale).clip(CircleShape)
-                    .background(if (canSend) ColorFlow.linear() else SolidColor(c.border))
+                    .background(if (canSend) SolidColor(c.accent) else SolidColor(c.border))
                     .pressable("Send", enabled = canSend, onClick = onSend),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Rounded.ArrowUpward, null, tint = if (canSend) ColorFlow.FlowInk else c.tertiary, modifier = Modifier.size(22.dp))
+                Icon(Icons.Rounded.ArrowUpward, null, tint = if (canSend) c.onAccent else c.tertiary, modifier = Modifier.size(22.dp))
             }
         }
     }

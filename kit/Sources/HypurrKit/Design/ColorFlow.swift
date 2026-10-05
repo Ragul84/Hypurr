@@ -1,27 +1,30 @@
 import SwiftUI
 
-/// Hypurr's colour flow: violet → magenta → cyan, looping. The same stops drive the
-/// web site, the GTK app and the terminal UI (docs/design/hypurr-design-system.md).
+/// Hypurr teal signal language (replaces the old violet → magenta → cyan colour flow).
+/// Same symbol name so call sites keep compiling; fills are solid/near-solid teal.
 public enum ColorFlow {
-    public static let violet: UInt32 = 0xA78BFA
-    public static let magenta: UInt32 = 0xF472B6
-    public static let cyan: UInt32 = 0x22D3EE
-    public static let stops: [UInt32] = [violet, magenta, cyan]
+    public static let signal: UInt32 = 0x00D4C8
+    public static let signalDeep: UInt32 = 0x007A73
+    public static let cyan: UInt32 = signal
+    /// Legacy aliases — resolve to teal so no purple remains on screen.
+    public static let violet: UInt32 = signal
+    public static let magenta: UInt32 = signalDeep
+    public static let stops: [UInt32] = [signal, 0x5EAD8A, signalDeep]
     public static let colors: [Color] = stops.map { Color(hex: $0) }
-    /// Text and symbols drawn on top of the flow (readable on all three stops).
-    public static let ink = Color(hex: 0x150A33)
+    /// Text and symbols drawn on top of the signal fill.
+    public static let ink = Color(hex: 0x021412)
 
-    /// The resting gradient: top-leading violet to bottom-trailing cyan.
+    /// Resting fill: solid teal (kept as LinearGradient for API compatibility).
     public static var linear: LinearGradient {
-        LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)
+        LinearGradient(colors: [Color(hex: signal), Color(hex: signalDeep)], startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 
-    /// A closed ring of the flow, for spinners and rings.
+    /// Closed ring for spinners — teal → deep teal.
     public static var angular: AngularGradient {
-        AngularGradient(colors: colors + [colors[0]], center: .center)
+        AngularGradient(colors: [Color(hex: signal), Color(hex: signalDeep), Color(hex: signal)], center: .center)
     }
 
-    /// The flow colour `position` of the way around the loop (wraps; any real number).
+    /// Signal colour along a loop (wraps); stays in the teal family.
     public static func color(at position: Double) -> Color {
         let wrapped = position - position.rounded(.down)
         let p = wrapped * 3
@@ -36,7 +39,7 @@ public enum ColorFlow {
     }
 }
 
-/// An animated colour-flow fill: the gradient axis slowly turns. Static under Reduce Motion.
+/// An animated teal signal fill. Static under Reduce Motion.
 public struct ColorFlowBackground: View {
     let period: Double
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -61,7 +64,7 @@ public struct ColorFlowBackground: View {
 }
 
 public extension View {
-    /// Paints text or symbols with the colour flow (moving unless `animated` is false).
+    /// Paints text or symbols with the teal signal (moving unless `animated` is false).
     func colorFlowForeground(animated: Bool = true) -> some View {
         modifier(ColorFlowForeground(animated: animated))
     }

@@ -53,7 +53,7 @@ class HypurrMessagingService : FirebaseMessagingService() {
                 .setGroup(alert.threadId)
                 .setAutoCancel(true)
                 .setContentIntent(pending)
-                .setColor(0xFF6D3FD9.toInt())
+                .setColor(0xFF00D4C8.toInt())
                 .build()
             runCatching { NotificationManagerCompat.from(context).notify(alert.threadId.hashCode(), notification) }
         }

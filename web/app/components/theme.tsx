@@ -37,53 +37,12 @@ export function ThemeToggle() {
   );
 }
 
-// Dynamic colour: pick a seed hue and every tonal role re-derives from it.
-const seeds = [
-  { h: 295, name: "Violet purr" },
-  { h: 345, name: "Magenta" },
-  { h: 210, name: "Cyan" },
-  { h: 150, name: "Mint" },
-  { h: 40, name: "Sunset" },
-];
-
+/** Wet-asphalt neon uses a fixed teal accent — no violet seed picker. */
 export function SeedPicker() {
-  const [seed, setSeed] = useState(295);
-  useEffect(() => {
-    const s = getComputedStyle(document.documentElement).getPropertyValue("--seed-h").trim();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (s) setSeed(Number(s));
-  }, []);
-  function pick(h: number) {
-    setSeed(h);
-    document.documentElement.style.setProperty("--seed-h", String(h));
-    try {
-      localStorage.setItem("hypurr-seed", String(h));
-    } catch {}
-  }
   return (
-    <div className="flex items-center gap-2" role="radiogroup" aria-label="Seed colour">
-      {seeds.map((s) => (
-        <motion.button
-          key={s.h}
-          type="button"
-          role="radio"
-          aria-checked={seed === s.h}
-          aria-label={s.name}
-          title={s.name}
-          onClick={() => pick(s.h)}
-          whileHover={{ scale: 1.15 }}
-          whileTap={{ scale: 0.9 }}
-          transition={springBouncy}
-          className="relative size-7 rounded-full"
-          style={{
-            background: `conic-gradient(oklch(0.7 0.2 ${s.h}), oklch(0.75 0.2 ${s.h + 55}), oklch(0.8 0.14 ${s.h - 85}), oklch(0.7 0.2 ${s.h}))`,
-          }}
-        >
-          {seed === s.h && (
-            <motion.span layoutId="seed-ring" transition={springBouncy} className="absolute -inset-1 rounded-full ring-2 ring-on-surface" />
-          )}
-        </motion.button>
-      ))}
+    <div className="flex items-center gap-2 text-sm text-on-primary/80" aria-label="Brand accent">
+      <span className="size-7 rounded-[4px] bg-[#00D4C8]" title="Signal teal" />
+      <span>Signal teal</span>
     </div>
   );
 }

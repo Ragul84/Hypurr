@@ -29,8 +29,8 @@ import androidx.compose.ui.unit.sp
 import com.ragul84.hypurr.data.ThemeMode
 
 /**
- * Hypurr design tokens (docs/design/hypurr-design-system.md): the same seed palette, colour flow and
- * spring motion as the Swift `HypurrTheme`/`ColorFlow`/`Motion`, GTK and web clients.
+ * Hypurr wet-asphalt neon tokens (docs/design/hypurr-design-system.md): deep asphalt ground,
+ * flat electric teal signal, sharp 0–4px plates. Shared with Swift / GTK / web.
  */
 @Immutable
 data class HypurrColors(
@@ -44,7 +44,7 @@ data class HypurrColors(
     val tertiary: Color,
     val accent: Color,
     val onAccent: Color,
-    /** "Needs you" */
+    /** "Needs you" label only (amber attention) */
     val warning: Color,
     val danger: Color,
     val success: Color,
@@ -53,29 +53,38 @@ data class HypurrColors(
 )
 
 val LightTokens = HypurrColors(
-    bg = Color(0xFFFCFAFF), surface = Color(0xFFF4EFFC), bubbleAgent = Color(0xFFEFE9FA), bubbleUser = Color(0xFFE4D9FB),
-    border = Color(0xFFE6DFF3), text = Color(0xFF1E1433), secondary = Color(0xFF5B4F7A), tertiary = Color(0xFF8C82A8),
-    accent = Color(0xFF6D3FD9), onAccent = Color(0xFFFFFFFF), warning = Color(0xFFC0267A), danger = Color(0xFFC2304D),
-    success = Color(0xFF1F9D6B), glass = Color(0xB8FFFFFF), dark = false,
+    bg = Color(0xFFF4F6F5), surface = Color(0xFFFFFFFF), bubbleAgent = Color(0xFFE8EEEC), bubbleUser = Color(0xFFD5E8E5),
+    border = Color(0xFFD5DEDB), text = Color(0xFF0A1210), secondary = Color(0xFF4A5E5A), tertiary = Color(0xFF8A9995),
+    accent = Color(0xFF007A73), onAccent = Color(0xFFF4F6F5), warning = Color(0xFFB86A00), danger = Color(0xFFC23B2E),
+    success = Color(0xFF1F7A55), glass = Color(0xB8FFFFFF), dark = false,
 )
 
 val DarkTokens = HypurrColors(
-    bg = Color(0xFF0E0A1C), surface = Color(0xFF161029), bubbleAgent = Color(0xFF1E1736), bubbleUser = Color(0xFF3A2A6B),
-    border = Color(0xFF2A2145), text = Color(0xFFF3EEFF), secondary = Color(0xFFA89CC8), tertiary = Color(0xFF75699A),
-    accent = Color(0xFFA78BFA), onAccent = Color(0xFF150A33), warning = Color(0xFFF472B6), danger = Color(0xFFFF8FA3),
-    success = Color(0xFF5EE0A8), glass = Color(0x9E1E1736), dark = true,
+    bg = Color(0xFF05070A), surface = Color(0xFF0B1211), bubbleAgent = Color(0xFF0E1614), bubbleUser = Color(0xFF12302C),
+    border = Color(0xFF14201E), text = Color(0xFFE8FFFC), secondary = Color(0xFF7FA8A3), tertiary = Color(0xFF3D5552),
+    accent = Color(0xFF00D4C8), onAccent = Color(0xFF021412), warning = Color(0xFFFFB020), danger = Color(0xFFFF6B5A),
+    success = Color(0xFF5EAD8A), glass = Color(0x9E0B1211), dark = true,
 )
 
-/** The colour flow: violet → magenta → cyan. Ink on the flow is [FlowInk]. */
+/**
+ * Teal signal language (replaces the old violet → magenta → cyan colour flow).
+ * Kept as [ColorFlow] so call sites compile; fills are solid/near-solid teal, never purple.
+ */
 object ColorFlow {
-    val violet = Color(0xFFA78BFA)
-    val magenta = Color(0xFFF472B6)
-    val cyan = Color(0xFF22D3EE)
-    val stops = listOf(violet, magenta, cyan)
-    val FlowInk = Color(0xFF150A33)
+    val signal = Color(0xFF00D4C8)
+    val signalDeep = Color(0xFF007A73)
+    val cyan = signal
+    /** @deprecated kept for compile; resolves to teal signal */
+    val violet = signal
+    /** @deprecated kept for compile; resolves to teal signal */
+    val magenta = signal
+    val stops = listOf(signal, Color(0xFF5EAD8A), signalDeep)
+    val FlowInk = Color(0xFF021412)
+    val SignalInk = FlowInk
 
-    fun linear(): Brush = Brush.linearGradient(stops)
-    fun sweep(): Brush = Brush.sweepGradient(stops + violet)
+    fun linear(): Brush = Brush.linearGradient(listOf(signal, signalDeep))
+    fun sweep(): Brush = Brush.sweepGradient(listOf(signal, signalDeep, signal))
+    fun solid(): Brush = Brush.linearGradient(listOf(signal, signal))
 }
 
 /** M3 Expressive spring tokens (stiffness / damping ratio), shared with Swift `Motion`. */
@@ -87,6 +96,8 @@ object Motion {
     fun <T> bouncy(): SpringSpec<T> = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow)
     val offset: SpringSpec<IntOffset> = spring(dampingRatio = 0.8f, stiffness = 380f)
     const val PRESS_SCALE = 0.96f
+    /** Signal-strike collapse (~280ms snappy). */
+    fun <T> signalStrike(): SpringSpec<T> = spring(dampingRatio = 0.75f, stiffness = 900f)
 }
 
 val LocalHypurr = staticCompositionLocalOf { LightTokens }
@@ -98,7 +109,7 @@ object Hypurr {
 private fun HypurrColors.scheme(): ColorScheme = if (dark) {
     darkColorScheme(
         primary = accent, onPrimary = onAccent, primaryContainer = bubbleUser, onPrimaryContainer = text,
-        secondary = ColorFlow.magenta, tertiary = ColorFlow.cyan, background = bg, onBackground = text,
+        secondary = success, tertiary = accent, background = bg, onBackground = text,
         surface = bg, onSurface = text, surfaceVariant = surface, onSurfaceVariant = secondary,
         surfaceContainer = surface, surfaceContainerHigh = bubbleAgent, surfaceContainerLow = surface,
         outline = tertiary, outlineVariant = border, error = danger,
@@ -106,7 +117,7 @@ private fun HypurrColors.scheme(): ColorScheme = if (dark) {
 } else {
     lightColorScheme(
         primary = accent, onPrimary = onAccent, primaryContainer = bubbleUser, onPrimaryContainer = text,
-        secondary = Color(0xFFC0267A), tertiary = Color(0xFF0E9FB5), background = bg, onBackground = text,
+        secondary = success, tertiary = accent, background = bg, onBackground = text,
         surface = bg, onSurface = text, surfaceVariant = surface, onSurfaceVariant = secondary,
         surfaceContainer = surface, surfaceContainerHigh = bubbleAgent, surfaceContainerLow = surface,
         outline = tertiary, outlineVariant = border, error = danger,
@@ -122,17 +133,18 @@ private fun HypurrColors.withDynamic(s: ColorScheme): HypurrColors = copy(
 
 private val HypurrTypography = Typography().let { t ->
     t.copy(
-        headlineLarge = t.headlineLarge.copy(fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp),
-        headlineMedium = t.headlineMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = (-0.4).sp),
+        headlineLarge = t.headlineLarge.copy(fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.8).sp),
+        headlineMedium = t.headlineMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp),
         titleLarge = t.titleLarge.copy(fontWeight = FontWeight.SemiBold),
         titleMedium = t.titleMedium.copy(fontWeight = FontWeight.SemiBold),
         bodyLarge = TextStyle(fontSize = 16.sp, lineHeight = 22.sp),
     )
 }
 
+/** Sharp plates: 0–4dp content radii (nav pills may still use ~22dp at call sites). */
 private val HypurrShapes = Shapes(
-    extraSmall = RoundedCornerShape(8.dp), small = RoundedCornerShape(12.dp), medium = RoundedCornerShape(18.dp),
-    large = RoundedCornerShape(24.dp), extraLarge = RoundedCornerShape(32.dp),
+    extraSmall = RoundedCornerShape(2.dp), small = RoundedCornerShape(4.dp), medium = RoundedCornerShape(4.dp),
+    large = RoundedCornerShape(4.dp), extraLarge = RoundedCornerShape(4.dp),
 )
 
 @Composable

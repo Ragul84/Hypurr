@@ -499,7 +499,7 @@ pub struct FolderPicker {
 }
 
 pub const COLORS: [&str; 11] =
-    ["black", "brown", "red", "orange", "yellow", "green", "cyan", "blue", "violet", "magenta", "gray"];
+    ["black", "asphalt", "teal", "cyan", "green", "ink", "gray", "attention", "red", "brown", "blue"];
 pub const SHAPES: [&str; 8] = ["blob", "pebble", "squircle", "tablet", "wedge", "hex", "cloud", "teardrop"];
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

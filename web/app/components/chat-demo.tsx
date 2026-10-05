@@ -96,7 +96,7 @@ export default function ChatDemo() {
               </div>
               <div className="m-3 mt-0 flex items-center gap-2 rounded-full bg-surface-container-high py-2 pr-2 pl-4 text-[13px] text-on-surface-variant">
                 <span className="flex-1">Message Scout</span>
-                <span className="flow-bg grid size-8 place-items-center rounded-full text-white">↑</span>
+                <span className="flow-bg grid size-8 place-items-center rounded-full text-[var(--on-primary)]">↑</span>
               </div>
             </PhoneFrame>
           </div>

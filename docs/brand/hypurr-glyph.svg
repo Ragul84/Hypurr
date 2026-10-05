@@ -1,25 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <defs>
-    <linearGradient id="fur" x1="0.1" y1="0" x2="0.9" y2="1">
-      <stop offset="0" stop-color="#A78BFA"/>
-      <stop offset="0.5" stop-color="#F472B6"/>
-      <stop offset="1" stop-color="#22D3EE"/>
-    </linearGradient>
-    <linearGradient id="wave" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#22D3EE"/>
-      <stop offset="1" stop-color="#F472B6"/>
-    </linearGradient>
-  </defs>
-  <g fill="none" stroke="url(#wave)" stroke-linecap="round" stroke-width="30" opacity="0.9">
+  <!-- Flat cyan cat + rain-tint waves (no mesh gradient). -->
+  <g fill="none" stroke="#00D4C8" stroke-linecap="round" stroke-width="30" opacity="0.55">
     <path d="M820 540 Q862 640 820 740"/>
     <path d="M884 500 Q944 640 884 780" opacity="0.55"/>
     <path d="M204 540 Q162 640 204 740"/>
     <path d="M140 500 Q80 640 140 780" opacity="0.55"/>
   </g>
-  <path fill="url(#fur)" d="M262 640 C262 470 296 300 330 214 L452 352 C492 344 532 344 572 352 L694 214 C728 300 762 470 762 640 C762 792 650 864 512 864 C374 864 262 792 262 640 Z"/>
-  <g fill="none" stroke="#150A33" stroke-linecap="round" stroke-linejoin="round">
+  <path fill="#00D4C8" d="M262 640 C262 470 296 300 330 214 L452 352 C492 344 532 344 572 352 L694 214 C728 300 762 470 762 640 C762 792 650 864 512 864 C374 864 262 792 262 640 Z"/>
+  <g fill="none" stroke="#021412" stroke-linecap="round" stroke-linejoin="round">
     <path stroke-width="34" d="M372 604 Q414 556 456 604"/>
     <path stroke-width="34" d="M568 604 Q610 556 652 604"/>
-    <path fill="#150A33" stroke="none" d="M490 660 h44 l-22 24 z"/><path stroke-width="26" d="M446 704 q33 40 66 0 q33 40 66 0"/>
+    <path fill="#021412" stroke="none" d="M490 660 h44 l-22 24 z"/>
+    <path stroke-width="26" d="M446 704 q33 40 66 0 q33 40 66 0"/>
   </g>
 </svg>

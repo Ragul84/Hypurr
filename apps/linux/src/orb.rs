@@ -126,12 +126,12 @@ fn listening(size: f64, t: f64) -> Vec<Dot> {
     dots
 }
 
-/// Hypurr colour flow (violet → magenta → cyan, looping) at `pos` (wraps at 1).
+/// Hypurr teal signal loop at `pos` (wraps at 1).
 fn flow_rgb(pos: f64) -> (f64, f64, f64) {
     const STOPS: [(f64, f64, f64); 3] = [
-        (0.655, 0.545, 0.980),
-        (0.957, 0.447, 0.714),
-        (0.133, 0.827, 0.933),
+        (0.000, 0.831, 0.784), // #00D4C8
+        (0.000, 0.478, 0.451), // #007A73
+        (0.369, 0.678, 0.541), // #5EAD8A
     ];
     let p = pos.rem_euclid(1.0) * 3.0;
     let i = (p.floor() as usize).min(2);

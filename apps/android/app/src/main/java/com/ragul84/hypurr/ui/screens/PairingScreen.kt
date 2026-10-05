@@ -61,9 +61,9 @@ fun FlowBackdrop(modifier: Modifier = Modifier) {
     // Radial glows rather than blur: identical on every API level (blur needs Android 12).
     fun glow(color: androidx.compose.ui.graphics.Color, a: Float) = Brush.radialGradient(listOf(color.copy(alpha = a), color.copy(alpha = 0f)))
     Box(modifier.fillMaxSize()) {
-        Box(Modifier.size(420.dp).offset((-150).dp, (-130).dp).background(glow(ColorFlow.violet, alpha), CircleShape))
-        Box(Modifier.size(380.dp).align(Alignment.TopEnd).offset(150.dp, 60.dp).background(glow(ColorFlow.magenta, alpha * 0.8f), CircleShape))
-        Box(Modifier.size(420.dp).align(Alignment.BottomCenter).offset(60.dp, 170.dp).background(glow(ColorFlow.cyan, alpha * 0.7f), CircleShape))
+        Box(Modifier.size(420.dp).offset((-150).dp, (-130).dp).background(glow(ColorFlow.signal, alpha * 0.45f), CircleShape))
+        Box(Modifier.size(380.dp).align(Alignment.TopEnd).offset(150.dp, 60.dp).background(glow(ColorFlow.signalDeep, alpha * 0.35f), CircleShape))
+        Box(Modifier.size(420.dp).align(Alignment.BottomCenter).offset(60.dp, 170.dp).background(glow(ColorFlow.signal, alpha * 0.25f), CircleShape))
     }
 }
 
@@ -86,7 +86,7 @@ fun PairingScreen(
             FlowOrb(104.dp, animate = state.busy)
             Spacer(Modifier.height(28.dp))
             Text("Hypurr", style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold,
-                brush = Brush.linearGradient(ColorFlow.stops)))
+                brush = Brush.linearGradient(listOf(ColorFlow.signal, ColorFlow.signalDeep))))
             Spacer(Modifier.height(8.dp))
             Text("Your coding bots, on your phone.", style = MaterialTheme.typography.titleMedium, color = c.secondary,
                 textAlign = TextAlign.Center)
@@ -145,8 +145,8 @@ fun PairingScreen(
 private fun Step(n: Int, text: String, code: String?) {
     val c = Hypurr.colors
     Row(verticalAlignment = Alignment.Top) {
-        Box(Modifier.size(26.dp).clip(CircleShape).background(ColorFlow.linear()), contentAlignment = Alignment.Center) {
-            Text("$n", color = ColorFlow.FlowInk, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        Box(Modifier.size(26.dp).clip(CircleShape).background(Hypurr.colors.accent), contentAlignment = Alignment.Center) {
+            Text("$n", color = Hypurr.colors.onAccent, fontWeight = FontWeight.Bold, fontSize = 13.sp)
         }
         Spacer(Modifier.width(12.dp))
         Column {
