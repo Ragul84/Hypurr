@@ -319,3 +319,5 @@ fn main() -> gtk::glib::ExitCode {
     // Our own flags (`--bot <id>`) are read in ui::connect; keep GTK from rejecting them.
     app.run_with_args(&std::env::args().take(1).collect::<Vec<_>>())
 }
+
+// sunfield-polish: path-filter touch for CI
