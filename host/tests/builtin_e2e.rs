@@ -88,8 +88,7 @@ fn tiny_hypurr_agent_archive() -> (PathBuf, String) {
 #[tokio::test]
 async fn builtin_status_install_models_and_fake_turn() {
     let (archive, sha) = tiny_hypurr_agent_archive();
-    let host =
-        start_host(&[("HYPURR_AGENT_ARCHIVE", &archive.to_string_lossy()), ("HYPURR_AGENT_SHA256", &sha)]).await;
+    let host = start_host(&[("HYPURR_AGENT_ARCHIVE", &archive.to_string_lossy()), ("HYPURR_AGENT_SHA256", &sha)]).await;
 
     let hello = host.call("hello", json!({})).await;
     let builtin = &hello["builtinAgent"];

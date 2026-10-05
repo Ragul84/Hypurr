@@ -919,7 +919,10 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
                 }
                 Ok(v) => v,
                 Err(e) if backend == crate::agent::builtin::BACKEND_ID => {
-                    tracing::info!(error = format!("{e:#}"), "hypurr-agent model probe failed; using free gateway list");
+                    tracing::info!(
+                        error = format!("{e:#}"),
+                        "hypurr-agent model probe failed; using free gateway list"
+                    );
                     json!({"models": crate::agent::builtin::free_models_json(), "currentModelId": crate::agent::builtin::DEFAULT_MODEL, "free": true})
                 }
                 Err(e) => return Err(e),
