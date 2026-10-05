@@ -199,3 +199,50 @@ body {
   .flow-bg, .flow-text, .flow-ring::before, .aurora span, .morph, .marquee, .purr, .typing span { animation: none !important; }
   html { scroll-behavior: auto; }
 }
+
+
+/* ---------- Hypurr motion language (docs/design/hypurr-motion.md) ---------- */
+.hypurr-scan {
+  position: relative; height: 4px; background: var(--outline-variant); overflow: hidden; border-radius: 1px;
+}
+.hypurr-scan > i {
+  position: absolute; top: 0; bottom: 0; width: 22%; background: var(--primary);
+  animation: hypurr-scan 1.6s linear infinite;
+}
+@keyframes hypurr-scan { from { left: -22%; } to { left: 100%; } }
+
+.hypurr-caret {
+  display: inline-block; width: 1px; height: 1.1em; background: var(--primary); vertical-align: -2px;
+  animation: hypurr-caret .18s linear infinite alternate; margin-left: 1px;
+}
+@keyframes hypurr-caret { to { opacity: 0.15; } }
+
+.hypurr-hair { height: 1px; background: var(--outline-variant); }
+.hypurr-hair > i { display: block; height: 100%; background: var(--primary); transition: width .42s linear; }
+
+.hypurr-rain-shimmer {
+  position: relative; overflow: hidden;
+}
+.hypurr-rain-shimmer::after {
+  content: ""; position: absolute; inset: -20%; pointer-events: none;
+  background: repeating-linear-gradient(-28deg, transparent 0 14px, color-mix(in srgb, var(--primary) 14%, transparent) 14px 15px);
+  animation: hypurr-rain 2.4s linear infinite;
+}
+@keyframes hypurr-rain { to { transform: translate(18px, 0); } }
+
+.hypurr-done-rule { height: 2px; background: var(--outline-variant); }
+.hypurr-done-rule > i { display: block; height: 100%; width: 0; background: var(--primary); animation: hypurr-draw .42s linear forwards; }
+@keyframes hypurr-draw { to { width: 100%; } }
+
+.hypurr-deny { transition: transform .18s cubic-bezier(0.2,0,0,1), opacity .18s; }
+.hypurr-deny.is-denied { transform: translateX(4px); opacity: 0.55; box-shadow: inset 1px 0 0 var(--negative, #FF6B5A); }
+
+@media (prefers-reduced-motion: reduce) {
+  .hypurr-scan > i, .hypurr-caret, .hypurr-rain-shimmer::after, .hypurr-done-rule > i {
+    animation: none !important;
+  }
+  .hypurr-scan > i { left: 35%; opacity: 0.4; }
+  .hypurr-caret { opacity: 0.7; }
+  .hypurr-done-rule > i { width: 100%; }
+  .hypurr-deny.is-denied { transform: none; }
+}

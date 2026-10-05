@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Hypurr motion lab</title>
+<style>
+  :root {
+    --ground:#05070A; --raised:#0B1211; --ink:#E8FFFC; --ink2:#7FA8A3; --ink3:#3D5552;
+    --rule:#14201E; --accent:#00D4C8; --on:#021412; --attn:#FFB020; --neg:#FF6B5A;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--ground); color:var(--ink); font:14px/1.4 ui-sans-serif,system-ui,sans-serif; }
+  h1 { font-size:20px; letter-spacing:-0.02em; margin:0 0 8px; }
+  .lab { display:grid; gap:28px; padding:28px; max-width:720px; margin:0 auto; }
+  .card { background:var(--raised); border:1px solid var(--rule); border-radius:4px; padding:16px; position:relative; overflow:hidden; }
+  .label { font:12px/1 ui-monospace,monospace; color:var(--ink2); margin-bottom:12px; text-transform:uppercase; letter-spacing:0.06em; }
+  /* 1 Thinking scan */
+  .scan-rule { height:4px; background:var(--rule); position:relative; overflow:hidden; border-radius:1px; }
+  .scan-band { position:absolute; top:0; bottom:0; width:22%; background:var(--accent); animation:scan 1.6s linear infinite; }
+  @keyframes scan { from { left:-22%; } to { left:100%; } }
+  .phase { font:12px/1.4 ui-monospace,monospace; color:var(--accent); margin-top:8px; min-height:1.2em; }
+  /* 2 Streaming */
+  .stream { font:15px/1.5 ui-sans-serif,system-ui; }
+  .stream .dim { color:var(--ink3); }
+  .caret { display:inline-block; width:1px; height:1.1em; background:var(--accent); vertical-align:-2px; animation:blink .18s linear infinite alternate; margin-left:1px; }
+  @keyframes blink { to { opacity:.15; } }
+  /* 3 Tool */
+  .tool { font:12px/1.4 ui-monospace,monospace; color:var(--ink2); }
+  .hair { height:1px; background:var(--rule); margin-top:8px; }
+  .hair > i { display:block; height:100%; background:var(--accent); width:0; animation:fill 2.4s linear infinite; }
+  @keyframes fill { 0%,10%{width:0} 90%,100%{width:100%} }
+  .chips { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; }
+  .chip { border:1px solid var(--rule); border-radius:4px; padding:4px 8px; font:11px ui-monospace,monospace; color:var(--ink); animation:tick .28s cubic-bezier(.2,0,0,1) both; }
+  .chip:nth-child(2){animation-delay:.12s} .chip:nth-child(3){animation-delay:.24s}
+  @keyframes tick { from { opacity:0; transform:translateY(4px);} to { opacity:1; transform:none;} }
+  /* 4 Cat assemble */
+  .assemble { height:96px; position:relative; }
+  .assemble canvas { display:block; margin:0 auto; }
+  /* 5 Neon status */
+  .neon-row { display:flex; align-items:center; gap:10px; }
+  .neon-dot { width:10px; height:10px; border-radius:1px; background:var(--accent); animation:neon 1.2s linear 1 forwards; }
+  @keyframes neon {
+    0%{opacity:.2} 10%{opacity:1} 20%{opacity:.2} 30%{opacity:1} 40%{opacity:.25} 50%{opacity:1} 100%{opacity:1}
+  }
+  /* 6 Needs you */
+  .needs { border-left:4px solid var(--accent); padding:12px; background:rgba(255,176,32,.06); animation:drop .28s cubic-bezier(.2,0,0,1) both; }
+  .needs .attn { color:var(--attn); font:12px ui-monospace,monospace; position:relative; }
+  .needs .attn::after { content:""; position:absolute; left:0; bottom:-2px; height:2px; width:0; background:var(--attn); animation:strike .12s linear .08s forwards; }
+  @keyframes drop { from { opacity:0; transform:translateY(-8px);} to { opacity:1; transform:none;} }
+  @keyframes strike { to { width:72px; } }
+  /* 7 Signal strike */
+  .strike-plate { padding:14px; position:relative; }
+  .strike-band { position:absolute; left:0; right:0; top:0; height:4px; background:var(--accent); transform-origin:left; animation:sband 1.8s linear infinite; }
+  @keyframes sband { 0%,55%{opacity:0;transform:scaleX(0)} 60%{opacity:1;transform:scaleX(1)} 70%{opacity:1} 78%{opacity:0} 100%{opacity:0} }
+  /* 8 Deny */
+  .deny { padding:14px; animation:shear 1.8s cubic-bezier(.2,0,0,1) infinite; border-left:1px solid var(--neg); }
+  @keyframes shear { 0%,40%{transform:none;opacity:1} 55%,100%{transform:translateX(4px);opacity:.55} }
+  /* 9 Done rule */
+  .done-rule { height:2px; background:var(--rule); margin-top:10px; }
+  .done-rule > i { display:block; height:100%; background:var(--accent); width:0; animation:draw .42s linear infinite; }
+  @keyframes draw { 0%,15%{width:0} 55%,100%{width:100%} }
+  /* 11 Rain shimmer */
+  .rain { height:72px; background:var(--raised); position:relative; overflow:hidden; }
+  .rain::before {
+    content:""; position:absolute; inset:-20%;
+    background: repeating-linear-gradient(-28deg, transparent 0 14px, rgba(0,212,200,.14) 14px 15px);
+    animation: drift 2.4s linear infinite;
+  }
+  @keyframes drift { to { transform: translate(18px, 0); } }
+  @media (prefers-reduced-motion: reduce) {
+    .scan-band, .caret, .hair > i, .chip, .neon-dot, .needs, .needs .attn::after,
+    .strike-band, .deny, .done-rule > i, .rain::before { animation: none !important; }
+    .scan-band { left:35%; opacity:.4; }
+    .caret { opacity:.7; }
+    .hair > i, .done-rule > i { width:100%; }
+    .neon-dot, .deny { opacity:1; transform:none; }
+    .needs .attn::after { width:72px; }
+  }
+</style>
+</head>
+<body>
+<div class="lab">
+  <div><h1>Hypurr motion lab</h1><p style="color:var(--ink2);margin:0">Wet-asphalt neon — flat cyan, sharp plates, reduced-motion safe.</p></div>
+
+  <section class="card" data-clip="thinking">
+    <div class="label">01 · Thinking · scan line</div>
+    <div class="scan-rule"><div class="scan-band"></div></div>
+    <div class="phase" id="phase">Reading files</div>
+  </section>
+
+  <section class="card" data-clip="streaming">
+    <div class="label">02 · Streaming text</div>
+    <div class="stream"><span id="stream-on"></span><span class="dim" id="stream-off"></span><span class="caret"></span></div>
+  </section>
+
+  <section class="card" data-clip="tool">
+    <div class="label">03 · Tool running</div>
+    <div class="tool">$ cargo test --all</div>
+    <div class="hair"><i></i></div>
+    <div class="chips"><span class="chip">host/src/lib.rs</span><span class="chip">host/src/tui/view.rs</span><span class="chip">+12 −3</span></div>
+  </section>
+
+  <section class="card" data-clip="assemble">
+    <div class="label">04 · Creating a bot</div>
+    <div class="assemble"><canvas id="cat" width="180" height="96"></canvas></div>
+  </section>
+
+  <section class="card" data-clip="pairing">
+    <div class="label">05 · Connecting · neon status</div>
+    <div class="neon-row"><div class="neon-dot"></div><span>Direct · Kevin's Mac Studio</span></div>
+  </section>
+
+  <section class="card" data-clip="needsyou">
+    <div class="label">06 · Needs you arriving</div>
+    <div class="needs"><div class="attn">Needs you</div><div style="margin-top:6px">Run cargo test --all?</div></div>
+  </section>
+
+  <section class="card" data-clip="strike">
+    <div class="label">07 · Signal strike</div>
+    <div class="strike-plate"><div class="strike-band"></div>Allow once → live row</div>
+  </section>
+
+  <section class="card" data-clip="deny">
+    <div class="label">08 · Deny shear</div>
+    <div class="deny">Denied · plate shears + dims</div>
+  </section>
+
+  <section class="card" data-clip="done">
+    <div class="label">09 · Task done</div>
+    <div>All 178 tests pass.</div>
+    <div class="done-rule"><i></i></div>
+  </section>
+
+  <section class="card" data-clip="skeleton">
+    <div class="label">11 · Rain-streak skeleton</div>
+    <div class="rain"></div>
+  </section>
+</div>
+<script>
+const phases = ["Reading files","Planning","Editing App.tsx"];
+let pi=0; const ph=document.getElementById('phase');
+setInterval(()=>{ pi=(pi+1)%phases.length; ph.textContent=phases[pi]; },1600);
+
+const full="I reviewed ChannelTransport.kt. Cap the relay heartbeat at 15s.";
+let n=0; const on=document.getElementById('stream-on'), off=document.getElementById('stream-off');
+function tickStream(){ n=Math.min(full.length,n+1); on.textContent=full.slice(0,n); off.textContent=full.slice(n); if(n<full.length) setTimeout(tickStream,28); else setTimeout(()=>{n=0;tickStream();},1200); }
+tickStream();
+
+// Cat assemble canvas
+const canvas=document.getElementById('cat'); const ctx=canvas.getContext('2d');
+let t0=performance.now();
+function drawCat(now){
+  const t=((now-t0)%2400)/2400; const p=Math.min(1,t/0.55);
+  ctx.clearRect(0,0,180,96); ctx.strokeStyle='rgba(0,212,200,0.35)'; ctx.lineWidth=1;
+  const cx=90, cy=52;
+  for(let i=0;i<7;i++){
+    const ang=-0.7+i*0.23; const len=48*(1-p*0.85);
+    ctx.beginPath(); ctx.moveTo(cx+Math.cos(ang)*len, cy+Math.sin(ang)*len); ctx.lineTo(cx,cy); ctx.stroke();
+  }
+  if(p>0.35){
+    const a=(p-0.35)/0.65; ctx.strokeStyle=`rgba(0,212,200,${a})`; ctx.lineWidth=2.5;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy-28); ctx.lineTo(cx-16, cy-10);
+    ctx.quadraticCurveTo(cx-30, cy+4, cx-20, cy+22);
+    ctx.quadraticCurveTo(cx, cy+34, cx+20, cy+22);
+    ctx.quadraticCurveTo(cx+30, cy+4, cx+16, cy-10); ctx.closePath(); ctx.stroke();
+  }
+  if(t>0.6 && t<0.72){ ctx.fillStyle='#00D4C8'; ctx.fillRect(0,8,180,4); }
+  requestAnimationFrame(drawCat);
+}
+requestAnimationFrame(drawCat);
+</script>
+</body>
+</html>

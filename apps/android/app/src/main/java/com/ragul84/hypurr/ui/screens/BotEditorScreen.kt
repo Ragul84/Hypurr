@@ -49,6 +49,7 @@ import com.ragul84.hypurr.ui.IconBubble
 import com.ragul84.hypurr.ui.Pill
 import com.ragul84.hypurr.ui.SoftButton
 import com.ragul84.hypurr.ui.avatarColor
+import com.ragul84.hypurr.ui.motion.CatAssemble
 import com.ragul84.hypurr.ui.glass
 import com.ragul84.hypurr.ui.pressable
 import com.ragul84.hypurr.ui.theme.Hypurr
@@ -154,7 +155,11 @@ fun BotEditorScreen(
             }
             if (!state.group) {
                 Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.Center) {
-                    BotAvatar(Bot(id = "preview", name = state.name.ifBlank { "?" }, avatarColor = state.avatarColor), 72.dp)
+                    if (state.isNew && !state.group) {
+                        CatAssemble(playing = true, size = 72.dp)
+                    } else {
+                        BotAvatar(Bot(id = "preview", name = state.name.ifBlank { "?" }, avatarColor = state.avatarColor), 72.dp)
+                    }
                 }
             }
             Section(if (state.group) "Group" else "About") {

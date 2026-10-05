@@ -50,6 +50,8 @@ import com.ragul84.hypurr.ui.IconBubble
 import com.ragul84.hypurr.ui.SoftButton
 import com.ragul84.hypurr.ui.glass
 import com.ragul84.hypurr.ui.theme.ColorFlow
+import com.ragul84.hypurr.ui.motion.NeonStatus
+import com.ragul84.hypurr.ui.motion.CatAssemble
 import com.ragul84.hypurr.ui.theme.Hypurr
 
 data class PairingUiState(val link: String = "", val busy: Boolean = false, val error: String? = null, val computerName: String? = null)
@@ -78,6 +80,7 @@ fun PairingScreen(
     val c = Hypurr.colors
     Box(Modifier.fillMaxSize().background(c.bg)) {
         FlowBackdrop()
+        CatAssemble(playing = true, Modifier.align(Alignment.TopCenter).padding(top = 72.dp), size = 64.dp)
         Column(
             Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -90,6 +93,14 @@ fun PairingScreen(
             Spacer(Modifier.height(8.dp))
             Text("Your coding bots, on your phone.", style = MaterialTheme.typography.titleMedium, color = c.secondary,
                 textAlign = TextAlign.Center)
+            state.computerName?.let { name ->
+                Spacer(Modifier.height(16.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                    NeonStatus(on = true)
+                    Spacer(Modifier.width(8.dp))
+                    Text("$name · Direct", color = c.accent, style = MaterialTheme.typography.labelLarge)
+                }
+            }
             Spacer(Modifier.height(36.dp))
             AnimatedContent(state.busy, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "pairing") { busy ->
                 if (busy) {

@@ -66,6 +66,8 @@ import com.ragul84.hypurr.net.Route
 import com.ragul84.hypurr.ui.theme.ColorFlow
 import com.ragul84.hypurr.ui.theme.Hypurr
 import com.ragul84.hypurr.ui.theme.Motion
+import com.ragul84.hypurr.ui.motion.HypurrMotion
+import com.ragul84.hypurr.ui.motion.reduceMotion
 
 /** A glass panel: translucent fill with a soft top highlight. Filled, so no border line. */
 fun Modifier.glass(shape: Shape, tint: Color, highlight: Boolean = true): Modifier = this
@@ -287,15 +289,16 @@ fun templateIcon(id: String): ImageVector = when (id) {
 @Composable
 fun SignalAllowButton(text: String, modifier: Modifier = Modifier, onAllow: () -> Unit) {
     val c = Hypurr.colors
+    val reduce = reduceMotion()
     var striking by remember { mutableStateOf(false) }
     val band by animateFloatAsState(
-        targetValue = if (striking) 1f else 0f,
-        animationSpec = tween(durationMillis = 120, easing = LinearEasing),
+        targetValue = if (striking && !reduce) 1f else 0f,
+        animationSpec = tween(durationMillis = HypurrMotion.STRIKE_MS, easing = LinearEasing),
         label = "signal-band",
     )
     LaunchedEffect(striking) {
         if (!striking) return@LaunchedEffect
-        delay(120)
+        delay((if (reduce) HypurrMotion.REDUCED_MS else HypurrMotion.STRIKE_MS).toLong())
         onAllow()
         striking = false
     }

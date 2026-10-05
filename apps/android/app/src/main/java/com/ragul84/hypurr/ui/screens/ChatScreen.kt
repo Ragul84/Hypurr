@@ -112,6 +112,9 @@ import com.ragul84.hypurr.ui.riskColor
 import com.ragul84.hypurr.ui.riskLabel
 import com.ragul84.hypurr.ui.BotAvatar
 import com.ragul84.hypurr.ui.FlowOrb
+import com.ragul84.hypurr.ui.motion.ThinkingScan
+import com.ragul84.hypurr.ui.motion.DoneRule
+import com.ragul84.hypurr.ui.motion.ToolHairline
 import com.ragul84.hypurr.ui.IconBubble
 import com.ragul84.hypurr.ui.SoftButton
 import com.ragul84.hypurr.ui.SignalAllowButton
@@ -730,6 +733,7 @@ private fun LearningCard(l: Learning, onOpenLink: (String) -> Unit) {
             l.cost?.let { Pill(it.label, c.accent) }
         }
         SelectionContainer { Text(l.summary, color = c.text, style = MaterialTheme.typography.bodyLarge) }
+        DoneRule(visible = true, Modifier.padding(top = 8.dp))
         if (l.files.isNotEmpty()) {
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(c.bg.copy(alpha = 0.55f)).padding(10.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -764,12 +768,23 @@ private fun Notice(entry: Entry) {
 
 @Composable
 private fun WorkingRow(bot: Bot, bots: Map<String, Bot>, modifier: Modifier = Modifier) {
-    val c = Hypurr.colors
-    Row(modifier.padding(start = 4.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        FlowOrb(22.dp)
-        Spacer(Modifier.width(10.dp))
-        Text(bot.activity.ifEmpty { "Thinking…" }, color = Hypurr.colors.accent, style = MaterialTheme.typography.bodyMedium,
-            maxLines = 1, overflow = TextOverflow.Ellipsis)
+    val activity = bot.activity.ifEmpty { "Thinking…" }
+    val phases = when {
+        activity.contains("test", true) || activity.contains("cargo", true) ->
+            listOf("Reading files", "Running tests", activity)
+        activity.contains("edit", true) || activity.contains(".tsx", true) || activity.contains(".kt", true) ->
+            listOf("Reading files", "Planning", activity)
+        else -> listOf("Reading files", "Planning", activity)
+    }
+    Column(modifier.padding(start = 4.dp, top = 4.dp, end = 24.dp).fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            FlowOrb(22.dp)
+            Spacer(Modifier.width(10.dp))
+            ThinkingScan(phases = phases, Modifier.weight(1f))
+        }
+        if (activity.contains("cargo", true) || activity.contains("test", true)) {
+            ToolHairline(progress = 0.62f, Modifier.padding(start = 32.dp, top = 6.dp))
+        }
     }
 }
 

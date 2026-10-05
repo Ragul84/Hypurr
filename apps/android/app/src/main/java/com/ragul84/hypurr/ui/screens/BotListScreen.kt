@@ -65,6 +65,9 @@ import com.ragul84.hypurr.model.Bot
 import com.ragul84.hypurr.net.LinkState
 import com.ragul84.hypurr.ui.BotAvatar
 import com.ragul84.hypurr.ui.FlowOrb
+import com.ragul84.hypurr.ui.motion.ThinkingScan
+import com.ragul84.hypurr.ui.motion.RainShimmer
+import com.ragul84.hypurr.ui.motion.LaunchFlicker
 import com.ragul84.hypurr.ui.IconBubble
 import com.ragul84.hypurr.ui.LinkPill
 import com.ragul84.hypurr.ui.glass
@@ -153,7 +156,9 @@ fun BotListScreen(
             return@Column
         }
         if (!synced && bots.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { FlowOrb(56.dp) }
+            RainShimmer(Modifier.fillMaxSize()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { FlowOrb(56.dp) }
+            }
             return@Column
         }
         LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 112.dp),
@@ -168,6 +173,7 @@ fun BotListScreen(
                 item(key = "needs") {
                     Column(Modifier.fillMaxWidth().animateItem().clip(RoundedCornerShape(4.dp)).background(c.surface)
                         .padding(vertical = 4.dp)) {
+                        Box(Modifier.fillMaxWidth().height(4.dp).background(c.accent))
                         needsYou.forEach { BotRow(it, now, byId = byId) { onOpen(it) } }
                     }
                 }
@@ -196,7 +202,7 @@ private fun EmptyRoster(onNewTask: () -> Unit) {
     Box(Modifier.fillMaxSize()) {
         FlowBackdrop()
         Column(Modifier.align(Alignment.Center).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            FlowOrb(72.dp, animate = false)
+            LaunchFlicker(play = true) { FlowOrb(72.dp, animate = false) }
             Spacer(Modifier.height(20.dp))
             Text("Start your first task", style = MaterialTheme.typography.titleLarge, color = c.text)
             Spacer(Modifier.height(6.dp))
@@ -263,11 +269,11 @@ fun StatusLine(bot: Bot) {
         bot.needsInput -> Text("Needs you · ${bot.activity.ifEmpty { "waiting for your answer" }}", color = c.warning,
             style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
         bot.status == "working" -> {
-            val still = LocalInspectionMode.current
-            val pulse by rememberInfiniteTransition(label = "work").animateFloat(0.55f, 1f,
-                infiniteRepeatable(tween(900, easing = LinearEasing), RepeatMode.Reverse), label = "pulse")
-            Text(bot.activity.ifEmpty { "Working…" }, color = Hypurr.colors.accent, style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.alpha(if (still) 1f else pulse))
+            val activity = bot.activity.ifEmpty { "Working…" }
+            ThinkingScan(
+                phases = listOf("Reading files", "Planning", activity),
+                animate = !LocalInspectionMode.current,
+            )
         }
         bot.failed -> Text("Failed · ${bot.lastMessage.orEmpty()}", color = c.danger, style = MaterialTheme.typography.bodyMedium,
             maxLines = 1, overflow = TextOverflow.Ellipsis)

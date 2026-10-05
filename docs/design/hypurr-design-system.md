@@ -63,3 +63,8 @@ Press scale is 0.96.
   with heavier weight / tighter tracking. (Font bundling may follow in a later PR.)
 - **UI:** Geist or system-ui.
 - **Mono:** JetBrains Mono / existing mono.
+
+## Motion language
+
+See [`hypurr-motion.md`](./hypurr-motion.md) for the wet-asphalt neon animation catalogue,
+tokens, and reduced-motion rules. Proof clips live in `docs/design/motion-proof/`.

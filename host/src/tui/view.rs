@@ -144,9 +144,15 @@ pub fn bot_color(name: &str) -> Color {
 
 // A full-cell orbit reads smoother at the 100 ms tick than the thin dots.
 const SPINNER: [&str; 8] = ["⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"];
+/// Thinking scan-line frames (wet-asphalt neon — flat cyan progress through a rule).
+const SCAN_LINE: [&str; 8] = ["─▸───", "──▸──", "───▸─", "────▸", "───◂─", "──◂──", "─◂───", "◂────"];
 
 fn spin(app: &App) -> &'static str {
     SPINNER[usize::try_from(app.frame % 8).unwrap_or(0)]
+}
+
+fn scan_line(app: &App) -> &'static str {
+    SCAN_LINE[usize::try_from(app.frame % 8).unwrap_or(0)]
 }
 
 /// Hypurr teal signal stops (looping).
@@ -201,7 +207,7 @@ pub fn glyph(app: &App, m: Mark) -> (&'static str, Style) {
     let t = theme();
     match m {
         Mark::Need => ("◆", t.amber),
-        Mark::Work => (spin(app), spin_style(app)),
+        Mark::Work => (scan_line(app), spin_style(app)),
         Mark::Unread => ("●", t.bold),
         Mark::Idle => ("○", t.dim),
         Mark::Error => ("×", t.red),
@@ -761,7 +767,7 @@ fn chat(buf: &mut Buffer, r: Rect, app: &mut App, narrow: bool) {
     x = put(buf, x + 3, r.y, r.width / 3, &title, t.bold) + 2;
     let (status, ss) = match b.mark() {
         Mark::Need => ("◆ needs you".to_owned(), t.amber),
-        Mark::Work => (format!("{} working {}", spin(app), elapsed(b.started_at)), spin_style(app)),
+        Mark::Work => (format!("{} {}", scan_line(app), elapsed(b.started_at)), spin_style(app)),
         Mark::Error => ("× error".to_owned(), t.red),
         _ => (String::new(), t.dim),
     };
@@ -1081,7 +1087,7 @@ fn build_chat(app: &App, b: &Bot, width: usize) -> Built {
         let line = if b.status == Status::NeedsInput {
             Span::styled(format!(" ◆ Needs you in {place} · ! opens it"), t.amber)
         } else {
-            Span::styled(format!(" {} Working in {place}", spin(app)), spin_style(app))
+            Span::styled(format!(" {} Working in {place}", scan_line(app)), spin_style(app))
         };
         out.lines.push(Line::from(line));
     }
