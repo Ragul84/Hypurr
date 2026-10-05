@@ -51,12 +51,12 @@ object Samples {
         urls = listOf("http://192.168.1.20:19222", "http://100.88.12.4:19222"), cloud = "https://api.hypurr.dev",
     )
 
-    val reviewer = Bot(id = "b1", name = "Reviewer", avatarColor = "teal", avatarShape = "blob", status = "needsInput",
-        activity = "wants to run cargo test --all", lastAt = NOW - 2 * MIN, unread = 1, cwd = "/Users/kevin/hypurr")
+    val reviewer = Bot(id = "b1", name = "Reviewer", avatarColor = "sunflower", avatarShape = "squircle", status = "needsInput",
+        activity = "Run the host tests?", lastAt = NOW - 2 * MIN, unread = 1, cwd = "/Users/kevin/hypurr")
     val bots = listOf(
         reviewer,
-        Bot(id = "b2", name = "Frontend", avatarColor = "cyan", avatarShape = "squircle", status = "working",
-            activity = "Editing web/src/App.tsx", lastAt = NOW - 1 * MIN, pinned = true),
+        Bot(id = "b2", name = "Frontend", avatarColor = "ink", avatarShape = "squircle", status = "working",
+            activity = "Editing App.tsx", lastAt = NOW - 1 * MIN, pinned = true),
         Bot(id = "b3", name = "Docs", avatarColor = "asphalt", avatarShape = "pebble", lastMessage = "Updated the setup guide for Android.",
             lastAt = NOW - 42 * MIN, unread = 2),
         Bot(id = "b4", name = "Release", avatarColor = "orange", avatarShape = "hex", status = "error",
@@ -75,9 +75,18 @@ object Samples {
             "every vector in remote-relay-vectors.json passes. One thing: the relay heartbeat should close a socket that has " +
             "been silent for 75 s, like the iOS client.", final = true), NOW - 7 * MIN),
         e("user", EntryData(text = "Good catch, fixed. Run the whole suite?"), NOW - 3 * MIN),
-        e("permission", EntryData(title = "Run cargo test --all?", command = "cd host && cargo test --all", status = "pending",
-            options = listOf(PermissionOption("allow", "Allow once", "allow_once"), PermissionOption("always", "Always allow", "allow_always"),
-                PermissionOption("reject", "Deny", "reject_once"))), NOW - 2 * MIN),
+        e("permission", EntryData(
+            title = "Run cargo test --all?",
+            explain = "Run the host tests?",
+            command = "cd host && cargo test --all",
+            detail = "Staging DB · ~4 min",
+            status = "pending",
+            options = listOf(
+                PermissionOption("allow", "Allow once", "allow_once"),
+                PermissionOption("always", "Always", "allow_always"),
+                PermissionOption("reject", "Deny", "reject_once"),
+            ),
+        ), NOW - 2 * MIN),
     )
 
     // MARK: tasks (stage A)

@@ -72,8 +72,8 @@ val LightTokens = HypurrColors(
     warning = Color(0xFF0E4A38),
     danger = Color(0xFFA1281C),
     success = Color(0xFF0E4A38),
-    glass = Color(0xE617140A),
-    press = Color(0x1A17140A),
+    glass = Color(0xE6FFF8E8),
+    press = Color(0x3317140A),
     dark = false,
 )
 
@@ -155,7 +155,7 @@ private fun HypurrColors.scheme(): ColorScheme = if (dark) {
     )
 } else {
     lightColorScheme(
-        primary = accent, onPrimary = onAccent, primaryContainer = bubbleUser, onPrimaryContainer = text,
+        primary = accent, onPrimary = onAccent, primaryContainer = bubbleUser, onPrimaryContainer = onAccent,
         secondary = success, tertiary = accent, background = bg, onBackground = text,
         surface = bg, onSurface = text, surfaceVariant = surface, onSurfaceVariant = secondary,
         surfaceContainer = surface, surfaceContainerHigh = bubbleAgent, surfaceContainerLow = surface,

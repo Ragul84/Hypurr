@@ -7,6 +7,7 @@ import com.ragul84.hypurr.data.ThemeMode
 import com.ragul84.hypurr.net.LinkState
 import com.ragul84.hypurr.net.Route
 import com.ragul84.hypurr.ui.screens.BotListScreen
+import com.ragul84.hypurr.ui.screens.NeedsYouAsk
 import com.ragul84.hypurr.ui.screens.ChatScreen
 import com.ragul84.hypurr.ui.screens.NewTaskScreen
 import com.ragul84.hypurr.ui.screens.NewTaskUiState
@@ -66,7 +67,15 @@ class ScreenshotTest {
     @Test
     fun botList() = shoot("bots") {
         BotListScreen(Samples.computer.name, LinkState.Ready(Route.Direct), rosterOrder(Samples.bots), synced = true,
-            onOpen = {}, onSettings = {}, onRetry = {}, now = Samples.NOW)
+            onOpen = {}, onSettings = {}, onRetry = {}, now = Samples.NOW,
+            asks = mapOf(
+                "b1" to NeedsYouAsk(
+                    title = "Run the host tests?",
+                    meta = "Reviewer · Kevin's Mac Studio",
+                    entryId = "e-perm",
+                ),
+            ),
+        )
     }
 
     @Test

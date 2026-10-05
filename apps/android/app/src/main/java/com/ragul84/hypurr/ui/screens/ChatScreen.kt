@@ -40,7 +40,7 @@ import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.Block
 import androidx.compose.material.icons.rounded.AdminPanelSettings
-import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.Color
 import com.ragul84.hypurr.model.Actor
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.Check
@@ -110,14 +110,15 @@ import com.ragul84.hypurr.ui.Pill
 import com.ragul84.hypurr.ui.relativeTime
 import com.ragul84.hypurr.ui.riskColor
 import com.ragul84.hypurr.ui.riskLabel
+import com.ragul84.hypurr.ui.ApprovalActions
 import com.ragul84.hypurr.ui.BotAvatar
-import com.ragul84.hypurr.ui.FlowOrb
-import com.ragul84.hypurr.ui.motion.ThinkingScan
+import com.ragul84.hypurr.ui.CatFace
+import com.ragul84.hypurr.ui.CreamPlate
+import com.ragul84.hypurr.ui.InkTile
+import com.ragul84.hypurr.ui.WorkingPhase
 import com.ragul84.hypurr.ui.motion.DoneRule
-import com.ragul84.hypurr.ui.motion.ToolHairline
 import com.ragul84.hypurr.ui.IconBubble
 import com.ragul84.hypurr.ui.SoftButton
-import com.ragul84.hypurr.ui.SignalAllowButton
 import com.ragul84.hypurr.ui.glass
 import com.ragul84.hypurr.ui.pressable
 import com.ragul84.hypurr.ui.theme.Hypurr
@@ -193,7 +194,7 @@ fun ChatScreen(
                 bottom = if (composer.files.isEmpty()) 108.dp else 176.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            if (bot.isWorking && (if (inThread) bot.workingThread == threadRoot?.id else bot.workingThread == null)) {
+            if (bot.status == "working" && (if (inThread) bot.workingThread == threadRoot?.id else bot.workingThread == null)) {
                 item(key = "working") { WorkingRow(bot, bots, Modifier.animateItem()) }
             }
             items(chat, key = { it.data.clientNonce ?: it.id }) { entry ->
@@ -212,43 +213,41 @@ fun ChatScreen(
                 }
             } else if (chat.isEmpty()) item(key = "empty") { EmptyChat(bot, bots) }
         }
-        // Header: frosted glass over the transcript. Compose has no backdrop blur before Android 12,
-        // so it is opaque: scrolled text must not show through the title.
-        val headerFill = c.glass.compositeOver(c.bg)
-        Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp), headerFill).statusBarsPadding()
-            .padding(horizontal = 10.dp, vertical = 10.dp)) {
+        // Sunfield header: sunflower ground, chunky ink tiles — no glass scrim.
+        Column(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconBubble(Icons.AutoMirrored.Rounded.ArrowBack, "Back", fill = c.surface.copy(alpha = 0.6f), onClick = onBack)
-            Spacer(Modifier.width(10.dp))
-            Row(Modifier.weight(1f).clip(RoundedCornerShape(20.dp)).then(if (onEdit != null && !inThread) Modifier.pressable("${bot.name} settings", onClick = onEdit) else Modifier),
+            InkTile(Icons.AutoMirrored.Rounded.ArrowBack, "Back", onClick = onBack)
+            Spacer(Modifier.width(8.dp))
+            Row(Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).then(if (onEdit != null && !inThread) Modifier.pressable("${bot.name} settings", onClick = onEdit) else Modifier),
                 verticalAlignment = Alignment.CenterVertically) {
-                if (bot.isGroup) GroupAvatar(bot, bots, 38.dp) else BotAvatar(bot, 38.dp)
+                if (bot.isGroup) GroupAvatar(bot, bots, 40.dp) else BotAvatar(bot, 40.dp)
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(if (inThread) "Thread" else bot.name, style = MaterialTheme.typography.titleMedium, color = c.text, maxLines = 1,
-                        overflow = TextOverflow.Ellipsis)
-                    Box {
-                        when {
-                            inThread -> Text("in ${bot.name}", color = c.secondary, style = MaterialTheme.typography.bodyMedium, maxLines = 1,
-                                overflow = TextOverflow.Ellipsis)
-                            bot.isGroup && !bot.isWorking -> Text(groupMembersLine(bot, bots), color = c.secondary,
-                                style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            else -> StatusLine(bot)
-                        }
+                    Text(if (inThread) "Thread" else bot.name, style = MaterialTheme.typography.titleLarge, color = c.text, maxLines = 1,
+                        overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.ExtraBold)
+                    when {
+                        inThread -> Text("in ${bot.name}", color = c.secondary, style = MaterialTheme.typography.bodyMedium, maxLines = 1,
+                            overflow = TextOverflow.Ellipsis)
+                        bot.needsInput -> Text("Waiting on you", color = c.secondary, style = MaterialTheme.typography.bodyMedium)
+                        bot.isGroup && bot.status != "working" -> Text(groupMembersLine(bot, bots), color = c.secondary,
+                            style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        bot.status == "working" -> WorkingPhase(bot.activity.ifEmpty { "Working…" })
+                        else -> Text(bot.activity.ifEmpty { bot.description.ifEmpty { "Ready" } }, color = c.secondary,
+                            style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
-            AnimatedVisibility(bot.isWorking, enter = scaleIn(Motion.spatialFast()) + fadeIn(), exit = scaleOut() + fadeOut()) {
+            AnimatedVisibility(bot.status == "working", enter = scaleIn(Motion.spatialFast()) + fadeIn(), exit = scaleOut() + fadeOut()) {
                 Row {
                     Spacer(Modifier.width(6.dp))
-                    IconBubble(Icons.Rounded.Stop, "Stop", tint = c.danger, fill = c.danger.copy(alpha = 0.12f), onClick = onStop)
+                    InkTile(Icons.Rounded.Stop, "Stop", onClick = onStop)
                 }
             }
         }
         if (task != null) TaskStrip(task) { checkpointsOpen = true }
         }
         Composer(draft, onDraftChange, onSend, Modifier.align(Alignment.BottomCenter), composer, images, onAttach, onRemoveFile,
-            if (inThread) "Reply in thread" else if (bot.isGroup) "Message ${bot.name}" else "Message")
+            if (inThread) "Reply in thread" else if (bot.isGroup) "Message ${bot.name}" else "Ask ${bot.name}…")
         if (task != null) {
             CheckpointSheet(checkpointsOpen, task, now, integrations, initialFinishOpen, onClose = { checkpointsOpen = false },
                 onRollback = { checkpointsOpen = false; onRollback(it) },
@@ -564,7 +563,9 @@ private fun UserBubble(entry: Entry, media: AttachmentUi, onLongPress: () -> Uni
             AttachmentView(a, media, Modifier.padding(start = 56.dp, bottom = 4.dp), onLongPress)
         }
         if (!entry.data.text.isNullOrEmpty()) {
-            Text(entry.data.text, color = c.text, style = MaterialTheme.typography.bodyLarge,
+            // Ink bubble + cream text (light); sunflower bubble + forest text (dark). Never ink-on-ink.
+            val bubbleInk = if (c.dark) c.onAccent else Color(0xFFFFF8E8)
+            Text(entry.data.text, color = bubbleInk, style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.padding(start = 56.dp).clip(RoundedCornerShape(20.dp))
                     .background(c.bubbleUser).combinedClickable(onClick = {}, onLongClick = onLongPress, onLongClickLabel = "Message actions")
                     .padding(horizontal = 16.dp, vertical = 11.dp))
@@ -636,7 +637,6 @@ private fun AgentBubble(entry: Entry, author: Bot?, onLongPress: () -> Unit) {
  * An explained approval card: one plain sentence, a risk level from the host's rules, the technical detail
  * folded away. Choices are text (an icon would be ambiguous). A task's card offers Undo after approving.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PermissionCard(entry: Entry, task: TaskInfo?, onRespond: (Entry, String?) -> Unit, onUndo: (Entry) -> Unit,
                            isAdmin: Boolean = true) {
@@ -645,77 +645,77 @@ private fun PermissionCard(entry: Entry, task: TaskInfo?, onRespond: (Entry, Str
     val pending = d.status == null || d.status == "pending"
     val blocked = d.blocked != null
     val risk = riskColor(d.risk)
-    val tint by animateColorAsState(when {
-        blocked -> c.danger
-        pending -> risk
-        else -> c.tertiary
-    }, Motion.effects(), label = "perm")
-    var details by remember(entry.id) { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().padding(end = 24.dp).clip(RoundedCornerShape(20.dp)).background(c.surface)
-        .animateContentSize(Motion.spatialDefault())) {
-        if (pending) Box(Modifier.fillMaxWidth().height(4.dp).background(c.accent.copy(alpha = 0.9f)))
-        Column(Modifier.fillMaxWidth().background(tint.copy(alpha = 0.10f)).padding(16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(if (blocked) Icons.Rounded.Block else Icons.Rounded.Shield, null, tint = tint, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(when {
-                blocked -> "Blocked by the safety net"
-                pending && d.needsAdmin == true && !isAdmin -> "Waiting for an admin"
-                pending -> "Needs you"
+    var details by remember(entry.id) { mutableStateOf(d.explain == null) }
+    val headline = when {
+        blocked -> d.blocked ?: "Blocked by the safety net"
+        !d.explain.isNullOrBlank() -> d.explain
+        !d.title.isNullOrBlank() -> d.title
+        else -> "Allow this action?"
+    }
+    val meta = listOfNotNull(
+        d.riskReasons?.firstOrNull(),
+        d.detail?.takeIf { it.isNotBlank() && it != d.command },
+    ).firstOrNull()
+    val detail = d.command ?: d.detail
+    CreamPlate(Modifier.fillMaxWidth().padding(end = 20.dp).animateContentSize(Motion.spatialDefault())) {
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            val pillLabel = when {
+                blocked -> "Blocked"
+                pending && d.needsAdmin == true && !isAdmin -> "Needs admin"
+                pending -> "Approval"
                 else -> "Answered"
-            }, color = tint, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            if (d.risk != null) Pill(riskLabel(d.risk), risk)
-        }
-        Text(d.explain ?: d.title ?: "Allow this action?", color = c.text, style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(top = 8.dp))
-        val why = d.blocked ?: d.riskReasons?.firstOrNull()
-        if (why != null) Text(why, color = c.secondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
-        val detail = d.command ?: d.detail
-        if (d.explain != null) {
-            Text(if (details) "Hide details" else "Show details", color = c.accent, style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier.padding(top = 8.dp).clip(RoundedCornerShape(50)).pressable(if (details) "Hide details" else "Show details") { details = !details }
-                    .padding(vertical = 4.dp))
-        }
-        if ((details || d.explain == null) && (!detail.isNullOrBlank() || d.title != null)) {
-            Column(Modifier.padding(top = 8.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.bg.copy(alpha = 0.6f)).padding(10.dp)) {
-                if (d.explain != null && d.title != null) Text(d.title, color = c.text, style = MaterialTheme.typography.labelLarge)
-                if (!detail.isNullOrBlank()) Text(detail, color = c.secondary, fontFamily = FontFamily.Monospace, fontSize = 13.sp, maxLines = 8,
-                    overflow = TextOverflow.Ellipsis)
-                d.riskReasons?.drop(1)?.forEach { Text("• $it", color = c.secondary, style = MaterialTheme.typography.bodySmall) }
             }
-        }
-        if (pending && d.needsAdmin == true) {
-            Row(Modifier.padding(top = 10.dp).clip(RoundedCornerShape(12.dp)).background(c.accent.copy(alpha = 0.10f))
-                .padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.AdminPanelSettings, null, tint = c.accent, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(if (isAdmin) "Your team's rules: an admin approves this" else "Needs an admin: your team's rules say an admin approves this",
-                    color = c.accent, style = MaterialTheme.typography.labelMedium)
+            val pillColor = when {
+                blocked -> c.danger
+                pending -> c.accent
+                else -> c.tertiary
             }
-        }
-        if (pending && (d.needsAdmin != true || isAdmin)) {
-            FlowRow(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                d.options.orEmpty().forEach { option ->
-                    val reject = option.kind.startsWith("reject")
-                    if (reject) {
-                        SoftButton(option.name, tint = c.danger) { onRespond(entry, option.optionId) }
-                    } else {
-                        SignalAllowButton(option.name) { onRespond(entry, option.optionId) }
+            Pill(pillLabel, pillColor)
+            Text(headline, color = c.text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold,
+                modifier = Modifier.padding(top = 10.dp))
+            if (meta != null) {
+                Text(meta, color = c.secondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
+            }
+            if (!detail.isNullOrBlank()) {
+                if (d.explain != null) {
+                    Text(if (details) "Hide details" else "Show command", color = c.accent, style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.padding(top = 8.dp).pressable(if (details) "Hide details" else "Show command") { details = !details }
+                            .padding(vertical = 2.dp))
+                }
+                if (details || d.explain == null) {
+                    val codeBg = if (c.dark) c.bg.copy(alpha = 0.45f) else Color(0xFFF3E6C8)
+                    Text(detail, color = c.secondary, fontFamily = FontFamily.Monospace, fontSize = 12.sp, maxLines = 6,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 8.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                            .background(codeBg).padding(10.dp))
+                }
+            }
+            if (pending && d.needsAdmin == true) {
+                Row(Modifier.padding(top = 10.dp).clip(RoundedCornerShape(12.dp)).background(c.accent.copy(alpha = 0.10f))
+                    .padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.AdminPanelSettings, null, tint = c.accent, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(if (isAdmin) "Your team's rules: an admin approves this" else "Needs an admin: your team's rules say an admin approves this",
+                        color = c.accent, style = MaterialTheme.typography.labelMedium)
+                }
+            }
+            if (pending && (d.needsAdmin != true || isAdmin) && !d.options.isNullOrEmpty()) {
+                ApprovalActions(d.options, Modifier.padding(top = 14.dp)) { onRespond(entry, it) }
+            } else if (!blocked && !pending) {
+                val option = d.options?.firstOrNull { it.optionId == d.selected }
+                Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(option?.name ?: d.status.orEmpty().replaceFirstChar(Char::uppercase), color = c.secondary,
+                        style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    val approved = option != null && !option.kind.startsWith("reject")
+                    if (approved && d.checkpoint != null && task?.hasSafetyNet == true && task.isActive) {
+                        SoftButton("Undo", icon = Icons.AutoMirrored.Rounded.Undo, tint = c.warning) { onUndo(entry) }
                     }
                 }
             }
-        } else if (!blocked && !pending) {
-            val option = d.options?.firstOrNull { it.optionId == d.selected }
-            Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(option?.name ?: d.status.orEmpty().replaceFirstChar(Char::uppercase), color = c.secondary,
-                    style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-                val approved = option != null && !option.kind.startsWith("reject")
-                if (approved && d.checkpoint != null && task?.hasSafetyNet == true && task.isActive) {
-                    SoftButton("Undo", icon = Icons.AutoMirrored.Rounded.Undo, tint = c.warning) { onUndo(entry) }
-                }
+            if (d.risk != null && pending) {
+                Text(riskLabel(d.risk), color = risk, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 8.dp))
             }
         }
-    }
     }
 }
 
@@ -768,23 +768,15 @@ private fun Notice(entry: Entry) {
 
 @Composable
 private fun WorkingRow(bot: Bot, bots: Map<String, Bot>, modifier: Modifier = Modifier) {
-    val activity = bot.activity.ifEmpty { "Thinking…" }
-    val phases = when {
-        activity.contains("test", true) || activity.contains("cargo", true) ->
-            listOf("Reading files", "Running tests", activity)
-        activity.contains("edit", true) || activity.contains(".tsx", true) || activity.contains(".kt", true) ->
-            listOf("Reading files", "Planning", activity)
-        else -> listOf("Reading files", "Planning", activity)
-    }
-    Column(modifier.padding(start = 4.dp, top = 4.dp, end = 24.dp).fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            FlowOrb(22.dp)
-            Spacer(Modifier.width(10.dp))
-            ThinkingScan(phases = phases, Modifier.weight(1f))
+    val c = Hypurr.colors
+    val activity = bot.activity.ifEmpty { "Working…" }
+    Row(modifier.padding(start = 4.dp, top = 6.dp, end = 24.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(28.dp).clip(RoundedCornerShape(10.dp)).background(if (c.dark) c.surface else Color(0xFF15130F)),
+            contentAlignment = Alignment.Center) {
+            CatFace(if (c.dark) c.text else Color(0xFFFFF8E8), 18.dp)
         }
-        if (activity.contains("cargo", true) || activity.contains("test", true)) {
-            ToolHairline(progress = 0.62f, Modifier.padding(start = 32.dp, top = 6.dp))
-        }
+        Spacer(Modifier.width(10.dp))
+        WorkingPhase(activity, Modifier.weight(1f))
     }
 }
 
@@ -826,7 +818,8 @@ private fun Composer(draft: String, onDraftChange: (String) -> Unit, onSend: () 
                 modifier = Modifier.padding(start = 8.dp, bottom = 6.dp))
         }
         Row(
-            Modifier.fillMaxWidth().glass(RoundedCornerShape(30.dp), c.glass).padding(start = if (composer.canAttach) 6.dp else 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(c.surface)
+                .padding(start = if (composer.canAttach) 6.dp else 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (composer.canAttach) {
@@ -842,7 +835,7 @@ private fun Composer(draft: String, onDraftChange: (String) -> Unit, onSend: () 
             Spacer(Modifier.width(8.dp))
             Box(
                 Modifier.size(44.dp).scale(sendScale).clip(CircleShape)
-                    .background(if (canSend) SolidColor(c.accent) else SolidColor(c.border))
+                    .background(if (canSend) c.accent else c.border.copy(alpha = 0.5f))
                     .pressable("Send", enabled = canSend, onClick = onSend),
                 contentAlignment = Alignment.Center,
             ) {

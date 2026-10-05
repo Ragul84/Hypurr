@@ -55,6 +55,7 @@ import org.webrtc.SurfaceViewRenderer
 import com.ragul84.hypurr.model.Pairing
 import com.ragul84.hypurr.net.LinkState
 import com.ragul84.hypurr.ui.screens.BotListScreen
+import com.ragul84.hypurr.ui.screens.NeedsYouAsk
 import com.ragul84.hypurr.ui.screens.BuiltinInstallPrompt
 import com.ragul84.hypurr.ui.screens.ChatScreen
 import com.ragul84.hypurr.ui.screens.NewTaskScreen
@@ -497,6 +498,29 @@ class MainActivity : ComponentActivity() {
                     val prompt = if (you?.canAct != false && builtin != null && (builtin.needsInstall || (!builtin.installed && builtin.available))) {
                         BuiltinInstallPrompt(busy = builtinBusy, error = builtinError, consent = builtin.consent ?: BuiltinInstallPrompt().consent)
                     } else null
+                    val asks = bots.values.filter { it.needsInput }.associate { bot ->
+                        val pending = entries[bot.id].orEmpty().asReversed().firstOrNull {
+                            it.kind == "permission" && (it.data.status == null || it.data.status == "pending")
+                        }
+                        val fallback = bot.activity.ifEmpty { "Needs your OK" }.let { a ->
+                            val capped = a.replaceFirstChar { ch -> ch.uppercaseChar() }
+                            if (capped.endsWith("?")) capped else "$capped?"
+                        }
+                        bot.id to NeedsYouAsk(
+                            title = pending?.data?.explain?.takeIf { it.isNotBlank() }
+                                ?: pending?.data?.title?.takeIf { it.isNotBlank() }
+                                ?: fallback,
+                            meta = "${bot.name} · ${current.name}",
+                            options = pending?.data?.options.orEmpty().ifEmpty {
+                                listOf(
+                                    com.ragul84.hypurr.model.PermissionOption("allow", "Allow once", "allow_once"),
+                                    com.ragul84.hypurr.model.PermissionOption("always", "Always", "allow_always"),
+                                    com.ragul84.hypurr.model.PermissionOption("reject", "Deny", "reject_once"),
+                                )
+                            },
+                            entryId = pending?.id,
+                        )
+                    }
                     BotListScreen(
                         current.name, linkState, rosterOrder(bots.values), synced,
                         onOpen = { screen = "chat:${it.id}" },
@@ -517,6 +541,11 @@ class MainActivity : ComponentActivity() {
                                 builtinBusy = false
                             }
                         },
+                        asks = asks,
+                        onRespondAsk = { _, entryId, optionId ->
+                            if (entryId != null) scope.launch { runCatching { store.respond(entryId, optionId) } }
+                        },
+                        onSpend = { screen = "settings" },
                     )
                 }
             }

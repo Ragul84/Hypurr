@@ -304,31 +304,132 @@ fun templateIcon(id: String): ImageVector = when (id) {
  * Signature "Press Allow" on Allow: press-down → forest/sunflower band flash (~120ms) → invoke [onAllow].
  * The approval plate then collapses via host status update; a 3px left rail marks the live row.
  */
+/** Solid forest/sunflower Allow — Sunfield primary CTA (replaces pale SoftButton strike). */
 @Composable
 fun SignalAllowButton(text: String, modifier: Modifier = Modifier, onAllow: () -> Unit) {
     val c = Hypurr.colors
     val reduce = reduceMotion()
     var striking by remember { mutableStateOf(false) }
-    val band by animateFloatAsState(
-        targetValue = if (striking && !reduce) 1f else 0f,
-        animationSpec = tween(durationMillis = HypurrMotion.STRIKE_MS, easing = LinearEasing),
-        label = "signal-band",
-    )
     LaunchedEffect(striking) {
         if (!striking) return@LaunchedEffect
         delay((if (reduce) HypurrMotion.REDUCED_MS else HypurrMotion.STRIKE_MS).toLong())
         onAllow()
         striking = false
     }
+    val label = sunfieldOptionLabel(text)
+    Row(
+        modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(c.accent)
+            .pressable(enabled = !striking, onClick = { if (!striking) striking = true })
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Text(label, color = c.onAccent, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
+    }
+}
+
+/** Shorten host option names to Sunfield labels. */
+fun sunfieldOptionLabel(name: String): String = when {
+    name.equals("Always allow", ignoreCase = true) -> "Always"
+    name.equals("Allow once", ignoreCase = true) -> "Allow once"
+    else -> name
+}
+
+/** Cream secondary button (Always). */
+@Composable
+fun CreamButton(text: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val c = Hypurr.colors
+    val fill = if (c.dark) c.bg.copy(alpha = 0.35f) else Color(0xFFF3E6C8)
+    Row(
+        modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(fill)
+            .pressable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Text(sunfieldOptionLabel(text), color = c.text, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+    }
+}
+
+/** Text-only Deny. */
+@Composable
+fun TextDenyButton(text: String = "Deny", modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val c = Hypurr.colors
+    Text(
+        sunfieldOptionLabel(text),
+        color = c.secondary,
+        fontWeight = FontWeight.Bold,
+        fontSize = 14.sp,
+        modifier = modifier.pressable(onClick = onClick).padding(horizontal = 10.dp, vertical = 10.dp),
+    )
+}
+
+/**
+ * One-row approval actions: forest Allow once · cream Always · text Deny.
+ * Maps host [PermissionOption] kinds onto Sunfield chrome.
+ */
+@Composable
+fun ApprovalActions(
+    options: List<com.ragul84.hypurr.model.PermissionOption>,
+    modifier: Modifier = Modifier,
+    onChoose: (String?) -> Unit,
+) {
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        options.forEach { option ->
+            val reject = option.kind.startsWith("reject")
+            val always = option.kind.contains("always", ignoreCase = true) ||
+                option.name.contains("always", ignoreCase = true)
+            when {
+                reject -> TextDenyButton(option.name, Modifier, onClick = { onChoose(option.optionId) })
+                always -> CreamButton(option.name, Modifier.weight(1f, fill = false), onClick = { onChoose(option.optionId) })
+                else -> SignalAllowButton(option.name, Modifier.weight(1f, fill = false), onAllow = { onChoose(option.optionId) })
+            }
+        }
+    }
+}
+
+/** Chunky ink square tile (back / cat header). */
+@Composable
+fun InkTile(icon: ImageVector, label: String, modifier: Modifier = Modifier, size: Dp = 40.dp, onClick: () -> Unit) {
+    val c = Hypurr.colors
+    val fill = if (c.dark) c.surface else Color(0xFF15130F)
+    val ink = if (c.dark) c.text else Color(0xFFFFF8E8)
+    Box(
+        modifier.size(size).clip(RoundedCornerShape(12.dp)).background(fill).pressable(label, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription = null, tint = ink, modifier = Modifier.size(size * 0.48f))
+    }
+}
+
+/** Cream plate with a chunky offset press shadow (Sunfield cards). */
+@Composable
+fun CreamPlate(modifier: Modifier = Modifier, shape: RoundedCornerShape = RoundedCornerShape(20.dp), content: @Composable () -> Unit) {
+    val c = Hypurr.colors
     Box(modifier) {
-        SoftButton(text, tint = c.accent, onClick = { if (!striking) striking = true })
+        Box(Modifier.matchParentSize().padding(top = 4.dp).clip(shape).background(c.press.copy(alpha = if (c.dark) 0.45f else 0.22f)))
+        Box(Modifier.clip(shape).background(c.surface)) { content() }
+    }
+}
+
+/** Friendly working phase: Cabinet text + ink-dot blink (no mono scanner). */
+@Composable
+fun WorkingPhase(text: String, modifier: Modifier = Modifier, animate: Boolean = true) {
+    val c = Hypurr.colors
+    val still = LocalInspectionMode.current || !animate || reduceMotion()
+    val t = rememberInfiniteTransition(label = "blink")
+    val alpha by t.animateFloat(0.25f, 1f, infiniteRepeatable(tween(700), RepeatMode.Reverse), label = "dot")
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         Box(
-            Modifier
-                .align(Alignment.TopStart)
-                .fillMaxWidth()
-                .height(4.dp)
-                .background(c.accent.copy(alpha = band)),
+            Modifier.size(8.dp).clip(CircleShape)
+                .background(c.accent.copy(alpha = if (still) 0.85f else alpha)),
         )
+        Spacer(Modifier.width(8.dp))
+        Text(text, color = c.secondary, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1)
     }
 }
 
