@@ -3,6 +3,7 @@ package com.ragul84.hypurr.data
 import com.ragul84.hypurr.model.Activity
 import com.ragul84.hypurr.model.Actor
 import com.ragul84.hypurr.model.AuditLog
+import com.ragul84.hypurr.model.Backend
 import com.ragul84.hypurr.model.Bot
 import com.ragul84.hypurr.model.PolicyInfo
 import com.ragul84.hypurr.model.TeamInfo
@@ -326,6 +327,13 @@ class HypurrStore(
 
     suspend fun react(entryId: String, emoji: String) {
         client?.react(entryId, emoji)?.let(::upsert)
+    }
+
+    /** Installs Hypurr's built-in OpenCode agent after the user consents. */
+    suspend fun installBuiltinAgent(): Backend {
+        val b = (client ?: throw HostException.unreachable()).installBuiltinAgent()
+        refreshHello()
+        return b
     }
 
     // MARK: bots and groups

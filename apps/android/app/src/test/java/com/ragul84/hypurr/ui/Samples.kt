@@ -316,7 +316,17 @@ object Samples {
             final = true, author = "a2", thread = com.ragul84.hypurr.model.ThreadSummary(2, NOW - 2 * MIN, listOf("user", "a2"))), NOW - 3 * MIN, bot = "g1"),
     )
 
-    val backends = listOf(com.ragul84.hypurr.model.Backend("claude", "Claude Code"), com.ragul84.hypurr.model.Backend("codex", "Codex"),
+    val freeModels = listOf(
+        com.ragul84.hypurr.model.AgentModel("opencode/big-pickle", "Big Pickle", "General coding", free = true),
+        com.ragul84.hypurr.model.AgentModel("opencode/space-bunny-free", "Space Bunny Free", free = true),
+        com.ragul84.hypurr.model.AgentModel("opencode/minimax-m2.5-free", "MiniMax M2.5 Free", free = true),
+    )
+    val builtinOpenCode = com.ragul84.hypurr.model.Backend(
+        "opencode", "Hypurr built-in", available = true, installed = true, builtin = true, free = true,
+        subtitle = "OpenCode · free models", defaultModel = "opencode/big-pickle", freeModels = freeModels,
+        description = "OpenCode with free Zen models — Hypurr's built-in agent.",
+    )
+    val backends = listOf(builtinOpenCode, com.ragul84.hypurr.model.Backend("claude", "Claude Code"), com.ragul84.hypurr.model.Backend("codex", "Codex"),
         com.ragul84.hypurr.model.Backend("gemini", "Gemini CLI"))
 
     val dirs = com.ragul84.hypurr.model.DirListing("/Users/kevin/code", "/Users/kevin", false, listOf(

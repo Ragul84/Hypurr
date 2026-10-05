@@ -1,6 +1,7 @@
 package com.ragul84.hypurr.net
 
 import com.ragul84.hypurr.data.DeviceIdentity
+import com.ragul84.hypurr.model.Backend
 import com.ragul84.hypurr.model.Bot
 import com.ragul84.hypurr.model.Computer
 import com.ragul84.hypurr.model.Entry
@@ -154,6 +155,12 @@ class HostClient(val transport: ChannelTransport) {
     }
 
     // Bots and groups.
+
+    /** Downloads the pinned OpenCode build into `~/.hypurr/agents/opencode` (user must have consented). */
+    suspend fun installBuiltinAgent(): Backend {
+        val res = transport.call("installBuiltinAgent", buildJsonObject { put("consent", true) }, timeoutMs = 600_000)
+        return HypurrJson.decodeFromJsonElement(res)
+    }
 
     /** A bot (`backend`, `cwd` empty = a personal workspace, `permission`) or a group (`kind: "group"`, `members`). */
     suspend fun createBot(config: JsonObject): Bot {

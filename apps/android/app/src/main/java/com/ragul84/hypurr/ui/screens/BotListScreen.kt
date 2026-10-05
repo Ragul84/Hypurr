@@ -99,6 +99,9 @@ fun BotListScreen(
     initialMenuOpen: Boolean = false,
     /** Opens the computer's screen; null when the computer doesn't offer it. */
     onScreen: (() -> Unit)? = null,
+    /** When set, show the built-in agent install card (OpenCode free models). */
+    builtinInstall: BuiltinInstallPrompt? = null,
+    onInstallBuiltin: () -> Unit = {},
 ) {
     val c = Hypurr.colors
     var menu by remember { mutableStateOf(initialMenuOpen) }
@@ -146,6 +149,7 @@ fun BotListScreen(
                     .glass(RoundedCornerShape(18.dp), c.warning.copy(alpha = 0.1f), highlight = false).padding(14.dp))
         }
         if (synced && bots.isEmpty()) {
+            builtinInstall?.let { BuiltinInstallCard(it, onInstallBuiltin, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
             EmptyRoster(onNewTask)
             return@Column
         }
@@ -155,6 +159,11 @@ fun BotListScreen(
         }
         LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 112.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            builtinInstall?.let { prompt ->
+                item(key = "builtin-install") {
+                    BuiltinInstallCard(prompt, onInstallBuiltin, Modifier.padding(horizontal = 4.dp, vertical = 8.dp))
+                }
+            }
             if (needsYou.isNotEmpty()) {
                 item(key = "needs-header") { SectionLabel("Needs you", c.warning) }
                 item(key = "needs") {
@@ -265,5 +274,29 @@ fun StatusLine(bot: Bot) {
             maxLines = 1, overflow = TextOverflow.Ellipsis)
         else -> Text(bot.lastMessage ?: bot.description.ifEmpty { bot.folderName }, color = c.secondary,
             style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** Offer to install Hypurr's built-in OpenCode agent (free Zen models). */
+data class BuiltinInstallPrompt(
+    val title: String = "Hypurr built-in agent",
+    val body: String = "Install OpenCode into ~/.hypurr/agents/opencode and start with free models (Big Pickle and others). No other AI account needed.",
+    val consent: String = "Free Zen models are provided by OpenCode for a limited time; some may use prompts to improve the model.",
+    val busy: Boolean = false,
+    val error: String? = null,
+)
+
+@Composable
+private fun BuiltinInstallCard(prompt: BuiltinInstallPrompt, onInstall: () -> Unit, modifier: Modifier = Modifier) {
+    val c = Hypurr.colors
+    Column(modifier.fillMaxWidth().glass(RoundedCornerShape(20.dp), c.bg.copy(alpha = 0.55f)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(prompt.title, color = c.text, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Pill("Free", c.success)
+        }
+        Text(prompt.body, color = c.secondary, style = MaterialTheme.typography.bodyMedium)
+        Text(prompt.consent, color = c.tertiary, style = MaterialTheme.typography.bodySmall)
+        prompt.error?.let { Text(it, color = c.danger, style = MaterialTheme.typography.bodySmall) }
+        FlowButton(if (prompt.busy) "Installing…" else "Install OpenCode", enabled = !prompt.busy, onClick = onInstall)
     }
 }
