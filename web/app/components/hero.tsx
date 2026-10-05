@@ -60,7 +60,7 @@ export default function Hero() {
               whileHover={reduce ? undefined : { scale: 1.04, y: -2 }}
               whileTap={{ scale: 0.96 }}
               transition={springBouncy}
-              className="flow-bg group inline-flex items-center justify-center gap-2 rounded-full px-7 py-3.5 font-semibold text-white shadow-[0_12px_40px_-10px_var(--flow-2)]"
+              className="flow-bg group inline-flex items-center justify-center gap-2 rounded-full px-7 py-3.5 font-semibold text-[var(--on-primary)] shadow-[0_12px_40px_-10px_color-mix(in_srgb,var(--primary)_45%,transparent)]"
             >
               Get Hypurr
               <ArrowRight size={18} weight="bold" className="transition-transform group-hover:translate-x-1" />
@@ -159,7 +159,7 @@ export default function Hero() {
                 edit src/pace.js  +12 −3
               </code>
               <div className="mt-3 grid grid-cols-3 gap-1.5 text-xs font-semibold">
-                <span className="flow-bg rounded-full py-2 text-center text-white">Allow</span>
+                <span className="flow-bg rounded-full py-2 text-center text-[var(--on-primary)]">Allow</span>
                 <span className="rounded-full bg-primary-container py-2 text-center text-on-primary-container">Always</span>
                 <span className="rounded-full bg-surface-container-highest py-2 text-center text-on-surface">Deny</span>
               </div>

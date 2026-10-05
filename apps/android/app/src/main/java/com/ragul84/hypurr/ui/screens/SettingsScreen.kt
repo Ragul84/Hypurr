@@ -65,7 +65,6 @@ import com.ragul84.hypurr.ui.LinkPill
 import com.ragul84.hypurr.ui.SoftButton
 import com.ragul84.hypurr.ui.glass
 import com.ragul84.hypurr.ui.pressable
-import com.ragul84.hypurr.ui.theme.ColorFlow
 import com.ragul84.hypurr.ui.theme.Hypurr
 import com.ragul84.hypurr.ui.theme.Motion
 
@@ -116,8 +115,8 @@ fun SettingsScreen(
         }
         Section("Computer") {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(ColorFlow.linear()), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Rounded.Computer, null, tint = ColorFlow.FlowInk)
+                Box(Modifier.size(44.dp).clip(RoundedCornerShape(4.dp)).background(c.accent), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Rounded.Computer, null, tint = c.onAccent)
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
@@ -132,7 +131,7 @@ fun SettingsScreen(
         }
         Section("Team") {
             Row(Modifier.fillMaxWidth().pressable("Team admin", onClick = onTeamAdmin), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(c.accent.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(44.dp).clip(RoundedCornerShape(4.dp)).background(c.accent.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
                     Icon(Icons.Rounded.AdminPanelSettings, null, tint = c.accent)
                 }
                 Spacer(Modifier.width(12.dp))
@@ -247,7 +246,7 @@ internal fun Section(title: String, content: @Composable ColumnScope.() -> Unit)
     val c = Hypurr.colors
     Text(title.uppercase(), color = c.tertiary, style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
         modifier = Modifier.padding(start = 8.dp, top = 18.dp, bottom = 8.dp))
-    Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(24.dp), c.surface).padding(16.dp),
+    Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(4.dp), c.surface).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
 }
 
@@ -273,7 +272,7 @@ internal fun ToggleRow(title: String, subtitle: String, on: Boolean, enabled: Bo
         Spacer(Modifier.width(12.dp))
         val knob by animateDpAsState(if (on) 22.dp else 2.dp, Motion.spatialFast(), label = "knob")
         Box(Modifier.size(50.dp, 30.dp).clip(RoundedCornerShape(50))
-            .background(if (on) ColorFlow.linear() else androidx.compose.ui.graphics.SolidColor(c.border))) {
+            .background(if (on) androidx.compose.ui.graphics.SolidColor(c.accent) else androidx.compose.ui.graphics.SolidColor(c.border))) {
             Box(Modifier.offset(x = knob, y = 2.dp).size(26.dp).clip(CircleShape).background(androidx.compose.ui.graphics.Color.White))
         }
     }
@@ -358,7 +357,7 @@ private fun Service(name: String, status: String, configured: Boolean, test: Str
                     edit: @Composable ColumnScope.() -> Unit) {
     val c = Hypurr.colors
     var open by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(c.bg.copy(alpha = 0.5f)).padding(12.dp)
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)).background(c.bg.copy(alpha = 0.5f)).padding(12.dp)
         .animateContentSize(Motion.spatialDefault()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth().pressable("Set up $name") { open = !open }, verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {

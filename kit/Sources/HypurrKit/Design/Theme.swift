@@ -36,31 +36,30 @@ public extension Color {
     }
 }
 
-/// Hypurr: violet-tinted neutrals, a violet accent and the violet → magenta → cyan
-/// colour flow (`ColorFlow`); colour also comes from the bots. Magenta marks
-/// "needs you" and red marks errors. Shared with the GTK app and the TUI
+/// Hypurr wet-asphalt neon: asphalt ground, flat electric teal signal, amber
+/// "Needs you", red for fail/deny. Shared with GTK / Android / web
 /// (docs/design/hypurr-design-system.md).
 public enum Palette {
-    public static let background = Color(light: 0xFCFAFF, dark: 0x0E0A1C)
-    public static let surface = Color(light: 0xF4EFFC, dark: 0x161029)
-    public static let bubbleAgent = Color(light: 0xEFE9FA, dark: 0x1E1736)
-    public static let bubbleUser = Color(light: 0xE4D9FB, dark: 0x3A2A6B)
-    public static let border = Color(light: 0xE6DFF3, dark: 0x2A2145)
-    public static let text = Color(light: 0x1E1433, dark: 0xF3EEFF)
-    public static let secondary = Color(light: 0x5B4F7A, dark: 0xA89CC8)
-    public static let tertiary = Color(light: 0x8C82A8, dark: 0x75699A)
+    public static let background = Color(light: 0xF4F6F5, dark: 0x05070A)
+    public static let surface = Color(light: 0xFFFFFF, dark: 0x0B1211)
+    public static let bubbleAgent = Color(light: 0xE8EEEC, dark: 0x0E1614)
+    public static let bubbleUser = Color(light: 0xD5E8E5, dark: 0x12302C)
+    public static let border = Color(light: 0xD5DEDB, dark: 0x14201E)
+    public static let text = Color(light: 0x0A1210, dark: 0xE8FFFC)
+    public static let secondary = Color(light: 0x4A5E5A, dark: 0x7FA8A3)
+    public static let tertiary = Color(light: 0x8A9995, dark: 0x3D5552)
     /// Ink used for fills (primary buttons, the send button, unread badges).
-    public static let accentFill = Color(light: 0x6D3FD9, dark: 0xA78BFA)
+    public static let accentFill = Color(light: 0x007A73, dark: 0x00D4C8)
     /// Ink readable as text and tint on the background.
-    public static let accent = Color(light: 0x6D3FD9, dark: 0xC4B5FD)
-    public static let onAccent = Color(light: 0xFFFFFF, dark: 0x150A33)
-    public static let accentDim = Color(light: 0xDCD3F0, dark: 0x352B55)
-    public static let danger = Color(light: 0xC2304D, dark: 0xFF8FA3)
-    /// "Needs you".
-    public static let warning = Color(light: 0xC0267A, dark: 0xF472B6)
-    public static let codeBackground = Color(light: 0xF1ECFB, dark: 0x120D24)
-    public static let added = Color(light: 0x1F8A5B, dark: 0x7EE0B5)
-    public static let removed = Color(light: 0xC2304D, dark: 0xFF8FA3)
+    public static let accent = Color(light: 0x007A73, dark: 0x00D4C8)
+    public static let onAccent = Color(light: 0xF4F6F5, dark: 0x021412)
+    public static let accentDim = Color(light: 0xC5DEDB, dark: 0x12302C)
+    public static let danger = Color(light: 0xC23B2E, dark: 0xFF6B5A)
+    /// "Needs you" label only (amber attention — not a second brand accent).
+    public static let warning = Color(light: 0xB86A00, dark: 0xFFB020)
+    public static let codeBackground = Color(light: 0xE8EEEC, dark: 0x080C0B)
+    public static let added = Color(light: 0x1F7A55, dark: 0x5EAD8A)
+    public static let removed = Color(light: 0xC23B2E, dark: 0xFF6B5A)
 }
 
 public enum AvatarPalette {
@@ -72,23 +71,28 @@ public enum AvatarPalette {
     }
 
     public static let colors: [Swatch] = [
-        .init(id: "black", label: "Black", hex: 0x2B2B2B),
-        .init(id: "brown", label: "Brown", hex: 0x936439),
-        .init(id: "red", label: "Red", hex: 0xFF263C),
-        .init(id: "orange", label: "Orange", hex: 0xFF6700),
-        .init(id: "yellow", label: "Yellow", hex: 0xFF9800),
-        .init(id: "green", label: "Green", hex: 0x00C972),
-        .init(id: "cyan", label: "Cyan", hex: 0x00BCA6),
-        .init(id: "blue", label: "Blue", hex: 0x1084FE),
-        .init(id: "violet", label: "Violet", hex: 0x9159FE),
-        .init(id: "magenta", label: "Magenta", hex: 0xFF309B),
-        .init(id: "gray", label: "Gray", hex: 0x777777),
+        .init(id: "black", label: "Black", hex: 0x05070A),
+        .init(id: "asphalt", label: "Asphalt", hex: 0x0B1211),
+        .init(id: "teal", label: "Teal", hex: 0x00D4C8),
+        .init(id: "cyan", label: "Cyan", hex: 0x00D4C8),
+        .init(id: "green", label: "Green", hex: 0x5EAD8A),
+        .init(id: "ink", label: "Ink", hex: 0x3D5552),
+        .init(id: "gray", label: "Gray", hex: 0x3D5552),
+        .init(id: "attention", label: "Attention", hex: 0xFFB020),
+        .init(id: "red", label: "Red", hex: 0xFF6B5A),
+        .init(id: "brown", label: "Brown", hex: 0x5A4A3A),
+        .init(id: "blue", label: "Blue", hex: 0x2A6B66),
+        // Legacy ids remap to asphalt/teal neutrals (no confetti violet/magenta brand).
+        .init(id: "violet", label: "Ink", hex: 0x3D5552),
+        .init(id: "magenta", label: "Mist", hex: 0x7FA8A3),
+        .init(id: "orange", label: "Attention", hex: 0xFFB020),
+        .init(id: "yellow", label: "Gold", hex: 0xC9A227),
     ]
 
     public static let shapes = ["blob", "pebble", "squircle", "tablet", "wedge", "hex", "cloud", "teardrop"]
 
     public static func color(_ id: String) -> Color {
-        (colors.first { $0.id == id } ?? colors[7]).color
+        (colors.first { $0.id == id } ?? colors.first { $0.id == "teal" } ?? colors[0]).color
     }
 }
 

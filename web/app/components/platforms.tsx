@@ -93,11 +93,11 @@ export default function Platforms() {
                 </IconCookie>
                 <h3 className="mt-6 font-display text-xl font-bold text-on-surface">Terminal</h3>
               </div>
-              <pre className="mx-4 mb-4 overflow-hidden rounded-2xl bg-[#0d0820] p-4 font-mono text-[11.5px] leading-relaxed text-[#e9e4ff]">
-                <span className="flow-text font-bold">▌ hypurr</span> <span className="text-[#9b8fc7]">· 5 bots · connected</span>{"\n"}
-                <span className="text-[#f472b6]">●</span> Pacer     <span className="text-[#f472b6]">needs you</span>{"\n"}
-                <span className="text-[#22d3ee]">⠹</span> Reviewer  <span className="text-[#9b8fc7]">running tests…</span>{"\n"}
-                <span className="text-[#a78bfa]">✓</span> Scout     <span className="text-[#9b8fc7]">done</span>
+              <pre className="mx-4 mb-4 overflow-hidden rounded-2xl bg-[#05070A] p-4 font-mono text-[11.5px] leading-relaxed text-[#E8FFFC]">
+                <span className="flow-text font-bold">▌ hypurr</span> <span className="text-[#7FA8A3]">· 5 bots · connected</span>{"\n"}
+                <span className="text-[#FFB020]">●</span> Pacer     <span className="text-[#FFB020]">needs you</span>{"\n"}
+                <span className="text-[#00D4C8]">⠹</span> Reviewer  <span className="text-[#7FA8A3]">running tests…</span>{"\n"}
+                <span className="text-[#00D4C8]">✓</span> Scout     <span className="text-[#7FA8A3]">done</span>
               </pre>
             </GlowCard>
           </Reveal>

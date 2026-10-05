@@ -1,24 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <path android:pathData="M0,0h108v108h-108z">
-        <aapt:attr name="android:fillColor">
-            <gradient android:type="linear" android:startX="0" android:startY="0" android:endX="108" android:endY="108"
-                android:startColor="#2A1065" android:endColor="#07102E" />
-        </aapt:attr>
-    </path>
-    <path android:pathData="M0,0h108v108h-108z">
-        <aapt:attr name="android:fillColor">
-            <gradient android:type="radial" android:centerX="22" android:centerY="16" android:gradientRadius="76"
-                android:startColor="#B3C026D3" android:endColor="#00C026D3" />
-        </aapt:attr>
-    </path>
-    <path android:pathData="M0,0h108v108h-108z">
-        <aapt:attr name="android:fillColor">
-            <gradient android:type="radial" android:centerX="92" android:centerY="97" android:gradientRadius="76"
-                android:startColor="#9906B6D4" android:endColor="#0006B6D4" />
-        </aapt:attr>
-    </path>
+    <path android:pathData="M0,0h108v108h-108z" android:fillColor="#05070A"/>
+    <!-- thin diagonal rain streaks (flat cyan, low opacity) -->
+    <path android:pathData="M10,0 L30,108" android:strokeWidth="0.7" android:strokeColor="#2900D4C8"/>
+    <path android:pathData="M28,0 L48,108" android:strokeWidth="0.7" android:strokeColor="#2200D4C8"/>
+    <path android:pathData="M46,0 L66,108" android:strokeWidth="0.7" android:strokeColor="#2900D4C8"/>
+    <path android:pathData="M64,0 L84,108" android:strokeWidth="0.7" android:strokeColor="#1F00D4C8"/>
+    <path android:pathData="M82,0 L102,108" android:strokeWidth="0.7" android:strokeColor="#2900D4C8"/>
+    <path android:pathData="M100,0 L120,108" android:strokeWidth="0.7" android:strokeColor="#2200D4C8"/>
+    <!-- top signal band -->
+    <path android:pathData="M0,0h108v4h-108z" android:fillColor="#00D4C8"/>
 </vector>

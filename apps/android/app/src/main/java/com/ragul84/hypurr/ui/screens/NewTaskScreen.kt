@@ -75,7 +75,6 @@ import com.ragul84.hypurr.ui.IconBubble
 import com.ragul84.hypurr.ui.glass
 import com.ragul84.hypurr.ui.pressable
 import com.ragul84.hypurr.ui.templateIcon
-import com.ragul84.hypurr.ui.theme.ColorFlow
 import com.ragul84.hypurr.ui.theme.Hypurr
 import com.ragul84.hypurr.ui.theme.Motion
 
@@ -214,8 +213,8 @@ private fun TemplateCard(t: TaskTemplate, selected: Boolean, modifier: Modifier,
     Column(modifier.heightIn(min = 104.dp).glass(RoundedCornerShape(22.dp), fill)
         .pressable(t.title, role = Role.RadioButton, onClick = onClick).padding(14.dp)) {
         Box(Modifier.size(34.dp).clip(RoundedCornerShape(11.dp))
-            .background(if (selected) ColorFlow.linear() else SolidColor(c.accent.copy(alpha = 0.12f))), contentAlignment = Alignment.Center) {
-            Icon(templateIcon(t.icon), null, tint = if (selected) ColorFlow.FlowInk else c.accent, modifier = Modifier.size(19.dp))
+            .background(if (selected) SolidColor(c.accent) else SolidColor(c.accent.copy(alpha = 0.12f))), contentAlignment = Alignment.Center) {
+            Icon(templateIcon(t.icon), null, tint = if (selected) c.onAccent else c.accent, modifier = Modifier.size(19.dp))
         }
         Text(t.title, color = c.text, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(top = 10.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -231,7 +230,7 @@ private fun Plan(state: NewTaskUiState, onChange: (NewTaskUiState) -> Unit) {
     var choosing by remember { mutableStateOf<String?>(null) }
     Text("HYPURR'S PLAN", color = c.tertiary, style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
         modifier = Modifier.padding(start = 6.dp, top = 20.dp, bottom = 8.dp))
-    Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(24.dp), c.surface).padding(16.dp).animateContentSize(Motion.spatialDefault()),
+    Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(4.dp), c.surface).padding(16.dp).animateContentSize(Motion.spatialDefault()),
         verticalArrangement = Arrangement.spacedBy(10.dp)) {
         PlanRow(Icons.Rounded.Folder, "Project", state.projectName ?: "Pick a project") { choosing = if (choosing == "project") null else "project" }
         AnimatedVisibility(choosing == "project") {
@@ -264,7 +263,7 @@ private fun Plan(state: NewTaskUiState, onChange: (NewTaskUiState) -> Unit) {
             else -> state.route?.reason
         }
         if (!reason.isNullOrEmpty()) Text(reason, color = c.secondary, style = MaterialTheme.typography.bodySmall)
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.success.copy(alpha = 0.10f)).padding(12.dp),
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)).background(c.success.copy(alpha = 0.10f)).padding(12.dp),
             verticalAlignment = Alignment.Top) {
             Icon(Icons.Rounded.Shield, null, tint = c.success, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(10.dp))
@@ -315,7 +314,7 @@ private fun FileChip(file: PickedFile, onRemove: () -> Unit) {
     val bitmap = remember(file) {
         if (file.isImage) runCatching { BitmapFactory.decodeByteArray(file.bytes, 0, file.bytes.size)?.asImageBitmap() }.getOrNull() else null
     }
-    Box(Modifier.size(width = if (bitmap != null) 76.dp else 150.dp, height = 76.dp).glass(RoundedCornerShape(16.dp), c.surface)) {
+    Box(Modifier.size(width = if (bitmap != null) 76.dp else 150.dp, height = 76.dp).glass(RoundedCornerShape(4.dp), c.surface)) {
         if (bitmap != null) {
             Image(bitmap, file.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         } else {
@@ -343,7 +342,7 @@ private fun SourceTag(source: String) {
 @Composable
 private fun IssueRow(issue: Issue, modifier: Modifier = Modifier, onRemove: (() -> Unit)? = null, onClick: (() -> Unit)? = null) {
     val c = Hypurr.colors
-    Row(modifier.fillMaxWidth().glass(RoundedCornerShape(18.dp), c.surface)
+    Row(modifier.fillMaxWidth().glass(RoundedCornerShape(4.dp), c.surface)
         .then(if (onClick != null) Modifier.pressable("${issue.key} ${issue.title}", onClick = onClick) else Modifier)
         .padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {

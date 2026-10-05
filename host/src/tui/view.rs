@@ -1,6 +1,5 @@
-//! Drawing. Hypurr palette: violet-tinted neutrals, a violet → magenta → cyan
-//! colour flow for the brand title and working spinners, magenta means
-//! "needs you" and red means an error. Every state also has its own glyph.
+//! Drawing. Hypurr wet-asphalt neon: asphalt neutrals, flat teal signal for the
+//! brand title and working spinners, amber means "needs you" and red means an error. Every state also has its own glyph.
 //! Tokens mirror `docs/design/hypurr-design-system.md` and the apps' Theme.swift.
 
 // Colors are written as #RRGGBB, like the apps' Theme.swift.
@@ -89,12 +88,12 @@ pub fn theme() -> &'static Theme {
         }
         let (text, second, dim, line, band, sel, panel, btn, green, red, add_bg, rm_bg) = if light {
             (
-                0x1E1433, 0x5B4F7A, 0x8C82A8, 0xDCD3F0, 0xF1ECFB, 0xE6DCFA, 0xFAF7FF, 0xE9E1FA, 0x1F8A5B, 0xC2304D,
+                0x0A1210, 0x4A5E5A, 0x8A9995, 0xD5DEDB, 0xE8EEEC, 0xD5E8E5, 0xFFFFFF, 0xC5DEDB, 0x1F7A55, 0xC23B2E,
                 0xE2F5EC, 0xFBE4EA,
             )
         } else {
             (
-                0xF3EEFF, 0xA89CC8, 0x75699A, 0x352B55, 0x1E1638, 0x2D2152, 0x150F2A, 0x2A2047, 0x7EE0B5, 0xFF8FA3,
+                0xE8FFFC, 0x7FA8A3, 0x3D5552, 0x14201E, 0x0E1614, 0x12302C, 0x0B1211, 0x12302C, 0x5EAD8A, 0xFF6B5A,
                 0x10261E, 0x2E1424,
             )
         };
@@ -106,7 +105,7 @@ pub fn theme() -> &'static Theme {
             secondary: fg(second),
             dim: fg(dim),
             line: fg(line),
-            amber: fg(if light { 0xC0267A } else { 0xF472B6 }),
+            amber: fg(if light { 0xB86A00 } else { 0xFFB020 }),
             red: fg(red),
             green: fg(green),
             code: s.bg(rgb(band)),
@@ -116,13 +115,13 @@ pub fn theme() -> &'static Theme {
             panel: s.bg(rgb(panel)),
             btn: s.bg(rgb(btn)),
             btn_primary: s
-                .fg(rgb(if light { 0xFFFFFF } else { 0x150A33 }))
-                .bg(rgb(if light { 0x6D3FD9 } else { 0xA78BFA }))
+                .fg(rgb(if light { 0xF4F6F5 } else { 0x021412 }))
+                .bg(rgb(if light { 0x007A73 } else { 0x00D4C8 }))
                 .add_modifier(Modifier::BOLD),
             added: s.fg(rgb(green)).bg(rgb(add_bg)),
             removed: s.fg(rgb(red)).bg(rgb(rm_bg)),
-            on_color: rgb(0x150A33),
-            shade: rgb(if light { 0xB9AED6 } else { 0x3D3260 }),
+            on_color: rgb(0x021412),
+            shade: rgb(if light { 0x8A9995 } else { 0x3D5552 }),
         }
     });
     &T
@@ -130,17 +129,17 @@ pub fn theme() -> &'static Theme {
 
 pub fn bot_color(name: &str) -> Color {
     let hex = match name {
-        "black" => 0x8A8A8A,
-        "brown" => 0x936439,
-        "red" => 0xFF263C,
-        "orange" => 0xFF6700,
-        "yellow" => 0xFF9800,
-        "green" => 0x00C972,
-        "cyan" => 0x00BCA6,
-        "violet" => 0x9159FE,
-        "magenta" => 0xFF309B,
-        "gray" => 0x777777,
-        _ => 0x1084FE,
+        "black" | "asphalt" => 0x7FA8A3,
+        "brown" => 0x5A4A3A,
+        "red" => 0xFF6B5A,
+        "orange" | "attention" => 0xFFB020,
+        "yellow" => 0xC9A227,
+        "green" => 0x5EAD8A,
+        "cyan" | "teal" => 0x00D4C8,
+        "violet" | "ink" => 0x3D5552,
+        "magenta" => 0x7FA8A3,
+        "gray" => 0x3D5552,
+        _ => 0x00D4C8,
     };
     rgb(hex)
 }
@@ -152,8 +151,8 @@ fn spin(app: &App) -> &'static str {
     SPINNER[usize::try_from(app.frame % 8).unwrap_or(0)]
 }
 
-/// Hypurr colour flow stops: violet → magenta → cyan (looping).
-const FLOW: [u32; 3] = [0xA78BFA, 0xF472B6, 0x22D3EE];
+/// Hypurr teal signal stops (looping).
+const FLOW: [u32; 3] = [0x00D4C8, 0x007A73, 0x5EAD8A];
 
 /// The flow colour at `pos` per-mille along the loop (wraps).
 pub(super) fn flow_color(pos: u32) -> Color {
@@ -503,7 +502,7 @@ fn status_line(buf: &mut Buffer, r: Rect, app: &mut App) {
     let insert = app.typing && app.overlays.is_empty();
     let pill = if insert { " INSERT " } else { " NAV " };
     let pill_style = if insert {
-        Style::default().fg(t.on_color).bg(rgb(0x22D3EE)).add_modifier(Modifier::BOLD)
+        Style::default().fg(t.on_color).bg(rgb(0x00D4C8)).add_modifier(Modifier::BOLD)
     } else {
         t.btn_primary
     };
@@ -787,7 +786,7 @@ fn chat(buf: &mut Buffer, r: Rect, app: &mut App, narrow: bool) {
     }
     if !app.online {
         let bar = Rect::new(r.x, top, r.width, 1);
-        let s = if t.color { Style::default().fg(t.on_color).bg(rgb(0xF472B6)) } else { t.sel };
+        let s = if t.color { Style::default().fg(t.on_color).bg(rgb(0xFFB020)) } else { t.sel };
         fill(buf, bar, s);
         put(
             buf,

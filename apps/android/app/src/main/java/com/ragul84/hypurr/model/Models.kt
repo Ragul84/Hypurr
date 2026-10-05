@@ -121,7 +121,7 @@ data class DirListing(val path: String = "", val parent: String? = null, val isG
 val QuickReactions = listOf("👍", "❤️", "😂", "🎉", "👀", "✅")
 
 /** Avatar palette ids, in the order the iPhone's picker shows them. */
-val AvatarColors = listOf("blue", "cyan", "green", "yellow", "orange", "red", "magenta", "violet", "brown", "gray", "black")
+val AvatarColors = listOf("teal", "cyan", "asphalt", "green", "gray", "ink", "black", "attention", "red", "brown", "blue")
 
 private val imageExtensions = setOf("png", "jpg", "jpeg", "gif", "webp", "heic", "heif", "bmp")
 

@@ -426,7 +426,7 @@ pub fn permission_card(ui: &App, st: &State, e: &Value, group: bool) -> gtk::Wid
         dot.set_draw_func(|_, cr, w, _| {
             let r = f64::from(w) / 2.0;
             cr.arc(r, r, r, 0.0, std::f64::consts::TAU);
-            let (red, g, b) = avatar::rgb(0xF472B6);
+            let (red, g, b) = avatar::rgb(0xFFB020);
             cr.set_source_rgb(red, g, b);
             cr.fill().ok();
         });

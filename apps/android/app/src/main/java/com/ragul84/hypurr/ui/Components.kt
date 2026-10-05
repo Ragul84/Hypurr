@@ -54,6 +54,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import com.ragul84.hypurr.model.Bot
 import com.ragul84.hypurr.net.LinkState
 import com.ragul84.hypurr.net.Route
@@ -91,24 +97,25 @@ fun IconBubble(icon: ImageVector, label: String, modifier: Modifier = Modifier, 
     }
 }
 
-/** The primary action: filled with the colour flow, ink text. */
+/** The primary action: flat teal signal fill, ink text, sharp plate. */
 @Composable
 fun FlowButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, icon: ImageVector? = null, onClick: () -> Unit) {
+    val c = Hypurr.colors
     val alpha by animateFloatAsState(if (enabled) 1f else 0.45f, Motion.effects(), label = "enabled")
     Row(
         modifier
-            .clip(RoundedCornerShape(50))
-            .background(ColorFlow.linear(), alpha = alpha)
+            .clip(RoundedCornerShape(4.dp))
+            .background(c.accent.copy(alpha = alpha))
             .pressable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 22.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
     ) {
         if (icon != null) {
-            Icon(icon, contentDescription = null, tint = ColorFlow.FlowInk, modifier = Modifier.size(20.dp))
+            Icon(icon, contentDescription = null, tint = c.onAccent, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
         }
-        Text(text, color = ColorFlow.FlowInk, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+        Text(text, color = c.onAccent, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
     }
 }
 
@@ -117,7 +124,7 @@ fun FlowButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = t
 fun SoftButton(text: String, modifier: Modifier = Modifier, icon: ImageVector? = null, tint: Color = Hypurr.colors.accent, onClick: () -> Unit) {
     Row(
         modifier
-            .clip(RoundedCornerShape(50))
+            .clip(RoundedCornerShape(4.dp))
             .background(tint.copy(alpha = 0.12f))
             .pressable(onClick = onClick)
             .padding(horizontal = 18.dp, vertical = 12.dp),
@@ -132,7 +139,7 @@ fun SoftButton(text: String, modifier: Modifier = Modifier, icon: ImageVector? =
     }
 }
 
-/** The thinking orb (Swift `ThinkingOrb(flow:)`): the colour flow turning, breathing while working. */
+/** The thinking orb (Swift `ThinkingOrb(flow:)`): teal signal sweep, breathing while working. */
 @Composable
 fun FlowOrb(size: Dp, modifier: Modifier = Modifier, animate: Boolean = true) {
     val still = LocalInspectionMode.current || !animate
@@ -152,17 +159,19 @@ fun FlowOrb(size: Dp, modifier: Modifier = Modifier, animate: Boolean = true) {
 
 /** Avatar palette ids (kit AvatarPalette) → colour. */
 fun avatarColor(id: String): Color = when (id) {
-    "black" -> Color(0xFF2B2B2B)
-    "brown" -> Color(0xFF936439)
-    "red" -> Color(0xFFFF263C)
-    "orange" -> Color(0xFFFF6700)
-    "yellow" -> Color(0xFFFF9800)
-    "green" -> Color(0xFF00C972)
-    "cyan" -> Color(0xFF00BCA6)
-    "violet" -> Color(0xFF9159FE)
-    "magenta" -> Color(0xFFFF309B)
-    "gray" -> Color(0xFF777777)
-    else -> Color(0xFF1084FE)
+    "black" -> Color(0xFF05070A)
+    "asphalt" -> Color(0xFF0B1211)
+    "brown" -> Color(0xFF5A4A3A)
+    "red" -> Color(0xFFFF6B5A)
+    "orange", "attention" -> Color(0xFFFFB020)
+    "yellow" -> Color(0xFFC9A227)
+    "green" -> Color(0xFF5EAD8A)
+    "cyan", "teal" -> Color(0xFF00D4C8)
+    "violet", "ink" -> Color(0xFF3D5552)
+    "magenta" -> Color(0xFF7FA8A3)
+    "gray" -> Color(0xFF3D5552)
+    "blue" -> Color(0xFF2A6B66)
+    else -> Color(0xFF00D4C8)
 }
 
 private fun avatarShape(id: String): Shape = when (id) {
@@ -187,7 +196,7 @@ fun BotAvatar(bot: Bot, size: Dp = 48.dp, modifier: Modifier = Modifier) {
         }
         if (bot.isWorking) {
             // Working: a flow ring; needs you: the warning dot.
-            val dot by animateColorAsState(if (bot.needsInput) Hypurr.colors.warning else ColorFlow.cyan, Motion.effects(), label = "dot")
+            val dot by animateColorAsState(if (bot.needsInput) Hypurr.colors.warning else Hypurr.colors.accent, Motion.effects(), label = "dot")
             Box(Modifier.align(Alignment.BottomEnd).size(size * 0.32f).clip(CircleShape).background(Hypurr.colors.bg).padding(2.dp)) {
                 Box(Modifier.matchParentSize().clip(CircleShape).background(dot))
             }
@@ -268,4 +277,48 @@ fun templateIcon(id: String): ImageVector = when (id) {
     "deps" -> androidx.compose.material.icons.Icons.Rounded.Update
     "explain" -> androidx.compose.material.icons.Icons.Rounded.School
     else -> androidx.compose.material.icons.Icons.Rounded.AutoAwesome
+}
+
+
+/**
+ * Signature "Signal strike" on Allow: press → 4px cyan band flash (~120ms) → invoke [onAllow].
+ * The approval plate then collapses via host status update; a 3px left rail marks the live row.
+ */
+@Composable
+fun SignalAllowButton(text: String, modifier: Modifier = Modifier, onAllow: () -> Unit) {
+    val c = Hypurr.colors
+    var striking by remember { mutableStateOf(false) }
+    val band by animateFloatAsState(
+        targetValue = if (striking) 1f else 0f,
+        animationSpec = tween(durationMillis = 120, easing = LinearEasing),
+        label = "signal-band",
+    )
+    LaunchedEffect(striking) {
+        if (!striking) return@LaunchedEffect
+        delay(120)
+        onAllow()
+        striking = false
+    }
+    Box(modifier) {
+        SoftButton(text, tint = c.accent, onClick = { if (!striking) striking = true })
+        Box(
+            Modifier
+                .align(Alignment.TopStart)
+                .fillMaxWidth()
+                .height(4.dp)
+                .background(c.accent.copy(alpha = band)),
+        )
+    }
+}
+
+/** 4px cyan signal band across a plate (Needs-you / live). */
+@Composable
+fun SignalBand(modifier: Modifier = Modifier, alpha: Float = 1f) {
+    Box(modifier.fillMaxWidth().height(4.dp).background(Hypurr.colors.accent.copy(alpha = alpha)))
+}
+
+/** 3px left signal rail on a live / Needs-you row. */
+@Composable
+fun SignalRail(modifier: Modifier = Modifier) {
+    Box(modifier.width(3.dp).height(40.dp).background(Hypurr.colors.accent))
 }

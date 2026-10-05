@@ -31,7 +31,7 @@ export default function Nav() {
           <a href={GITHUB} aria-label="Hypurr on GitHub" title="GitHub" className="grid size-10 place-items-center rounded-full text-on-surface-variant transition hover:bg-surface-container-high hover:text-on-surface">
             <GithubLogo size={20} weight="bold" />
           </a>
-          <a href="#install" className="flow-bg ml-1 rounded-full px-4 py-2 text-sm font-semibold text-white transition active:scale-95">Get Hypurr</a>
+          <a href="#install" className="flow-bg ml-1 rounded-full px-4 py-2 text-sm font-semibold text-[var(--on-primary)] transition active:scale-95">Get Hypurr</a>
         </div>
       </motion.nav>
     </header>

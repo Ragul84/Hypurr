@@ -28,8 +28,8 @@ export const viewport: Viewport = {
 };
 
 // Applies the saved theme and seed colour before first paint (no flash).
-const boot = `(()=>{try{var d=document.documentElement,t=localStorage.getItem('hypurr-theme'),s=localStorage.getItem('hypurr-seed');
-if(!t)t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';d.dataset.theme=t;if(s)d.style.setProperty('--seed-h',s)}catch(e){}})()`;
+const boot = `(()=>{try{var d=document.documentElement,t=localStorage.getItem('hypurr-theme');
+if(!t)t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';d.dataset.theme=t}catch(e){}})()`;
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (

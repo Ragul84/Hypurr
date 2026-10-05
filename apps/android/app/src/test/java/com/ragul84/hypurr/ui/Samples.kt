@@ -51,13 +51,13 @@ object Samples {
         urls = listOf("http://192.168.1.20:19222", "http://100.88.12.4:19222"), cloud = "https://api.hypurr.dev",
     )
 
-    val reviewer = Bot(id = "b1", name = "Reviewer", avatarColor = "violet", avatarShape = "blob", status = "needsInput",
+    val reviewer = Bot(id = "b1", name = "Reviewer", avatarColor = "teal", avatarShape = "blob", status = "needsInput",
         activity = "wants to run cargo test --all", lastAt = NOW - 2 * MIN, unread = 1, cwd = "/Users/kevin/hypurr")
     val bots = listOf(
         reviewer,
         Bot(id = "b2", name = "Frontend", avatarColor = "cyan", avatarShape = "squircle", status = "working",
             activity = "Editing web/src/App.tsx", lastAt = NOW - 1 * MIN, pinned = true),
-        Bot(id = "b3", name = "Docs", avatarColor = "magenta", avatarShape = "pebble", lastMessage = "Updated the setup guide for Android.",
+        Bot(id = "b3", name = "Docs", avatarColor = "asphalt", avatarShape = "pebble", lastMessage = "Updated the setup guide for Android.",
             lastAt = NOW - 42 * MIN, unread = 2),
         Bot(id = "b4", name = "Release", avatarColor = "orange", avatarShape = "hex", status = "error",
             lastMessage = "Notarization timed out", lastAt = NOW - 3 * 60 * MIN),

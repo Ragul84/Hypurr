@@ -30,46 +30,46 @@ struct Palette {
     danger: &'static str,
     code: &'static str,
     panel: &'static str,
-    /// "Needs you" (magenta in Hypurr).
+    /// "Needs you" (amber attention — not brand accent).
     warning: &'static str,
 }
 
-// Hypurr tokens (docs/design/hypurr-design-system.md): violet-tinted neutrals,
-// a violet accent and the violet → magenta → cyan colour flow.
+// Hypurr tokens (docs/design/hypurr-design-system.md): wet-asphalt neon —
+// asphalt ground, flat electric teal signal.
 const LIGHT: Palette = Palette {
-    background: "#FCFAFF",
-    surface: "#F4EFFC",
-    bubble_agent: "#EFE9FA",
-    bubble_user: "#E4D9FB",
-    border: "#E6DFF3",
-    text: "#1E1433",
-    secondary: "#5B4F7A",
-    tertiary: "#8C82A8",
-    accent_fill: "#6D3FD9",
-    on_accent: "#FFFFFF",
-    accent_dim: "#DCD3F0",
-    danger: "#C2304D",
-    code: "#F1ECFB",
+    background: "#F4F6F5",
+    surface: "#FFFFFF",
+    bubble_agent: "#E8EEEC",
+    bubble_user: "#D5E8E5",
+    border: "#D5DEDB",
+    text: "#0A1210",
+    secondary: "#4A5E5A",
+    tertiary: "#8A9995",
+    accent_fill: "#007A73",
+    on_accent: "#F4F6F5",
+    accent_dim: "#C5DEDB",
+    danger: "#C23B2E",
+    code: "#E8EEEC",
     panel: "#FFFFFF",
-    warning: "#C0267A",
+    warning: "#B86A00",
 };
 
 const DARK: Palette = Palette {
-    background: "#0E0A1C",
-    surface: "#161029",
-    bubble_agent: "#1E1736",
-    bubble_user: "#3A2A6B",
-    border: "#2A2145",
-    text: "#F3EEFF",
-    secondary: "#A89CC8",
-    tertiary: "#75699A",
-    accent_fill: "#A78BFA",
-    on_accent: "#150A33",
-    accent_dim: "#352B55",
-    danger: "#FF8FA3",
-    code: "#120D24",
-    panel: "#1E1736",
-    warning: "#F472B6",
+    background: "#05070A",
+    surface: "#0B1211",
+    bubble_agent: "#0E1614",
+    bubble_user: "#12302C",
+    border: "#14201E",
+    text: "#E8FFFC",
+    secondary: "#7FA8A3",
+    tertiary: "#3D5552",
+    accent_fill: "#00D4C8",
+    on_accent: "#021412",
+    accent_dim: "#12302C",
+    danger: "#FF6B5A",
+    code: "#080C0B",
+    panel: "#0B1211",
+    warning: "#FFB020",
 };
 
 fn colors(p: &Palette) -> String {
@@ -78,8 +78,8 @@ fn colors(p: &Palette) -> String {
          @define-color cd_border {};\n@define-color cd_text {};\n@define-color cd_secondary {};\n@define-color cd_tertiary {};\n\
          @define-color cd_accent {};\n@define-color cd_on_accent {};\n@define-color cd_accent_dim {};\n@define-color cd_danger {};\n\
          @define-color cd_code {};\n@define-color cd_panel {};\n@define-color cd_warning {};\n\
-         @define-color cd_flow1 #A78BFA;\n@define-color cd_flow2 #F472B6;\n@define-color cd_flow3 #22D3EE;\n\
-         @define-color cd_on_flow #150A33;\n",
+         @define-color cd_flow1 #00D4C8;\n@define-color cd_flow2 #007A73;\n@define-color cd_flow3 #5EAD8A;\n\
+         @define-color cd_on_flow #021412;\n",
         p.background,
         p.surface,
         p.bubble_agent,
@@ -178,7 +178,7 @@ button.footer-row:hover, button.footer-row:checked { background: @cd_agent; }
 .person-circle { background: @cd_user; border-radius: 999px; color: @cd_secondary; }
 
 /* Menus: a floating panel of rows (DesktopActionMenu / SidebarAccountPanel). */
-popover.panel > contents { background: @cd_panel; border-radius: 18px; padding: 7px; box-shadow: 0 8px 20px rgba(0,0,0,0.25); }
+popover.panel > contents { background: @cd_panel; border-radius: 4px; padding: 7px; box-shadow: 0 8px 20px rgba(0,0,0,0.25); }
 popover.panel > arrow { background: transparent; border: none; }
 button.menu-row { min-height: 30px; padding: 0 10px; border-radius: 10px; background: transparent; box-shadow: none;
   border: none; font-size: 12px; font-weight: normal; color: @cd_text; }
@@ -187,7 +187,7 @@ button.menu-row.danger-text { color: @cd_danger; }
 .menu-divider { background: alpha(@cd_text, 0.13); min-height: 1px; margin: 5px 10px; }
 
 /* Conversation */
-.bubble { border-radius: 22px; padding: 8px 12px; font-size: 12px; color: @cd_text; }
+.bubble { border-radius: 4px; padding: 8px 12px; font-size: 12px; color: @cd_text; }
 .bubble-user { background: @cd_user; }
 .bubble-agent { background: @cd_agent; }
 .time { font-size: 10px; color: @cd_tertiary; }
@@ -196,8 +196,8 @@ button.thread-chip { border-radius: 999px; padding: 5px 10px; background: @cd_su
   min-height: 0; transition: background 120ms; }
 button.thread-chip:hover { background: @cd_agent; }
 button.mention-chip { border-radius: 999px; padding: 6px 10px; background: @cd_surface; box-shadow: none; border: none; min-height: 0; }
-button.working { background: @cd_agent; border-radius: 22px; padding: 12px; box-shadow: none; border: none; min-height: 0; }
-.perm-card { background: @cd_agent; border-radius: 22px; padding: 16px; }
+button.working { background: @cd_agent; border-radius: 4px; padding: 12px; box-shadow: none; border: none; min-height: 0; }
+.perm-card { background: @cd_agent; border-radius: 4px; padding: 16px; border-left: 4px solid @cd_accent; }
 .choices { background: @cd_bg; border-radius: 14px; }
 button.choice { min-height: 46px; padding: 0 14px; border-radius: 0; background: transparent; box-shadow: none; border: none;
   font-size: 13px; }

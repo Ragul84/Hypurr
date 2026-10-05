@@ -340,7 +340,7 @@ fn empty_page(ui_new: &gtk::Button) -> gtk::Box {
         &[
             ("blob", "blue", Mood::Working),
             ("squircle", "orange", Mood::Idle),
-            ("teardrop", "violet", Mood::Working),
+            ("teardrop", "teal", Mood::Working),
         ],
         60,
         10,
