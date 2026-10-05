@@ -8,11 +8,11 @@ where the harness owns the conversation.
 
 | | Where | Owner | Lifetime |
 |---|---|---|---|
-| Transcript | SQLite `entries` | Codync | Persistent main chat and flat reply threads per bot |
+| Transcript | SQLite `entries` | Hypurr | Persistent main chat and flat reply threads per bot |
 | Model context | ACP session (`bots.session_id`) | The harness | Until *New session*, a failed resume, or an agent/command/folder change |
-| Long-term memory | `~/.codync/bots/<id>/memory/` | Codync (keeper) + the user | Forever, across sessions |
+| Long-term memory | `~/.hypurr/bots/<id>/memory/` | Hypurr (keeper) + the user | Forever, across sessions |
 
-Codync never replays the transcript into a session. Each turn sends only the new message(s); the harness keeps
+Hypurr never replays the transcript into a session. Each turn sends only the new message(s); the harness keeps
 its own context and compacts it itself.
 
 ## Instruction snapshot (`host/src/chat/context.rs`)
@@ -24,7 +24,7 @@ its own context and compacts it itself.
 - **Claude** (`agentCapabilities._meta.claudeCode` present) receives the snapshot as a real system prompt:
   `_meta.systemPrompt.append` on `session/new` and `session/load`. It survives compaction.
 - **Other harnesses** receive it in the first message of each session (`<bot-profile>…</bot-profile>`).
-- **Compaction epoch:** Codync advertises `clientCapabilities.session.compaction`. Each completed
+- **Compaction epoch:** Hypurr advertises `clientCapabilities.session.compaction`. Each completed
   `compaction_update` (deduplicated by `compactionId`) increments `context.epoch.<bot>`. The next turn
   re-renders the snapshot, and Claude's session is loaded again with the new system prompt. The adapter
   rebuilds its query and resumes the same conversation.
@@ -47,8 +47,8 @@ its own context and compacts it itself.
   nothing: the frozen prompt only picks up new facts at the next compaction or session.
   - On Claude it runs with a replaced system prompt, no tools, no settings, `persistSession: false` and the
     `haiku` model.
-  - Other harnesses get the instructions inline, in `~/.codync/memory-keeper`.
-- **History search:** the built-in `memory` MCP server (`codync-host mcp memory`) gives the bot
+  - Other harnesses get the instructions inline, in `~/.hypurr/memory-keeper`.
+- **History search:** the built-in `memory` MCP server (`hypurr-host mcp memory`) gives the bot
   `search_history`, a substring search (every word must appear) over its own chat: the user's messages and its
   final replies, main chat and threads. Whatever the keeper didn't write down can still be found.
 - **Episodes:** every 6 remembered exchanges (pending turns in `memory.episode.<bot>`), the keeper writes one
@@ -76,7 +76,7 @@ its own context and compacts it itself.
 
 - Harnesses other than Claude have no system prompt channel and don't report compaction. For them, the first
   message carries the instructions and the snapshot only refreshes when a new session starts.
-- Compaction is the harness's own. Codync can't choose what survives it, only re-apply its instructions
+- Compaction is the harness's own. Hypurr can't choose what survives it, only re-apply its instructions
   afterwards.
 - A session a harness has deleted (for example, one cleaned up after a month) can't be resumed. The bot
   starts fresh, but its memory remains.

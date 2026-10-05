@@ -14,7 +14,7 @@ The host records the request and its outcome in both chats using existing notice
 - Requests have their own reply channel and never merge with user messages or another request. Contiguous user messages keep the existing batching behavior.
 - The recipient uses its own folder, tools, memory and permission policy. Permission cards appear in its chat. The requesting bot's entire transcript is not copied; only the request is passed. Requests are not treated as user facts by the memory keeper.
 - The host rejects self-delegation, duplicate outstanding requests to the same recipient, and direct or indirect wait cycles, including queued requests. Up to 64 requests can be outstanding host-wide.
-- Native Claude Code/Codex subagents remain managed by the harness. Codync does not turn them into permanent bots or override their delegation settings.
+- Native Claude Code/Codex subagents remain managed by the harness. Hypurr does not turn them into permanent bots or override their delegation settings.
 
 ## Stops, failures and restart
 

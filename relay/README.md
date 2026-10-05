@@ -1,6 +1,6 @@
-# Codync relay
+# Hypurr relay
 
-Cloudflare Worker that holds the APNs key and forwards pushes for codync-host.
+Cloudflare Worker that holds the APNs key and forwards pushes for hypurr-host.
 The phone exchanges its APNs token for an AES-GCM **ticket** (`POST /register`);
 hosts only ever see tickets (`POST /push`). A ticket is a bearer capability: anyone holding it can ask this Worker to push
 to its device. Only the Worker can decrypt the raw APNs token. Do not log tickets.
@@ -17,7 +17,7 @@ openssl rand -base64 32 | npx wrangler secret put TICKET_KEY
 npm run deploy
 ```
 
-It deploys as `codync-relay`. The iOS app points at `SharedStore.relayURL` in `CodyncKit`.
+It deploys as `hypurr-relay`. The iOS app points at `SharedStore.relayURL` in `HypurrKit`.
 Rotating `TICKET_KEY` invalidates every ticket; phones re-register on launch.
 
 ## Test

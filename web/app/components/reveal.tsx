@@ -1,8 +1,9 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
+import { spring } from "./motion";
 
-// Fades a section in once as it scrolls into view; static under reduced motion.
+// Springs a block up into place once as it scrolls into view; static under reduced motion.
 export default function Reveal({
   children,
   delay = 0,
@@ -16,10 +17,10 @@ export default function Reveal({
   return (
     <motion.div
       className={className}
-      initial={reduce ? false : { opacity: 0, y: 24 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.25 }}
-      transition={{ duration: 0.6, delay, ease: [0.16, 1, 0.3, 1] }}
+      initial={reduce ? false : { opacity: 0, y: 36, scale: 0.97, filter: "blur(6px)" }}
+      whileInView={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+      viewport={{ once: true, amount: 0.2 }}
+      transition={{ ...spring, delay }}
     >
       {children}
     </motion.div>

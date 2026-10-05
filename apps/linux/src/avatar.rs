@@ -1,5 +1,5 @@
 //! Grok-Bot-style characters (same silhouettes and palette as the Apple apps), drawn with cairo.
-//! Mirrors CodyncKit/Design/CharacterAvatar.swift: `CharacterAvatar`, `GroupAvatar`, `AvatarWithStatus`.
+//! Mirrors HypurrKit/Design/CharacterAvatar.swift: `CharacterAvatar`, `GroupAvatar`, `AvatarWithStatus`.
 
 use gtk::cairo::Context;
 use gtk::prelude::*;
@@ -365,13 +365,14 @@ fn area(parts: Vec<Part>, size: i32, badge: Badge) -> gtk::DrawingArea {
             let d = s * if badge == Badge::Needs { 0.36 } else { 0.28 };
             let (cx, cy) = (s - d / 2.0, s - d / 2.0);
             let dark = adw::StyleManager::default().is_dark();
-            let bg = if dark { 0.04 } else { 1.0 };
+            // The window background (Hypurr's tinted neutrals) as a cut-out ring.
+            let (br, bgc, bb) = if dark { rgb(0x0E0A1C) } else { rgb(0xFCFAFF) };
             cr.arc(cx, cy, d / 2.0 + 2.0, 0.0, 2.0 * PI);
-            cr.set_source_rgb(bg, bg, bg);
+            cr.set_source_rgb(br, bgc, bb);
             cr.fill().ok();
             cr.arc(cx, cy, d / 2.0, 0.0, 2.0 * PI);
             if badge == Badge::Needs {
-                let (r, g, b) = rgb(0xF0A030);
+                let (r, g, b) = rgb(0xF472B6);
                 cr.set_source_rgb(r, g, b);
                 cr.fill().ok();
                 cr.set_source_rgb(1.0, 1.0, 1.0);

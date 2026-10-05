@@ -1,6 +1,6 @@
 import AppKit
-import CodyncKit
-import CodyncUI
+import HypurrKit
+import HypurrUI
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -139,7 +139,7 @@ struct ComputersView: View {
         .animation(Motion.reduced(Motion.layout, reduceMotion), value: host.accounts.computers.map(\.id))
         .animation(Motion.reduced(Motion.layout, reduceMotion), value: host.accounts.cloudComputers.map(\.id))
         .animation(Motion.reduced(Motion.layout, reduceMotion), value: account.isSignedIn)
-        .codyncSheet(item: $editingSSH) { profile in
+        .hypurrSheet(item: $editingSSH) { profile in
             SSHProfileEditor(profile: profile, isNew: !host.ssh.profiles.contains { $0.id == profile.id })
         }
     }
@@ -154,7 +154,7 @@ struct ComputersView: View {
                 }
             }
             if host.ssh.profiles.isEmpty {
-                Text("Run bots on another computer you reach with SSH. It needs codync-host installed; your SSH keys stay on this Mac.")
+                Text("Run bots on another computer you reach with SSH. It needs hypurr-host installed; your SSH keys stay on this Mac.")
                     .font(.callout)
                     .foregroundStyle(Palette.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -296,7 +296,7 @@ private struct ManagedComputerCard: View {
                 Spacer()
                 IconButton("Pair iPhone", systemImage: "qrcode", selected: showPairing) { showPairing.toggle() }
                     .disabled(store.connection != .online)
-                    .codyncSheet(isPresented: $showPairing) {
+                    .hypurrSheet(isPresented: $showPairing) {
                         VStack(spacing: 0) {
                             ModalHeader("Pair iPhone with \(store.hostName)")
                             PairingPanel(store: store)
@@ -311,7 +311,7 @@ private struct ManagedComputerCard: View {
                     Text(cloudLine).font(.caption).foregroundStyle(cloud?.lastError == nil ? Palette.secondary : Palette.warning)
                 }
             }
-            .toggleStyle(.codync)
+            .toggleStyle(.hypurr)
             .disabled(busy || store.connection != .online)
 
             accountLine
@@ -326,7 +326,7 @@ private struct ManagedComputerCard: View {
                             .font(.caption).foregroundStyle(autoApproval ? Palette.warning : Palette.secondary)
                     }
                 }
-                .toggleStyle(.codync)
+                .toggleStyle(.hypurr)
                 .disabled(busy || store.connection != .online)
                 .transition(.opacity)
             }
@@ -347,7 +347,7 @@ private struct ManagedComputerCard: View {
         .animation(Motion.reduced(Motion.layout, reduceMotion), value: devices?.map(\.key))
         .animation(Motion.reduced(Motion.layout, reduceMotion), value: cloud?.owner == nil)
         .task(id: "\(store.computer.id)/\(store.connection == .online)/\(store.accessRequests.count)") { await loadDevices() }
-        .codyncDialog("Revoke \(confirmRevoke?.name ?? "device")?", isPresented: Binding(
+        .hypurrDialog("Revoke \(confirmRevoke?.name ?? "device")?", isPresented: Binding(
             get: { confirmRevoke != nil }, set: { if !$0 { confirmRevoke = nil } }
         ), message: "It disconnects right away and has to pair or ask again.") {
             guard let device = confirmRevoke else { return [] }
@@ -358,11 +358,11 @@ private struct ManagedComputerCard: View {
                 }
             }]
         }
-        .codyncDialog("Let account devices in without a code?", isPresented: $confirmAutoApproval,
-                      message: "Any device signed in to your account gets full control of \(store.hostName): its files, terminals and bots, with no check here. If someone gets into your account, or Codync's cloud is ever compromised, they could add their own device and you'd have no chance to stop it. Devices paired with a QR code aren't affected.") {
+        .hypurrDialog("Let account devices in without a code?", isPresented: $confirmAutoApproval,
+                      message: "Any device signed in to your account gets full control of \(store.hostName): its files, terminals and bots, with no check here. If someone gets into your account, or Hypurr's cloud is ever compromised, they could add their own device and you'd have no chance to stop it. Devices paired with a QR code aren't affected.") {
             [DialogAction("Skip the check", destructive: true) { setApproval(.auto) }]
         }
-        .codyncDialog("Remove \(store.hostName) from the account?", isPresented: $confirmUnclaim,
+        .hypurrDialog("Remove \(store.hostName) from the account?", isPresented: $confirmUnclaim,
                       message: "Devices that were approved through the account lose access. Devices paired with a QR code keep it.") {
             [DialogAction("Remove from account", destructive: true) { run { await host.unclaim(store) } }]
         }
@@ -513,7 +513,7 @@ private struct SSHRow: View {
         case .connected: return "\(target) · Connected"
         case let .retrying(message): return "\(message) Retrying…"
         case let .failed(message): return message
-        case .notInstalled: return "codync-host isn't installed on \(profile.host). Install it there:"
+        case .notInstalled: return "hypurr-host isn't installed on \(profile.host). Install it there:"
         }
     }
 
@@ -580,9 +580,9 @@ private struct SSHProfileEditor: View {
                             .transition(.opacity.combined(with: .scale(scale: 0.8)))
                     }
                 }
-                SSHField("Codync port", text: $remotePort, prompt: "")
+                SSHField("Hypurr port", text: $remotePort, prompt: "")
             }
-            Text("Codync opens an SSH tunnel to codync-host on that computer's loopback. It uses your SSH config and ssh-agent; agent forwarding stays off.")
+            Text("Hypurr opens an SSH tunnel to hypurr-host on that computer's loopback. It uses your SSH config and ssh-agent; agent forwarding stays off.")
                 .font(.caption).foregroundStyle(Palette.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if let problem {
@@ -610,7 +610,7 @@ private struct SSHProfileEditor: View {
             return
         }
         guard let remote = Int(remotePort.trimmingCharacters(in: .whitespaces)) else {
-            problem = "The Codync port must be a number."
+            problem = "The Hypurr port must be a number."
             return
         }
         p.remotePort = remote

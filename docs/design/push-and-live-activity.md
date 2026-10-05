@@ -59,7 +59,7 @@ Alert kinds are `done`, `needsInput`, and `failed`.
 
 Hosts submit an event's alert requests in registration order to `POST /push-batch` as `{ "notifications": [<push request>, ...] }` (1–256 entries). The Worker decrypts the tickets and sends only the last request for each physical APNs destination, environment and token kind. It returns indexed statuses; superseded tickets and HTTP 410 results are forgotten by the host on its next push operation. Superseded identities also lose their older ticket rows so they cannot reappear on the next event. This requires no new database, no plaintext notification content, and no change to the ticket encryption scheme. Live Activity updates continue using `/push` because each activity has its own token.
 
- The public APNs alert always has title `Codync` and a useful fallback sentence. The encrypted payload carries the private fields. `mutable-content: 1` requests extension processing. The public routing fields are `botId`, `computerId`, and `ctx`; `thread-id` is `<computerId>:<botId>`.
+ The public APNs alert always has title `Hypurr` and a useful fallback sentence. The encrypted payload carries the private fields. `mutable-content: 1` requests extension processing. The public routing fields are `botId`, `computerId`, and `ctx`; `thread-id` is `<computerId>:<botId>`.
 
 Live Activity requests carry:
 
@@ -81,7 +81,7 @@ Live Activity requests carry:
 
 `timestamp`, `stale-date`, and `dismissal-date` use Unix seconds. `startedAt` uses Swift Date's 2001 reference epoch. The Worker preserves the host event timestamp rather than replacing it with delivery time. Older hosts that omit it use Worker receipt time.
 
-- Topic: `com.pokai.Codync.ios.push-type.liveactivity`; push type: `liveactivity`.
+- Topic: `com.ragul84.Hypurr.ios.push-type.liveactivity`; push type: `liveactivity`.
 - Working updates use APNs priority 5; input requests and end events use 10.
 - Updates set `stale-date`; ends set `dismissal-date` to event time plus 60 seconds. Expiration follows that deadline. Ordinary alerts expire after one hour.
 - Invalid environment, kind, activity event, state or dates return 400. Remote activity free text is rejected. Alert custom data cannot overwrite `aps`; alert payloads larger than 4096 bytes return 413.
@@ -91,15 +91,15 @@ Host delivery is currently best effort with a 10-second request timeout. There i
 
 ## Why only “Done” appeared
 
-The previous public fallback was literally `Codync / Done`. Any missing `sealed`, `ctx`, inaccessible shared key, failed authentication or extension packaging problem kept that fallback. Device verification reproduced a more specific cause: five authorized device identities pointed to this phone. One current identity decrypted the completion normally; four obsolete identities produced generic fallbacks for the same event. The batched Worker path now selects the latest registration for the physical token across those identities.
+The previous public fallback was literally `Hypurr / Done`. Any missing `sealed`, `ctx`, inaccessible shared key, failed authentication or extension packaging problem kept that fallback. Device verification reproduced a more specific cause: five authorized device identities pointed to this phone. One current identity decrypted the completion normally; four obsolete identities produced generic fallbacks for the same event. The batched Worker path now selects the latest registration for the physical token across those identities.
 
-Registration previously accumulated random tickets, including tickets with obsolete/missing push keys. Re-registering now removes those old records for the same device. The fallback itself now says “Your task is complete. Open Codync to read the result.” Failure and input requests have distinct fallback sentences.
+Registration previously accumulated random tickets, including tickets with obsolete/missing push keys. Re-registering now removes those old records for the same device. The fallback itself now says “Your task is complete. Open Hypurr to read the result.” Failure and input requests have distinct fallback sentences.
 
 For a phone that still shows fallback text:
 
 1. Open the updated app and connect to the updated host so token/key registration completes.
-2. Verify the installed app embeds `CodyncNotificationService.appex`, and the service principal class is the generated module's `NotificationService`.
-3. Verify signed app and extension share the same expanded `CodyncKeychainGroup` and Keychain entitlement. Source plist equality alone does not verify a signed installation.
+2. Verify the installed app embeds `HypurrNotificationService.appex`, and the service principal class is the generated module's `NotificationService`.
+3. Verify signed app and extension share the same expanded `HypurrKeychainGroup` and Keychain entitlement. Source plist equality alone does not verify a signed installation.
 4. Inspect device logs for categories `Push`, `PushDecrypt`, and `NotificationService`. They distinguish missing keys, Keychain failures, failed content authentication/decoding and fallback delivery without printing keys or message contents.
 5. Test after the first unlock following a reboot. Keys intentionally use `AfterFirstUnlockThisDeviceOnly`; pre-unlock fallback is expected.
 
@@ -107,7 +107,7 @@ For a phone that still shows fallback text:
 
 The APNs Worker uses the existing secrets `APNS_TEAM_ID`, `APNS_KEY_ID`, `APNS_SIGNING_KEY`, and `TICKET_KEY`; see the [relay deployment guide](../../relay/README.md). Keep `TICKET_KEY` stable across deployments. Rotating it invalidates every existing ticket. Tickets are bearer capabilities accepted by the Worker and must not be logged.
 
-The app bundle is `com.pokai.Codync.ios`. App and notification extension share `group.com.pokai.Codync` and the expanded shared Keychain access group. `project.yml` embeds both extension targets and enables `NSSupportsLiveActivities`; no new entitlement is required by these changes. Confirm sandbox versus production against the signed provisioning profile, especially for distribution builds.
+The app bundle is `com.ragul84.Hypurr.ios`. App and notification extension share `group.com.ragul84.hypurr` and the expanded shared Keychain access group. `project.yml` embeds both extension targets and enables `NSSupportsLiveActivities`; no new entitlement is required by these changes. Confirm sandbox versus production against the signed provisioning profile, especially for distribution builds.
 
 Deployment order: Worker → host → iOS. The optional encrypted subtitle remains compatible with clients that decode only title/body. New clients accept older encrypted payloads without subtitles. The new `failed` category requires the updated app for its custom action. Follow the repository's stop-old-process/relaunch rules when installing builds.
 
@@ -139,21 +139,21 @@ Local tests cover payload generation, error classification, request validation, 
 
 ### Deployment and device verification — 2026-09-27
 
-- Deployed `codync-relay`, version `2ba1d27c-116c-423d-87e4-2a7749575bd3`; `/health` returned HTTP 200.
+- Deployed `hypurr-relay`, version `2ba1d27c-116c-423d-87e4-2a7749575bd3`; `/health` returned HTTP 200.
 - Built and restarted the signed Mac app and its launchd host. The running host includes the new notification implementation; its health endpoint returned success.
-- Built and installed the signed Debug iOS app on the paired iPhone 16 Pro Max. App and notification extension both resolve their shared Keychain group to `7FUM8A8H72.com.pokai.Codync`, with the matching App Group. The app uses the development APNs environment.
+- Built and installed the signed Debug iOS app on the paired iPhone 16 Pro Max. App and notification extension both resolve their shared Keychain group to `TEAMID.com.ragul84.Hypurr`, with the matching App Group. The app uses the development APNs environment.
 - The live host contained 191 tickets across five device identities. The active phone's group shrank from ten rows to one on reconnect. Added regression coverage ensures older groups also send through only their newest stored ticket.
 - Two encrypted test alerts returned HTTP 200 from the deployed Worker/APNs path. Device logs confirm the notification service extension executed, with no recorded decryption failure for those tests.
 - Debug device diagnostics read iOS-delivered notifications for the temporary verification bot and confirmed the decrypted title `Push verification`, subtitle `Task complete`, and final result body. The same inspection identified the four obsolete-identity fallbacks, leading to physical-destination deduplication in the Worker.
 - A task started from the iPhone created a real Live Activity. While the app was on the Home Screen, an APNs needs-input update changed the Dynamic Island indicator to amber. Releasing the controlled host task ended the activity and removed its host ticket. The stale-date payload passed automated checks, but its delayed visual transition was not conclusively observed on the device.
 
 
-For repeatable Debug-only acceptance, launch the app with `CODYNC_PUSH_VERIFY_BOT` set to the temporary test bot ID. The console's `CODYNC_PUSH_VERIFICATION` line reports only that bot's delivered notifications, current activities and authorization state. It does not expose keys, tickets, account IDs or other bots' notifications. Release builds do not include this diagnostic.
+For repeatable Debug-only acceptance, launch the app with `HYPURR_PUSH_VERIFY_BOT` set to the temporary test bot ID. The console's `HYPURR_PUSH_VERIFICATION` line reports only that bot's delivered notifications, current activities and authorization state. It does not expose keys, tickets, account IDs or other bots' notifications. Release builds do not include this diagnostic.
 
 - The deployed batch endpoint received five tickets for one physical phone and returned four superseded results plus one successful delivery. Device diagnostics confirmed exactly one new decrypted notification and no additional generic fallbacks. The user also confirmed the complete title and body were visible.
 - The updated running host executed controlled failure and success tasks. Its next delivery automatically removed obsolete identity rows, leaving one valid alert ticket in the live database.
 - Final signed iOS and macOS Debug builds passed after the batch fix.
 
-Set `CODYNC_PUSH_CLEAR_TEST_NOTIFICATIONS=1` alongside the Debug verification bot ID to remove only that bot's delivered test notifications after reporting them.
+Set `HYPURR_PUSH_CLEAR_TEST_NOTIFICATIONS=1` alongside the Debug verification bot ID to remove only that bot's delivered test notifications after reporting them.
 
 - Final device diagnostics confirmed one decrypted failure (`Push verification / Task failed / The agent failed.`), one additional decrypted success, no new generic fallback, and no remaining test activity. The temporary bot was deleted and its delivered notifications were cleared.

@@ -151,23 +151,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "codync-gtk"
-version = "2.1.0"
-dependencies = [
- "async-channel",
- "dirs",
- "futures",
- "gtk4",
- "libadwaita",
- "qrcode",
- "reqwest",
- "serde_json",
- "tokio",
- "uuid",
- "vte4",
-]
-
-[[package]]
 name = "combine"
 version = "4.6.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -790,6 +773,23 @@ dependencies = [
  "tokio",
  "tower-service",
  "tracing",
+]
+
+[[package]]
+name = "hypurr-gtk"
+version = "2.1.0"
+dependencies = [
+ "async-channel",
+ "dirs",
+ "futures",
+ "gtk4",
+ "libadwaita",
+ "qrcode",
+ "reqwest",
+ "serde_json",
+ "tokio",
+ "uuid",
+ "vte4",
 ]
 
 [[package]]

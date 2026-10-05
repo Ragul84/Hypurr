@@ -1,12 +1,12 @@
 import ActivityKit
-import CodyncKit
-import CodyncUI
+import HypurrKit
+import HypurrUI
 import Foundation
 import UIKit
 import UserNotifications
 import os
 
-private let log = Logger(subsystem: "com.pokai.Codync.ios", category: "Push")
+private let log = Logger(subsystem: "com.ragul84.Hypurr.ios", category: "Push")
 
 private var apnsEnvironment: String {
     #if DEBUG
@@ -50,7 +50,7 @@ final class PushRegistrar {
     /// Device acceptance checks can inspect only the explicitly selected test bot's notifications.
     /// No keys, tickets, account identifiers, or unrelated notification content are logged.
     func verifyDeliveryIfRequested() {
-        guard let botId = ProcessInfo.processInfo.environment["CODYNC_PUSH_VERIFY_BOT"] else { return }
+        guard let botId = ProcessInfo.processInfo.environment["HYPURR_PUSH_VERIFY_BOT"] else { return }
         let activities = Activity<BotActivityAttributes>.activities.filter { $0.attributes.botId == botId }.map {
             ["status": $0.content.state.status, "state": String(describing: $0.activityState)]
         }
@@ -64,7 +64,7 @@ final class PushRegistrar {
                 ["title": $0.request.content.title, "subtitle": $0.request.content.subtitle,
                  "body": $0.request.content.body, "category": $0.request.content.categoryIdentifier]
             }
-            if ProcessInfo.processInfo.environment["CODYNC_PUSH_CLEAR_TEST_NOTIFICATIONS"] == "1" {
+            if ProcessInfo.processInfo.environment["HYPURR_PUSH_CLEAR_TEST_NOTIFICATIONS"] == "1" {
                 center.removeDeliveredNotifications(withIdentifiers: delivered.map { $0.request.identifier })
             }
             let result: [String: Any] = [
@@ -75,7 +75,7 @@ final class PushRegistrar {
             ]
             if let data = try? JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]),
                let text = String(data: data, encoding: .utf8) {
-                print("CODYNC_PUSH_VERIFICATION \(text)")
+                print("HYPURR_PUSH_VERIFICATION \(text)")
             }
         }
     }
@@ -157,21 +157,21 @@ final class LiveActivities {
     /// Simulator-only visual verification. No host, relay, or APNs request.
     func previewIfRequested() async {
         #if targetEnvironment(simulator)
-        guard let status = ProcessInfo.processInfo.environment["CODYNC_ACTIVITY_PREVIEW"] else { return }
-        for activity in Activity<BotActivityAttributes>.activities where activity.attributes.botId.hasPrefix("codync-design-preview-") {
+        guard let status = ProcessInfo.processInfo.environment["HYPURR_ACTIVITY_PREVIEW"] else { return }
+        for activity in Activity<BotActivityAttributes>.activities where activity.attributes.botId.hasPrefix("hypurr-design-preview-") {
             await activity.end(nil, dismissalPolicy: .immediate)
         }
         guard status != "stop", var bot = Bot.widgetPreview.first else { return }
         try? await Task.sleep(for: .milliseconds(500))
         for index in 0..<(status == "multiple" ? 2 : 1) {
-            bot.id = "codync-design-preview-\(index)"
+            bot.id = "hypurr-design-preview-\(index)"
             bot.name = index == 0 ? "Reviewer" : "Builder"
             let state = BotActivityAttributes.ContentState(
                 status: status == "multiple" ? (index == 0 ? "needsInput" : "working") : status == "stale" ? "working" : status,
                 activity: status == "needsInput" || status == "multiple" ? "Review the proposed changes." : "Running the test suite.",
                 startedAt: .now - 154)
             do {
-                _ = try Activity.request(attributes: BotActivityAttributes(bot: bot, computerId: "preview", link: URL(string: "codync://computers")),
+                _ = try Activity.request(attributes: BotActivityAttributes(bot: bot, computerId: "preview", link: URL(string: "hypurr://computers")),
                     content: .init(state: state, staleDate: status == "stale" ? .now - 1 : .now + 900), pushType: nil)
             } catch { log.error("Simulator activity preview: \(error.localizedDescription)") }
         }

@@ -8,16 +8,16 @@ Reviewed against repository configuration on 2026-09-26. Checked-in configuratio
 | --- | --- | --- |
 | Apple app | `apps/shared/Config/dev.plist`, `main.plist` | `project.yml` copies the selected file to bundled `AccountConfig.plist`; Debug uses dev, Release uses main |
 | Account SDK | `apps/shared/AccountSession.swift` | Public Clerk configuration; development environment overrides are supported |
-| Host | `host/src/remote/cloud.rs` | `CODYNC_CLOUD=off` or stored disable wins; then `CODYNC_CLOUD_URL`, stored URL, compiled default |
+| Host | `host/src/remote/cloud.rs` | `HYPURR_CLOUD=off` or stored disable wins; then `HYPURR_CLOUD_URL`, stored URL, compiled default |
 | Cloud Worker / D1 / DO | `cloud/wrangler.toml` | Root production, `dev`, or `local` environment |
 | APNs Worker | `relay/wrangler.toml` | Separate deployment and secrets; see [relay README](../../relay/README.md) |
 
-The host's compiled default follows its build profile like the app: debug builds use `https://dev-api.codync.dev`, release builds `https://api.codync.dev`. Override it with the Mac's **Reach from anywhere** control or `codync-host cloud --url <url>`. `codync-host cloud` displays status; `--disable` turns access off. App and host must point at the same intended cloud.
+The host's compiled default follows its build profile like the app: debug builds use `https://dev-api.hypurr.dev`, release builds `https://api.hypurr.dev`. Override it with the Mac's **Reach from anywhere** control or `hypurr-host cloud --url <url>`. `hypurr-host cloud` displays status; `--disable` turns access off. App and host must point at the same intended cloud.
 
 ## Checked-in readiness
 
-- **Development:** app configuration and Worker configuration target `https://dev-api.codync.dev`; dev Clerk issuer and D1 binding are configured in source. Exercise the live path before claiming readiness.
-- **Production:** `main.plist` targets `https://api.codync.dev` with the Clerk production instance (`clerk.codync.dev`, Google sign-in through the `codync-auth` Google Cloud project, published). The root Worker is deployed with D1 `codync`, `CLERK_SECRET_KEY` and `CLERK_WEBHOOK_SECRET` (Clerk webhook endpoint `https://api.codync.dev/v1/webhooks/clerk`, `user.deleted`).
+- **Development:** app configuration and Worker configuration target `https://dev-api.hypurr.dev`; dev Clerk issuer and D1 binding are configured in source. Exercise the live path before claiming readiness.
+- **Production:** `main.plist` targets `https://api.hypurr.dev` with the Clerk production instance (`clerk.hypurr.dev`, Google sign-in through the `hypurr-auth` Google Cloud project, published). The root Worker is deployed with D1 `hypurr`, `CLERK_SECRET_KEY` and `CLERK_WEBHOOK_SECRET` (Clerk webhook endpoint `https://api.hypurr.dev/v1/webhooks/clerk`, `user.deleted`).
 - **Local:** Wrangler's `local` environment supports the isolated integration test and its test issuer. It is not a real Google sign-in test.
 
 ## Deployment procedure

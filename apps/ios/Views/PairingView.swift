@@ -1,9 +1,9 @@
-import CodyncKit
-import CodyncUI
+import HypurrKit
+import HypurrUI
 import SwiftUI
 import VisionKit
 
-/// Pair with a computer running codync-host, one thing per page: install it, then scan its code.
+/// Pair with a computer running hypurr-host, one thing per page: install it, then scan its code.
 struct PairingView<Leading: View>: View {
     /// Adding another computer from the computers sheet: has a close button; closes once paired.
     var inModal = false
@@ -97,7 +97,7 @@ private struct InstallPage: View {
                     .padding(.top, 8)
 
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("Install Codync\non your computer")
+                        Text("Install Hypurr\non your computer")
                             .font(.system(size: 30, weight: .semibold))
                             .tracking(-0.5)
                             .foregroundStyle(Palette.text)
@@ -112,23 +112,23 @@ private struct InstallPage: View {
                         // Copied here, pasted on the computer (Universal Clipboard or a message to yourself).
                         if os == .mac {
                             Hint("Install with Homebrew")
-                            CommandBlock("brew install --cask leepokai/codync/codync")
+                            CommandBlock("brew install --cask Ragul84/hypurr/hypurr")
                             Hint("or download the Mac app")
-                            CommandBlock("https://github.com/leepokai/Codync/releases/latest/download/codync-macos.dmg")
+                            CommandBlock("https://github.com/Ragul84/Hypurr/releases/latest/download/hypurr-macos.dmg")
                         } else {
                             Hint("Run the installer")
-                            CommandBlock("curl -fsSL https://raw.githubusercontent.com/leepokai/Codync/main/packaging/install.sh | sh\ncodync-host install")
+                            CommandBlock("curl -fsSL https://raw.githubusercontent.com/Ragul84/Hypurr/main/packaging/install.sh | sh\nhypurr-host install")
                             Hint("or install with Homebrew")
-                            CommandBlock("brew install leepokai/codync/codync-host\ncodync-host install")
+                            CommandBlock("brew install Ragul84/hypurr/hypurr-host\nhypurr-host install")
                         }
                         Text(os == .mac
-                             ? "Open Codync and it sets up the host on its own."
-                             : "codync-host install keeps it running in the background.")
+                             ? "Open Hypurr and it sets up the host on its own."
+                             : "hypurr-host install keeps it running in the background.")
                             .font(.subheadline)
                             .foregroundStyle(Palette.secondary)
                             .contentTransition(.opacity)
                         Hint("Every install option")
-                        CommandBlock("https://www.codync.dev/#install")
+                        CommandBlock("https://www.hypurr.dev/#install")
                     }
                     .animation(Motion.layout, value: os)
 
@@ -218,17 +218,17 @@ private struct ScanPage: View {
                         .tracking(-0.5)
                         .foregroundStyle(Palette.text)
                     Text(os == .mac
-                         ? "On your Mac, click Codync in the menu bar, then Pair iPhone."
+                         ? "On your Mac, click Hypurr in the menu bar, then Pair iPhone."
                          : "On your computer, run this in a terminal:")
                         .font(.body)
                         .foregroundStyle(Palette.secondary)
-                    if os == .linux { CommandBlock("codync-host pair") }
+                    if os == .linux { CommandBlock("hypurr-host pair") }
                 }
 
                 viewfinder
 
                 HStack {
-                    TextField("Or paste a codync://pair link", text: $pasted)
+                    TextField("Or paste a hypurr://pair link", text: $pasted)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                         .font(.callout.monospaced())
@@ -245,7 +245,7 @@ private struct ScanPage: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text(error).font(.footnote).foregroundStyle(Palette.danger)
                         // The usual cause: the phone has no road to the computer yet.
-                        Label("Check that this iPhone and the computer are on the same Wi-Fi or both on Tailscale, or that “Reach from anywhere” is on in Codync on the computer.",
+                        Label("Check that this iPhone and the computer are on the same Wi-Fi or both on Tailscale, or that “Reach from anywhere” is on in Hypurr on the computer.",
                               systemImage: "wifi.exclamationmark")
                             .font(.footnote)
                             .foregroundStyle(Palette.secondary)
@@ -261,7 +261,7 @@ private struct ScanPage: View {
                     Label("Connects on Wi-Fi, over Tailscale, or from anywhere through Cloudflare, on its own. End-to-end encrypted.",
                           systemImage: "lock.fill")
                     if tailscaleOn {
-                        Label("Tailscale is on: Codync connects over it directly.", systemImage: "checkmark.circle.fill")
+                        Label("Tailscale is on: Hypurr connects over it directly.", systemImage: "checkmark.circle.fill")
                     } else {
                         Button { openURL(Tailscale.downloadURL) } label: {
                             Label("Use Tailscale? Direct and faster away from home.", systemImage: "arrow.up.right")
@@ -360,7 +360,7 @@ struct QRScanner: UIViewControllerRepresentable {
 
         func dataScanner(_ scanner: DataScannerViewController, didAdd items: [RecognizedItem], allItems: [RecognizedItem]) {
             for case let .barcode(code) in items {
-                if let value = code.payloadStringValue, value.hasPrefix("codync://"), !done {
+                if let value = code.payloadStringValue, value.hasPrefix("hypurr://"), !done {
                     done = true
                     scanner.stopScanning()
                     onCode(value)

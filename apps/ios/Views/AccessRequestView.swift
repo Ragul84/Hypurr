@@ -1,5 +1,5 @@
-import CodyncKit
-import CodyncUI
+import HypurrKit
+import HypurrUI
 import SwiftUI
 
 /// Asking a computer in the account for access (spec §4.2 B): once both sides committed,

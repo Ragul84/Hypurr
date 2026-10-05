@@ -1,4 +1,4 @@
-//! Talks to the local codync-host: JSON commands and the SSE event stream,
+//! Talks to the local hypurr-host: JSON commands and the SSE event stream,
 //! run on a tokio runtime and handed to the GTK main loop through channels.
 
 use futures::StreamExt;
@@ -20,21 +20,21 @@ pub fn runtime() -> &'static tokio::runtime::Runtime {
 }
 
 pub fn data_dir() -> PathBuf {
-    std::env::var_os("CODYNC_HOME")
+    std::env::var_os("HYPURR_HOME")
         .map(PathBuf::from)
-        .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join(".codync"))
+        .unwrap_or_else(|| dirs::home_dir().unwrap_or_default().join(".hypurr"))
 }
 
 pub fn port() -> u16 {
-    std::env::var("CODYNC_PORT")
+    std::env::var("HYPURR_PORT")
         .ok()
         .and_then(|p| p.parse().ok())
         .unwrap_or(19222)
 }
 
-/// `CODYNC_URL` overrides the host address (e.g. a host outside a container).
+/// `HYPURR_URL` overrides the host address (e.g. a host outside a container).
 pub fn base() -> String {
-    std::env::var("CODYNC_URL").unwrap_or_else(|_| format!("http://127.0.0.1:{}", port()))
+    std::env::var("HYPURR_URL").unwrap_or_else(|_| format!("http://127.0.0.1:{}", port()))
 }
 
 pub fn token() -> Option<String> {
@@ -53,7 +53,7 @@ fn http() -> &'static reqwest::Client {
 const PATIENCE: Duration = Duration::from_secs(20);
 
 async fn call_async(method: String, body: Value) -> Result<Value, String> {
-    let token = token().ok_or("The Codync host isn't set up on this computer.")?;
+    let token = token().ok_or("The Hypurr host isn't set up on this computer.")?;
     let started = std::time::Instant::now();
     let res = loop {
         let sent = http()
@@ -83,7 +83,7 @@ async fn call_async(method: String, body: Value) -> Result<Value, String> {
             Err(e) if e.is_connect() && method != "hello" && started.elapsed() < PATIENCE => {
                 tokio::time::sleep(Duration::from_millis(500)).await;
             }
-            Err(_) => return Err("Can't reach the Codync host.".to_owned()),
+            Err(_) => return Err("Can't reach the Hypurr host.".to_owned()),
         }
     };
     let ok = res.status().is_success();
@@ -214,23 +214,23 @@ pub fn stream(tx: async_channel::Sender<Event>) {
     });
 }
 
-/// `codync-host install`, for when the host isn't running yet.
+/// `hypurr-host install`, for when the host isn't running yet.
 pub fn install_host(done: impl FnOnce(Result<(), String>) + 'static) {
     let (tx, rx) = async_channel::bounded(1);
     runtime().spawn(async move {
-        let bin = ["codync-host", "/usr/local/bin/codync-host", "/home/linuxbrew/.linuxbrew/bin/codync-host"]
+        let bin = ["hypurr-host", "/usr/local/bin/hypurr-host", "/home/linuxbrew/.linuxbrew/bin/hypurr-host"]
             .iter()
             .map(PathBuf::from)
-            .chain(dirs::home_dir().map(|h| h.join(".cargo/bin/codync-host")))
-            .chain(dirs::home_dir().map(|h| h.join(".local/bin/codync-host")))
+            .chain(dirs::home_dir().map(|h| h.join(".cargo/bin/hypurr-host")))
+            .chain(dirs::home_dir().map(|h| h.join(".local/bin/hypurr-host")))
             .find(|p| p.components().count() == 1 || p.exists());
         let r = match bin {
             Some(bin) => match tokio::process::Command::new(bin).arg("install").output().await {
                 Ok(o) if o.status.success() => Ok(()),
                 Ok(o) => Err(String::from_utf8_lossy(&o.stderr).trim().to_owned()),
-                Err(_) => Err("codync-host isn't installed. Install it with Homebrew or from a release, then try again.".into()),
+                Err(_) => Err("hypurr-host isn't installed. Install it with Homebrew or from a release, then try again.".into()),
             },
-            None => Err("codync-host isn't installed.".into()),
+            None => Err("hypurr-host isn't installed.".into()),
         };
         let _ = tx.send(r).await;
     });

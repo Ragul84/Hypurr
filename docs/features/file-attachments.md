@@ -14,7 +14,7 @@ Photos and files sent with a message, from the iPhone and the Mac.
   of order is refused. Then `send {…, attachments: [uploadId]}`; the text may be empty.
 - Storage (`host/src/chat/uploads.rs`): `<workspace>/uploads/<uploadId>/<name>` for a personal
   workspace (so reading needs no extra approval), otherwise
-  `~/.codync/bots/<bot>/uploads/<uploadId>/<name>`. Only UUID ids and plain file names are accepted.
+  `~/.hypurr/bots/<bot>/uploads/<uploadId>/<name>`. Only UUID ids and plain file names are accepted.
 - The agent gets the message text plus an "Attached files" list of absolute paths and reads them with
   its own tools (Claude and Codex read images too). The entry keeps `attachments: [{id, name, size}]`
   for display.

@@ -8,7 +8,7 @@ The footer displays **Account**, never the Mac user's local name.
 
 Both Apple apps use `apps/shared/AccountSession.swift`. Public keys and cloud URLs come from `apps/shared/Config/<env>.plist`, copied into the bundle as `AccountConfig.plist` by `project.yml`. Debug selects dev; Release selects main. See [environments](environments-and-deployment.md).
 
-Confirm Apple and Google sign-in, Native API and the native app registrations in the intended Clerk instance. macOS uses `com.pokai.Codync`, iOS uses `com.pokai.Codync.ios`, with their matching `://callback` URLs. Dashboard configuration and actual OAuth consent must be verified independently of the checked-in plist. Do not bundle Clerk secret keys.
+Confirm Apple and Google sign-in, Native API and the native app registrations in the intended Clerk instance. macOS uses `com.ragul84.Hypurr`, iOS uses `com.ragul84.Hypurr.ios`, with their matching `://callback` URLs. Dashboard configuration and actual OAuth consent must be verified independently of the checked-in plist. Do not bundle Clerk secret keys.
 
 ### macOS Sign in with Apple
 
@@ -24,16 +24,16 @@ This uses Clerk's Apple Services ID and does not require the native Sign in with
 Apple entitlement on the independently distributed Mac app. iOS continues using
 Clerk's native Apple authorization.
 
-The production Services ID `com.pokai.Codync.signin` is associated with primary
-App ID `com.pokai.Codync.ios` in Apple Developer. Keep that association: Apple's
+The production Services ID `com.ragul84.Hypurr.signin` is associated with primary
+App ID `com.ragul84.Hypurr.ios` in Apple Developer. Keep that association: Apple's
 web and native authorization must represent the same identity rather than being
-joined by email. The Mac's `com.pokai.Codync://callback` must also remain allowed
+joined by email. The Mac's `com.ragul84.Hypurr://callback` must also remain allowed
 in Clerk. See [Apple's web configuration guide](https://developer.apple.com/help/account/capabilities/configure-sign-in-with-apple-for-the-web/)
 and [Clerk's Apple OAuth guide](https://clerk.com/docs/guides/configure/auth-strategies/social-connections/apple).
 
 The development instance uses the same custom credentials (Services ID, team
-`7FUM8A8H72`, key `8S76D7ADWU`) since 2026-10-03, with
-`sunny-mollusk-8651.clerk.accounts.dev` and its `/v1/oauth_callback` added to the
+`<your Team ID>`, key `8S76D7ADWU`) since 2026-10-03, with
+`your-dev-instance.clerk.accounts.dev` and its `/v1/oauth_callback` added to the
 Services ID. Clerk's shared Apple credentials belong to Clerk's team, so with them
 the Mac's web sign-in and the iPhone's native sign-in got different Apple user IDs
 and became two Clerk users; don't switch development back to shared credentials.
@@ -62,23 +62,23 @@ transfer, session activation and persistence. Cancellation is silent and
 incomplete sign-in/sign-up results remain explicit errors.
 
 Enable Apple for sign-up and sign-in in both Clerk environments, and register
-`7FUM8A8H72.com.pokai.Codync.ios` under Native applications. Enable the App ID's
+`TEAMID.com.ragul84.Hypurr.ios` under Native applications. Enable the App ID's
 `APPLE_ID_AUTH` capability as a primary App ID and retain
 `com.apple.developer.applesignin: [Default]` in `iOS.entitlements`. Regenerate
 provisioning profiles after adding this entitlement. Native setup is described
 in [Clerk's Apple sign-in guide](https://clerk.com/docs/ios/guides/configure/auth-strategies/sign-in-with-apple).
 
-On 2026-09-30, Apple sign-up/sign-in was enabled in Codync's development and
+On 2026-09-30, Apple sign-up/sign-in was enabled in Hypurr's development and
 production Clerk instances. Production's connection required custom credentials:
-Services ID `com.pokai.Codync.signin`, primary App ID `com.pokai.Codync.ios`,
-domain `clerk.codync.dev` and return URL
-`https://clerk.codync.dev/v1/oauth_callback`. The Sign in with Apple key is stored
+Services ID `com.ragul84.Hypurr.signin`, primary App ID `com.ragul84.Hypurr.ios`,
+domain `clerk.hypurr.dev` and return URL
+`https://clerk.hypurr.dev/v1/oauth_callback`. The Sign in with Apple key is stored
 privately outside the repository and supplied only to Clerk. Never add its P8
 contents to app resources, logs or documentation.
 
 Apple Private Email Relay also has the production Clerk sender domain
-`clkmail.codync.dev` and sender
-`bounces+115655512@clkmail.codync.dev` registered as email sources. Registration
+`clkmail.hypurr.dev` and sender
+`bounces+115655512@clkmail.hypurr.dev` registered as email sources. Registration
 does not replace an actual delivery test to an Apple relay address.
 
 Account storage and computer approval still use the Clerk user ID, regardless of
@@ -105,8 +105,8 @@ identity, so phones see the old computer as **No access** (if they were connecte
 or as an older copy once the new one is reachable, and offer to remove it; pair
 again or ask for access to reach the new one.
 
-On the Mac, open Codync in the menu bar and choose **Pair iPhone**, then scan the
-code on the phone (or paste its `codync://pair` link). The host approves the phone's
+On the Mac, open Hypurr in the menu bar and choose **Pair iPhone**, then scan the
+code on the phone (or paste its `hypurr://pair` link). The host approves the phone's
 device key; the phone saves the computer in its current account context. This
 works when the phone uses Apple Hide My Email and the Mac uses Google. Automatic
 account discovery, in contrast, requires the same Clerk user ID on both devices.
@@ -133,7 +133,7 @@ network failures leave the user in the custom account menu with a retryable
 error. Log out calls Clerk's sign-out API.
 
 The custom account menu displays the authenticated email and avatar when
-available. `AccountSession.sessionToken()` hands the session JWT to the Codync
+available. `AccountSession.sessionToken()` hands the session JWT to the Hypurr
 cloud client. A Clerk session never authorizes a computer by itself: each
 computer approves each device after comparing a 6-digit code
 ([remote relay protocol](../reference/remote-relay.md) §4.2). Conversations are not uploaded.
@@ -160,8 +160,8 @@ References:
 The iOS app now uses the same ClerkKit dependency and shared AccountSession.
 Its top-left button opens Accounts; Computers & settings is a separate destination
 inside that sheet. The iOS native application must be registered in the same Clerk
-instance with bundle ID `com.pokai.Codync.ios` and its own callback
-`com.pokai.Codync.ios://callback`. The iOS public configuration is in
+instance with bundle ID `com.ragul84.Hypurr.ios` and its own callback
+`com.ragul84.Hypurr.ios://callback`. The iOS public configuration is in
 `apps/shared/Config/<env>.plist`. The repository configuration does not prove
 that the corresponding Clerk Dashboard registration has been completed.
 
@@ -199,15 +199,15 @@ A device asking for access raises the menu bar dot and opens the approval sheet 
 
 SSH computers use the system OpenSSH (`apps/macos/App/SSHTunnel.swift`): `ssh -G` to
 resolve the target, `ssh-keygen -F` against `~/.ssh/known_hosts` and
-`~/.codync/ssh_known_hosts`, a fingerprint confirmation on first contact (no proxy),
-`codync-host info --json` for the identity and loopback token, then
+`~/.hypurr/ssh_known_hosts`, a fingerprint confirmation on first contact (no proxy),
+`hypurr-host info --json` for the identity and loopback token, then
 `ssh -N -L 127.0.0.1:<free port>:127.0.0.1:<remote port>` with keepalive and backoff.
 A changed host key or a different computer ID blocks the connection. Sign-in is key or
 ssh-agent only (`BatchMode`: nothing prompts for a password or passphrase); a refused key
 stops with a message instead of retrying. The remote command searches Homebrew,
-`~/.local/bin` and the Mac app bundle for `codync-host` too, since `sh -l` doesn't read
+`~/.local/bin` and the Mac app bundle for `hypurr-host` too, since `sh -l` doesn't read
 `~/.zprofile`. At launch the app kills tunnels a crashed or force-quit copy left behind
-(`pkill` on the `.codync/ssh_known_hosts` argument only Codync's tunnels carry). Debug
+(`pkill` on the `.hypurr/ssh_known_hosts` argument only Hypurr's tunnels carry). Debug
 builds run `SSH.selfCheck()` at launch (argv, `ssh -G` parsing, validation).
 
 ## Verification boundaries

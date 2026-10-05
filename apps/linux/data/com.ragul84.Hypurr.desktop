@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Hypurr
+Comment=Message your coding-agent bots
+Exec=hypurr
+Icon=com.ragul84.Hypurr
+Terminal=false
+Categories=Development;
+StartupWMClass=com.ragul84.Hypurr

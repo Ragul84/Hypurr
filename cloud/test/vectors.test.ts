@@ -159,7 +159,7 @@ describe("SAS, offer, claim, push", () => {
   });
 });
 
-describe("Codync-Sig", () => {
+describe("Hypurr-Sig", () => {
   const r = V.requestSig;
   const req = (headers: Record<string, string>, authority = r.authority, path = r.pathAndQuery) =>
     new Request(`https://${authority}${path}`, { method: r.method, headers });
@@ -169,29 +169,29 @@ describe("Codync-Sig", () => {
     expect(ref.sigCanonical(r.method, r.authority, r.pathAndQuery, r.ts, r.nonce, new Uint8Array())).toBe(r.canonical);
     expect(await sigCanonical(r.method, r.authority, r.pathAndQuery, r.ts, r.nonce, new Uint8Array())).toBe(r.canonical);
     const header = ref.signRequest(device, { method: r.method, authority: r.authority, pathAndQuery: r.pathAndQuery, ts: r.ts, nonce: r.nonce });
-    expect(`Codync-Sig: ${header}`).toBe(r.header);
+    expect(`Hypurr-Sig: ${header}`).toBe(r.header);
   });
 
   it("verifies in the Worker within the time window only", async () => {
-    const value = r.header.slice("Codync-Sig: ".length);
-    expect(await verifySig(req({ "Codync-Sig": value }), new Uint8Array(), r.ts)).toEqual({
+    const value = r.header.slice("Hypurr-Sig: ".length);
+    expect(await verifySig(req({ "Hypurr-Sig": value }), new Uint8Array(), r.ts)).toEqual({
       kid: V.keys.deviceSignPub,
       ts: r.ts,
       nonce: r.nonce,
     });
-    expect(await verifySig(req({ "Codync-Sig": value }), new Uint8Array(), r.ts + 300_000)).not.toBeNull();
-    expect(await verifySig(req({ "Codync-Sig": value }), new Uint8Array(), r.ts + 300_001)).toBeNull();
-    expect(await verifySig(req({ "Codync-Sig": value }), new Uint8Array(), r.ts - 300_001)).toBeNull();
+    expect(await verifySig(req({ "Hypurr-Sig": value }), new Uint8Array(), r.ts + 300_000)).not.toBeNull();
+    expect(await verifySig(req({ "Hypurr-Sig": value }), new Uint8Array(), r.ts + 300_001)).toBeNull();
+    expect(await verifySig(req({ "Hypurr-Sig": value }), new Uint8Array(), r.ts - 300_001)).toBeNull();
   });
 
   it("binds the authority, path and body", async () => {
-    const value = r.header.slice("Codync-Sig: ".length);
+    const value = r.header.slice("Hypurr-Sig: ".length);
     // Upper-case Host is the same authority; a different host is not.
-    expect(await verifySig(req({ "Codync-Sig": value }, r.authority.toUpperCase()), new Uint8Array(), r.ts)).not.toBeNull();
-    expect(await verifySig(req({ "Codync-Sig": value }, "codync-cloud.example.workers.dev"), new Uint8Array(), r.ts)).toBeNull();
-    expect(await verifySig(req({ "Codync-Sig": value }, r.authority, `${r.pathAndQuery}&pair=x`), new Uint8Array(), r.ts)).toBeNull();
-    expect(await verifySig(req({ "Codync-Sig": value }), new Uint8Array([1]), r.ts)).toBeNull();
-    expect(await verifySig(req({ "Codync-Sig": value.replace("v=1", "v=2") }), new Uint8Array(), r.ts)).toBeNull();
+    expect(await verifySig(req({ "Hypurr-Sig": value }, r.authority.toUpperCase()), new Uint8Array(), r.ts)).not.toBeNull();
+    expect(await verifySig(req({ "Hypurr-Sig": value }, "hypurr-cloud.example.workers.dev"), new Uint8Array(), r.ts)).toBeNull();
+    expect(await verifySig(req({ "Hypurr-Sig": value }, r.authority, `${r.pathAndQuery}&pair=x`), new Uint8Array(), r.ts)).toBeNull();
+    expect(await verifySig(req({ "Hypurr-Sig": value }), new Uint8Array([1]), r.ts)).toBeNull();
+    expect(await verifySig(req({ "Hypurr-Sig": value.replace("v=1", "v=2") }), new Uint8Array(), r.ts)).toBeNull();
     expect(await verifySig(req({}), new Uint8Array(), r.ts)).toBeNull();
   });
 });

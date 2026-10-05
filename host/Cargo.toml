@@ -1,12 +1,12 @@
 [package]
-name = "codync-host"
-version = "2.3.0"
+name = "hypurr-host"
+version = "2.4.0"
 edition = "2024"
 # let-chains (`if let … && let …`) need 1.88.
 rust-version = "1.88"
-description = "Runs your coding-agent bots and serves the Codync apps"
+description = "Runs your coding-agent bots and serves the Hypurr apps"
 license = "MIT"
-repository = "https://github.com/leepokai/Codync"
+repository = "https://github.com/Ragul84/Hypurr"
 
 [dependencies]
 anyhow = "1.0.104"

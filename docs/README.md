@@ -1,4 +1,4 @@
-# Codync documentation
+# Hypurr documentation
 
 Current documentation describes the checked-out implementation. Last reviewed: **2026-09-26**.
 Source review, a passing build, local integration tests and production acceptance are different checks; a feature documented here is not a claim that its deployed service has been verified.
@@ -28,6 +28,7 @@ Source review, a passing build, local integration tests and production acceptanc
 - [Remote screen](features/remote-screen.md)
 - [Marketplace and agent setup](features/marketplace.md)
 - [Connector setup and credentials](features/connector-credentials.md)
+- [Hypurr design system (tokens for every client)](design/hypurr-design-system.md)
 - [Widgets, Live Activities and onboarding](design/mobile-widgets.md)
 - [Notifications and background Live Activity updates](design/push-and-live-activity.md)
 

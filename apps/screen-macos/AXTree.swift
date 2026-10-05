@@ -12,7 +12,7 @@ enum AXTree {
 
     static func frontmost(display: CGDirectDisplayID) throws -> [String: Any] {
         guard AXIsProcessTrusted() else {
-            throw HelperError("Codync Screen isn't allowed to read the screen's controls yet. Allow it under Privacy & Security → Accessibility.")
+            throw HelperError("Hypurr Screen isn't allowed to read the screen's controls yet. Allow it under Privacy & Security → Accessibility.")
         }
         guard let app = NSWorkspace.shared.frontmostApplication else { throw HelperError("No app is in front.") }
         let root = AXUIElementCreateApplication(app.processIdentifier)
@@ -32,7 +32,7 @@ enum AXTree {
     /// URL of the web page it sits in (if any), so the host types a login only where it belongs.
     static func focusedField() throws -> [String: Any] {
         guard AXIsProcessTrusted() else {
-            throw HelperError("Codync Screen isn't allowed to read the screen's controls yet. Allow it under Privacy & Security → Accessibility.")
+            throw HelperError("Hypurr Screen isn't allowed to read the screen's controls yet. Allow it under Privacy & Security → Accessibility.")
         }
         guard let app = NSWorkspace.shared.frontmostApplication else { throw HelperError("No app is in front.") }
         let root = AXUIElementCreateApplication(app.processIdentifier)

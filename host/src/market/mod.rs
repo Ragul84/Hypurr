@@ -8,7 +8,7 @@
 //!   connectors; see `composio`.
 //! - **Skills** are instruction folders (a `SKILL.md` plus any files it uses),
 //!   from <https://github.com/anthropics/skills> or written by hand, kept in
-//!   `~/.codync/skills/<id>`. A bot that has one turned on is told where it is
+//!   `~/.hypurr/skills/<id>`. A bot that has one turned on is told where it is
 //!   and reads it when the task calls for it.
 //! - **Agents** come from the ACP registry; see `backends`.
 //!
@@ -35,7 +35,7 @@ use std::time::{Duration, Instant};
 
 const MCP_REGISTRY: &str = "https://registry.modelcontextprotocol.io/v0/servers";
 const SKILLS_REPO: &str = "anthropics/skills";
-const UA: &str = concat!("codync-host/", env!("CARGO_PKG_VERSION"));
+const UA: &str = concat!("hypurr-host/", env!("CARGO_PKG_VERSION"));
 const TIMEOUT: Duration = Duration::from_secs(15);
 /// Registry search is slow (often 20-30 s); lookups by name are fast.
 const SEARCH_TIMEOUT: Duration = Duration::from_secs(45);
@@ -70,7 +70,7 @@ pub struct Connector {
 }
 
 impl Connector {
-    /// ACP `McpServer`. Remote servers run through this host's `remote` proxy (`codync-host mcp remote`),
+    /// ACP `McpServer`. Remote servers run through this host's `remote` proxy (`hypurr-host mcp remote`),
     /// which keeps sign-in tokens fresh and works with agents that only speak stdio.
     /// A remote server still waiting for sign-in is left out.
     pub fn acp(&self, exe: &std::path::Path, port: u16) -> Option<Value> {
@@ -928,7 +928,7 @@ mod tests {
             headers: BTreeMap::new(),
             oauth: None,
         };
-        let exe = std::path::Path::new("/bin/codync-host");
+        let exe = std::path::Path::new("/bin/hypurr-host");
         let config = c.acp(exe, 1).unwrap();
         assert_eq!(config["args"][1], "local");
         assert_eq!(config["env"], json!([]));

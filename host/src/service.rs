@@ -58,7 +58,7 @@ pub fn stop() -> Result<()> {
             .stderr(Stdio::null())
             .status()?;
     } else if installed() {
-        run("systemctl", &["--user", "stop", "codync-host.service"])?;
+        run("systemctl", &["--user", "stop", "hypurr-host.service"])?;
     }
     wait_for_host_exit()
 }
@@ -67,7 +67,7 @@ pub fn start() -> Result<()> {
     if cfg!(target_os = "macos") {
         run("launchctl", &["bootstrap", &format!("gui/{}", current_uid()), &launchd_plist().to_string_lossy()])
     } else {
-        run("systemctl", &["--user", "start", "codync-host.service"])
+        run("systemctl", &["--user", "start", "hypurr-host.service"])
     }
 }
 
@@ -96,17 +96,17 @@ pub fn require_executable(expected: &Path) -> Result<()> {
 }
 
 pub const DEFAULT_PORT: u16 = 19222;
-const LABEL: &str = "com.pokai.codync.host";
+const LABEL: &str = "com.ragul84.hypurr.host";
 /// Marker between our command and a wrapped user status line.
 const STATUSLINE_MARK: &str = " statusline --";
 
-/// The user's home. Codync can't do anything useful without one, so its absence is fatal.
+/// The user's home. Hypurr can't do anything useful without one, so its absence is fatal.
 fn home() -> PathBuf {
-    dirs::home_dir().expect("HOME must be set: Codync keeps its data and agent settings there")
+    dirs::home_dir().expect("HOME must be set: Hypurr keeps its data and agent settings there")
 }
 
 pub fn data_dir() -> PathBuf {
-    std::env::var_os("CODYNC_HOME").map_or_else(|| home().join(".codync"), PathBuf::from)
+    std::env::var_os("HYPURR_HOME").map_or_else(|| home().join(".hypurr"), PathBuf::from)
 }
 
 fn launchd_plist() -> PathBuf {
@@ -114,7 +114,7 @@ fn launchd_plist() -> PathBuf {
 }
 
 fn systemd_unit() -> PathBuf {
-    dirs::config_dir().unwrap_or_else(|| home().join(".config")).join("systemd/user/codync-host.service")
+    dirs::config_dir().unwrap_or_else(|| home().join(".config")).join("systemd/user/hypurr-host.service")
 }
 
 fn xml_escape(s: &str) -> String {
@@ -135,14 +135,14 @@ pub fn lock_host() -> Result<std::fs::File> {
     create_parent(&path)?;
     let file = std::fs::OpenOptions::new().create(true).truncate(false).read(true).write(true).open(path)?;
     fs2::FileExt::try_lock_exclusive(&file)
-        .context("another codync-host is already running for this data directory")?;
+        .context("another hypurr-host is already running for this data directory")?;
     Ok(file)
 }
 
 /// Installs and starts the host as a per-user background service. The current
 /// PATH is captured so the service finds `npx`, `claude`, `codex`, …
 pub fn install(port: u16) -> Result<()> {
-    let exe = std::env::current_exe()?.canonicalize().context("locating the codync-host binary")?;
+    let exe = std::env::current_exe()?.canonicalize().context("locating the hypurr-host binary")?;
     let exe = exe.to_string_lossy();
     let path = std::env::var("PATH").unwrap_or_default();
     let log = data_dir().join("host.log");
@@ -179,15 +179,15 @@ pub fn install(port: u16) -> Result<()> {
         run("launchctl", &["bootstrap", &format!("gui/{uid}"), &file.to_string_lossy()])?;
     } else {
         let unit = format!(
-            "[Unit]\nDescription=Codync host\nAfter=network-online.target\n\n[Service]\nExecStart={exe} serve --port {port}\nEnvironment=PATH={path}\nRestart=always\nRestartSec=3\n\n[Install]\nWantedBy=default.target\n"
+            "[Unit]\nDescription=Hypurr host\nAfter=network-online.target\n\n[Service]\nExecStart={exe} serve --port {port}\nEnvironment=PATH={path}\nRestart=always\nRestartSec=3\n\n[Install]\nWantedBy=default.target\n"
         );
         let file = systemd_unit();
         create_parent(&file)?;
         std::fs::write(&file, unit).with_context(|| format!("writing {}", file.display()))?;
         run("systemctl", &["--user", "daemon-reload"])?;
-        run("systemctl", &["--user", "stop", "codync-host.service"])?;
+        run("systemctl", &["--user", "stop", "hypurr-host.service"])?;
         wait_for_host_exit()?;
-        run("systemctl", &["--user", "enable", "--now", "codync-host.service"])?;
+        run("systemctl", &["--user", "enable", "--now", "hypurr-host.service"])?;
         println!("Tip: `loginctl enable-linger $USER` keeps the host running while you're logged out.");
     }
     Ok(())
@@ -202,7 +202,7 @@ pub fn uninstall() {
             .status();
         let _ = std::fs::remove_file(launchd_plist());
     } else {
-        let _ = run("systemctl", &["--user", "disable", "--now", "codync-host.service"]);
+        let _ = run("systemctl", &["--user", "disable", "--now", "hypurr-host.service"]);
         let _ = std::fs::remove_file(systemd_unit());
         let _ = run("systemctl", &["--user", "daemon-reload"]);
     }
@@ -244,7 +244,7 @@ impl KeepAwake {
                     Command::new("systemd-inhibit")
                         .args([
                             "--what=sleep:idle",
-                            "--who=Codync",
+                            "--who=Hypurr",
                             "--why=A bot is working or a routine is scheduled",
                             "--mode=block",
                             "sleep",
@@ -371,7 +371,7 @@ pub struct PairingQr<'a> {
 
 pub fn pairing_url(q: &PairingQr) -> String {
     let mut url = format!(
-        "codync://pair?v=3&name={}&id={}&sk={}&bk={}&code={}&urls={}",
+        "hypurr://pair?v=3&name={}&id={}&sk={}&bk={}&code={}&urls={}",
         pct(q.name),
         q.computer_id,
         q.sign_key,
@@ -400,9 +400,9 @@ fn write_settings(settings: &Path, v: &Value) -> Result<()> {
         .with_context(|| format!("writing {}", settings.display()))
 }
 
-/// Routes Claude Code's status line through `codync-host statusline` so usage
+/// Routes Claude Code's status line through `hypurr-host statusline` so usage
 /// limits reach the host locally. An existing status line keeps working: it is
-/// wrapped (`codync-host statusline -- <original>`) and restored on uninstall.
+/// wrapped (`hypurr-host statusline -- <original>`) and restored on uninstall.
 pub fn ensure_statusline(settings: &Path) -> Result<bool> {
     let mut v = read_settings(settings)?.unwrap_or_else(|| json!({}));
     let current = v["statusLine"]["command"].as_str().map(str::to_owned);
@@ -447,7 +447,7 @@ mod tests {
     use super::*;
 
     fn temp_settings(contents: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("codync-settings-{}", uuid::Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("hypurr-settings-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         let f = dir.join("settings.json");
         std::fs::write(&f, contents).unwrap();
@@ -483,7 +483,7 @@ mod tests {
         };
         assert_eq!(
             pairing_url(&q),
-            "codync://pair?v=3&name=Kevin%27s%20Mac&id=cid&sk=sk&bk=bk&code=c0de&urls=http%3A%2F%2F100.1.2.3%3A19222%2Chttp%3A%2F%2Fa%3A1"
+            "hypurr://pair?v=3&name=Kevin%27s%20Mac&id=cid&sk=sk&bk=bk&code=c0de&urls=http%3A%2F%2F100.1.2.3%3A19222%2Chttp%3A%2F%2Fa%3A1"
         );
         q.cloud = Some("https://cloud.example");
         assert!(pairing_url(&q).ends_with("&cloud=https%3A%2F%2Fcloud.example"));

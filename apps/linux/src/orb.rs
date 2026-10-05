@@ -1,6 +1,7 @@
-//! `ThinkingOrb` from the Apple apps (CodyncKit/Design/ThinkingOrbGeometry.swift, a port of
+//! `ThinkingOrb` from the Apple apps (HypurrKit/Design/ThinkingOrbGeometry.swift, a port of
 //! thinking-orbs 0.3.1, MIT, Jakub Antalik): the *working* orbits and the *listening* lattice.
-//! Drawn in the widget's CSS color, so a `warning-text` / `secondary` class tints it.
+//! Drawn in the widget's CSS color, so a `warning-text` / `secondary` class tints it;
+//! with the `flow` class each dot takes the Hypurr colour flow instead.
 
 use gtk::prelude::*;
 use std::f64::consts::PI;
@@ -125,6 +126,24 @@ fn listening(size: f64, t: f64) -> Vec<Dot> {
     dots
 }
 
+/// Hypurr colour flow (violet → magenta → cyan, looping) at `pos` (wraps at 1).
+fn flow_rgb(pos: f64) -> (f64, f64, f64) {
+    const STOPS: [(f64, f64, f64); 3] = [
+        (0.655, 0.545, 0.980),
+        (0.957, 0.447, 0.714),
+        (0.133, 0.827, 0.933),
+    ];
+    let p = pos.rem_euclid(1.0) * 3.0;
+    let i = (p.floor() as usize).min(2);
+    let f = p - p.floor();
+    let (a, b) = (STOPS[i], STOPS[(i + 1) % 3]);
+    (
+        a.0 + (b.0 - a.0) * f,
+        a.1 + (b.1 - a.1) * f,
+        a.2 + (b.2 - a.2) * f,
+    )
+}
+
 /// A turning orb; `listening` is the "needs you" state.
 pub fn widget(listening_state: bool, size: i32) -> gtk::DrawingArea {
     let area = gtk::DrawingArea::builder()
@@ -136,6 +155,7 @@ pub fn widget(listening_state: bool, size: i32) -> gtk::DrawingArea {
     area.set_draw_func(move |area, cr, w, _| {
         let s = f64::from(w);
         let c = area.color();
+        let flow = area.has_css_class("flow");
         let speed = if listening_state { 3.998 } else { 3.9 };
         let t = 0.6 + start.elapsed().as_secs_f64() * speed;
         let mut dots = if listening_state {
@@ -146,12 +166,16 @@ pub fn widget(listening_state: bool, size: i32) -> gtk::DrawingArea {
         dots.sort_by(|a, b| a.z.total_cmp(&b.z));
         for d in dots.iter().filter(|d| d.alpha >= 0.02) {
             let ink = (1.0 - d.white.clamp(0.0, 1.0)) * d.alpha;
-            cr.set_source_rgba(
-                f64::from(c.red()),
-                f64::from(c.green()),
-                f64::from(c.blue()),
-                ink,
-            );
+            let (r, g, b) = if flow {
+                flow_rgb(d.x / s.max(1.0) * 0.6 + t * 0.04)
+            } else {
+                (
+                    f64::from(c.red()),
+                    f64::from(c.green()),
+                    f64::from(c.blue()),
+                )
+            };
+            cr.set_source_rgba(r, g, b, ink);
             cr.arc(d.x, d.y, d.radius.max(0.3), 0.0, 2.0 * PI);
             cr.fill().ok();
         }

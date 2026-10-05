@@ -28,9 +28,9 @@ pub fn method(executable: &Path) -> Method {
 pub fn require_standalone(executable: &Path) -> Result<()> {
     match method(executable) {
         Method::Standalone => Ok(()),
-        Method::AppBundle => bail!("this host belongs to Codync.app; update the Mac app from Settings > Updates"),
+        Method::AppBundle => bail!("this host belongs to Hypurr.app; update the Mac app from Settings > Updates"),
         Method::Homebrew => bail!(
-            "this host belongs to Homebrew; run `brew upgrade leepokai/codync/codync-host`, then `codync-host install`"
+            "this host belongs to Homebrew; run `brew upgrade Ragul84/hypurr/hypurr-host`, then `hypurr-host install`"
         ),
         Method::Development => bail!("this is a development build; rebuild it instead of replacing it with a release"),
     }
@@ -82,7 +82,7 @@ where
     Restore: FnOnce() -> Restored,
     Restored: Future<Output = Result<()>>,
 {
-    let backup = target.with_file_name(format!(".codync-host-backup-{}", uuid::Uuid::new_v4()));
+    let backup = target.with_file_name(format!(".hypurr-host-backup-{}", uuid::Uuid::new_v4()));
     std::fs::hard_link(target, &backup).context("creating the rollback copy")?;
     if let Err(error) = stop().await {
         let _ = std::fs::remove_file(&backup);
@@ -124,14 +124,14 @@ pub async fn apply(release: &release::Release, target: &Path, port: u16, force: 
         drop(service::lock_host().context("stop the manually started host before updating its executable")?);
     }
     let bytes = release::archive(release).await?;
-    let stage = target.with_file_name(format!(".codync-host-update-{}", uuid::Uuid::new_v4()));
+    let stage = target.with_file_name(format!(".hypurr-host-update-{}", uuid::Uuid::new_v4()));
     let result = async {
         release::extract(&bytes, &release.platform, &stage)?;
         let output = tokio::process::Command::new(&stage).arg("--version").kill_on_drop(true).output();
         let output = tokio::time::timeout(Duration::from_secs(10), output).await??;
         ensure!(
             output.status.success()
-                && String::from_utf8_lossy(&output.stdout).trim() == format!("codync-host {}", release.version),
+                && String::from_utf8_lossy(&output.stdout).trim() == format!("hypurr-host {}", release.version),
             "downloaded executable reported the wrong version"
         );
         let old_hash = release::sha256(&std::fs::read(target)?);

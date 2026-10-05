@@ -1,13 +1,13 @@
 # Architecture
 
-Codync keeps agents and their working files on a computer. Clients address that computer's bots; the host owns execution, transcripts and authorization.
+Hypurr keeps agents and their working files on a computer. Clients address that computer's bots; the host owns execution, transcripts and authorization.
 
 ## Runtime paths
 
 ```mermaid
 flowchart LR
     Phone[iPhone / remote Apple client] -->|Encrypted WebSocket| Cloud[cloud/ Worker + ComputerRelay DO]
-    Phone -->|Encrypted direct channel| Host[codync-host]
+    Phone -->|Encrypted direct channel| Host[hypurr-host]
     Cloud <-->|Encrypted frames| Host
     Local[Mac / Linux / TUI] -->|Loopback HTTP + SSE| Host
     SSH[Mac SSH tunnel] -->|Forwarded loopback HTTP + SSE| Host
@@ -24,7 +24,7 @@ The phone tries direct candidates first, with a 1.5-second connection race, then
 
 | Data | Owner and location |
 |---|---|
-| Bots, chats, replies, revisions, authorized devices | Host SQLite in its data directory (`~/.codync` by default; `CODYNC_HOME` overrides it) |
+| Bots, chats, replies, revisions, authorized devices | Host SQLite in its data directory (`~/.hypurr` by default; `HYPURR_HOME` overrides it) |
 | Host signing and mailbox keys | `identity.json`, separate from SQLite |
 | Loopback API bearer token | Host `token` file |
 | Agent context and provider credentials | Coding harness on that computer |

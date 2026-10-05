@@ -4,7 +4,7 @@
 //! The tokens live on this computer. The sign-in page redirects to one of two places:
 //! - `http://127.0.0.1:<port>/oauth/callback`, served by this host, when the user signs
 //!   in on this computer (Mac app, TUI);
-//! - `<cloud>/v1/oauth/callback`, a stateless page that bounces to `codync://oauth?…`,
+//! - `<cloud>/v1/oauth/callback`, a stateless page that bounces to `hypurr://oauth?…`,
 //!   which the phone's sign-in sheet catches and hands back with `connectorSignInFinish`.
 //!
 //! The authorization code alone is useless: the PKCE verifier never leaves this host.
@@ -101,7 +101,7 @@ pub async fn required(url: &str, headers: &std::collections::BTreeMap<String, St
         .header("accept", "application/json, text/event-stream")
         .json(&json!({"jsonrpc": "2.0", "id": 0, "method": "initialize", "params": {
             "protocolVersion": crate::mcp::PROTOCOL_VERSION, "capabilities": {},
-            "clientInfo": {"name": "codync", "version": env!("CARGO_PKG_VERSION")},
+            "clientInfo": {"name": "hypurr", "version": env!("CARGO_PKG_VERSION")},
         }}))
         .timeout(TIMEOUT);
     for (k, v) in headers {
@@ -196,7 +196,7 @@ pub async fn start(store: &Store, port: u16, id: &str, callback: Callback) -> Re
         Callback::Host => loopback_uri(port),
         Callback::App => app
             .clone()
-            .ok_or_else(|| anyhow!("The Codync cloud is off on this computer, so sign in from the computer itself."))?,
+            .ok_or_else(|| anyhow!("The Hypurr cloud is off on this computer, so sign in from the computer itself."))?,
     };
 
     let resource = resource_metadata(&url).await;
@@ -220,7 +220,7 @@ pub async fn start(store: &Store, port: u16, id: &str, callback: Callback) -> Re
         let res = crate::http()
             .post(&register)
             .json(&json!({
-                "client_name": "Codync",
+                "client_name": "Hypurr",
                 "redirect_uris": wanted,
                 "grant_types": ["authorization_code", "refresh_token"],
                 "response_types": ["code"],

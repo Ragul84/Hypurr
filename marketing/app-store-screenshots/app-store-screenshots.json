@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "appName": "Codync",
-  "themeId": "codync-halftone",
+  "appName": "Hypurr",
+  "themeId": "hypurr-halftone",
   "fontId": "system-sans",
   "connectedCanvas": true,
   "locales": [
@@ -18,8 +18,8 @@
         "id": "s_i1",
         "layout": "hero",
         "label": {
-          "en": "CODYNC",
-          "zh-Hant": "CODYNC"
+          "en": "HYPURR",
+          "zh-Hant": "HYPURR"
         },
         "headline": {
           "en": "Your coding agents,\nas bots.",
@@ -173,8 +173,8 @@
         "id": "s_p1",
         "layout": "hero",
         "label": {
-          "en": "CODYNC",
-          "zh-Hant": "CODYNC"
+          "en": "HYPURR",
+          "zh-Hant": "HYPURR"
         },
         "headline": {
           "en": "Your coding agents,\nas bots.",

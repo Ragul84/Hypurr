@@ -26,13 +26,13 @@ impl Drop for Host {
 
 impl Host {
     async fn start() -> Self {
-        let home = std::env::temp_dir().join(format!("codync-routines-e2e-{}", uuid::Uuid::new_v4()));
+        let home = std::env::temp_dir().join(format!("hypurr-routines-e2e-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&home).unwrap();
         let port = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
-        let child = Command::new(env!("CARGO_BIN_EXE_codync-host"))
+        let child = Command::new(env!("CARGO_BIN_EXE_hypurr-host"))
             .args(["serve", "--bind", "127.0.0.1", "--port", &port.to_string()])
-            .env("CODYNC_CLOUD", "off")
-            .env("CODYNC_HOME", &home)
+            .env("HYPURR_CLOUD", "off")
+            .env("HYPURR_HOME", &home)
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
@@ -52,10 +52,10 @@ impl Host {
     async fn restart(&mut self) {
         common::stop(&mut self.child);
         let port = self.base.rsplit(':').next().unwrap();
-        self.child = Command::new(env!("CARGO_BIN_EXE_codync-host"))
+        self.child = Command::new(env!("CARGO_BIN_EXE_hypurr-host"))
             .args(["serve", "--bind", "127.0.0.1", "--port", port])
-            .env("CODYNC_CLOUD", "off")
-            .env("CODYNC_HOME", &self.home)
+            .env("HYPURR_CLOUD", "off")
+            .env("HYPURR_HOME", &self.home)
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
@@ -218,7 +218,7 @@ async fn routines_execute_pause_deduplicate_and_reject_wrong_webhook_keys() {
     .unwrap();
     let servers: Value =
         serde_json::from_str(&std::fs::read_to_string(host.home.join("routine-bot/servers.json")).unwrap()).unwrap();
-    assert!(servers.as_array().unwrap().iter().any(|s| s["name"] == "routines" || s["name"] == "codync-routines"));
+    assert!(servers.as_array().unwrap().iter().any(|s| s["name"] == "routines" || s["name"] == "hypurr-routines"));
     host.call("setRoutineEnabled", json!({"botId":bot,"id":id,"enabled":false})).await;
     assert!(
         !client
@@ -401,10 +401,10 @@ async fn recurring_work_continues_after_a_failed_run() {
 #[tokio::test]
 async fn only_one_host_can_own_a_data_directory_even_on_another_port() {
     let host = Host::start().await;
-    let mut other = Command::new(env!("CARGO_BIN_EXE_codync-host"))
+    let mut other = Command::new(env!("CARGO_BIN_EXE_hypurr-host"))
         .args(["serve", "--bind", "127.0.0.1", "--port", "0"])
-        .env("CODYNC_CLOUD", "off")
-        .env("CODYNC_HOME", &host.home)
+        .env("HYPURR_CLOUD", "off")
+        .env("HYPURR_HOME", &host.home)
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()

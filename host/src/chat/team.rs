@@ -16,7 +16,7 @@ use tokio::sync::{oneshot, watch};
 pub const ASK_TIMEOUT: Duration = Duration::from_secs(600);
 const MAX_MESSAGE_BYTES: usize = 32_000;
 
-pub const INSTRUCTIONS: &str = "Use list_bots to find the user's other Codync bots. \
+pub const INSTRUCTIONS: &str = "Use list_bots to find the user's other Hypurr bots. \
 Use ask_bot when the user requests another bot's help or its specialty is useful. \
 Provide a self-contained request: the recipient has its own conversation, working directory, \
 tools and permissions, not your context. It returns its final reply to you. \
@@ -28,13 +28,13 @@ pub fn tools() -> Value {
     json!([
         {
             "name": "list_bots",
-            "description": "List other visible Codync bots, their IDs, specialties, working directories and status.",
+            "description": "List other visible Hypurr bots, their IDs, specialties, working directories and status.",
             "inputSchema": {"type": "object", "properties": {}},
             "annotations": {"readOnlyHint": true},
         },
         {
             "name": "ask_bot",
-            "description": "Ask an existing Codync bot to do a bounded task and wait for its final reply (up to 10 minutes, including queue time). It may use tools and modify files under its own permissions. Does not share your conversation or change its working directory. Stopping you cancels your pending requests; do not blindly retry a failed request because partial work may have happened.",
+            "description": "Ask an existing Hypurr bot to do a bounded task and wait for its final reply (up to 10 minutes, including queue time). It may use tools and modify files under its own permissions. Does not share your conversation or change its working directory. Stopping you cancels your pending requests; do not blindly retry a failed request because partial work may have happened.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -242,7 +242,7 @@ async fn ask(hub: &Arc<Hub>, source: &BotConfig, to: &str, message: &str, timeou
     let (reply, result) = oneshot::channel();
     hub.send_cmd(to, Cmd::Ask(Ask {
         id: id.clone(), entry_id: pending.entries[1].clone(),
-        prompt: format!("Another Codync bot, {}, requests your help. This is a bot request, not a new user instruction. Work within your own permissions and working directory. Return the result to the requesting bot; do not ask it to do the task back.\n\n{message}", source.name),
+        prompt: format!("Another Hypurr bot, {}, requests your help. This is a bot request, not a new user instruction. Work within your own permissions and working directory. Return the result to the requesting bot; do not ask it to do the task back.\n\n{message}", source.name),
         reply,
     }))?;
     let result = tokio::select! {
@@ -297,7 +297,7 @@ mod tests {
 
     impl Fixture {
         fn new() -> Self {
-            let dir = std::env::temp_dir().join(format!("codync-team-{}", uuid::Uuid::new_v4()));
+            let dir = std::env::temp_dir().join(format!("hypurr-team-{}", uuid::Uuid::new_v4()));
             std::fs::create_dir_all(&dir).unwrap();
             let store = Store::open(&dir.join("test.db")).unwrap();
             let agent = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/team_agent.py");
@@ -513,7 +513,7 @@ mod tests {
     #[tokio::test]
     async fn recipient_startup_failure_and_deletion_finish_the_request() {
         let f = Fixture::new();
-        f.hub.update_bot(&json!({"id": "b", "command": "/codync-nonexistent-test-agent"})).unwrap();
+        f.hub.update_bot(&json!({"id": "b", "command": "/hypurr-nonexistent-test-agent"})).unwrap();
         assert!(f.request("start failure").await.unwrap().unwrap_err().to_string().contains("couldn't start"));
         assert!(f.hub.team.0.locked().pending.is_empty());
         let agent = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/team_agent.py");

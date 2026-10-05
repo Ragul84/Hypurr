@@ -2,9 +2,9 @@
 //! bots operate it through the built-in `computer` MCP server (`mcp.rs`).
 //!
 //! Capture, encoding and input injection live in a separate *screen helper*
-//! that connects to `~/.codync/screen.sock` — on macOS `CodyncScreen.app`
+//! that connects to `~/.hypurr/screen.sock` — on macOS `HypurrScreen.app`
 //! (a signed bundle, so Screen Recording / Accessibility grants stick), on
-//! Linux `codync-screen` (xdg portals + `GStreamer`). The host stays the only
+//! Linux `hypurr-screen` (xdg portals + `GStreamer`). The host stays the only
 //! network-facing process: it relays WebRTC signaling, gates access (off by
 //! default, enabled only from this computer) and arbitrates control between
 //! the user and bots.
@@ -441,7 +441,7 @@ impl Screen {
 
     fn link(&self) -> Result<Arc<Link>> {
         if !self.enabled() {
-            bail!("Remote screen is turned off on this computer. Turn it on in Codync's menu there.");
+            bail!("Remote screen is turned off on this computer. Turn it on in Hypurr's menu there.");
         }
         self.link.locked().clone().ok_or_else(|| anyhow!("The screen helper isn't running on this computer."))
     }
@@ -480,7 +480,7 @@ impl Screen {
     pub async fn offer(&self, owner: &str, sdp: &str, session: Option<&str>, display: Option<u32>) -> Result<Value> {
         let link = self.link()?;
         if !self.status.locked().capture {
-            bail!("Codync isn't allowed to record this computer's screen yet. Allow it in System Settings there.");
+            bail!("Hypurr isn't allowed to record this computer's screen yet. Allow it in System Settings there.");
         }
         let session = match session {
             Some(id) => id.to_owned(),
@@ -771,7 +771,7 @@ fn scale_frames(node: &mut Value, s: f64) {
 
 // MARK: helper socket
 
-/// Accepts screen helpers on `~/.codync/screen.sock`. The newest connection wins.
+/// Accepts screen helpers on `~/.hypurr/screen.sock`. The newest connection wins.
 pub async fn serve_helpers(screen: Arc<Screen>) {
     let path = crate::service::data_dir().join("screen.sock");
     let _ = std::fs::remove_file(&path);
@@ -801,12 +801,12 @@ pub async fn serve_helpers(screen: Arc<Screen>) {
     }
 }
 
-/// Linux: the host runs `codync-screen` itself while Remote screen is on (on macOS
-/// launchd runs Codync Screen for the app). Restarts it if it exits; stops it when turned off.
+/// Linux: the host runs `hypurr-screen` itself while Remote screen is on (on macOS
+/// launchd runs Hypurr Screen for the app). Restarts it if it exits; stops it when turned off.
 #[cfg(target_os = "linux")]
 pub async fn supervise_linux_helper(screen: Arc<Screen>) {
-    let exe = std::env::current_exe().ok().and_then(|p| p.parent().map(|d| d.join("codync-screen")));
-    let program = exe.filter(|p| p.is_file()).unwrap_or_else(|| "codync-screen".into());
+    let exe = std::env::current_exe().ok().and_then(|p| p.parent().map(|d| d.join("hypurr-screen")));
+    let program = exe.filter(|p| p.is_file()).unwrap_or_else(|| "hypurr-screen".into());
     let mut child: Option<tokio::process::Child> = None;
     let mut backoff = Duration::from_secs(1);
     loop {
@@ -814,7 +814,7 @@ pub async fn supervise_linux_helper(screen: Arc<Screen>) {
         if screen.enabled() && !running {
             match tokio::process::Command::new(&program).kill_on_drop(true).spawn() {
                 Ok(c) => child = Some(c),
-                Err(error) => tracing::warn!(%error, program = %program.display(), "can't start codync-screen"),
+                Err(error) => tracing::warn!(%error, program = %program.display(), "can't start hypurr-screen"),
             }
             tokio::time::sleep(backoff).await;
             backoff = (backoff * 2).min(Duration::from_secs(30));

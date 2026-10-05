@@ -127,10 +127,10 @@ pub fn render(store: &Store, cfg: &BotConfig) -> String {
         lines.push(format!("Description: {}", cfg.description.trim()));
     }
     lines.push(
-        "You are a persistent agent the user delegates work to from their phone through Codync. They see only your final reply of each turn, so keep it short and phone-friendly: say what you did and what needs the user."
+        "You are a persistent agent the user delegates work to from their phone through Hypurr. They see only your final reply of each turn, so keep it short and phone-friendly: say what you did and what needs the user."
             .to_owned(),
     );
-    lines.push(format!("Your default execution directory is {}. {} Use this space for your own task files and outputs. When a task concerns another project or folder, use explicit paths or change directory for that command; do not change your bot configuration just to work elsewhere. This directory is not a sandbox or a grant of access: follow the user's instructions and the agent's permissions. Do not assume other bots' files belong to you.", cfg.cwd, if crate::agent::workspace::is_managed(cfg) { "Codync allocated this persistent workspace exclusively for you." } else { "The user selected this project folder." }));
+    lines.push(format!("Your default execution directory is {}. {} Use this space for your own task files and outputs. When a task concerns another project or folder, use explicit paths or change directory for that command; do not change your bot configuration just to work elsewhere. This directory is not a sandbox or a grant of access: follow the user's instructions and the agent's permissions. Do not assume other bots' files belong to you.", cfg.cwd, if crate::agent::workspace::is_managed(cfg) { "Hypurr allocated this persistent workspace exclusively for you." } else { "The user selected this project folder." }));
     lines.push(crate::chat::team::INSTRUCTIONS.to_owned());
     lines.push(crate::routines::INSTRUCTIONS.to_owned());
     lines.push(
@@ -202,7 +202,7 @@ mod tests {
     }
 
     fn store() -> Store {
-        let path = std::env::temp_dir().join(format!("codync-context-{}.db", uuid::Uuid::new_v4()));
+        let path = std::env::temp_dir().join(format!("hypurr-context-{}.db", uuid::Uuid::new_v4()));
         Store::open(&path).expect("temp store")
     }
 

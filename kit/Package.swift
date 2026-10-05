@@ -2,11 +2,11 @@
 import PackageDescription
 
 let package = Package(
-    name: "CodyncKit",
+    name: "HypurrKit",
     platforms: [.macOS(.v14), .iOS(.v17)],
     products: [
-        .library(name: "CodyncKit", targets: ["CodyncKit"]),
-        .library(name: "CodyncUI", targets: ["CodyncUI"]),
+        .library(name: "HypurrKit", targets: ["HypurrKit"]),
+        .library(name: "HypurrUI", targets: ["HypurrUI"]),
     ],
     dependencies: [
         // libwebrtc for the remote screen viewer (hardware H.264 over WebRTC).
@@ -16,17 +16,17 @@ let package = Package(
         .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", exact: "1.18.0"),
     ],
     targets: [
-        .target(name: "CodyncKit", resources: [.copy("Resources/ThirdPartyNotices"), .process("Resources/ProviderIcons.xcassets")]),
+        .target(name: "HypurrKit", resources: [.copy("Resources/ThirdPartyNotices"), .process("Resources/ProviderIcons.xcassets")]),
         .target(
-            name: "CodyncUI",
+            name: "HypurrUI",
             dependencies: [
-                "CodyncKit",
+                "HypurrKit",
                 .product(name: "WebRTC", package: "WebRTC", condition: .when(platforms: [.iOS])),
                 .product(name: "SwiftTerm", package: "SwiftTerm"),
             ],
             resources: [.process("Resources")]
         ),
-        .testTarget(name: "CodyncKitTests", dependencies: ["CodyncKit"], resources: [.copy("Fixtures")]),
-        .testTarget(name: "CodyncUITests", dependencies: ["CodyncUI", "CodyncKit"]),
+        .testTarget(name: "HypurrKitTests", dependencies: ["HypurrKit"], resources: [.copy("Fixtures")]),
+        .testTarget(name: "HypurrUITests", dependencies: ["HypurrUI", "HypurrKit"]),
     ]
 )

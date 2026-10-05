@@ -1,4 +1,4 @@
-// Authentication: Clerk session JWTs (users) and Codync-Sig (host and device keys, spec §5).
+// Authentication: Clerk session JWTs (users) and Hypurr-Sig (host and device keys, spec §5).
 
 import { verifyToken } from "@clerk/backend";
 import type { Env } from "./index";
@@ -53,7 +53,7 @@ export async function verifyEd25519(pub: Uint8Array, sig: Uint8Array, msg: Uint8
   }
 }
 
-// ---- Codync-Sig (§5) ----
+// ---- Hypurr-Sig (§5) ----
 
 export const SIG_WINDOW_MS = 300_000;
 export const NONCE_TTL_MS = 600_000;
@@ -64,7 +64,7 @@ export interface SignedRequest {
   nonce: string;
 }
 
-/** The exact bytes a Codync-Sig signs. */
+/** The exact bytes a Hypurr-Sig signs. */
 export async function sigCanonical(
   method: string,
   authority: string,
@@ -73,7 +73,7 @@ export async function sigCanonical(
   nonce: string,
   body: Uint8Array,
 ): Promise<string> {
-  return ["codync-sig-v1", method.toUpperCase(), authority.toLowerCase(), pathAndQuery, String(ts), nonce, b64url(await sha256(body))].join("\n");
+  return ["hypurr-sig-v1", method.toUpperCase(), authority.toLowerCase(), pathAndQuery, String(ts), nonce, b64url(await sha256(body))].join("\n");
 }
 
 /**
@@ -81,7 +81,7 @@ export async function sigCanonical(
  * D1 `sig_nonces` for HTTP, the DO's `nonces` table for relay sockets. `null` = reject.
  */
 export async function verifySig(req: Request, body: Uint8Array, now = Date.now()): Promise<SignedRequest | null> {
-  const header = req.headers.get("Codync-Sig");
+  const header = req.headers.get("Hypurr-Sig");
   if (!header) return null;
   const f = new Map<string, string>();
   for (const part of header.split(",")) {

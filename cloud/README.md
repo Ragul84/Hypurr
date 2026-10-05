@@ -1,16 +1,16 @@
-# Codync cloud
+# Hypurr cloud
 
 Cloudflare Worker for accounts and the off-LAN relay (spec: [docs/reference/remote-relay.md](../docs/reference/remote-relay.md)).
 
 - **`/v1` API** (`src/api.ts`): Clerk-authenticated account routes (devices, claims, computers, access
-  requests, grants), `Codync-Sig`-authenticated host routes (`/v1/host/*`), the Clerk webhook, and a
+  requests, grants), `Hypurr-Sig`-authenticated host routes (`/v1/host/*`), the Clerk webhook, and a
   15-minute cron that expires requests and prunes nonces, and the public routine webhook route
   `POST /v1/hooks/:computerId/:routineId` (spec §7.8). D1 schema: `migrations/0001_init.sql`.
 - **`ComputerRelay`** (`src/relay.ts`): one Durable Object per computer (SQLite storage, WebSocket
   Hibernation). It admits device sockets against the host-signed ACL, forwards channel frames it can't
   read, reports presence, holds the offline mailbox, and queues routine webhook deliveries (`hookbox`,
   checked against the keys the host registers; `src/hooks.ts`). It is reachable only through requests the Worker
-  builds itself (`X-Codync-Internal: 1`); `/internal/*` has no public route.
+  builds itself (`X-Hypurr-Internal: 1`); `/internal/*` has no public route.
 - **Auth** (`src/auth.ts`): Clerk session JWTs via `@clerk/backend` (`CLERK_SECRET_KEY` → JWKS fetched and
   cached per isolate; `CLERK_JWT_KEY` → networkless, dev/e2e only) and Ed25519 request signatures
   (WebCrypto).
@@ -23,7 +23,7 @@ it: new devices come from the host's own QR pairing or its approval, and the ACL
 ```bash
 npm ci
 npm run typecheck
-npm test          # vitest in workerd: vectors, Codync-Sig, API, DO relay/mailbox
+npm test          # vitest in workerd: vectors, Hypurr-Sig, API, DO relay/mailbox
 ```
 
 `test/ref.ts` is a device/host reference implementation on `@noble/*`, checked against
@@ -36,10 +36,10 @@ date to the newest one it supports. `wrangler.toml` keeps the deploy date.
 
 ```bash
 (cd ../host && cargo build)
-npm run e2e       # local D1 + wrangler dev + real codync-host + test/e2e/phone.ts
+npm run e2e       # local D1 + wrangler dev + real hypurr-host + test/e2e/phone.ts
 ```
 
-Env: `CODYNC_HOST_BIN` (default `../host/target/debug/codync-host`), `CODYNC_E2E_CLOUD_PORT` (default
+Env: `HYPURR_HOST_BIN` (default `../host/target/debug/hypurr-host`), `HYPURR_E2E_CLOUD_PORT` (default
 8787), `E2E_VERBOSE=1` to stream wrangler and host logs. Needs `python3` for the fake agent.
 
 ## Deploy
@@ -47,12 +47,12 @@ Env: `CODYNC_HOST_BIN` (default `../host/target/debug/codync-host`), `CODYNC_E2E
 Development deployment (see [environment readiness](../docs/guides/environments-and-deployment.md); these commands change remote resources):
 
 ```bash
-# Only if the database does not exist: npx wrangler d1 create codync-dev
+# Only if the database does not exist: npx wrangler d1 create hypurr-dev
 # Confirm its database_id in [env.dev] before applying migrations.
-npx wrangler d1 migrations apply codync-dev --env dev --remote
+npx wrangler d1 migrations apply hypurr-dev --env dev --remote
 npx wrangler secret put CLERK_SECRET_KEY --env dev
 npx wrangler secret put CLERK_WEBHOOK_SECRET --env dev
-npx wrangler deploy --env dev               # → https://dev-api.codync.dev
+npx wrangler deploy --env dev               # → https://dev-api.hypurr.dev
 ```
 
 | Name | Kind | Purpose |

@@ -11,7 +11,7 @@ use std::sync::Arc;
 use zeroize::Zeroizing;
 
 const PREFIX: &str = "vault:v1:";
-const SERVICE: &str = "dev.codync.credentials";
+const SERVICE: &str = "dev.hypurr.credentials";
 
 pub async fn unlock(hub: Arc<crate::hub::Hub>) -> Result<()> {
     if hub.store.secret_key.locked().is_some() {

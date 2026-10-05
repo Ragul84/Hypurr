@@ -1,5 +1,7 @@
-//! Drawing. Black and white: color comes only from the bots; amber means
+//! Drawing. Hypurr palette: violet-tinted neutrals, a violet → magenta → cyan
+//! colour flow for the brand title and working spinners, magenta means
 //! "needs you" and red means an error. Every state also has its own glyph.
+//! Tokens mirror `docs/design/hypurr-design-system.md` and the apps' Theme.swift.
 
 // Colors are written as #RRGGBB, like the apps' Theme.swift.
 #![allow(clippy::unreadable_literal)]
@@ -50,8 +52,8 @@ fn rgb(hex: u32) -> Color {
 pub fn theme() -> &'static Theme {
     static T: LazyLock<Theme> = LazyLock::new(|| {
         let color = std::env::var_os("NO_COLOR").is_none_or(|v| v.is_empty());
-        // COLORFGBG="15;0" is a dark background; "0;15" a light one. CODYNC_THEME wins.
-        let light = match std::env::var("CODYNC_THEME").as_deref() {
+        // COLORFGBG="15;0" is a dark background; "0;15" a light one. HYPURR_THEME wins.
+        let light = match std::env::var("HYPURR_THEME").as_deref() {
             Ok("light") => true,
             Ok("dark") => false,
             _ => std::env::var("COLORFGBG")
@@ -87,24 +89,24 @@ pub fn theme() -> &'static Theme {
         }
         let (text, second, dim, line, band, sel, panel, btn, green, red, add_bg, rm_bg) = if light {
             (
-                0x141414, 0x5F5F5F, 0x8E8E8E, 0xD6D6D6, 0xEFEFEF, 0xE2E2E2, 0xF7F7F7, 0xE4E4E4, 0x2E7D32, 0xC23A2B,
-                0xE3F3E4, 0xF9E3E0,
+                0x1E1433, 0x5B4F7A, 0x8C82A8, 0xDCD3F0, 0xF1ECFB, 0xE6DCFA, 0xFAF7FF, 0xE9E1FA, 0x1F8A5B, 0xC2304D,
+                0xE2F5EC, 0xFBE4EA,
             )
         } else {
             (
-                0xF2F2F2, 0x9A9A9A, 0x6E6E6E, 0x333333, 0x1C1C1C, 0x262626, 0x141414, 0x2A2A2A, 0x8FD18B, 0xF0A7A7,
-                0x14261A, 0x2A1616,
+                0xF3EEFF, 0xA89CC8, 0x75699A, 0x352B55, 0x1E1638, 0x2D2152, 0x150F2A, 0x2A2047, 0x7EE0B5, 0xFF8FA3,
+                0x10261E, 0x2E1424,
             )
         };
         let fg = |h| s.fg(rgb(h));
         Theme {
             color,
-            text: s,
-            bold: s.add_modifier(Modifier::BOLD),
+            text: fg(text),
+            bold: fg(text).add_modifier(Modifier::BOLD),
             secondary: fg(second),
             dim: fg(dim),
             line: fg(line),
-            amber: fg(if light { 0xB8700A } else { 0xF0A030 }),
+            amber: fg(if light { 0xC0267A } else { 0xF472B6 }),
             red: fg(red),
             green: fg(green),
             code: s.bg(rgb(band)),
@@ -113,11 +115,14 @@ pub fn theme() -> &'static Theme {
             sel: s.bg(rgb(sel)),
             panel: s.bg(rgb(panel)),
             btn: s.bg(rgb(btn)),
-            btn_primary: s.fg(rgb(if light { 0xFFFFFF } else { 0x0A0A0A })).bg(rgb(text)).add_modifier(Modifier::BOLD),
+            btn_primary: s
+                .fg(rgb(if light { 0xFFFFFF } else { 0x150A33 }))
+                .bg(rgb(if light { 0x6D3FD9 } else { 0xA78BFA }))
+                .add_modifier(Modifier::BOLD),
             added: s.fg(rgb(green)).bg(rgb(add_bg)),
             removed: s.fg(rgb(red)).bg(rgb(rm_bg)),
-            on_color: rgb(0x0A0A0A),
-            shade: rgb(if light { 0xB0B0B0 } else { 0x3A3A3A }),
+            on_color: rgb(0x150A33),
+            shade: rgb(if light { 0xB9AED6 } else { 0x3D3260 }),
         }
     });
     &T
@@ -140,17 +145,66 @@ pub fn bot_color(name: &str) -> Color {
     rgb(hex)
 }
 
-const SPINNER: [&str; 10] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+// A full-cell orbit reads smoother at the 100 ms tick than the thin dots.
+const SPINNER: [&str; 8] = ["⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"];
 
 fn spin(app: &App) -> &'static str {
-    SPINNER[usize::try_from(app.frame % 10).unwrap_or(0)]
+    SPINNER[usize::try_from(app.frame % 8).unwrap_or(0)]
+}
+
+/// Hypurr colour flow stops: violet → magenta → cyan (looping).
+const FLOW: [u32; 3] = [0xA78BFA, 0xF472B6, 0x22D3EE];
+
+/// The flow colour at `pos` per-mille along the loop (wraps).
+pub(super) fn flow_color(pos: u32) -> Color {
+    let p = (pos % 1000) * 3;
+    let (i, f) = ((p / 1000) as usize, p % 1000);
+    let (a, b) = (FLOW[i], FLOW[(i + 1) % 3]);
+    let mix = |shift: u32| {
+        let (ca, cb) = ((a >> shift) & 0xFF, (b >> shift) & 0xFF);
+        u8::try_from((ca * (1000 - f) + cb * f) / 1000).unwrap_or(u8::MAX)
+    };
+    Color::Rgb(mix(16), mix(8), mix(0))
+}
+
+/// Where the flow is now: one full loop every ~6 s at the 100 ms tick.
+fn flow_phase(app: &App) -> u32 {
+    u32::try_from(app.frame % 60).unwrap_or(0) * 1000 / 60
+}
+
+/// The working spinner's style: it cycles through the flow colours.
+fn spin_style(app: &App) -> Style {
+    let t = theme();
+    if t.color { Style::default().fg(flow_color(flow_phase(app))) } else { t.secondary }
+}
+
+/// Text painted with the moving colour flow, one colour per cell (the brand title).
+fn put_flow(buf: &mut Buffer, x: u16, y: u16, max: u16, s: &str, app: &App, base: Style) -> u16 {
+    let t = theme();
+    if !t.color {
+        return put(buf, x, y, max, s, base.add_modifier(Modifier::BOLD));
+    }
+    let n = u32::try_from(s.chars().count().max(1)).unwrap_or(1);
+    let phase = flow_phase(app);
+    let mut cx = x;
+    let mut b = [0u8; 4];
+    for (i, ch) in s.chars().enumerate() {
+        let room = (x + max).saturating_sub(cx);
+        if room == 0 {
+            break;
+        }
+        let at = u32::try_from(i).unwrap_or(0) * 600 / n + phase;
+        let style = base.fg(flow_color(at)).add_modifier(Modifier::BOLD);
+        cx = put(buf, cx, y, room, ch.encode_utf8(&mut b), style);
+    }
+    cx
 }
 
 pub fn glyph(app: &App, m: Mark) -> (&'static str, Style) {
     let t = theme();
     match m {
         Mark::Need => ("◆", t.amber),
-        Mark::Work => (spin(app), t.secondary),
+        Mark::Work => (spin(app), spin_style(app)),
         Mark::Unread => ("●", t.bold),
         Mark::Idle => ("○", t.dim),
         Mark::Error => ("×", t.red),
@@ -449,16 +503,16 @@ fn status_line(buf: &mut Buffer, r: Rect, app: &mut App) {
     let insert = app.typing && app.overlays.is_empty();
     let pill = if insert { " INSERT " } else { " NAV " };
     let pill_style = if insert {
-        Style::default().fg(t.on_color).bg(rgb(0xF0A030)).add_modifier(Modifier::BOLD)
+        Style::default().fg(t.on_color).bg(rgb(0x22D3EE)).add_modifier(Modifier::BOLD)
     } else {
         t.btn_primary
     };
     let pill_style = if t.color { pill_style } else { t.sel };
     let mut x = put(buf, r.x, r.y, r.width, pill, pill_style) + 1;
-    let host = if app.host.is_empty() { "codync" } else { &app.host };
-    x = put(buf, x, r.y, 24, host, t.bold.patch(t.panel)) + 2;
+    let host = if app.host.is_empty() { "hypurr" } else { &app.host };
+    x = put_flow(buf, x, r.y, 24, host, app, t.panel) + 2;
     let c = app.counts();
-    let marks = [("◆", t.amber, 1), ("⠹", t.secondary, 2), ("●", t.bold, 3), ("×", t.red, 4)];
+    let marks = [("◆", t.amber, 1), ("⣾", spin_style(app), 2), ("●", t.bold, 3), ("×", t.red, 4)];
     for (i, (g, s, filter)) in marks.into_iter().enumerate() {
         if c[i] == 0 {
             continue;
@@ -532,7 +586,10 @@ fn roster(buf: &mut Buffer, r: Rect, app: &mut App, narrow: bool) {
     if narrow {
         fill(buf, Rect::new(r.x, r.y, r.width, 1), t.panel);
     }
-    put(buf, x0 + 1, r.y, wd.saturating_sub(10), if app.host.is_empty() { "codync" } else { &app.host }, t.bold);
+    let host = if app.host.is_empty() { "hypurr" } else { app.host.as_str() };
+    let hx =
+        put(buf, x0 + 1, r.y, 2, "≋ ", if t.color { Style::default().fg(flow_color(flow_phase(app))) } else { t.dim });
+    put_flow(buf, hx, r.y, wd.saturating_sub(12), host, app, Style::default());
     rput(buf, r.right() - 1, r.y, &format!("{} chat{}", bots.len(), if bots.len() == 1 { "" } else { "s" }), t.dim);
     if !narrow {
         hline(buf, x0, r.y + 1, wd, t.line);
@@ -707,7 +764,7 @@ fn chat(buf: &mut Buffer, r: Rect, app: &mut App, narrow: bool) {
     x = put(buf, x + 3, r.y, r.width / 3, &title, t.bold) + 2;
     let (status, ss) = match b.mark() {
         Mark::Need => ("◆ needs you".to_owned(), t.amber),
-        Mark::Work => (format!("{} working {}", spin(app), elapsed(b.started_at)), t.secondary),
+        Mark::Work => (format!("{} working {}", spin(app), elapsed(b.started_at)), spin_style(app)),
         Mark::Error => ("× error".to_owned(), t.red),
         _ => (String::new(), t.dim),
     };
@@ -730,7 +787,7 @@ fn chat(buf: &mut Buffer, r: Rect, app: &mut App, narrow: bool) {
     }
     if !app.online {
         let bar = Rect::new(r.x, top, r.width, 1);
-        let s = if t.color { Style::default().fg(t.on_color).bg(rgb(0xF0A030)) } else { t.sel };
+        let s = if t.color { Style::default().fg(t.on_color).bg(rgb(0xF472B6)) } else { t.sel };
         fill(buf, bar, s);
         put(
             buf,
@@ -1006,7 +1063,7 @@ fn build_chat(app: &App, b: &Bot, width: usize) -> Built {
         out.lines.push(Line::from(Span::styled(format!(" {}", b.name), name_style(&b.color))));
         let act = if b.activity.is_empty() { "Working…".to_owned() } else { b.activity.clone() };
         out.lines.push(Line::from(vec![
-            Span::styled(format!(" {} ", spin(app)), t.secondary),
+            Span::styled(format!(" {} ", spin(app)), spin_style(app)),
             Span::styled(truncate(&act, width.saturating_sub(4)), t.secondary),
         ]));
         let steps = info.get(&last_turn).map_or(0, |ti| ti.steps);
@@ -1027,7 +1084,7 @@ fn build_chat(app: &App, b: &Bot, width: usize) -> Built {
         let line = if b.status == Status::NeedsInput {
             Span::styled(format!(" ◆ Needs you in {place} · ! opens it"), t.amber)
         } else {
-            Span::styled(format!(" {} Working in {place}", spin(app)), t.secondary)
+            Span::styled(format!(" {} Working in {place}", spin(app)), spin_style(app))
         };
         out.lines.push(Line::from(line));
     }
@@ -1526,7 +1583,7 @@ fn build_trace(app: &App, b: &Bot, turn: i64, width: usize, full: bool) -> Vec<L
                 let (g, gs) = match e.data["status"].as_str() {
                     Some("completed") => ("✓".to_owned(), t.green),
                     Some("failed") => ("×".to_owned(), t.red),
-                    _ => (spin(app).to_owned(), t.secondary),
+                    _ => (spin(app).to_owned(), spin_style(app)),
                 };
                 let kind = tool_label(e.data["toolKind"].as_str().unwrap_or("tool")).to_owned();
                 let title = e.data["title"].as_str().unwrap_or("Tool");
@@ -2413,7 +2470,7 @@ fn pair(buf: &mut Buffer, area: Rect, url: Option<&str>) {
         inner.x,
         y,
         inner.width,
-        "Scan with the Codync iPhone app, or open on the phone:",
+        "Scan with the Hypurr iPhone app, or open on the phone:",
         t.secondary.patch(t.panel),
     );
     put(buf, inner.x, y + 1, inner.width, &truncate(url, usize::from(inner.width)), t.dim.patch(t.panel));

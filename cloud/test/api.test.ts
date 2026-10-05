@@ -87,7 +87,7 @@ describe("basics", () => {
   it("bounces a connector sign-in to the app", async () => {
     const res = await SELF.fetch(`${ORIGIN}/v1/oauth/callback?code=abc&state=xyz`, { redirect: "manual" });
     expect(res.status).toBe(302);
-    expect(res.headers.get("Location")).toBe("codync://oauth?code=abc&state=xyz");
+    expect(res.headers.get("Location")).toBe("hypurr://oauth?code=abc&state=xyz");
   });
 
   it("health", async () => {
@@ -137,7 +137,7 @@ describe("Clerk", () => {
   });
 });
 
-describe("Codync-Sig over HTTP", () => {
+describe("Hypurr-Sig over HTTP", () => {
   const register = (key: ref.SignKey, o: { nonce?: string; ts?: number; authority?: string } = {}) =>
     call("POST", "/v1/host/register", {
       key,
@@ -158,7 +158,7 @@ describe("Codync-Sig over HTTP", () => {
     const key = ref.signKey();
     expect((await register(key, { ts: Date.now() - 301_000 })).status).toBe(401);
     expect((await register(key, { ts: Date.now() + 301_000 })).status).toBe(401);
-    expect((await register(key, { authority: "codync-cloud.example.workers.dev" })).status).toBe(401);
+    expect((await register(key, { authority: "hypurr-cloud.example.workers.dev" })).status).toBe(401);
     expect((await register(key, { authority: AUTHORITY.toUpperCase() })).status).toBe(200);
   });
 
@@ -184,7 +184,7 @@ describe("Codync-Sig over HTTP", () => {
     const res = await worker.fetch(
       new Request(`https://${AUTHORITY}/v1/host/register`, {
         method: "POST",
-        headers: { "Codync-Sig": sig },
+        headers: { "Hypurr-Sig": sig },
         body: ref.enc.encode(ref.dec.decode(body).replace("Mac", "Evil")),
       }),
       env,

@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Check, Copy } from "@phosphor-icons/react";
+import { springBouncy } from "./motion";
 
 export default function CopyCommand({ command }: { command: string }) {
   const [copied, setCopied] = useState(false);
@@ -17,19 +19,30 @@ export default function CopyCommand({ command }: { command: string }) {
   }
 
   return (
-    <div className="flex items-center gap-3 rounded-xl bg-neutral-950 py-3 pr-3 pl-4">
-      <code className="min-w-0 flex-1 overflow-x-auto font-mono text-sm whitespace-nowrap text-neutral-200">
-        {command}
-      </code>
-      <button
+    <div className="flex items-center gap-3 rounded-2xl bg-surface-dim/80 py-3 pr-3 pl-5 ring-1 ring-outline-variant/60">
+      <span className="font-mono text-sm text-primary select-none">$</span>
+      <code className="min-w-0 flex-1 overflow-x-auto font-mono text-sm whitespace-nowrap text-on-surface">{command}</code>
+      <motion.button
         type="button"
         onClick={copy}
+        whileTap={{ scale: 0.85 }}
+        transition={springBouncy}
         aria-label={copied ? "Copied" : "Copy command"}
         title={copied ? "Copied" : "Copy"}
-        className="shrink-0 rounded-full p-2 text-neutral-400 transition hover:bg-neutral-800 hover:text-neutral-100 active:scale-95"
+        className="relative grid size-9 shrink-0 place-items-center rounded-full bg-primary-container text-on-primary-container"
       >
-        {copied ? <Check size={16} className="text-orange-400" /> : <Copy size={16} />}
-      </button>
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.span
+            key={copied ? "ok" : "copy"}
+            initial={{ scale: 0.4, opacity: 0, rotate: -30 }}
+            animate={{ scale: 1, opacity: 1, rotate: 0 }}
+            exit={{ scale: 0.4, opacity: 0, rotate: 30 }}
+            transition={springBouncy}
+          >
+            {copied ? <Check size={16} weight="bold" /> : <Copy size={16} />}
+          </motion.span>
+        </AnimatePresence>
+      </motion.button>
     </div>
   );
 }

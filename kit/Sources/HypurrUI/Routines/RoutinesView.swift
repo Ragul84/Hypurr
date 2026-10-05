@@ -1,0 +1,167 @@
+import HypurrKit
+import SwiftUI
+
+/// The same routine list in the Mac sidebar and the phone's modal; a row opens its editor.
+struct RoutinesView: View {
+    let botId: String
+    var initialId: String?
+    var close: (() -> Void)?
+    @Environment(BotStore.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var routines: [Routine] = []
+    @State private var runs: [RoutineRun] = []
+    /// The routine the editor is open on; nil with `showEditor` sets up a new one.
+    @State private var editingId: String?
+    @State private var loaded = false
+    @State private var busy = false
+    @State private var error: String?
+    @State private var showEditor = false
+    @State private var loadError: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Routines").font(.system(size: 13, weight: .semibold))
+                Spacer(minLength: 0)
+                askInChat
+                IconButton("Set up a routine", systemImage: "plus") { open(nil) }
+                    .disabled(model.isOffline)
+                if let close { IconButton("Close routines", systemImage: "xmark", action: close) }
+            }
+            if let loadError { Text(loadError).font(.caption).foregroundStyle(Palette.danger) }
+            if let error { Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled) }
+            listing
+        }
+        .foregroundStyle(Palette.text)
+        .font(.system(size: 13))
+        .onChange(of: initialId) { _, id in
+            if let id { open(id) }
+        }
+        .task(id: botId) {
+            if let initialId { open(initialId) }
+            repeat {
+                await load()
+                do { try await Task.sleep(for: .seconds(3)) } catch { break }
+            } while !Task.isCancelled
+        }
+        .hypurrSheet(isPresented: $showEditor) {
+            RoutineEditorView(botId: botId, routine: routines.first { $0.id == editingId }) { saved in
+                let created = editingId == nil
+                if let i = routines.firstIndex(where: { $0.id == saved?.id }), let saved { routines[i] = saved }
+                else if let saved { routines.append(saved) }
+                // A new webhook routine stays open: its URL and key exist only now.
+                if created, let saved, saved.triggers.contains(where: { $0.type == "webhook" }) {
+                    animate { editingId = saved.id }
+                } else {
+                    animate { showEditor = false }
+                }
+                Task { await load() }
+            }
+            #if os(macOS)
+                .frame(width: 540).frame(maxHeight: 700)
+            #endif
+        }
+    }
+
+    private var listing: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if routines.isEmpty {
+                Text(loaded ? "No routines yet. Ask the bot for one, or set it up yourself with +." : "Loading routines…")
+                    .font(.caption)
+                    .foregroundStyle(Palette.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(routines) { routine in
+                        if routine.id != routines.first?.id { Divider() }
+                        row(routine)
+                    }
+                }
+                .padding(.horizontal, 14)
+                .background(Palette.surface, in: RoundedRectangle(cornerRadius: 12))
+            }
+        }
+    }
+
+    private func row(_ routine: Routine) -> some View {
+        HStack(spacing: 12) {
+            Button { open(routine.id) } label: {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(routine.name).foregroundStyle(Palette.text)
+                    Text(summary(routine))
+                        .font(.caption)
+                        .foregroundStyle(routine.lastError == nil ? Palette.secondary : Palette.danger)
+                }
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            Toggle(isOn: Binding(get: { routine.enabled }, set: { action("setRoutineEnabled", routine, enabled: $0) })) { EmptyView() }
+                .toggleStyle(.hypurr)
+                .fixedSize()
+                .accessibilityLabel(routine.name)
+                .disabled(busy || model.isOffline)
+        }
+    }
+
+    /// The row's second line: what's happening now, else when it runs.
+    private func summary(_ routine: Routine) -> String {
+        if let active = runs.first(where: { $0.routineId == routine.id && $0.isActive }) { return runLabel(active) }
+        if routine.lastError != nil { return "Schedule needs attention" }
+        if let last = runs.first(where: { $0.routineId == routine.id }), ["failed", "interrupted"].contains(last.status) {
+            return "Last run \(runLabel(last).lowercased())"
+        }
+        return routine.triggerDescriptions.joined(separator: " · ")
+    }
+
+    private var askInChat: some View {
+        IconButton("Ask the bot for a routine", systemImage: "text.bubble") {
+            edit("I want a routine that ")
+        }
+        .disabled(model.isOffline)
+    }
+
+    private func runLabel(_ run: RoutineRun) -> String {
+        switch run.status {
+        case "pending": "Queued"
+        case "starting": "Starting"
+        case "running": "Running"
+        case "recovering": "Resuming after restart"
+        case "failed": "Failed"
+        case "interrupted": "Interrupted"
+        default: run.status.capitalized
+        }
+    }
+
+    private func animate(_ change: () -> Void) { withAnimation(Motion.reduced(Motion.layout, reduceMotion), change) }
+    private func open(_ id: String?) { animate { editingId = id; showEditor = true } }
+    private func edit(_ text: String) {
+        animate {
+            model.routineDrafts[botId] = text
+            close?()
+        }
+    }
+    private func action(_ method: String, _ routine: Routine, enabled: Bool? = nil) {
+        guard !busy, let client = model.client else { return }
+        busy = true
+        Task {
+            defer { busy = false }
+            do {
+                try await client.routineAction(method, botId: botId, id: routine.id, enabled: enabled)
+                error = nil
+                await load()
+            } catch { self.error = error.localizedDescription }
+        }
+    }
+    private func load() async {
+        guard let client = model.client else { return }
+        do {
+            let result = try await client.routines(botId: botId)
+            routines = result.routines
+            runs = result.runs
+            loaded = true
+            loadError = nil
+        } catch is CancellationError {} catch { self.loadError = error.localizedDescription }
+    }
+}

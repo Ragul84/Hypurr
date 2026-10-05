@@ -2,7 +2,7 @@ import AppKit
 import Observation
 import Sparkle
 
-/// Sparkle owns download, signature verification and app replacement. Codync
+/// Sparkle owns download, signature verification and app replacement. Hypurr
 /// coordinates its background services before letting the installer proceed.
 @MainActor
 @Observable
@@ -209,7 +209,7 @@ final class UpdatesManager: NSObject, SPUUpdaterDelegate, @preconcurrency SPUSta
 /// Normal Quit leaves the daemon running. If Sparkle has staged an update,
 /// termination waits until the background services have actually stopped.
 @MainActor
-final class CodyncAppDelegate: NSObject, NSApplicationDelegate {
+final class HypurrAppDelegate: NSObject, NSApplicationDelegate {
     weak var updates: UpdatesManager?
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

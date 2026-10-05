@@ -32,7 +32,7 @@ computer display without choosing the phone's orientation.
 - `host/src/screen.rs` coordinates access to the local helper and owns viewer sessions. Another device cannot renegotiate or close a session it does not own.
 - `apps/screen-macos/` is the macOS capture/input helper, installed through `SMAppService` and responsible for the OS permissions.
 - `apps/screen-linux/` implements the Linux helper using desktop portals and GStreamer, including ICE URL conversion and TURN transport configuration.
-- Helpers communicate locally through `~/.codync/screen.sock`. SDP is non-trickle; input uses the `input` and `input-fast` data channels.
+- Helpers communicate locally through `~/.hypurr/screen.sock`. SDP is non-trickle; input uses the `input` and `input-fast` data channels.
 - Screen access is off by default. Enabling through `setScreenEnabled` requires a loopback caller. Interactive OS permission prompts must be completed on the computer.
 - Bots with their computer capability enabled receive the built-in `computer` MCP tools (`host/src/mcp.rs`). Their permission policy still applies. An interactive phone can take over; bots may still look.
 - Each device may hold four sessions; the host allows 32 total, including pending sessions. Credential issuance is limited to 12 requests per minute per account by `TURN_LIMITER` (Cloudflare's per-location rate limiter).

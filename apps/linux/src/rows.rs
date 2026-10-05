@@ -1,4 +1,4 @@
-//! The rows a conversation is made of (kit/Sources/CodyncUI/Thread/ChatRows.swift and
+//! The rows a conversation is made of (kit/Sources/HypurrUI/Thread/ChatRows.swift and
 //! PermissionCard.swift): bubbles, author labels, thread chips, notices, approval cards and
 //! the working indicator.
 
@@ -410,7 +410,7 @@ pub fn permission_card(ui: &App, st: &State, e: &Value, group: bool) -> gtk::Wid
         dot.set_draw_func(|_, cr, w, _| {
             let r = f64::from(w) / 2.0;
             cr.arc(r, r, r, 0.0, std::f64::consts::TAU);
-            let (red, g, b) = avatar::rgb(0xF0A030);
+            let (red, g, b) = avatar::rgb(0xF472B6);
             cr.set_source_rgb(red, g, b);
             cr.fill().ok();
         });
@@ -789,6 +789,9 @@ pub fn working(ui: &App, bot: &Value) -> gtk::Widget {
     let inner = gtk::Box::builder().spacing(8).build();
     let o = orb::widget(needs, 16);
     o.add_css_class(if needs { "warning-text" } else { "secondary" });
+    if !needs {
+        o.add_css_class("flow");
+    }
     inner.append(&o);
     let act = bot["activity"]
         .as_str()

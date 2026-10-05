@@ -692,7 +692,7 @@ pub fn group_editor(ui: &App, group: Option<Value>) {
     dialog.present(Some(&ui.window));
 }
 
-/// A sheet with Codync's modal header (title, a check to save, close) over a scrolling body.
+/// A sheet with Hypurr's modal header (title, a check to save, close) over a scrolling body.
 fn modal(
     title: &str,
     save_tip: &str,
@@ -1206,19 +1206,19 @@ pub fn account_menu(ui: &App, anchor: &gtk::Button) {
         .chevron(),
         MenuItem::new(
             "phone-symbolic",
-            "Get Codync for mobile",
-            open("https://apps.apple.com/app/id6760984418"),
+            "Get Hypurr for mobile",
+            open("https://apps.apple.com/app/id0000000000"),
         ),
         MenuItem::new(
             "help-browser-symbolic",
             "Help & documentation",
-            open("https://github.com/leepokai/codync#readme"),
+            open("https://github.com/Ragul84/hypurr#readme"),
         )
         .divider(),
         MenuItem::new(
             "dialog-warning-symbolic",
             "Report an issue",
-            open("https://github.com/leepokai/codync/issues"),
+            open("https://github.com/Ragul84/hypurr/issues"),
         ),
     ];
     ui::popup_menu(anchor, None, items);
@@ -1369,9 +1369,9 @@ fn host_updates_group(ui: &App) -> adw::PreferencesGroup {
             );
             let description =
                 match value["method"].as_str() {
-                    Some("homebrew") => "Update with brew upgrade leepokai/codync/codync-host",
+                    Some("homebrew") => "Update with brew upgrade Ragul84/hypurr/hypurr-host",
                     Some("development") => "Rebuild this development installation to update it.",
-                    Some("appBundle") => "Update the Codync Mac app to update its bundled host.",
+                    Some("appBundle") => "Update the Hypurr Mac app to update its bundled host.",
                     _ => value["state"]["error"].as_str().unwrap_or_else(|| {
                         match value["state"]["phase"].as_str() {
                             Some("complete") => "Update installed and host restarted.",
@@ -1503,7 +1503,7 @@ pub fn settings(ui: &App) {
     page.add(&credentials);
     let pair = adw::PreferencesGroup::builder()
         .title("Pair your iPhone")
-        .description("Scan with the Codync app or the iPhone Camera.")
+        .description("Scan with the Hypurr app or the iPhone Camera.")
         .build();
     let qr_area = gtk::DrawingArea::builder()
         .content_width(220)
@@ -1601,7 +1601,7 @@ pub fn settings(ui: &App) {
     let about = adw::PreferencesGroup::new();
     about.add(
         &adw::ActionRow::builder()
-            .title("codync-host")
+            .title("hypurr-host")
             .subtitle(format!(
                 "{} · {}",
                 st.hello["version"].as_str().unwrap_or(""),
@@ -1617,9 +1617,9 @@ pub fn settings(ui: &App) {
 /// Shown when the host isn't running: offer to install/start it.
 pub fn host_missing(ui: &App) {
     let status = adw::StatusPage::builder()
-        .title("Start the Codync host")
+        .title("Start the Hypurr host")
         .description(
-            "Codync runs your coding agents through a small background service on this computer.",
+            "Hypurr runs your coding agents through a small background service on this computer.",
         )
         .icon_name("computer-symbolic")
         .build();
@@ -1629,7 +1629,7 @@ pub fn host_missing(ui: &App) {
         .halign(gtk::Align::Center)
         .build();
     status.set_child(Some(&btn));
-    let (dialog, view, _) = header_dialog("Codync", 460, 420);
+    let (dialog, view, _) = header_dialog("Hypurr", 460, 420);
     view.set_content(Some(&status));
     let (ui2, dialog2) = (ui.clone(), dialog.clone());
     btn.connect_clicked(move |b| {

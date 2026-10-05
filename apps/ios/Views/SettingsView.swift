@@ -1,5 +1,5 @@
-import CodyncKit
-import CodyncUI
+import HypurrKit
+import HypurrUI
 import SwiftUI
 import UserNotifications
 
@@ -57,7 +57,7 @@ struct SettingsView: View {
 
             CardSection("Notifications", footer: "Get a result summary, a request for input, or a failure notice. Notification previews follow your iOS settings.") {
                 Toggle("Push notifications", isOn: $notificationsEnabled)
-                    .toggleStyle(.codync)
+                    .toggleStyle(.hypurr)
                     .onChange(of: notificationsEnabled) { PushRegistrar.shared.resync() }
                 notificationsRow
             }
@@ -83,7 +83,7 @@ struct SettingsView: View {
 
             CardSection {
                 ValueRow("App version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "")
-                Button("Source code") { openURL(URL(string: "https://github.com/leepokai/Codync")!) }
+                Button("Source code") { openURL(URL(string: "https://github.com/Ragul84/Hypurr")!) }
                     .buttonStyle(.plain)
                     .foregroundStyle(Palette.text)
             }
@@ -98,33 +98,33 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
             }
         }
-        .codyncDialog("Remove the older \(confirmRemoveCopy?.name ?? "computer")?", isPresented: Binding(
+        .hypurrDialog("Remove the older \(confirmRemoveCopy?.name ?? "computer")?", isPresented: Binding(
             get: { confirmRemoveCopy != nil }, set: { if !$0 { confirmRemoveCopy = nil } }
         ), message: "It's this computer under an earlier identity and can't be reached anymore. Removing it only cleans up your account.") {
             guard let copy = confirmRemoveCopy else { return [] }
             return [DialogAction("Remove", destructive: true) { Task { await accounts.removeFromAccount(copy.computerId) } }]
         }
-        .codyncDialog("Start over?", isPresented: $confirmStartOver,
+        .hypurrDialog("Start over?", isPresented: $confirmStartOver,
                       message: "Signs out of every account and forgets every computer on this iPhone, then shows the welcome again. Your computers keep their bots and chats; pair again to use them.") {
             [DialogAction("Start over", destructive: true) { Task { await app.startOver() } }]
         }
         .refreshable { await accounts.refreshCloud() }
         .page("Computers & settings", pushed: pushed)
         .task { await accounts.refreshCloud() }
-        .codyncSheet(isPresented: $addingComputer) {
+        .hypurrSheet(isPresented: $addingComputer) {
             PairingView(inModal: true)
         }
-        .codyncSheet(item: $access) { target in
+        .hypurrSheet(item: $access) { target in
             AccessRequestView(computer: target.computer, pending: accounts.pendingAccess[target.id] != nil)
         }
-        .codyncDialog("Remove \(confirmForget?.name ?? "computer")?",
+        .hypurrDialog("Remove \(confirmForget?.name ?? "computer")?",
                       isPresented: Binding(get: { confirmForget != nil }, set: { if !$0 { confirmForget = nil } }),
                       message: "Its bots and conversations stay on that computer. You can pair again any time.") {
             [DialogAction("Remove", destructive: true) {
                 if let c = confirmForget { accounts.forget(c.id) }
             }]
         }
-        .codyncDialog("Revoke this iPhone's access to \(confirmRevoke?.name ?? "the computer")?",
+        .hypurrDialog("Revoke this iPhone's access to \(confirmRevoke?.name ?? "the computer")?",
                       isPresented: Binding(get: { confirmRevoke != nil }, set: { if !$0 { confirmRevoke = nil } }),
                       message: "You can ask for access again; the computer will show a new code to confirm.") {
             [DialogAction("Revoke", destructive: true) {
@@ -273,7 +273,7 @@ private struct ComputerRow: View {
             items.append(MenuItem("Remove", icon: "trash", destructive: true, divider: revoke == nil, action: remove))
             return items
         }
-        .codyncOverlay(isPresented: $coloring) { close in
+        .hypurrOverlay(isPresented: $coloring) { close in
             ZStack {
                 Color.black.opacity(0.35).ignoresSafeArea().onTapGesture(perform: close)
                 SwatchPanel(selected: store.computer.color) { id in
@@ -334,7 +334,7 @@ private struct AccountComputerRow: View {
         let online = computer.isOnline ? "Online" : "Offline"
         if let ticket { return "Waiting for your OK on the computer · \(ticket.code)" }
         return switch computer.access {
-        case "granted": "Approved for an earlier install of Codync. Revoke it, then ask again."
+        case "granted": "Approved for an earlier install of Hypurr. Revoke it, then ask again."
         case "pending": "\(online) · A request is waiting"
         default: "\(online) · In your account"
         }

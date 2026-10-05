@@ -103,12 +103,12 @@ fn aead(key: &[u8; 32]) -> ChaCha20Poly1305 {
 
 /// What the device signs in `hello`.
 pub fn hs1_input(cid_raw: &[u8; 16], dk: &[u8; 32], ek_d: &[u8; 32], n: &[u8; 32]) -> Vec<u8> {
-    [b"codync/hs1/v1".as_slice(), cid_raw, dk, ek_d, n].concat()
+    [b"hypurr/hs1/v1".as_slice(), cid_raw, dk, ek_d, n].concat()
 }
 
 /// `TH`: what the host signs in `welcome`, and the HKDF salt.
 pub fn transcript_hash(cid_raw: &[u8; 16], dk: &[u8; 32], ek_d: &[u8; 32], n: &[u8; 32], ek_h: &[u8; 32]) -> [u8; 32] {
-    sha256(&[b"codync/hs2/v1", cid_raw, dk, ek_d, n, ek_h])
+    sha256(&[b"hypurr/hs2/v1", cid_raw, dk, ek_d, n, ek_h])
 }
 
 /// Per-direction channel keys.
@@ -120,8 +120,8 @@ pub struct Keys {
 pub fn channel_keys(shared: &[u8; 32], th: &[u8; 32]) -> Keys {
     let hk = Hkdf::<Sha256>::new(Some(th), shared);
     let mut keys = Keys { d2h: [0; 32], h2d: [0; 32] };
-    hk.expand(b"codync/d2h/v1", &mut keys.d2h).expect("32 bytes is a valid HKDF-SHA256 output length");
-    hk.expand(b"codync/h2d/v1", &mut keys.h2d).expect("32 bytes is a valid HKDF-SHA256 output length");
+    hk.expand(b"hypurr/d2h/v1", &mut keys.d2h).expect("32 bytes is a valid HKDF-SHA256 output length");
+    hk.expand(b"hypurr/h2d/v1", &mut keys.h2d).expect("32 bytes is a valid HKDF-SHA256 output length");
     keys
 }
 
@@ -134,7 +134,7 @@ fn frame_nonce(c: u64) -> Nonce {
 }
 
 fn frame_aad(c: u64) -> Vec<u8> {
-    [b"codync/frame/v1".as_slice(), &c.to_be_bytes()].concat()
+    [b"hypurr/frame/v1".as_slice(), &c.to_be_bytes()].concat()
 }
 
 pub fn seal_frame(key: &[u8; 32], c: u64, last: bool, chunk: &[u8]) -> Vec<u8> {
@@ -249,7 +249,7 @@ pub fn open_mailbox(
     let (sig, ct) = rest.split_at(64);
     let epk: [u8; 32] = epk.try_into()?;
     let sig: [u8; 64] = sig.try_into()?;
-    verify(dk, &[b"codync/mbox/v1".as_slice(), cid_raw, &epk, ct].concat(), &sig)?;
+    verify(dk, &[b"hypurr/mbox/v1".as_slice(), cid_raw, &epk, ct].concat(), &sig)?;
     let key = mailbox_key(&x25519(box_secret, &epk)?, cid_raw, dk, &epk);
     aead(&key)
         .decrypt(&[0u8; 12].into(), Payload { msg: ct, aad: &[dk.as_slice(), client_nonce.as_bytes()].concat() })
@@ -257,7 +257,7 @@ pub fn open_mailbox(
 }
 
 fn mailbox_key(shared: &[u8; 32], cid_raw: &[u8; 16], dk: &[u8; 32], epk: &[u8; 32]) -> [u8; 32] {
-    hkdf_key(&[b"codync/mbox/v1".as_slice(), cid_raw, dk, epk].concat(), shared, b"codync/mbox-key/v1")
+    hkdf_key(&[b"hypurr/mbox/v1".as_slice(), cid_raw, dk, epk].concat(), shared, b"hypurr/mbox-key/v1")
 }
 
 // MARK: push (§6.7)
@@ -268,7 +268,7 @@ pub fn seal_push(cid_raw: &[u8; 16], push_key: &[u8; 32], plaintext: &[u8], eph:
     let epk = x25519_pub(eph);
     let shared = x25519(eph, push_key)?;
     let key =
-        hkdf_key(&[b"codync/push/v1".as_slice(), cid_raw, push_key, &epk].concat(), &shared, b"codync/push-key/v1");
+        hkdf_key(&[b"hypurr/push/v1".as_slice(), cid_raw, push_key, &epk].concat(), &shared, b"hypurr/push-key/v1");
     let ct = aead(&key)
         .encrypt(&[0u8; 12].into(), Payload { msg: plaintext, aad: cid_raw })
         .map_err(|_| anyhow!("push payload too large"))?;
@@ -278,37 +278,37 @@ pub fn seal_push(cid_raw: &[u8; 16], push_key: &[u8; 32], plaintext: &[u8], eph:
 // MARK: SAS, offers, canonical strings (§4, §5)
 
 pub fn sas_commit(dk: &[u8; 32], device_nonce: &[u8; 32]) -> [u8; 32] {
-    sha256(&[b"codync/sascommit/v1", dk, device_nonce])
+    sha256(&[b"hypurr/sascommit/v1", dk, device_nonce])
 }
 
 /// The 6-digit code both screens show.
 pub fn sas_code(host_sign_pub: &[u8; 32], dk: &[u8; 32], device_nonce: &[u8; 32], host_nonce: &[u8; 32]) -> String {
-    let h = sha256(&[b"codync/sas/v2", host_sign_pub, dk, device_nonce, host_nonce]);
+    let h = sha256(&[b"hypurr/sas/v2", host_sign_pub, dk, device_nonce, host_nonce]);
     let n = u32::from_be_bytes([h[0], h[1], h[2], h[3]]) % 1_000_000;
     format!("{n:06}")
 }
 
 /// The ACL `offers[].id` (and relay `pair=`) for a pairing code.
 pub fn offer_id(code: &[u8; 16]) -> String {
-    b64(&sha256(&[b"codync/offer/v1", code])[..16])
+    b64(&sha256(&[b"hypurr/offer/v1", code])[..16])
 }
 
 /// What the host signs to join an account (`claimSign`).
 pub fn claim_input(claim_id: &str, nonce: &str, user_id: &str, computer_id: &str, box_key: &str) -> String {
-    format!("codync/claim/v1\n{claim_id}\n{nonce}\n{user_id}\n{computer_id}\n{box_key}")
+    format!("hypurr/claim/v1\n{claim_id}\n{nonce}\n{user_id}\n{computer_id}\n{box_key}")
 }
 
-/// The `Codync-Sig` signing input.
+/// The `Hypurr-Sig` signing input.
 pub fn request_sig_input(method: &str, authority: &str, path_query: &str, ts: i64, nonce: &str, body: &[u8]) -> String {
     format!(
-        "codync-sig-v1\n{}\n{}\n{path_query}\n{ts}\n{nonce}\n{}",
+        "hypurr-sig-v1\n{}\n{}\n{path_query}\n{ts}\n{nonce}\n{}",
         method.to_ascii_uppercase(),
         authority.to_ascii_lowercase(),
         b64(&sha256(&[body]))
     )
 }
 
-/// The `Codync-Sig` header value.
+/// The `Hypurr-Sig` header value.
 pub fn request_sig_header(key: &SigningKey, ts: i64, nonce: &str, input: &str) -> String {
     let kid = b64(key.verifying_key().as_bytes());
     let sig = b64(&sign(key, input.as_bytes()));
@@ -523,7 +523,7 @@ mod tests {
         );
         assert_eq!(input, r["canonical"]);
         let header = request_sig_header(&k.device, ts, nonce, &input);
-        assert_eq!(format!("Codync-Sig: {header}"), r["header"]);
+        assert_eq!(format!("Hypurr-Sig: {header}"), r["header"]);
 
         let a = &v["acl"];
         let json = a["json"].as_str().unwrap();

@@ -22,7 +22,7 @@ static CACHE: Mutex<Option<Value>> = Mutex::new(None);
 /// How this machine would launch a registry agent.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Launch {
-    /// A per-platform archive, downloaded once into `~/.codync/agents`.
+    /// A per-platform archive, downloaded once into `~/.hypurr/agents`.
     Download,
     Npx,
     Uvx,
@@ -273,7 +273,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
     })
 }
 
-/// Downloads + extracts a binary distribution into `~/.codync/agents/<id>/<version>`.
+/// Downloads + extracts a binary distribution into `~/.hypurr/agents/<id>/<version>`.
 async fn install_binary(agent: &Value, target: &Value, cmd: &Path, progress: &impl Fn(&str)) -> Result<PathBuf> {
     let id = agent["id"].as_str().and_then(safe_component).ok_or_else(|| anyhow!("registry entry has a bad id"))?;
     let version = agent["version"].as_str().and_then(safe_component).unwrap_or("latest");
@@ -393,7 +393,7 @@ mod tests {
 
     #[test]
     fn keeps_only_the_installed_version() {
-        let root = std::env::temp_dir().join(format!("codync-ver-{}", uuid::Uuid::new_v4()));
+        let root = std::env::temp_dir().join(format!("hypurr-ver-{}", uuid::Uuid::new_v4()));
         for v in ["1.0.0", "1.1.0"] {
             std::fs::create_dir_all(root.join(v)).unwrap();
         }
@@ -404,7 +404,7 @@ mod tests {
 
     #[test]
     fn raw_binary_extract_marks_executable() {
-        let dir = std::env::temp_dir().join(format!("codync-reg-{}", uuid::Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("hypurr-reg-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         let archive = dir.join("tool-darwin");
         std::fs::write(&archive, "#!/bin/sh\necho hi\n").unwrap();

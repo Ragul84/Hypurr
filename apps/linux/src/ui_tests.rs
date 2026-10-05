@@ -13,7 +13,7 @@ fn wait(mut ready: impl FnMut() -> bool) {
             return;
         }
         if Instant::now() >= deadline {
-            if let Ok(dir) = std::env::var("CODYNC_UI_ARTIFACTS") {
+            if let Ok(dir) = std::env::var("HYPURR_UI_ARTIFACTS") {
                 let _ = std::fs::create_dir_all(&dir);
                 let _ = std::process::Command::new("import")
                     .args(["-window", "root", &format!("{dir}/failure.png")])
@@ -73,7 +73,7 @@ fn close(ui: &App) {
     }
 }
 fn screenshot(name: &str) {
-    if let Ok(dir) = std::env::var("CODYNC_UI_ARTIFACTS") {
+    if let Ok(dir) = std::env::var("HYPURR_UI_ARTIFACTS") {
         let deadline = Instant::now() + Duration::from_millis(400);
         wait(|| Instant::now() > deadline);
         std::fs::create_dir_all(&dir).unwrap();
@@ -99,14 +99,14 @@ fn requests() -> Value {
 #[test]
 #[ignore = "run under Xvfb using tests/ui_fixture.py"]
 fn native_ui_flows() {
-    assert_eq!(std::env::var("CODYNC_UI_TEST").as_deref(), Ok("1"));
+    assert_eq!(std::env::var("HYPURR_UI_TEST").as_deref(), Ok("1"));
     adw::init().unwrap();
     // Exercise actions after their dialog is ready, without racing presentation animations.
     gtk::Settings::default()
         .unwrap()
         .set_gtk_enable_animations(false);
     let app = adw::Application::builder()
-        .application_id("com.pokai.Codync.ParityTest")
+        .application_id("com.ragul84.Hypurr.ParityTest")
         .build();
     app.register(None::<&gtk::gio::Cancellable>).unwrap();
     let display = gtk::gdk::Display::default().unwrap();
@@ -171,7 +171,7 @@ fn native_ui_flows() {
             .any(|r| r[0] == "readUpload")
     });
 
-    let downloads = std::path::PathBuf::from(std::env::var("CODYNC_UI_DOWNLOADS").unwrap());
+    let downloads = std::path::PathBuf::from(std::env::var("HYPURR_UI_DOWNLOADS").unwrap());
     wait(|| std::fs::read(downloads.join("parity.txt")).ok().as_deref() == Some(b"fixture"));
     click(&ui.chat_list, "Save attachment");
     wait(|| {
