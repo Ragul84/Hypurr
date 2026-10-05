@@ -36,30 +36,27 @@ public extension Color {
     }
 }
 
-/// Hypurr wet-asphalt neon: asphalt ground, flat electric teal signal, amber
-/// "Needs you", red for fail/deny. Shared with GTK / Android / web
-/// (docs/design/hypurr-design-system.md).
+/// Hypurr Sunfield Panel: sunflower ground, cream plates, forest primary.
+/// Dark = deep forest + sunflower accents (never black+teal).
+/// Shared with GTK / Android / web (docs/design/hypurr-design-system.md).
 public enum Palette {
-    public static let background = Color(light: 0xF4F6F5, dark: 0x05070A)
-    public static let surface = Color(light: 0xFFFFFF, dark: 0x0B1211)
-    public static let bubbleAgent = Color(light: 0xE8EEEC, dark: 0x0E1614)
-    public static let bubbleUser = Color(light: 0xD5E8E5, dark: 0x12302C)
-    public static let border = Color(light: 0xD5DEDB, dark: 0x14201E)
-    public static let text = Color(light: 0x0A1210, dark: 0xE8FFFC)
-    public static let secondary = Color(light: 0x4A5E5A, dark: 0x7FA8A3)
-    public static let tertiary = Color(light: 0x8A9995, dark: 0x3D5552)
-    /// Ink used for fills (primary buttons, the send button, unread badges).
-    public static let accentFill = Color(light: 0x007A73, dark: 0x00D4C8)
-    /// Ink readable as text and tint on the background.
-    public static let accent = Color(light: 0x007A73, dark: 0x00D4C8)
-    public static let onAccent = Color(light: 0xF4F6F5, dark: 0x021412)
-    public static let accentDim = Color(light: 0xC5DEDB, dark: 0x12302C)
-    public static let danger = Color(light: 0xC23B2E, dark: 0xFF6B5A)
-    /// "Needs you" label only (amber attention — not a second brand accent).
-    public static let warning = Color(light: 0xB86A00, dark: 0xFFB020)
-    public static let codeBackground = Color(light: 0xE8EEEC, dark: 0x080C0B)
-    public static let added = Color(light: 0x1F7A55, dark: 0x5EAD8A)
-    public static let removed = Color(light: 0xC23B2E, dark: 0xFF6B5A)
+    public static let background = Color(light: 0xF2B90D, dark: 0x0E4A38)
+    public static let surface = Color(light: 0xFFF8E8, dark: 0x143D30)
+    public static let bubbleAgent = Color(light: 0xFFF8E8, dark: 0x1A4A3A)
+    public static let bubbleUser = Color(light: 0x17140A, dark: 0xF2B90D)
+    public static let border = Color(light: 0x1F17140A, dark: 0x1FFFF8E8)
+    public static let text = Color(light: 0x17140A, dark: 0xFFF8E8)
+    public static let secondary = Color(light: 0x5C5640, dark: 0xC8E0D4)
+    public static let tertiary = Color(light: 0x8A8168, dark: 0x7A9E8E)
+    public static let accentFill = Color(light: 0x0E4A38, dark: 0xF2B90D)
+    public static let accent = Color(light: 0x0E4A38, dark: 0xF2B90D)
+    public static let onAccent = Color(light: 0xFFF8E8, dark: 0x0E4A38)
+    public static let accentDim = Color(light: 0xFFE7A8, dark: 0x1A4A3A)
+    public static let danger = Color(light: 0xA1281C, dark: 0xF5A090)
+    public static let warning = Color(light: 0x0E4A38, dark: 0xF2B90D)
+    public static let codeBackground = Color(light: 0xFFE7A8, dark: 0x0A3428)
+    public static let added = Color(light: 0x0E4A38, dark: 0x5DDB9A)
+    public static let removed = Color(light: 0xA1281C, dark: 0xF5A090)
 }
 
 public enum AvatarPalette {
@@ -71,13 +68,13 @@ public enum AvatarPalette {
     }
 
     public static let colors: [Swatch] = [
-        .init(id: "black", label: "Black", hex: 0x05070A),
-        .init(id: "asphalt", label: "Asphalt", hex: 0x0B1211),
-        .init(id: "teal", label: "Teal", hex: 0x00D4C8),
-        .init(id: "cyan", label: "Cyan", hex: 0x00D4C8),
-        .init(id: "green", label: "Green", hex: 0x5EAD8A),
-        .init(id: "ink", label: "Ink", hex: 0x3D5552),
-        .init(id: "gray", label: "Gray", hex: 0x3D5552),
+        .init(id: "black", label: "Ink", hex: 0x17140A),
+        .init(id: "asphalt", label: "Forest", hex: 0x0E4A38),
+        .init(id: "teal", label: "Sunflower", hex: 0xF2B90D),
+        .init(id: "cyan", label: "Cream", hex: 0xFFE7A8),
+        .init(id: "green", label: "Forest", hex: 0x0E4A38),
+        .init(id: "ink", label: "Ink", hex: 0x17140A),
+        .init(id: "gray", label: "Warm gray", hex: 0x5C5640),
         .init(id: "attention", label: "Attention", hex: 0xFFB020),
         .init(id: "red", label: "Red", hex: 0xFF6B5A),
         .init(id: "brown", label: "Brown", hex: 0x5A4A3A),

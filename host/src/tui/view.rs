@@ -93,7 +93,7 @@ pub fn theme() -> &'static Theme {
             )
         } else {
             (
-                0xE8FFFC, 0x7FA8A3, 0x3D5552, 0x14201E, 0x0E1614, 0x12302C, 0x0B1211, 0x12302C, 0x5EAD8A, 0xFF6B5A,
+                0xE8FFFC, 0x7FA8A3, 0x3D5552, 0x14201E, 0x0E1614, 0x12302C, 0x0B1211, 0x12302C, 0xE8C46A, 0xFF6B5A,
                 0x10261E, 0x2E1424,
             )
         };
@@ -116,7 +116,7 @@ pub fn theme() -> &'static Theme {
             btn: s.bg(rgb(btn)),
             btn_primary: s
                 .fg(rgb(if light { 0xF4F6F5 } else { 0x021412 }))
-                .bg(rgb(if light { 0x007A73 } else { 0x00D4C8 }))
+                .bg(rgb(if light { 0x0E4A38 } else { 0xF2B90D }))
                 .add_modifier(Modifier::BOLD),
             added: s.fg(rgb(green)).bg(rgb(add_bg)),
             removed: s.fg(rgb(red)).bg(rgb(rm_bg)),
@@ -134,23 +134,29 @@ pub fn bot_color(name: &str) -> Color {
         "red" => 0xFF6B5A,
         "orange" | "attention" => 0xFFB020,
         "yellow" => 0xC9A227,
-        "green" => 0x5EAD8A,
+        "green" => 0xE8C46A,
         "violet" | "ink" | "gray" => 0x3D5552,
         // "cyan" / "teal" and unknown ids → signal teal
-        _ => 0x00D4C8,
+        _ => 0xF2B90D,
     };
     rgb(hex)
 }
 
 // A full-cell orbit reads smoother at the 100 ms tick than the thin dots.
 const SPINNER: [&str; 8] = ["⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"];
+/// Thinking scan-line frames (wet-asphalt neon — flat cyan progress through a rule).
+const SCAN_LINE: [&str; 8] = ["─▸───", "──▸──", "───▸─", "────▸", "───◂─", "──◂──", "─◂───", "◂────"];
 
 fn spin(app: &App) -> &'static str {
     SPINNER[usize::try_from(app.frame % 8).unwrap_or(0)]
 }
 
+fn scan_line(app: &App) -> &'static str {
+    SCAN_LINE[usize::try_from(app.frame % 8).unwrap_or(0)]
+}
+
 /// Hypurr teal signal stops (looping).
-const FLOW: [u32; 3] = [0x00D4C8, 0x007A73, 0x5EAD8A];
+const FLOW: [u32; 3] = [0xF2B90D, 0x0E4A38, 0xE8C46A];
 
 /// The flow colour at `pos` per-mille along the loop (wraps).
 pub(super) fn flow_color(pos: u32) -> Color {
@@ -201,7 +207,7 @@ pub fn glyph(app: &App, m: Mark) -> (&'static str, Style) {
     let t = theme();
     match m {
         Mark::Need => ("◆", t.amber),
-        Mark::Work => (spin(app), spin_style(app)),
+        Mark::Work => (scan_line(app), spin_style(app)),
         Mark::Unread => ("●", t.bold),
         Mark::Idle => ("○", t.dim),
         Mark::Error => ("×", t.red),
@@ -500,7 +506,7 @@ fn status_line(buf: &mut Buffer, r: Rect, app: &mut App) {
     let insert = app.typing && app.overlays.is_empty();
     let pill = if insert { " INSERT " } else { " NAV " };
     let pill_style = if insert {
-        Style::default().fg(t.on_color).bg(rgb(0x00D4C8)).add_modifier(Modifier::BOLD)
+        Style::default().fg(t.on_color).bg(rgb(0xF2B90D)).add_modifier(Modifier::BOLD)
     } else {
         t.btn_primary
     };
@@ -761,7 +767,7 @@ fn chat(buf: &mut Buffer, r: Rect, app: &mut App, narrow: bool) {
     x = put(buf, x + 3, r.y, r.width / 3, &title, t.bold) + 2;
     let (status, ss) = match b.mark() {
         Mark::Need => ("◆ needs you".to_owned(), t.amber),
-        Mark::Work => (format!("{} working {}", spin(app), elapsed(b.started_at)), spin_style(app)),
+        Mark::Work => (format!("{} {}", scan_line(app), elapsed(b.started_at)), spin_style(app)),
         Mark::Error => ("× error".to_owned(), t.red),
         _ => (String::new(), t.dim),
     };
@@ -1081,7 +1087,7 @@ fn build_chat(app: &App, b: &Bot, width: usize) -> Built {
         let line = if b.status == Status::NeedsInput {
             Span::styled(format!(" ◆ Needs you in {place} · ! opens it"), t.amber)
         } else {
-            Span::styled(format!(" {} Working in {place}", spin(app)), spin_style(app))
+            Span::styled(format!(" {} Working in {place}", scan_line(app)), spin_style(app))
         };
         out.lines.push(Line::from(line));
     }

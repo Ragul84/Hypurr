@@ -11,14 +11,14 @@ pub const SHAPES: &[&str] = &[
     "blob", "pebble", "squircle", "tablet", "wedge", "hex", "cloud", "teardrop",
 ];
 pub const COLORS: &[(&str, u32)] = &[
-    ("black", 0x05070A),
+    ("black", 0x17140A),
     ("brown", 0x936439),
     ("red", 0xFF263C),
     ("orange", 0xFF6700),
     ("yellow", 0xFF9800),
     ("green", 0x00C972),
-    ("teal", 0x00D4C8),
-    ("cyan", 0x00D4C8),
+    ("teal", 0xF2B90D),
+    ("cyan", 0xFFE7A8),
     ("blue", 0x1084FE),
     ("violet", 0x3D5552),
     ("magenta", 0x7FA8A3),
@@ -367,7 +367,7 @@ fn area(parts: Vec<Part>, size: i32, badge: Badge) -> gtk::DrawingArea {
             let (cx, cy) = (s - d / 2.0, s - d / 2.0);
             let dark = adw::StyleManager::default().is_dark();
             // The window background (Hypurr's tinted neutrals) as a cut-out ring.
-            let (br, bgc, bb) = if dark { rgb(0x05070A) } else { rgb(0xF4F6F5) };
+            let (br, bgc, bb) = if dark { rgb(0x0E4A38) } else { rgb(0xF2B90D) };
             cr.arc(cx, cy, d / 2.0 + 2.0, 0.0, 2.0 * PI);
             cr.set_source_rgb(br, bgc, bb);
             cr.fill().ok();

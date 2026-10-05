@@ -1,15 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Flat cyan cat on transparent — wet-asphalt neon (no mesh glow). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp" android:height="108dp"
-    android:viewportWidth="1024" android:viewportHeight="1024">
-    <group android:pivotX="512" android:pivotY="512" android:scaleX="0.62" android:scaleY="0.62" android:translateY="-30">
-        <path android:fillColor="#00D4C8"
-            android:pathData="M262 640 C262 470 296 300 330 214 L452 352 C492 344 532 344 572 352 L694 214 C728 300 762 470 762 640 C762 792 650 864 512 864 C374 864 262 792 262 640 Z"/>
-        <path android:strokeColor="#021412" android:strokeWidth="34" android:strokeLineCap="round" android:strokeLineJoin="round"
-            android:pathData="M372 604 Q414 556 456 604 M568 604 Q610 556 652 604"/>
-        <path android:fillColor="#021412" android:pathData="M490 660 h44 l-22 24 z"/>
-        <path android:strokeColor="#021412" android:strokeWidth="26" android:strokeLineCap="round" android:strokeLineJoin="round"
-            android:pathData="M446 704 q33 40 66 0 q33 40 66 0"/>
-    </group>
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <!-- ink plate -->
+    <path android:fillColor="#17140A"
+        android:pathData="M30,30 h48 a12,12 0 0 1 12,12 v48 a12,12 0 0 1 -12,12 h-48 a12,12 0 0 1 -12,-12 v-48 a12,12 0 0 1 12,-12 z"/>
+    <!-- cat outline -->
+    <path android:strokeColor="#FFF8E8" android:strokeWidth="3.2" android:fillColor="#00000000"
+        android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M38,52 L44,34 L50,48 h8 L64,34 L70,52 v12 a14,14 0 0 1 -28,0 z"/>
+    <path android:fillColor="#FFF8E8" android:pathData="M46,56 m-2.2,0 a2.2,2.2 0 1,0 4.4,0 a2.2,2.2 0 1,0 -4.4,0"/>
+    <path android:fillColor="#FFF8E8" android:pathData="M62,56 m-2.2,0 a2.2,2.2 0 1,0 4.4,0 a2.2,2.2 0 1,0 -4.4,0"/>
+    <path android:strokeColor="#FFF8E8" android:strokeWidth="2.6" android:fillColor="#00000000"
+        android:strokeLineCap="round"
+        android:pathData="M50,66 c 2.5,3 5.5,3 8,0"/>
 </vector>

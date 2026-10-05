@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=390, initial-scale=1"/>
+<title>Hypurr motion studio</title>
+<style>
+:root {
+  --ground:#05070A; --raised:#0B1211; --agent:#0E1614; --user:#12302C;
+  --ink:#E8FFFC; --ink2:#7FA8A3; --ink3:#3D5552; --rule:#14201E;
+  --accent:#00D4C8; --on:#021412; --attn:#FFB020; --neg:#FF6B5A; --pos:#5EAD8A;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+html, body { background:#000; color:var(--ink); font:15px/1.4 ui-sans-serif, system-ui, sans-serif; overflow:hidden; }
+body { display:grid; place-items:center; min-height:100vh; }
+/* Phone frame */
+.phone {
+  width:390px; height:844px; background:var(--ground); border-radius:44px;
+  border:3px solid #1a2220; position:relative; overflow:hidden;
+  box-shadow: 0 0 0 1px #0a0e0d, 0 40px 80px rgba(0,0,0,.65);
+}
+.notch {
+  position:absolute; top:10px; left:50%; transform:translateX(-50%);
+  width:120px; height:28px; background:#000; border-radius:18px; z-index:50;
+}
+.status-bar {
+  height:54px; padding:14px 22px 0; display:flex; justify-content:space-between;
+  font:600 13px/1 ui-sans-serif; color:var(--ink); position:relative; z-index:40;
+}
+.content { position:absolute; inset:54px 0 0; overflow:hidden; }
+.scene { position:absolute; inset:0; opacity:0; pointer-events:none; }
+.scene.on { opacity:1; pointer-events:auto; }
+.nav {
+  position:absolute; left:0; right:0; bottom:0; height:72px;
+  background:color-mix(in srgb, var(--raised) 88%, transparent);
+  border-top:1px solid var(--rule); display:flex; align-items:center; justify-content:space-around;
+  padding-bottom:12px;
+}
+.nav span { font:11px/1 ui-sans-serif; color:var(--ink3); }
+.nav span.on { color:var(--accent); }
+.title { font:800 28px/1.1 ui-sans-serif; letter-spacing:-0.03em; padding:8px 20px 4px; }
+.sub { padding:0 20px 12px; color:var(--ink2); font-size:13px; display:flex; gap:8px; align-items:center; }
+.pill {
+  display:inline-flex; align-items:center; gap:6px; padding:3px 8px; border-radius:999px;
+  background:color-mix(in srgb, var(--pos) 14%, transparent); color:var(--pos); font:12px/1 ui-sans-serif;
+}
+.pill .dot { width:6px; height:6px; border-radius:1px; background:currentColor; }
+.row {
+  display:flex; gap:12px; align-items:center; padding:10px 20px; margin:0 8px;
+  border-radius:4px;
+}
+.row.raised { background:var(--raised); }
+.avatar {
+  width:44px; height:44px; border-radius:50%; background:var(--accent); color:var(--on);
+  display:grid; place-items:center; font:700 18px/1 ui-sans-serif; position:relative; flex:none;
+}
+.avatar .badge {
+  position:absolute; right:-1px; bottom:-1px; width:12px; height:12px; border-radius:50%;
+  background:var(--attn); border:2px solid var(--ground);
+}
+.meta { flex:1; min-width:0; }
+.meta .name { font:600 16px/1.2 ui-sans-serif; display:flex; justify-content:space-between; gap:8px; }
+.meta .name time { color:var(--ink3); font:12px/1 ui-monospace,monospace; font-weight:400; }
+.meta .line { color:var(--ink2); font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.meta .line.attn { color:var(--attn); font-weight:500; }
+.meta .line.live { color:var(--accent); }
+.unread {
+  background:var(--accent); color:var(--on); font:700 11px/1 ui-sans-serif;
+  min-width:18px; height:18px; border-radius:999px; display:grid; place-items:center; padding:0 5px;
+}
+.section { font:600 12px/1 ui-sans-serif; color:var(--attn); letter-spacing:0.02em; padding:14px 20px 6px; }
+.section.muted { color:var(--ink3); }
+/* Scan line with flat falloff trail (no glow) */
+.scan-wrap { margin-top:6px; }
+.scan-rule { height:3px; background:var(--rule); position:relative; overflow:hidden; border-radius:1px; }
+.scan-band {
+  position:absolute; top:0; bottom:0; width:28%;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--accent) 35%, transparent) 18%,
+    var(--accent) 55%,
+    color-mix(in srgb, var(--accent) 35%, transparent) 82%,
+    transparent 100%);
+  left:0;
+}
+.phase-row { display:flex; justify-content:space-between; margin-top:6px; font:12px/1.3 ui-monospace,monospace; color:var(--accent); }
+.phase-row .elapsed { color:var(--ink3); }
+/* Chat */
+.chat-head {
+  display:flex; align-items:center; gap:10px; padding:6px 12px 10px;
+  border-bottom:1px solid var(--rule); background:var(--raised);
+}
+.bubble {
+  max-width:78%; margin:8px 16px; padding:10px 12px; border-radius:4px; font-size:14px; line-height:1.45;
+}
+.bubble.agent { background:var(--agent); margin-right:auto; }
+.bubble.user { background:var(--user); margin-left:auto; color:var(--ink); }
+.bubble .dim { color:var(--ink3); }
+.caret {
+  display:inline-block; width:1px; height:1.05em; background:var(--accent);
+  vertical-align:-2px; margin-left:1px; opacity:1;
+}
+.approval {
+  margin:10px 16px 10px; background:var(--raised); border-radius:4px; overflow:hidden;
+  border:1px solid var(--rule); transform-origin:top center;
+}
+.approval .band { height:4px; background:var(--accent); transform:scaleX(0); transform-origin:left; }
+.approval .body { padding:14px; }
+.approval .attn { color:var(--attn); font:600 12px/1 ui-sans-serif; display:flex; align-items:center; gap:6px; }
+.approval .ask { font:600 16px/1.3 ui-sans-serif; margin-top:8px; }
+.approval .code {
+  margin-top:8px; padding:8px 10px; background:var(--ground); border-radius:4px;
+  font:12px/1.35 ui-monospace,monospace; color:var(--ink2);
+}
+.approval .actions { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+.btn {
+  border:none; border-radius:4px; padding:9px 14px; font:600 13px/1 ui-sans-serif; cursor:default;
+  background:color-mix(in srgb, var(--accent) 14%, transparent); color:var(--accent);
+}
+.btn.deny { background:color-mix(in srgb, var(--neg) 12%, transparent); color:var(--neg); }
+.btn.primary { background:var(--accent); color:var(--on); }
+.live-row {
+  display:flex; align-items:center; gap:0; margin:10px 16px; background:var(--raised);
+  border-radius:4px; overflow:hidden; height:0; opacity:0;
+}
+.live-row .rail { width:3px; align-self:stretch; background:var(--accent); }
+.live-row .txt { padding:10px 12px; font-size:13px; color:var(--ink2); }
+.composer {
+  position:absolute; left:12px; right:12px; bottom:84px;
+  background:var(--raised); border-radius:22px; padding:6px 6px 6px 16px;
+  display:flex; align-items:center; gap:8px; border:1px solid var(--rule);
+}
+.composer input { flex:1; background:transparent; border:0; color:var(--ink2); font:14px/1 ui-sans-serif; outline:none; }
+.send {
+  width:34px; height:34px; border-radius:50%; background:var(--accent); color:var(--on);
+  display:grid; place-items:center; font-size:16px;
+}
+/* Tool */
+.tool-card { margin:12px 16px; padding:12px; background:var(--raised); border-radius:4px; border:1px solid var(--rule); }
+.tool-card .cmd { font:12px/1.4 ui-monospace,monospace; color:var(--ink2); }
+.hair { height:1px; background:var(--rule); margin-top:10px; position:relative; overflow:hidden; }
+.hair > i { display:block; height:100%; background:var(--accent); width:0; }
+.chips { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; }
+.chip {
+  border:1px solid var(--rule); border-radius:4px; padding:4px 8px;
+  font:11px ui-monospace,monospace; color:var(--ink); opacity:0; transform:translateY(4px);
+}
+/* Assemble */
+.assemble-stage {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  height:100%; padding:40px 24px 100px; gap:20px;
+}
+.assemble-stage h2 { font:800 22px/1.2 ui-sans-serif; letter-spacing:-0.02em; }
+.assemble-stage .name-type { font:13px/1 ui-monospace,monospace; color:var(--accent); min-height:1.2em; }
+#catSvg { width:168px; height:168px; }
+/* Pairing */
+.pair-stage { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; gap:18px; padding-bottom:80px; }
+.pair-stage h2 { font:800 26px/1 ui-sans-serif; letter-spacing:-0.03em; }
+.pair-canvas { width:280px; height:200px; }
+.neon-row { display:flex; align-items:center; gap:10px; font:14px/1 ui-sans-serif; color:var(--ink2); }
+.neon-dot { width:10px; height:10px; border-radius:1px; background:var(--accent); opacity:0.2; }
+/* Done */
+.done-card { margin:16px; padding:14px; background:var(--raised); border-radius:4px; border:1px solid var(--rule); }
+.done-rule { height:2px; background:var(--rule); margin-top:12px; position:relative; overflow:hidden; }
+.done-rule > i { display:block; height:100%; width:0; background:var(--accent); }
+.chip-settle { display:inline-flex; align-items:center; gap:6px; margin-top:12px; padding:5px 10px;
+  border-radius:4px; background:color-mix(in srgb, var(--pos) 14%, transparent); color:var(--pos);
+  font:12px/1 ui-sans-serif; font-weight:600; opacity:0; transform:translateY(4px); }
+/* Skeleton */
+.skel { margin:12px 16px; height:64px; background:var(--raised); border-radius:4px; position:relative; overflow:hidden; }
+.skel-rain { position:absolute; inset:-30%; }
+.caption {
+  position:absolute; top:62px; left:0; right:0; text-align:center;
+  font:600 11px/1 ui-monospace,monospace; color:var(--ink3); letter-spacing:0.08em; text-transform:uppercase;
+  z-index:45; opacity:0.85;
+}
+.desk {
+  display:none; width:980px; height:620px; background:var(--ground); border:1px solid var(--rule);
+  border-radius:8px; overflow:hidden; position:relative;
+}
+body.desktop .phone { display:none; }
+body.desktop .desk { display:block; }
+.desk .rail { position:absolute; left:0; top:0; bottom:0; width:200px; background:var(--raised); border-right:1px solid var(--rule); padding:20px 14px; }
+.desk .main { position:absolute; left:200px; right:0; top:0; bottom:0; padding:0; overflow:hidden; background:var(--ground); }
+.desk .main .content { position:relative; height:100%; }
+.desk .main .scene { display:none; position:absolute; inset:0; padding:20px 28px 24px; overflow:hidden; }
+.desk .main .scene.on { display:block; }
+.desk .main .nav { position:absolute; left:0; right:0; bottom:0; }
+.desk .caption-desk {
+  position:absolute; top:14px; right:20px; z-index:50;
+  font:600 11px/1 ui-monospace,monospace; color:var(--ink3); letter-spacing:0.08em; text-transform:uppercase;
+}
+</style>
+</head>
+<body>
+<div class="phone" id="phone">
+  <div class="notch"></div>
+  <div class="status-bar"><span>9:41</span><span>▮▮▮</span></div>
+  <div class="caption" id="caption">01 · THINKING</div>
+  <div class="content">
+    <!-- Bots / thinking / needs / skeleton / deny / done shared chrome -->
+    <div class="scene on" id="sc-bots">
+      <div class="title">Bots</div>
+      <div class="sub"><span>Kevin's Mac Studio</span><span class="pill"><span class="dot"></span>Direct</span></div>
+      <div class="section" id="needs-label" style="opacity:0">Needs you</div>
+      <div id="needs-slot"></div>
+      <div class="section muted">All bots</div>
+      <div class="row" id="row-frontend">
+        <div class="avatar">F</div>
+        <div class="meta">
+          <div class="name">Frontend <time>1m</time></div>
+          <div class="line live" id="frontend-line">Editing web/src/App.tsx</div>
+          <div class="scan-wrap" id="scan-wrap" style="opacity:0">
+            <div class="scan-rule"><div class="scan-band" id="scan-band"></div></div>
+            <div class="phase-row"><span id="phase">Reading files</span><span class="elapsed" id="elapsed">0.0s</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="row" id="row-docs">
+        <div class="avatar" style="background:#3D5552;color:#E8FFFC">D</div>
+        <div class="meta"><div class="name">Docs <time>42m</time></div><div class="line">Updated the setup guide.</div></div>
+        <span class="unread">2</span>
+      </div>
+      <div class="skel" id="skel" style="display:none"><canvas class="skel-rain" id="skel-rain" width="400" height="120"></canvas></div>
+      <div class="nav"><span class="on">Bots</span><span>Activity</span><span>Settings</span></div>
+    </div>
+
+    <!-- Chat / stream / tool / strike / deny -->
+    <div class="scene" id="sc-chat">
+      <div class="chat-head">
+        <div class="avatar" style="width:36px;height:36px;font-size:14px">R<div class="badge"></div></div>
+        <div><div style="font-weight:700">Reviewer</div><div style="font-size:12px;color:var(--attn)" id="chat-sub">Needs you · cargo test</div></div>
+      </div>
+      <div class="bubble agent" id="bubble-agent">I reviewed ChannelTransport.kt. Cap the relay heartbeat at 15s.</div>
+      <div class="bubble user">Run the host tests and show me what fails.</div>
+      <div class="bubble agent" id="bubble-stream" style="display:none"><span id="stream-on"></span><span class="dim" id="stream-off"></span><span class="caret" id="caret"></span></div>
+      <div class="tool-card" id="tool-card" style="display:none">
+        <div class="cmd">$ cargo test --all</div>
+        <div class="hair"><i id="hair"></i></div>
+        <div class="chips">
+          <span class="chip" id="chip0">host/src/lib.rs</span>
+          <span class="chip" id="chip1">host/src/tui/view.rs</span>
+          <span class="chip" id="chip2">+12 −3</span>
+        </div>
+      </div>
+      <div class="approval" id="approval">
+        <div class="band" id="strike-band"></div>
+        <div class="body" id="approval-body">
+          <div class="attn">Needs you · Medium risk</div>
+          <div class="ask">Run cargo test --all?</div>
+          <div class="code">cd host && cargo test --all</div>
+          <div class="actions">
+            <button class="btn primary" id="btn-allow">Allow once</button>
+            <button class="btn">Always</button>
+            <button class="btn deny" id="btn-deny">Deny</button>
+          </div>
+        </div>
+      </div>
+      <div class="live-row" id="live-row"><div class="rail"></div><div class="txt">Reviewer · running cargo test</div></div>
+      <div class="done-card" id="done-card" style="display:none">
+        <div>All 178 tests pass.</div>
+        <div class="done-rule"><i id="done-rule"></i></div>
+        <div class="chip-settle" id="checkpoint">Checkpoint · safe to undo</div>
+      </div>
+      <div class="composer"><input value="Message" readonly/><div class="send">↑</div></div>
+      <div class="nav"><span class="on">Bots</span><span>Activity</span><span>Settings</span></div>
+    </div>
+
+    <!-- Assemble -->
+    <div class="scene" id="sc-assemble">
+      <div class="assemble-stage">
+        <div style="font:12px/1 ui-monospace,monospace;color:var(--ink3);letter-spacing:0.08em">NEW BOT</div>
+        <svg id="catSvg" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+          <defs></defs>
+          <g id="rainGroup" fill="none" stroke="#00D4C8" stroke-linecap="round" stroke-width="3" opacity="0"></g>
+          <g id="waves" fill="none" stroke="#00D4C8" stroke-linecap="round" stroke-width="30" opacity="0">
+            <path d="M820 540 Q862 640 820 740"/>
+            <path d="M884 500 Q944 640 884 780" opacity="0.55"/>
+            <path d="M204 540 Q162 640 204 740"/>
+            <path d="M140 500 Q80 640 140 780" opacity="0.55"/>
+          </g>
+          <path id="catBody" fill="#00D4C8" opacity="0"
+            d="M262 640 C262 470 296 300 330 214 L452 352 C492 344 532 344 572 352 L694 214 C728 300 762 470 762 640 C762 792 650 864 512 864 C374 864 262 792 262 640 Z"/>
+          <g id="catFace" fill="none" stroke="#021412" stroke-linecap="round" stroke-linejoin="round" opacity="0">
+            <path stroke-width="34" d="M372 604 Q414 556 456 604"/>
+            <path stroke-width="34" d="M568 604 Q610 556 652 604"/>
+            <path fill="#021412" stroke="none" d="M490 660 h44 l-22 24 z"/>
+            <path stroke-width="26" d="M446 704 q33 40 66 0 q33 40 66 0"/>
+          </g>
+          <rect id="sigBand" x="0" y="48" width="1024" height="36" fill="#00D4C8" opacity="0"/>
+        </svg>
+        <h2>Create bot</h2>
+        <div class="name-type" id="bot-name"></div>
+      </div>
+    </div>
+
+    <!-- Pairing -->
+    <div class="scene" id="sc-pair">
+      <div class="pair-stage">
+        <canvas class="pair-canvas" id="pair-canvas" width="560" height="400"></canvas>
+        <h2>Hypurr</h2>
+        <div style="color:var(--ink2);font-size:14px">Your coding bots, on your phone.</div>
+        <div class="neon-row"><div class="neon-dot" id="neon-dot"></div><span id="neon-label">Connecting…</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="desk" id="desk">
+  <div class="rail">
+    <div style="font:800 18px/1 ui-sans-serif;margin-bottom:24px;color:var(--ink)">Hypurr</div>
+    <div style="color:var(--accent);margin:8px 0;font:600 14px/1 ui-sans-serif">Bots</div>
+    <div style="color:var(--ink3);margin:8px 0;font:14px/1 ui-sans-serif">Activity</div>
+    <div style="color:var(--ink3);margin:8px 0;font:14px/1 ui-sans-serif">Settings</div>
+    <div style="margin-top:40px;font-size:12px;color:var(--ink2)">Kevin's Mac Studio</div>
+    <div class="pill" style="margin-top:8px"><span class="dot"></span>Direct</div>
+  </div>
+  <div class="main" id="desk-main">
+    <div class="caption-desk" id="caption-desk">01 · THINKING</div>
+    <div class="content" id="desk-content"></div>
+  </div>
+</div>
+
+<script>
+/* Deterministic motion clock — capture drives setTime(ms). */
+const ACCENT = '#00D4C8';
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+const lerp = (a,b,t)=>a+(b-a)*t;
+const ease = (t)=> t<=0?0:t>=1?1: Math.pow(t, 2.2); // approx emphasized end
+const easeOut = (t)=>1-Math.pow(1-clamp(t,0,1), 3);
+
+const captions = {
+  thinking: '01 · THINKING',
+  streaming: '02 · STREAMING',
+  tool: '03 · TOOL RUNNING',
+  assemble: '04 · CREATING A BOT',
+  pairing: '05 · CONNECTING',
+  needsyou: '06 · NEEDS YOU',
+  strike: '07 · SIGNAL STRIKE',
+  deny: '08 · DENY',
+  done: '09 · TASK DONE',
+  skeleton: '11 · RAIN SKELETON',
+};
+
+let moment = 'thinking';
+let tMs = 0;
+
+function showScene(id) {
+  document.querySelectorAll('.scene').forEach(s => s.classList.toggle('on', s.id === id));
+}
+
+function resetDom() {
+  // bots
+  document.getElementById('scan-wrap').style.opacity = 0;
+  document.getElementById('needs-label').style.opacity = 0;
+  document.getElementById('needs-slot').innerHTML = '';
+  document.getElementById('skel').style.display = 'none';
+  document.getElementById('frontend-line').textContent = 'Editing web/src/App.tsx';
+  document.getElementById('frontend-line').className = 'line live';
+  // chat
+  document.getElementById('bubble-stream').style.display = 'none';
+  document.getElementById('tool-card').style.display = 'none';
+  document.getElementById('approval').style.display = 'block';
+  document.getElementById('approval').style.height = '';
+  document.getElementById('approval').style.opacity = 1;
+  document.getElementById('approval').style.transform = '';
+  document.getElementById('approval-body').style.display = '';
+  document.getElementById('strike-band').style.transform = 'scaleX(0)';
+  document.getElementById('live-row').style.height = '0';
+  document.getElementById('live-row').style.opacity = '0';
+  document.getElementById('done-card').style.display = 'none';
+  document.getElementById('btn-allow').style.transform = '';
+  document.getElementById('chat-sub').textContent = 'Needs you · cargo test';
+  document.getElementById('chat-sub').style.color = 'var(--attn)';
+  // assemble
+  ['catBody','catFace','waves','sigBand'].forEach(id => document.getElementById(id).setAttribute('opacity','0'));
+  document.getElementById('bot-name').textContent = '';
+  document.getElementById('rainGroup').innerHTML = '';
+  document.getElementById('rainGroup').setAttribute('opacity','0');
+  // pair
+  document.getElementById('neon-dot').style.opacity = 0.2;
+  document.getElementById('neon-label').textContent = 'Connecting…';
+}
+
+function buildRainStreaks() {
+  const g = document.getElementById('rainGroup');
+  g.innerHTML = '';
+  for (let i = 0; i < 14; i++) {
+    const x = 80 + i * 64;
+    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    line.setAttribute('x1', x);
+    line.setAttribute('y1', 40);
+    line.setAttribute('x2', x + 120);
+    line.setAttribute('y2', 980);
+    line.setAttribute('stroke-opacity', String(0.12 + (i % 3) * 0.04));
+    g.appendChild(line);
+  }
+}
+
+function setAssemble(p) {
+  // p 0..1 over ~2.8s
+  buildRainStreaks();
+  const rain = document.getElementById('rainGroup');
+  const body = document.getElementById('catBody');
+  const face = document.getElementById('catFace');
+  const waves = document.getElementById('waves');
+  const band = document.getElementById('sigBand');
+  const name = document.getElementById('bot-name');
+
+  // rain visible then converge (opacity + scale toward center via translate)
+  const rainP = clamp(p / 0.35, 0, 1);
+  rain.setAttribute('opacity', String(0.9 * (1 - easeOut(clamp((p - 0.25) / 0.35, 0, 1)))));
+  const scale = lerp(1.15, 0.55, easeOut(rainP));
+  rain.setAttribute('transform', `translate(512 512) scale(${scale}) translate(-512 -512)`);
+
+  // Body appears only after rain has mostly converged (avoids teardrop silhouette)
+  const bodyP = easeOut(clamp((p - 0.42) / 0.28, 0, 1));
+  body.setAttribute('opacity', String(bodyP));
+  const faceP = easeOut(clamp((p - 0.58) / 0.18, 0, 1));
+  face.setAttribute('opacity', String(faceP));
+  waves.setAttribute('opacity', String(0.55 * faceP));
+
+  // signal band flash 0.78-0.88
+  let bandA = 0;
+  if (p > 0.78 && p < 0.86) bandA = 1;
+  else if (p >= 0.86 && p < 0.92) bandA = 1 - (p - 0.86) / 0.06;
+  band.setAttribute('opacity', String(bandA));
+
+  // name types after confirm
+  const label = 'Reviewer';
+  if (p > 0.88) {
+    const tp = clamp((p - 0.88) / 0.10, 0, 1);
+    name.textContent = label.slice(0, Math.round(label.length * tp));
+  } else name.textContent = '';
+}
+
+function setPairing(p) {
+  const c = document.getElementById('pair-canvas');
+  const ctx = c.getContext('2d');
+  const W = c.width, H = c.height;
+  ctx.clearRect(0,0,W,H);
+  const cx = W/2, cy = H/2 - 10;
+  // rain converge to a neon point (visible streaks, flat colour steps)
+  const converge = easeOut(clamp(p / 0.48, 0, 1));
+  const n = 22;
+  for (let i = 0; i < n; i++) {
+    const ang = -Math.PI * 0.9 + i * (Math.PI * 1.8 / (n - 1));
+    const len0 = 190;
+    const len = lerp(len0, 10, converge);
+    // layered opacity steps (no glow)
+    const layers = [
+      [6, 0.08],
+      [3, 0.22],
+      [1.5, 0.55],
+    ];
+    for (const [lw, a] of layers) {
+      ctx.strokeStyle = `rgba(0,212,200,${a * (0.35 + 0.65 * (1 - converge * 0.4))})`;
+      ctx.lineWidth = lw;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(ang) * len, cy + Math.sin(ang) * len);
+      ctx.lineTo(cx + Math.cos(ang) * 5, cy + Math.sin(ang) * 5);
+      ctx.stroke();
+    }
+  }
+  // converge core — grows then settles as a sharp tile
+  const core = lerp(4, 12, converge);
+  ctx.fillStyle = `rgba(0,212,200,${0.45 + 0.55 * converge})`;
+  ctx.fillRect(cx - core / 2, cy - core / 2, core, core);
+  // residual short rays after converge (reads as "locked")
+  if (converge > 0.92) {
+    const hold = clamp((p - 0.48) / 0.52, 0, 1);
+    ctx.strokeStyle = `rgba(0,212,200,${0.35 * (1 - hold * 0.5)})`;
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 8; i++) {
+      const ang = i * (Math.PI * 2 / 8) + 0.2;
+      const r0 = 14, r1 = lerp(46, 22, hold);
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(ang) * r0, cy + Math.sin(ang) * r0);
+      ctx.lineTo(cx + Math.cos(ang) * r1, cy + Math.sin(ang) * r1);
+      ctx.stroke();
+    }
+  }
+
+  // neon flicker after converge — max 2 flashes then steady (≤3/sec)
+  const neon = document.getElementById('neon-dot');
+  const label = document.getElementById('neon-label');
+  let op = 0.2;
+  neon.style.width = '12px';
+  neon.style.height = '12px';
+  if (p < 0.48) {
+    label.textContent = 'Connecting…';
+    label.style.color = 'var(--ink2)';
+  } else {
+    const q = p - 0.48;
+    if (q < 0.10) op = 1;
+    else if (q < 0.20) op = 0.22;
+    else if (q < 0.30) op = 1;
+    else if (q < 0.40) op = 0.28;
+    else op = 1;
+    label.textContent = op > 0.5 ? "Direct · Kevin's Mac Studio" : 'Connecting…';
+    if (q >= 0.40) {
+      label.textContent = "Direct · Kevin's Mac Studio";
+      label.style.color = 'var(--accent)';
+    }
+  }
+  neon.style.opacity = op;
+}
+
+function setThinking(p) {
+  showScene('sc-bots');
+  document.getElementById('scan-wrap').style.opacity = 1;
+  // loop scan over 1600ms within the clip
+  const cycle = (p * 3000) % 1600; // ms into loop when p is 0..1 over 3s
+  const x = cycle / 1600;
+  const band = document.getElementById('scan-band');
+  band.style.left = `${lerp(-28, 100, x)}%`;
+  const phases = ['Reading files', 'Planning', 'Editing App.tsx'];
+  const pi = Math.min(2, Math.floor((p * 3000) / 1000));
+  document.getElementById('phase').textContent = phases[pi];
+  document.getElementById('elapsed').textContent = (p * 3).toFixed(1) + 's';
+}
+
+function setStreaming(p) {
+  showScene('sc-chat');
+  document.getElementById('approval').style.display = 'none';
+  document.getElementById('bubble-stream').style.display = 'block';
+  document.getElementById('chat-sub').textContent = 'Working · reviewing';
+  document.getElementById('chat-sub').style.color = 'var(--accent)';
+  const words = 'I reviewed ChannelTransport.kt. Cap the relay heartbeat at 15s and fail closed on socket timeout.'.split(' ');
+  const n = Math.floor(easeOut(clamp(p / 0.85, 0, 1)) * words.length);
+  const on = words.slice(0, n).join(' ');
+  const off = words.slice(n).join(' ');
+  document.getElementById('stream-on').textContent = on + (on && off ? ' ' : '');
+  document.getElementById('stream-off').textContent = off;
+  // caret blink when idle at end
+  const caret = document.getElementById('caret');
+  if (p > 0.85) {
+    const blink = Math.floor(p * 3000 / 180) % 2;
+    caret.style.opacity = blink ? '0.15' : '1';
+  } else caret.style.opacity = '1';
+}
+
+function setTool(p) {
+  showScene('sc-chat');
+  document.getElementById('approval').style.display = 'none';
+  document.getElementById('tool-card').style.display = 'block';
+  document.getElementById('chat-sub').textContent = 'Working · cargo test';
+  document.getElementById('chat-sub').style.color = 'var(--accent)';
+  document.getElementById('hair').style.width = `${clamp(p / 0.85, 0, 1) * 100}%`;
+  [0,1,2].forEach(i => {
+    const el = document.getElementById('chip'+i);
+    const start = 0.25 + i * 0.12;
+    const t = easeOut(clamp((p - start) / 0.18, 0, 1));
+    el.style.opacity = t;
+    el.style.transform = `translateY(${(1-t)*4}px)`;
+  });
+}
+
+function setNeedsYou(p) {
+  showScene('sc-bots');
+  const label = document.getElementById('needs-label');
+  const slot = document.getElementById('needs-slot');
+  const drop = easeOut(clamp(p / 0.35, 0, 1));
+  label.style.opacity = drop;
+  if (!slot.dataset.built) {
+    slot.innerHTML = `<div class="row raised" id="needs-row" style="border-left:4px solid var(--accent)">
+      <div class="avatar">R<div class="badge"></div></div>
+      <div class="meta">
+        <div class="name">Reviewer <time>2m</time></div>
+        <div class="line attn" id="needs-line">Needs you · wants to run cargo test --all</div>
+      </div>
+      <span class="unread" id="needs-badge" style="transform:scale(0)">1</span>
+    </div>`;
+    slot.dataset.built = '1';
+  }
+  const row = document.getElementById('needs-row');
+  row.style.opacity = drop;
+  row.style.transform = `translateY(${(1-drop)*8}px)`;
+  // amber strike under label text via box-shadow simulation
+  const line = document.getElementById('needs-line');
+  const strike = easeOut(clamp((p - 0.28) / 0.12, 0, 1));
+  line.style.boxShadow = `inset 0 -2px 0 0 color-mix(in srgb, var(--attn) ${strike*100}%, transparent)`;
+  // badge tick
+  const badge = document.getElementById('needs-badge');
+  const bt = easeOut(clamp((p - 0.45) / 0.2, 0, 1));
+  badge.style.transform = `scale(${bt})`;
+}
+
+function setStrike(p) {
+  showScene('sc-chat');
+  document.getElementById('approval').style.display = 'block';
+  document.getElementById('live-row').style.height = '0';
+  document.getElementById('live-row').style.opacity = '0';
+  const allow = document.getElementById('btn-allow');
+  const band = document.getElementById('strike-band');
+  const plate = document.getElementById('approval');
+  const body = document.getElementById('approval-body');
+  const live = document.getElementById('live-row');
+
+  // Hold plate visible longer so strike reads clearly on camera
+  if (p < 0.18) {
+    const pr = p / 0.18;
+    allow.style.transform = `scale(${lerp(1, 0.96, pr)})`;
+    band.style.transform = 'scaleX(0)';
+    plate.style.display = 'block';
+    plate.style.opacity = 1;
+    plate.style.transform = '';
+    body.style.display = '';
+  } else if (p < 0.38) {
+    // cyan band flash held ~600ms of the clip
+    allow.style.transform = 'scale(0.96)';
+    band.style.transform = 'scaleX(1)';
+    plate.style.display = 'block';
+    plate.style.opacity = 1;
+    plate.style.transform = '';
+  } else if (p < 0.78) {
+    const c = easeOut((p - 0.38) / 0.40);
+    band.style.transform = 'scaleX(0)';
+    allow.style.transform = '';
+    plate.style.display = 'block';
+    plate.style.opacity = String(1 - c);
+    plate.style.transform = `scaleY(${lerp(1, 0.12, c)})`;
+    plate.style.transformOrigin = 'top';
+    live.style.height = `${Math.round(c * 40)}px`;
+    live.style.opacity = String(c);
+  } else {
+    plate.style.display = 'none';
+    plate.style.opacity = 0;
+    plate.style.transform = '';
+    live.style.height = '40px';
+    live.style.opacity = '1';
+    document.getElementById('chat-sub').textContent = 'Running · cargo test';
+    document.getElementById('chat-sub').style.color = 'var(--accent)';
+  }
+}
+
+function setDeny(p) {
+  showScene('sc-chat');
+  document.getElementById('approval').style.display = 'block';
+  document.getElementById('live-row').style.opacity = 0;
+  document.getElementById('live-row').style.height = '0';
+  const plate = document.getElementById('approval');
+  const shear = easeOut(clamp((p - 0.2) / 0.25, 0, 1));
+  plate.style.transform = `translateX(${shear * 4}px)`;
+  plate.style.opacity = String(lerp(1, 0.55, shear));
+  plate.style.boxShadow = shear > 0.1 ? 'inset 1px 0 0 #FF6B5A' : 'none';
+  if (p > 0.55) {
+    document.getElementById('chat-sub').textContent = 'Denied';
+    document.getElementById('chat-sub').style.color = 'var(--neg)';
+  }
+}
+
+function setDone(p) {
+  showScene('sc-chat');
+  document.getElementById('approval').style.display = 'none';
+  document.getElementById('done-card').style.display = 'block';
+  document.getElementById('chat-sub').textContent = 'Done';
+  document.getElementById('chat-sub').style.color = 'var(--pos)';
+  const draw = easeOut(clamp(p / 0.42, 0, 1)); // first 42% of clip ~ matches draw token feel when clip is ~3s: use absolute
+  // Better: draw completes by p=0.45
+  const d = easeOut(clamp(p / 0.45, 0, 1));
+  document.getElementById('done-rule').style.width = `${d * 100}%`;
+  const chip = document.getElementById('checkpoint');
+  const ct = easeOut(clamp((p - 0.5) / 0.2, 0, 1));
+  chip.style.opacity = ct;
+  chip.style.transform = `translateY(${(1-ct)*4}px)`;
+}
+
+function setSkeleton(p) {
+  showScene('sc-bots');
+  document.getElementById('skel').style.display = 'block';
+  const c = document.getElementById('skel-rain');
+  const ctx = c.getContext('2d');
+  const W = c.width, H = c.height;
+  ctx.clearRect(0,0,W,H);
+  const drift = (p * 48) % 24;
+  ctx.strokeStyle = 'rgba(0,212,200,0.16)';
+  ctx.lineWidth = 1;
+  for (let x = -H; x < W + H; x += 16) {
+    ctx.beginPath();
+    ctx.moveTo(x + drift, 0);
+    ctx.lineTo(x + drift + H * 0.4, H);
+    ctx.stroke();
+  }
+}
+
+function setMoment(name) {
+  moment = name;
+  document.getElementById('caption').textContent = captions[name] || name;
+  resetDom();
+  slotCleanup();
+  if (name === 'assemble') showScene('sc-assemble');
+  else if (name === 'pairing') showScene('sc-pair');
+  else if (['streaming','tool','strike','deny','done'].includes(name)) showScene('sc-chat');
+  else showScene('sc-bots');
+  setTime(0);
+}
+
+function slotCleanup() {
+  const slot = document.getElementById('needs-slot');
+  delete slot.dataset.built;
+  slot.innerHTML = '';
+}
+
+function setTime(ms) {
+  tMs = ms;
+  // default clip length 3000ms
+  const dur = 3000;
+  const p = clamp(ms / dur, 0, 1);
+  switch (moment) {
+    case 'thinking': setThinking(p); break;
+    case 'streaming': setStreaming(p); break;
+    case 'tool': setTool(p); break;
+    case 'assemble': showScene('sc-assemble'); setAssemble(p); break;
+    case 'pairing': showScene('sc-pair'); setPairing(p); break;
+    case 'needsyou': setNeedsYou(p); break;
+    case 'strike': setStrike(p); break;
+    case 'deny': setDeny(p); break;
+    case 'done': setDone(p); break;
+    case 'skeleton': setSkeleton(p); break;
+  }
+}
+
+window.__MOTION__ = {
+  setMoment, setTime,
+  moments: Object.keys(captions),
+  duration: 3000,
+  phone: () => document.getElementById('phone'),
+  desk: () => document.getElementById('desk'),
+};
+
+const isDesktop = new URLSearchParams(location.search).has('desktop');
+if (isDesktop) {
+  document.body.classList.add('desktop');
+  const deskContent = document.getElementById('desk-content');
+  const phoneContent = document.querySelector('#phone > .content');
+  // Move scenes into desk so animations target the visible tree
+  while (phoneContent.firstChild) deskContent.appendChild(phoneContent.firstChild);
+  const _setMoment = setMoment;
+  setMoment = function(name) {
+    _setMoment(name);
+    const cd = document.getElementById('caption-desk');
+    if (cd) cd.textContent = captions[name] || name;
+  };
+  window.__MOTION__.setMoment = setMoment;
+}
+
+// idle preview loop if not capturing
+let preview = !new URLSearchParams(location.search).has('capture');
+if (preview) {
+  let i = 0; const keys = Object.keys(captions);
+  setMoment(keys[0]);
+  let start = performance.now();
+  function tick(now) {
+    if (!preview) return;
+    const elapsed = (now - start) % 3000;
+    setTime(elapsed);
+    if (elapsed < 16) { /* near loop */ }
+    // advance moment every 3s
+    const idx = Math.floor(((now - start) / 3000)) % keys.length;
+    if (keys[idx] !== moment) { setMoment(keys[idx]); start = now - (now - start) % 3000; }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+} else {
+  setMoment('thinking');
+}
+</script>
+</body>
+</html>

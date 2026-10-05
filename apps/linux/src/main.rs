@@ -34,42 +34,42 @@ struct Palette {
     warning: &'static str,
 }
 
-// Hypurr tokens (docs/design/hypurr-design-system.md): wet-asphalt neon —
-// asphalt ground, flat electric teal signal.
+// Hypurr tokens (docs/design/hypurr-design-system.md): Sunfield Panel —
+// sunflower ground, cream plates, forest primary.
 const LIGHT: Palette = Palette {
-    background: "#F4F6F5",
-    surface: "#FFFFFF",
-    bubble_agent: "#E8EEEC",
-    bubble_user: "#D5E8E5",
-    border: "#D5DEDB",
-    text: "#0A1210",
-    secondary: "#4A5E5A",
-    tertiary: "#8A9995",
-    accent_fill: "#007A73",
-    on_accent: "#F4F6F5",
-    accent_dim: "#C5DEDB",
-    danger: "#C23B2E",
+    background: "#F2B90D",
+    surface: "#FFF8E8",
+    bubble_agent: "#FFF8E8",
+    bubble_user: "#17140A",
+    border: "#E8DFC8",
+    text: "#17140A",
+    secondary: "#5C5640",
+    tertiary: "#8A8168",
+    accent_fill: "#0E4A38",
+    on_accent: "#FFF8E8",
+    accent_dim: "#FFE7A8",
+    danger: "#A1281C",
     code: "#E8EEEC",
     panel: "#FFFFFF",
-    warning: "#B86A00",
+    warning: "#0E4A38",
 };
 
 const DARK: Palette = Palette {
-    background: "#05070A",
-    surface: "#0B1211",
-    bubble_agent: "#0E1614",
-    bubble_user: "#12302C",
-    border: "#14201E",
-    text: "#E8FFFC",
-    secondary: "#7FA8A3",
-    tertiary: "#3D5552",
-    accent_fill: "#00D4C8",
-    on_accent: "#021412",
-    accent_dim: "#12302C",
-    danger: "#FF6B5A",
+    background: "#0E4A38",
+    surface: "#143D30",
+    bubble_agent: "#1A4A3A",
+    bubble_user: "#F2B90D",
+    border: "#1F5542",
+    text: "#FFF8E8",
+    secondary: "#C8E0D4",
+    tertiary: "#7A9E8E",
+    accent_fill: "#F2B90D",
+    on_accent: "#0E4A38",
+    accent_dim: "#1A4A3A",
+    danger: "#F5A090",
     code: "#080C0B",
     panel: "#0B1211",
-    warning: "#FFB020",
+    warning: "#F2B90D",
 };
 
 fn colors(p: &Palette) -> String {
@@ -78,7 +78,7 @@ fn colors(p: &Palette) -> String {
          @define-color cd_border {};\n@define-color cd_text {};\n@define-color cd_secondary {};\n@define-color cd_tertiary {};\n\
          @define-color cd_accent {};\n@define-color cd_on_accent {};\n@define-color cd_accent_dim {};\n@define-color cd_danger {};\n\
          @define-color cd_code {};\n@define-color cd_panel {};\n@define-color cd_warning {};\n\
-         @define-color cd_flow1 #00D4C8;\n@define-color cd_flow2 #007A73;\n@define-color cd_flow3 #5EAD8A;\n\
+         @define-color cd_flow1 #F2B90D;\n@define-color cd_flow2 #0E4A38;\n@define-color cd_flow3 #E8C46A;\n\
          @define-color cd_on_flow #021412;\n",
         p.background,
         p.surface,
@@ -178,7 +178,7 @@ button.footer-row:hover, button.footer-row:checked { background: @cd_agent; }
 .person-circle { background: @cd_user; border-radius: 999px; color: @cd_secondary; }
 
 /* Menus: a floating panel of rows (DesktopActionMenu / SidebarAccountPanel). */
-popover.panel > contents { background: @cd_panel; border-radius: 4px; padding: 7px; box-shadow: 0 8px 20px rgba(0,0,0,0.25); }
+popover.panel > contents { background: @cd_panel; border-radius: 18px; padding: 7px; box-shadow: 0 8px 20px rgba(0,0,0,0.25); }
 popover.panel > arrow { background: transparent; border: none; }
 button.menu-row { min-height: 30px; padding: 0 10px; border-radius: 10px; background: transparent; box-shadow: none;
   border: none; font-size: 12px; font-weight: normal; color: @cd_text; }
@@ -187,7 +187,7 @@ button.menu-row.danger-text { color: @cd_danger; }
 .menu-divider { background: alpha(@cd_text, 0.13); min-height: 1px; margin: 5px 10px; }
 
 /* Conversation */
-.bubble { border-radius: 4px; padding: 8px 12px; font-size: 12px; color: @cd_text; }
+.bubble { border-radius: 18px; padding: 8px 12px; font-size: 12px; color: @cd_text; }
 .bubble-user { background: @cd_user; }
 .bubble-agent { background: @cd_agent; }
 .time { font-size: 10px; color: @cd_tertiary; }
@@ -196,8 +196,8 @@ button.thread-chip { border-radius: 999px; padding: 5px 10px; background: @cd_su
   min-height: 0; transition: background 120ms; }
 button.thread-chip:hover { background: @cd_agent; }
 button.mention-chip { border-radius: 999px; padding: 6px 10px; background: @cd_surface; box-shadow: none; border: none; min-height: 0; }
-button.working { background: @cd_agent; border-radius: 4px; padding: 12px; box-shadow: none; border: none; min-height: 0; }
-.perm-card { background: @cd_agent; border-radius: 4px; padding: 16px; border-left: 4px solid @cd_accent; }
+button.working { background: @cd_agent; border-radius: 18px; padding: 12px; box-shadow: none; border: none; min-height: 0; }
+.perm-card { background: @cd_agent; border-radius: 18px; padding: 16px; border-left: 4px solid @cd_accent; }
 .choices { background: @cd_bg; border-radius: 14px; }
 button.choice { min-height: 46px; padding: 0 14px; border-radius: 0; background: transparent; box-shadow: none; border: none;
   font-size: 13px; }
@@ -225,7 +225,7 @@ button.chip-x { min-width: 18px; min-height: 18px; padding: 0; background: trans
 button.pick-row { padding: 8px 12px; border-radius: 12px; background: transparent; box-shadow: none; border: none;
   font-weight: normal; font-size: 13px; transition: background 120ms; }
 button.pick-row:hover, button.pick-row.first { background: @cd_agent; }
-.keycap { font-family: monospace; font-size: 10px; color: @cd_secondary; background: @cd_bg; border-radius: 4px;
+.keycap { font-family: monospace; font-size: 10px; color: @cd_secondary; background: @cd_bg; border-radius: 18px;
   min-width: 18px; min-height: 18px; padding: 0 3px; }
 .plus-circle { background: @cd_agent; border-radius: 999px; }
 .field-label { font-size: 11px; color: @cd_secondary; margin-left: 4px; }

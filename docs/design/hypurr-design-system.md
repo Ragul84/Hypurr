@@ -1,65 +1,92 @@
-# Hypurr design system
+# Hypurr design system — Sunfield Panel
 
-**Wet-asphalt neon** — one token set for every client: the web site
-(`web/app/globals.css`), SwiftUI (`kit/Sources/HypurrKit/Design/Theme.swift`,
-`ColorFlow.swift`, `Motion.swift`), GTK (`apps/linux/src/main.rs` palette + CSS),
-Android (`apps/android/.../ui/theme/Theme.kt`), and the terminal UI.
-Change a token in all of them together.
+**Direction B.** One token set for every client: web (`web/app/globals.css`),
+SwiftUI (`kit/.../Theme.swift`), GTK (`apps/linux`), Android
+(`apps/android/.../Theme.kt`), and the TUI. Change a token in all of them together.
+
+Category defaults refused: black+teal AI neon, purple mesh, Material letter-circles,
+instrument/terminal density, congested meta columns.
+
+## Concept
+
+Hypurr is a Teenage Engineering synth panel: sunflower colour field, cream plates
+with a chunky “press” shadow, forest-green primary actions, Cabinet Grotesk
+ExtraBold titles, and friendly cat-face bot tiles.
 
 ## Colour
 
-| Token | Dark (default) | Light |
+| Token | Light (default) | Dark (warm forest, not black) |
 |---|---|---|
-| ground / background | `#05070A` | `#F4F6F5` |
-| raised / surface | `#0B1211` | `#FFFFFF` |
-| ink / text | `#E8FFFC` | `#0A1210` |
-| ink-2 / secondary | `#7FA8A3` | `#4A5E5A` |
-| ink-3 / tertiary | `#3D5552` | `#8A9995` |
-| rule / border | `#14201E` | `#D5DEDB` |
-| accent | `#00D4C8` | `#007A73` |
-| on-accent | `#021412` | `#F4F6F5` |
-| negative / danger | `#FF6B5A` | `#C23B2E` |
-| positive / success | `#5EAD8A` | `#1F7A55` |
-| attention / warning | `#FFB020` | `#B86A00` |
+| ground / background | `#F2B90D` sunflower | `#0E4A38` deep forest |
+| raised / surface | `#FFF8E8` cream | `#143D30` forest plate |
+| cream (cards always) | `#FFF8E8` | `#1A4A3A` |
+| ink / text | `#17140A` | `#FFF8E8` |
+| ink-2 / secondary | `#5C5640` | `#C8E0D4` |
+| ink-3 / tertiary | `#8A8168` | `#7A9E8E` |
+| rule / border | `rgba(23,20,10,0.12)` | `rgba(255,248,232,0.12)` |
+| accent (primary action) | `#0E4A38` forest | `#F2B90D` sunflower |
+| on-accent | `#FFF8E8` | `#0E4A38` |
+| negative / danger | `#A1281C` | `#F5A090` |
+| positive / success | `#0E4A38` | `#5DDB9A` |
+| attention / Needs-you | `#0E4A38` (chip on cream) | `#F2B90D` |
 
-Accent role: **live / primary action** (Allow, Direct, active tab, live editing).
-Attention amber only on the **"Needs you"** label. Negative red only for failed / deny.
+Accent role: **primary action** (Allow once, New, selected tab, send).
+Needs-you uses a forest chip on cream (light) or sunflower chip on forest (dark).
+Danger red only for failed / Deny emphasis.
 
-**Signal language** (replaces the old violet → magenta → cyan colour flow): flat
-teal fills and a 4px cyan **signal band** on live / Needs-you plates. No mesh,
-no purple, no soft UI glow.
+**No teal. No cyan. No purple.**
 
-## Surfaces
+## Surfaces & shape
 
-- Sharp plates: **0–4px** radius on content cards, approvals, bubbles.
-- Nav glass may stay ~22px pill on phone only.
-- Optional thin diagonal rain streaks (1px cyan ~12–22% opacity, never glow).
-
-## Signature interaction — Signal strike
-
-1. User taps **Allow once** on a Needs-you plate.
-2. Press scale 96% → 4px cyan band flashes full-width (~120ms) → plate collapses
-   to a thin live row (~280ms spring) → 3px left rail remains.
-3. Reduced motion: crossfade 150ms; still fire success haptic where available.
-
-## Motion
-
-M3 Expressive springs (stiffness / damping ratio, mass 1):
-
-| Token | Values | Use |
-|---|---|---|
-| spatialFast | 1400 / 0.6 | knobs, chips, press feedback |
-| spatialDefault | 380 / 0.8 | movement, resizing |
-| spatialSlow | 200 / 0.8 | sheets, big panels |
-| effects | 1600 / 1.0 | colour, opacity (no overshoot) |
-| signalStrike | ~900 / 0.75 | approval collapse |
-| bouncy | 0.45 s, bounce 0.38 | confirmations, badges |
-
-Press scale is 0.96.
+- Content cards / bot rows: **18–22px** radius, cream fill.
+- Chunky **press shadow**: `0 4px 0 rgba(23,20,10,0.10)` light; `0 4px 0 rgba(0,0,0,0.35)` dark.
+- Needs-you hero: **26px** radius, stronger press `0 8–12px 0`.
+- Nav bar: ink pill (light) or sunflower/cream pill (dark), ~24px radius.
+- Buttons: **16px** radius; primary = forest fill.
 
 ## Type
 
-- **Display:** Archivo ExtraBold expanded where fonts can be bundled; else system
-  with heavier weight / tighter tracking. (Font bundling may follow in a later PR.)
-- **UI:** Geist or system-ui.
-- **Mono:** JetBrains Mono / existing mono.
+- **Display / UI:** Cabinet Grotesk (Fontshare, ITF Free Font License — app embedding allowed; do not modify/redistribute the font files). Weights 400 / 500 / 700 / 800.
+- Fallback OFL: Bricolage Grotesque (bundled as spare).
+- Titles: ExtraBold 34–40, tracking −0.04em.
+- Row titles: ExtraBold 17.
+- Body: Medium 15.
+- Meta: Bold 12–13.
+- Sentence case everywhere. No ALL CAPS eyebrows.
+
+## Spacing
+
+- Side margin: **18–22px**.
+- Between bot cards: **8–10px**.
+- Hero → list rest: **14–22px**.
+- Max ~2 lines per bot row. Spacious over dense.
+
+## Icons
+
+Custom chunky rounded stroke set (`docs/brand/icons/`). Stroke ~2.1–2.25, round caps.
+Bot identity: cat-face tiles (ink / cream / amber fills), not letter circles.
+
+## Signature interaction — Press Allow
+
+1. Tap **Allow once**.
+2. Button presses down (translateY +2–4px, shadow collapses) → forest flash → approval card compresses into a live cream row with a cat blink.
+3. Reduced motion: 150ms crossfade; still fire success haptic.
+
+## Motion language (Sunfield)
+
+Friendlier restyle of the motion PR catalogue:
+
+| Moment | Sunfield treatment |
+|---|---|
+| Thinking | Cat ear twitch / blink on the bot tile; soft ink-dot typing (not cyan scan) |
+| Creating a bot | Cream tiles assemble into cat face on sunflower |
+| Pairing | Forest label “lights on” with two soft flickers |
+| Approvals | Press-down Allow; Deny shears cream card sideways |
+| Loading | Soft cream shimmer (no rain streaks) |
+| Launch | Sunflower field fades in; title stamps with press shadow |
+
+Springs: keep M3 Expressive spatialFast / Default / Slow / effects; press scale **0.94** (chunkier).
+
+## Dark mode
+
+Warm **deep forest** ground `#0E4A38` with sunflower accent actions — never near-black + teal.
