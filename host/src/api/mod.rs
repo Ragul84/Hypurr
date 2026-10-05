@@ -84,7 +84,7 @@ impl std::error::Error for UnknownMethod {}
 pub fn error_status(e: &anyhow::Error) -> (StatusCode, String) {
     if e.is::<UnknownMethod>() {
         (StatusCode::NOT_FOUND, e.to_string())
-    } else if e.is::<Forbidden>() {
+    } else if e.is::<Forbidden>() || e.is::<crate::admin::NotAllowed>() {
         (StatusCode::FORBIDDEN, e.to_string())
     } else if e.is::<crate::remote::cloud::Conflict>() {
         (StatusCode::CONFLICT, e.to_string())
@@ -242,8 +242,35 @@ fn enable_new_connectors(hub: &Hub, before: &[String]) -> Result<()> {
 }
 
 /// Runs one API method for `caller` (permissions per spec §6.6).
-pub async fn dispatch(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value) -> Result<Value> {
+pub async fn dispatch(hub: &Arc<Hub>, caller: &Caller, method: &str, mut b: Value) -> Result<Value> {
     devices::permit(caller, method)?;
+    // Team admin: the caller's role and the team's rules, then the audit log.
+    let actor = crate::admin::actor(&hub.store, caller);
+    if let Err(e) = crate::admin::authorize(&hub.store, &actor, method, &mut b) {
+        crate::admin::audit::blocked(&hub.store, &actor, method, &e);
+        return Err(e.into());
+    }
+    if !crate::admin::audit::audited(method) {
+        let mut out = run(hub, caller, &actor, method, b).await?;
+        if method == "hello" {
+            out["you"] = actor.json();
+        }
+        return Ok(out);
+    }
+    let before = crate::admin::audit::before(&hub.store, method, &b);
+    let result = run(hub, caller, &actor, method, b.clone()).await;
+    match &result {
+        Ok(out) => crate::admin::audit::after(&hub.store, &actor, method, &b, out, &before),
+        Err(e) => {
+            if let Some(na) = e.downcast_ref::<crate::admin::NotAllowed>() {
+                crate::admin::audit::blocked(&hub.store, &actor, method, na);
+            }
+        }
+    }
+    result
+}
+
+async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, method: &str, b: Value) -> Result<Value> {
     if method.contains("onnector")
         || method.starts_with("composio")
         || method == "setComposioKey"
@@ -408,6 +435,7 @@ pub async fn dispatch(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value) -
                 "device": tokio::task::spawn_blocking(crate::service::device).await?,
                 "home": dirs::home_dir().map(|p| p.to_string_lossy().into_owned()),
                 "backends": backends::list(),
+                "builtinAgent": crate::agent::builtin::status(),
                 "rev": hub.store.current_rev(),
                 "screen": hub.screen.state(),
                 // Shells out to `tailscale`: keep it off the async workers.
@@ -474,8 +502,13 @@ pub async fn dispatch(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value) -
         // One chunk of a file for a later `send` (`attachments`); base64 `data` at `offset`.
         "upload" => {
             use base64::Engine as _;
-            let row = hub.store.bot(str_arg(&b, "botId")?)?.filter(|r| !r.deleted && !r.config.is_group());
-            let root = crate::chat::uploads::root(&row.ok_or_else(|| anyhow!("unknown bot"))?.config);
+            // `draftId` instead of `botId`: a file for a task that hasn't started yet.
+            let root = if let Some(draft) = b["draftId"].as_str() {
+                crate::chat::uploads::draft_root(draft)?
+            } else {
+                let row = hub.store.bot(str_arg(&b, "botId")?)?.filter(|r| !r.deleted && !r.config.is_group());
+                crate::chat::uploads::root(&row.ok_or_else(|| anyhow!("unknown bot"))?.config)
+            };
             let (id, name) = (str_arg(&b, "uploadId")?.to_owned(), str_arg(&b, "name")?.to_owned());
             let data =
                 base64::engine::general_purpose::STANDARD.decode(str_arg(&b, "data")?).context("invalid data")?;
@@ -615,6 +648,66 @@ pub async fn dispatch(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value) -
             hub.send_cmd(bot, Cmd::Permission { entry_id: entry_id.to_owned(), option_id })?;
             json!({})
         }
+        // Beginner tasks and the safety net (`tasks`).
+        "taskSetup" => {
+            let hub = hub.clone();
+            tokio::task::spawn_blocking(move || crate::tasks::setup(&hub.store)).await?
+        }
+        "routeTask" => {
+            let (hub, goal, template) = (
+                hub.clone(),
+                b["goal"].as_str().unwrap_or_default().to_owned(),
+                b["template"].as_str().map(str::to_owned),
+            );
+            json!({"route": tokio::task::spawn_blocking(move || crate::tasks::route(&hub.store, &goal, template.as_deref())).await?})
+        }
+        "startTask" => crate::tasks::start(hub, &b).await?,
+        "tasks" => crate::tasks::list(&hub.store)?,
+        "taskCheckpoint" => {
+            crate::tasks::manual_checkpoint(hub, str_arg(&b, "taskId")?, b["label"].as_str().unwrap_or_default())
+                .await?
+        }
+        "rollbackTask" => crate::tasks::rollback(hub, str_arg(&b, "taskId")?, str_arg(&b, "checkpointId")?).await?,
+        "finishTask" => crate::tasks::finish::finish(hub, str_arg(&b, "taskId")?, &b).await?,
+        "taskCosts" => crate::tasks::costs(&hub.store)?,
+        "integrations" => json!({"integrations": crate::integrations::Integrations::load(&hub.store).public()}),
+        "setIntegrations" => json!({"integrations": crate::integrations::update(&hub.store, &b)?.public()}),
+        "testIntegration" => crate::integrations::test(&hub.store, str_arg(&b, "kind")?).await?,
+        "issues" => {
+            let projects = {
+                let hub = hub.clone();
+                tokio::task::spawn_blocking(move || crate::tasks::projects(&hub.store)).await?
+            };
+            let projects: Vec<_> = match b["project"].as_str() {
+                Some(p) => projects.into_iter().filter(|x| x.path == p).collect(),
+                None => projects,
+            };
+            crate::integrations::issues(&hub.store, &projects).await
+        }
+        "taskTemplates" => json!({"templates": crate::tasks::templates::all(&hub.store)}),
+        "saveTemplate" => {
+            let t: crate::tasks::templates::Template = serde_json::from_value(b).context("invalid template")?;
+            json!({"template": crate::tasks::templates::save(&hub.store, t)?})
+        }
+        "deleteTemplate" => json!({"removed": crate::tasks::templates::delete(&hub.store, str_arg(&b, "id")?)?}),
+        "saveProject" => {
+            let hub = hub.clone();
+            json!({"project": tokio::task::spawn_blocking(move || crate::tasks::save_project(&hub.store, &b)).await??})
+        }
+        "removeProject" => {
+            crate::tasks::remove_project(&hub.store, str_arg(&b, "path")?)?;
+            json!({})
+        }
+        "safetySettings" => json!({"safety": crate::tasks::SafetySettings::load(&hub.store)}),
+        // Team admin (`admin`).
+        "team" => crate::admin::team(&hub.store, actor)?,
+        "setRole" => crate::admin::set_role(&hub.store, actor, &b)?,
+        "setTeam" => crate::admin::set_team(&hub.store, actor, &b)?,
+        "policies" => crate::admin::policies(&hub.store),
+        "setPolicies" => crate::admin::set_policies(&hub.store, &b)?,
+        "auditLog" => crate::admin::audit::list(&hub.store, &b)?,
+        "activity" => crate::admin::activity::activity(&hub.store, &b)?,
+        "setSafetySettings" => json!({"safety": crate::tasks::set_safety(&hub.store, &b)?}),
         "registerDevice" => {
             let ticket = str_arg(&b, "ticket")?;
             if let Some(relay) = b["relay"].as_str().filter(|r| r.starts_with("https://")) {
@@ -791,13 +884,50 @@ pub async fn dispatch(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value) -
             market::remove_skill(&hub.store, str_arg(&b, "id")?)?;
             json!({})
         }
+        "installBuiltinAgent" => {
+            // Consent: the client must pass `consent: true` after showing the notice.
+            if b["consent"] != true {
+                bail!("Confirm installing Hypurr Agent first.");
+            }
+            crate::agent::builtin::install(|line| tracing::info!(%line, "builtin install")).await?
+        }
+        "builtinAgent" => crate::agent::builtin::status(),
         "agentSetup" => {
             let step: crate::agent::term::Step =
                 serde_json::from_value(b["step"].clone()).context("`step` is install or login")?;
             let (cols, rows) = term_size(&b);
             json!({"term": hub.terms.start(str_arg(&b, "backend")?, step, b["method"].as_str(), cols, rows).await?})
         }
-        "agentModels" => crate::agent::auth::models(&hub.store, str_arg(&b, "backend")?).await?,
+        "agentModels" => {
+            let backend = str_arg(&b, "backend")?;
+            match crate::agent::auth::models(&hub.store, backend).await {
+                Ok(v) if backend == crate::agent::builtin::BACKEND_ID => {
+                    // Keep ACP's live list, but always surface the curated free models first.
+                    let mut models = crate::agent::builtin::free_models_json().as_array().cloned().unwrap_or_default();
+                    for m in v["models"].as_array().into_iter().flatten() {
+                        if !models.iter().any(|x| x["id"] == m["id"]) {
+                            models.push(m.clone());
+                        }
+                    }
+                    {
+                        let current = v["currentModelId"]
+                            .as_str()
+                            .filter(|s| !s.is_empty())
+                            .map_or_else(|| json!(crate::agent::builtin::DEFAULT_MODEL), |s| json!(s));
+                        json!({"models": models, "currentModelId": current, "free": true})
+                    }
+                }
+                Ok(v) => v,
+                Err(e) if backend == crate::agent::builtin::BACKEND_ID => {
+                    tracing::info!(
+                        error = format!("{e:#}"),
+                        "hypurr-agent model probe failed; using free gateway list"
+                    );
+                    json!({"models": crate::agent::builtin::free_models_json(), "currentModelId": crate::agent::builtin::DEFAULT_MODEL, "free": true})
+                }
+                Err(e) => return Err(e),
+            }
+        }
         "agentAuth" => crate::agent::auth::check(&hub.store, str_arg(&b, "backend")?).await?,
         "agentAuthenticate" => {
             crate::agent::auth::authenticate(&hub.store, str_arg(&b, "backend")?, str_arg(&b, "method")?).await?
@@ -937,19 +1067,19 @@ struct EventsQuery {
     client: Option<String>,
 }
 
-/// Counts a connected iOS client (pushes are held while one is connected) for as long as its stream lives.
-struct IosClientGuard(Arc<Hub>);
+/// Counts a connected phone client, iOS or Android (pushes are held while one is connected), for as long as its stream lives.
+struct PhoneClientGuard(Arc<Hub>);
 
-impl IosClientGuard {
+impl PhoneClientGuard {
     fn new(hub: Arc<Hub>) -> Self {
-        hub.ios_clients.fetch_add(1, Ordering::Relaxed);
+        hub.phone_clients.fetch_add(1, Ordering::Relaxed);
         Self(hub)
     }
 }
 
-impl Drop for IosClientGuard {
+impl Drop for PhoneClientGuard {
     fn drop(&mut self) {
-        self.0.ios_clients.fetch_sub(1, Ordering::Relaxed);
+        self.0.phone_clients.fetch_sub(1, Ordering::Relaxed);
     }
 }
 
@@ -984,7 +1114,7 @@ pub fn events_stream(
     catch_up.insert(0, hello);
 
     let local = matches!(caller, Caller::Local);
-    let guard = Arc::new((client == Some("ios")).then(|| IosClientGuard::new(hub.clone())));
+    let guard = Arc::new(matches!(client, Some("ios" | "android")).then(|| PhoneClientGuard::new(hub.clone())));
     let tail = live.filter_map(move |msg| {
         let _keep = guard.clone();
         async move {

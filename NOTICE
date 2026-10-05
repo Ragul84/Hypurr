@@ -3,3 +3,13 @@ Copyright (c) 2026 Ragul84
 
 Based on Codync by Po Kai Lee (https://github.com/leepokai/Codync),
 used under the MIT License. The original copyright notice is kept in LICENSE.
+
+---
+
+This product can download and run OpenCode (https://github.com/anomalyco/opencode,
+also published as npm package opencode-ai and Homebrew formula anomalyco/tap/opencode),
+Copyright (c) AnomalyCo / SST contributors, used under the MIT License. OpenCode is not
+vendored in this repository; Hypurr installs a pinned release binary into
+~/.hypurr/agents/opencode with the user's consent. Free Zen models (Big Pickle and
+others) are provided by OpenCode for a limited time under OpenCode's Zen terms; some
+free models may use prompts to improve the model. See https://opencode.ai/docs/zen/.

@@ -20,6 +20,7 @@ Run from the repository root unless a command changes directories:
 - `cd apps/linux && cargo test`: test Linux code; requires GTK 4, libadwaita and VTE GTK 4 development packages.
 - `cd cloud && npm ci && npm test && npm run typecheck`: validate the cloud service; see `docs/guides/cloudflare-testing.md` for integration checks.
 - `cd relay && npm ci && npm test && npm run typecheck`: install dependencies and validate the relay.
+- `cd apps/android && ./gradlew assembleDebug testDebugUnitTest`: build and test the Android app (JDK 17+, Android SDK); `apps/android/scripts/e2e-local-host.sh` checks it against a real local host.
 
 ## Installing a new build: kill the old one first
 
@@ -29,7 +30,7 @@ Always stop the old Mac app, host and iPhone process before running a new build 
 
 - **Every source change ships as a release.** A version bump on `main` is the only release trigger (Auto Tag → DMG, host, Linux app, Homebrew, in-app update), so any change to shipped code (`apps/`, `kit/`, `host/`, `packaging/`) bumps the version before it reaches `main`, without being asked. Docs, `web/`, `cloud/`, `relay/` and CI-only changes don't bump.
 - Pick the bump yourself: patch for fixes and small tweaks, minor for new features or protocol additions. Never bump major (stay on 2.x). One bump per merge into `main`: if `MARKETING_VERSION` is already ahead of the latest `v*` tag, leave it.
-- How: set `MARKETING_VERSION` in `apps/project.yml` and `version` in `host/Cargo.toml` (+ its `Cargo.lock` entry) to the same value, run `xcodegen generate --spec apps/project.yml`, commit as `build: bump version to X.Y.Z`. `CURRENT_PROJECT_VERSION` changes only for App Store uploads.
+- How: set `MARKETING_VERSION` in `apps/project.yml`, `version` in `host/Cargo.toml` (+ its `Cargo.lock` entry) and `versionName`/`versionCode` in `apps/android/app/build.gradle.kts` to the same value, run `xcodegen generate --spec apps/project.yml`, commit as `build: bump version to X.Y.Z`. `CURRENT_PROJECT_VERSION` changes only for App Store uploads.
 
 ## Coding Style & Naming Conventions
 
@@ -41,7 +42,7 @@ Name Swift files after their main `UpperCamelCase` type; use `snake_case.rs` and
 
 ## Cross-platform UI changes
 
-- Any UI change in any client must include the corresponding updates to all other native clients and the TUI in the same change: shared SwiftUI (`kit/Sources/HypurrUI/`), iOS (`apps/ios/`), macOS (`apps/macos/`), Linux GTK (`apps/linux/src/`), and terminal UI (`host/src/tui/`). This applies in every direction; Linux and TUI changes must also be reflected in SwiftUI.
+- Any UI change in any client must include the corresponding updates to all other native clients and the TUI in the same change: shared SwiftUI (`kit/Sources/HypurrUI/`), iOS (`apps/ios/`), macOS (`apps/macos/`), Linux GTK (`apps/linux/src/`), Android (`apps/android/`), and terminal UI (`host/src/tui/`). This applies in every direction; Linux and TUI changes must also be reflected in SwiftUI.
 - Keep shared features, actions, terminology, displayed information, and loading, empty, error, and permission states consistent. Adapt layout, controls, and input to each platform, including terminal keyboard interaction, while preserving the same user-facing behavior.
 - Inspect every client's corresponding implementation before finishing a UI task. Implement applicable changes together; do not silently defer another client. For a platform-only change or an unsupported capability, document which clients are unaffected and the concrete reason in the change summary.
 - Validate each affected client with its relevant build/tests and UI checks. Report any checks that could not run and why.

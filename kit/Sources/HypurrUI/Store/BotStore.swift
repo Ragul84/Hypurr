@@ -849,6 +849,24 @@ public final class BotStore {
         }
     }
 
+    /// Undo on an approval card: stops the task's agent if it's still going, then goes back to the
+    /// checkpoint saved just before that approval. The host keeps what was there as "Before going back".
+    public func undo(_ entry: Entry) {
+        let botId = entry.data.author ?? entry.botId
+        guard let checkpoint = entry.data.checkpoint, let task = bots[botId]?.task else { return }
+        Task {
+            do {
+                if bots[botId]?.isWorking == true {
+                    try? await withLink { try await $0.stop(botId) }
+                    for _ in 0..<20 where bots[botId]?.status == "working" { try? await Task.sleep(for: .milliseconds(250)) }
+                }
+                try await withLink(replay: true) { try await $0.rollbackTask(taskId: task.id, checkpointId: checkpoint) }
+            } catch {
+                lastError = error.localizedDescription
+            }
+        }
+    }
+
     struct ReadingScope: Hashable {
         let botId: String
         let thread: String?

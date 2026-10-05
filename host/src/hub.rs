@@ -56,7 +56,7 @@ pub struct Hub {
     emit_lock: Mutex<()>,
     bots: Mutex<HashMap<String, BotHandle>>,
     runtime: Mutex<HashMap<String, Runtime>>,
-    pub ios_clients: AtomicUsize,
+    pub phone_clients: AtomicUsize,
     pub usage: Mutex<Usage>,
     keep_awake: Mutex<service::KeepAwake>,
     /// Generation of the authorized-device table and pairing offers: bumped on every
@@ -96,7 +96,7 @@ impl Hub {
             emit_lock: Mutex::new(()),
             bots: Mutex::default(),
             runtime: Mutex::default(),
-            ios_clients: AtomicUsize::new(0),
+            phone_clients: AtomicUsize::new(0),
             usage: Mutex::default(),
             keep_awake: Mutex::default(),
             auth: watch::Sender::new(0),
@@ -182,6 +182,9 @@ impl Hub {
         });
         v["lastMessage"] = preview.map(|p| crate::agent::acp::truncate(&p, 280)).into();
         v["lastAt"] = last.map_or(cfg.created_at, |l| l.at).into();
+        if let Some(task) = crate::tasks::Task::for_bot(&self.store, &cfg.id) {
+            v["task"] = task.public();
+        }
         v
     }
 
@@ -218,6 +221,10 @@ impl Hub {
     pub fn create_bot(self: &Arc<Self>, mut cfg: BotConfig) -> Result<Value> {
         cfg.id = uuid::Uuid::new_v4().to_string();
         cfg.created_at = crate::store::now_ms();
+        // Built-in Hypurr Agent: default to a free gateway model when the client didn't pick one.
+        if cfg.backend == crate::agent::builtin::BACKEND_ID && cfg.model.as_deref().unwrap_or("").is_empty() {
+            cfg.model = Some(crate::agent::builtin::DEFAULT_MODEL.to_owned());
+        }
         // No name yet (Grok Bot's flow): it gets one after its first few conversations.
         cfg.auto_name = !cfg.is_group() && cfg.name.trim().is_empty();
         if cfg.auto_name {
@@ -285,6 +292,7 @@ impl Hub {
         self.groups.stop(self, id);
         let _ = self.send_cmd(id, Cmd::Shutdown);
         self.bots.locked().remove(id);
+        crate::tasks::bot_deleted(self, id);
         self.runtime.locked().remove(id);
         {
             let _g = self.emit_lock.locked();
@@ -542,8 +550,8 @@ impl Hub {
         Ok(removed)
     }
 
-    pub fn ios_connected(&self) -> bool {
-        self.ios_clients.load(Ordering::Relaxed) > 0
+    pub fn phone_connected(&self) -> bool {
+        self.phone_clients.load(Ordering::Relaxed) > 0
     }
 }
 

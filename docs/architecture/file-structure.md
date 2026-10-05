@@ -43,13 +43,14 @@ Hypurr/
 │   ├── ios/                   # App/, Views/, Resources/, Widgets/, NotificationService/
 │   ├── macos/                 # App/, Views/, Resources/, LaunchAgents/
 │   ├── linux/                 # GTK 4/libadwaita desktop client
+│   ├── android/               # Kotlin + Jetpack Compose app (Gradle); app/src/{main,test}, scripts/, screenshots/
 │   ├── screen-macos/          # macOS screen helper
 │   └── screen-linux/          # Linux portal/GStreamer screen helper
 ├── cloud/                     # Account API + encrypted relay Worker and Durable Object
 │   ├── src/
 │   ├── migrations/            # D1 migrations
 │   └── test/                  # workerd tests; e2e/ runs against a real test host
-├── relay/                     # Separate APNs push Worker; src/ and test/
+├── relay/                     # Separate push Worker (APNs + FCM); src/ and test/
 ├── docs/                      # Architecture, guides, reference, features, design, archive
 ├── tools/                     # Widget rendering utilities
 ├── packaging/                 # Distribution templates
@@ -67,12 +68,17 @@ Hypurr/
 | CLI and background service | `host/src/main.rs`, `service.rs` |
 | API, caller permissions, event ordering | `host/src/api/`, `hub.rs` |
 | SQLite transcript, bots, lanes and sessions | `host/src/store.rs` |
-| Agent process, ACP, queue and session lifecycle | `host/src/agent/bot.rs`, `acp.rs` |
+| Agent process, ACP, queue and session lifecycle | `host/src/agent/ (incl. `builtin.rs` — managed Hypurr Agent)
+bot.rs`, `acp.rs` |
+| Beginner tasks: router, templates, safety net, risk rules, finish, cost | `host/src/tasks/` |
+| Work tools: GitHub, Jira, Slack / Teams webhooks | `host/src/integrations/` |
+| Team admin: roles, rules, audit log, activity | `host/src/admin/` (gate in `api::dispatch`) |
 | Group room turns / bot-to-bot requests | `host/src/chat/group.rs` / `team.rs` |
 | Prompt snapshots and memory keeper | `host/src/chat/context.rs`, `memory.rs` |
 | Identity, encryption and direct channel | `host/src/remote/identity.rs`, `crypto.rs`, `channel.rs` |
 | Host cloud state and relay connection | `host/src/remote/cloud.rs`, `relay.rs` |
-| Agent discovery, sign-in, setup terminal | `host/src/agent/backends.rs`, `registry.rs`, `auth.rs`, `term.rs` |
+| Agent discovery, sign-in, setup terminal | `host/src/agent/ (incl. `builtin.rs` — managed Hypurr Agent)
+backends.rs`, `registry.rs`, `auth.rs`, `term.rs` |
 | Marketplace, Composio, connector OAuth | `host/src/market/` |
 | Screen bridge and built-in MCP tools | `host/src/screen.rs`, `mcp.rs` |
 | Swift transport and cloud API | `kit/Sources/HypurrKit/Client/` |

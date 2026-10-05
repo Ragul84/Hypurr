@@ -1,0 +1,478 @@
+{
+  "hello": {
+    "you": {
+      "key": "lkBeNd0DrTuv8gVQ-crAADIulm7cowodVcZ63UCyU-M",
+      "name": "Priya's phone",
+      "role": "viewer"
+    }
+  },
+  "team": {
+    "you": {
+      "key": "local",
+      "name": "This computer",
+      "role": "admin"
+    },
+    "defaultRole": "member",
+    "people": [
+      {
+        "key": "local",
+        "name": "This computer",
+        "platform": "macos",
+        "role": "admin",
+        "fixed": true,
+        "you": true
+      },
+      {
+        "key": "T53oBdatyaaCHYUFS7-DS7zl6tvtumOE0J8PmdDU6ZQ",
+        "name": "Arjun's Pixel",
+        "platform": "android",
+        "role": "admin",
+        "ownRole": true,
+        "lastSeenAt": 1791142159619,
+        "you": false
+      },
+      {
+        "key": "lkBeNd0DrTuv8gVQ-crAADIulm7cowodVcZ63UCyU-M",
+        "name": "Priya's phone",
+        "platform": "android",
+        "role": "viewer",
+        "ownRole": true,
+        "lastSeenAt": 1791142159471,
+        "you": false
+      }
+    ]
+  },
+  "policies": {
+    "policies": {
+      "allowedAgents": [
+        "custom"
+      ],
+      "dailyLimit": 0.0,
+      "taskLimit": 0.0,
+      "askFrom": "high",
+      "adminApprovesFrom": "low"
+    },
+    "safety": {
+      "protectedBranches": [
+        "main"
+      ],
+      "blockProtected": true,
+      "alwaysAskHigh": true,
+      "requireGit": false
+    },
+    "spentToday": 0.0,
+    "agents": []
+  },
+  "card": {
+    "id": "604e0ee7-185f-4482-beee-fdbda27a4bf0",
+    "seq": 4,
+    "botId": "ead7661b-06c0-43d7-a18f-e09b012fb07b",
+    "threadId": null,
+    "rev": 12,
+    "kind": "permission",
+    "turn": 1,
+    "data": {
+      "title": "Edit a.txt",
+      "toolKind": "edit",
+      "command": "sed -i s/x/y/ a.txt",
+      "detail": "",
+      "diffs": [],
+      "cwd": "/Users/priya/shop",
+      "options": [
+        {
+          "optionId": "allow",
+          "name": "Allow",
+          "kind": "allow_once"
+        },
+        {
+          "optionId": "always",
+          "name": "Always",
+          "kind": "allow_always"
+        },
+        {
+          "optionId": "no",
+          "name": "Reject",
+          "kind": "reject_once"
+        }
+      ],
+      "status": "pending",
+      "selected": null,
+      "risk": "low",
+      "explain": "The agent wants to change files in the project (sed -i s/x/y/ a.txt).",
+      "riskReasons": [
+        "Edits inside the project can be undone from a checkpoint."
+      ],
+      "needsAdmin": true,
+      "author": "ead7661b-06c0-43d7-a18f-e09b012fb07b"
+    },
+    "createdAt": 1791142160086,
+    "updatedAt": 1791142160086
+  },
+  "auditLog": {
+    "entries": [
+      {
+        "seq": 11,
+        "at": 1791142160196,
+        "actor": "lkBeNd0DrTuv8gVQ-crAADIulm7cowodVcZ63UCyU-M",
+        "actorName": "Priya's phone",
+        "role": "viewer",
+        "action": "blocked",
+        "target": "auditLog",
+        "detail": {
+          "reason": "You're a viewer on this computer, so you can only look. Ask an admin."
+        },
+        "hash": "8241bf30c5d672a4faab4f38dea5a30e09a24830dfa745b73b732cc05a440193"
+      },
+      {
+        "seq": 10,
+        "at": 1791142160191,
+        "actor": "lkBeNd0DrTuv8gVQ-crAADIulm7cowodVcZ63UCyU-M",
+        "actorName": "Priya's phone",
+        "role": "viewer",
+        "action": "blocked",
+        "target": "send",
+        "detail": {
+          "reason": "You're a viewer on this computer, so you can only look. Ask an admin."
+        },
+        "hash": "01954897ecae7ec486205efd5086af496ea67b548339c33137bb0027354831e0"
+      },
+      {
+        "seq": 9,
+        "at": 1791142160189,
+        "actor": "local",
+        "actorName": "This computer",
+        "role": "admin",
+        "action": "role.change",
+        "target": "Priya's phone",
+        "detail": {
+          "key": "lkBeNd0DrTuv8gVQ-crAADIulm7cowodVcZ63UCyU-M",
+          "role": "viewer"
+        },
+        "hash": "f8c027daad0551eeae18ca416997aab6690778c066def3b21e80d3aa3a74cc52"
+      },
+      {
+        "seq": 8,
+        "at": 1791142160115,
+        "actor": "T53oBdatyaaCHYUFS7-DS7zl6tvtumOE0J8PmdDU6ZQ",
+        "actorName": "Arjun's Pixel",
+        "role": "admin",
+        "action": "approval.answer",
+        "target": "Edit a.txt",
+        "detail": {
+          "title": "Edit a.txt",
+          "risk": "low",
+          "explain": "The agent wants to change files in the project (sed -i s/x/y/ a.txt).",
+          "answer": "allow_once",
+          "botId": "ead7661b-06c0-43d7-a18f-e09b012fb07b",
+          "bot": "Tester"
+        },
+        "hash": "b121ec1944d39bb29426c0e18d38a961cc9ae803bb17ba87d0d85bc19fb982df"
+      },
+      {
+        "seq": 7,
+        "at": 1791142160113,
+        "actor": "lkBeNd0DrTuv8gVQ-crAADIulm7cowodVcZ63UCyU-M",
+        "actorName": "Priya's phone",
+        "role": "member",
+        "action": "blocked",
+        "target": "respondPermission",
+        "detail": {
+          "reason": "Your team's rules say an admin approves low risk requests."
+        },
+        "hash": "8b69cb9d058f8daf35695a7c23fa0a4911a24cd0d09b0b8d161f6d2bcce0d520"
+      },
+      {
+        "seq": 6,
+        "at": 1791142159648,
+        "actor": "lkBeNd0DrTuv8gVQ-crAADIulm7cowodVcZ63UCyU-M",
+        "actorName": "Priya's phone",
+        "role": "member",
+        "action": "bot.create",
+        "target": "Tester",
+        "detail": {
+          "botId": "ead7661b-06c0-43d7-a18f-e09b012fb07b",
+          "agent": "custom",
+          "kind": "agent"
+        },
+        "hash": "c5bf9eb4503b99fea7cbed64f9b47a2df48b9006f3ab8c99f5f38bef3ac65ab2"
+      },
+      {
+        "seq": 5,
+        "at": 1791142159644,
+        "actor": "lkBeNd0DrTuv8gVQ-crAADIulm7cowodVcZ63UCyU-M",
+        "actorName": "Priya's phone",
+        "role": "member",
+        "action": "blocked",
+        "target": "createBot",
+        "detail": {
+          "reason": "Your team's rules don't allow the agent “claude”. Pick another one."
+        },
+        "hash": "7b2481a51e78434f4faef9b975a0f84744b20b9bcb1adfedd2d5b3cfde46c1fe"
+      },
+      {
+        "seq": 4,
+        "at": 1791142159638,
+        "actor": "T53oBdatyaaCHYUFS7-DS7zl6tvtumOE0J8PmdDU6ZQ",
+        "actorName": "Arjun's Pixel",
+        "role": "admin",
+        "action": "policy.change",
+        "target": "Team rules",
+        "detail": {
+          "allowedAgents": [
+            "custom"
+          ],
+          "adminApprovesFrom": "low",
+          "protectedBranches": [
+            "main"
+          ]
+        },
+        "hash": "dffb7e23204c7483787bf37bee833164104398b4638512aa8536478685f41a92"
+      },
+      {
+        "seq": 3,
+        "at": 1791142159634,
+        "actor": "lkBeNd0DrTuv8gVQ-crAADIulm7cowodVcZ63UCyU-M",
+        "actorName": "Priya's phone",
+        "role": "member",
+        "action": "blocked",
+        "target": "setPolicies",
+        "detail": {
+          "reason": "You're a member on this computer, so you can't change this. Ask an admin."
+        },
+        "hash": "af8089c7c3f9644c80b17088155a132b9adac27ad7d9a1dfad605460afb1c1c9"
+      },
+      {
+        "seq": 2,
+        "at": 1791142159602,
+        "actor": "local",
+        "actorName": "This computer",
+        "role": "admin",
+        "action": "role.change",
+        "target": "Arjun's Pixel",
+        "detail": {
+          "key": "T53oBdatyaaCHYUFS7-DS7zl6tvtumOE0J8PmdDU6ZQ",
+          "role": "admin"
+        },
+        "hash": "3283d19d3f2f68a5c417c83c9fdcfb79869cc5323a84506c9f3cdd28c3e0686f"
+      },
+      {
+        "seq": 1,
+        "at": 1791142159563,
+        "actor": "local",
+        "actorName": "This computer",
+        "role": "admin",
+        "action": "role.default",
+        "target": "New devices",
+        "detail": {
+          "defaultRole": "member"
+        },
+        "hash": "452d38cc1da1920c9559cabf2c7a66397e2549396aacc469cf5e437ea44febed"
+      }
+    ],
+    "count": 11,
+    "intact": true,
+    "brokenAt": null
+  },
+  "activity": {
+    "days": 7,
+    "people": [
+      {
+        "key": "local",
+        "name": "This computer",
+        "role": "admin",
+        "tasks": 0,
+        "spend": 0.0,
+        "approvals": 0,
+        "blocked": 0
+      },
+      {
+        "key": "T53oBdatyaaCHYUFS7-DS7zl6tvtumOE0J8PmdDU6ZQ",
+        "name": "Arjun's Pixel",
+        "role": "admin",
+        "lastSeenAt": 1791142159619,
+        "tasks": 0,
+        "spend": 0.0,
+        "approvals": 1,
+        "blocked": 0
+      },
+      {
+        "key": "lkBeNd0DrTuv8gVQ-crAADIulm7cowodVcZ63UCyU-M",
+        "name": "Priya's phone",
+        "role": "viewer",
+        "lastSeenAt": 1791142159471,
+        "tasks": 0,
+        "spend": 0.0,
+        "approvals": 0,
+        "blocked": 5
+      }
+    ],
+    "tasks": [],
+    "events": [
+      {
+        "seq": 11,
+        "at": 1791142160196,
+        "actor": "lkBeNd0DrTuv8gVQ-crAADIulm7cowodVcZ63UCyU-M",
+        "actorName": "Priya's phone",
+        "role": "viewer",
+        "action": "blocked",
+        "target": "auditLog",
+        "detail": {
+          "reason": "You're a viewer on this computer, so you can only look. Ask an admin."
+        },
+        "hash": "8241bf30c5d672a4faab4f38dea5a30e09a24830dfa745b73b732cc05a440193"
+      },
+      {
+        "seq": 10,
+        "at": 1791142160191,
+        "actor": "lkBeNd0DrTuv8gVQ-crAADIulm7cowodVcZ63UCyU-M",
+        "actorName": "Priya's phone",
+        "role": "viewer",
+        "action": "blocked",
+        "target": "send",
+        "detail": {
+          "reason": "You're a viewer on this computer, so you can only look. Ask an admin."
+        },
+        "hash": "01954897ecae7ec486205efd5086af496ea67b548339c33137bb0027354831e0"
+      },
+      {
+        "seq": 9,
+        "at": 1791142160189,
+        "actor": "local",
+        "actorName": "This computer",
+        "role": "admin",
+        "action": "role.change",
+        "target": "Priya's phone",
+        "detail": {
+          "key": "lkBeNd0DrTuv8gVQ-crAADIulm7cowodVcZ63UCyU-M",
+          "role": "viewer"
+        },
+        "hash": "f8c027daad0551eeae18ca416997aab6690778c066def3b21e80d3aa3a74cc52"
+      },
+      {
+        "seq": 8,
+        "at": 1791142160115,
+        "actor": "T53oBdatyaaCHYUFS7-DS7zl6tvtumOE0J8PmdDU6ZQ",
+        "actorName": "Arjun's Pixel",
+        "role": "admin",
+        "action": "approval.answer",
+        "target": "Edit a.txt",
+        "detail": {
+          "title": "Edit a.txt",
+          "risk": "low",
+          "explain": "The agent wants to change files in the project (sed -i s/x/y/ a.txt).",
+          "answer": "allow_once",
+          "botId": "ead7661b-06c0-43d7-a18f-e09b012fb07b",
+          "bot": "Tester"
+        },
+        "hash": "b121ec1944d39bb29426c0e18d38a961cc9ae803bb17ba87d0d85bc19fb982df"
+      },
+      {
+        "seq": 7,
+        "at": 1791142160113,
+        "actor": "lkBeNd0DrTuv8gVQ-crAADIulm7cowodVcZ63UCyU-M",
+        "actorName": "Priya's phone",
+        "role": "member",
+        "action": "blocked",
+        "target": "respondPermission",
+        "detail": {
+          "reason": "Your team's rules say an admin approves low risk requests."
+        },
+        "hash": "8b69cb9d058f8daf35695a7c23fa0a4911a24cd0d09b0b8d161f6d2bcce0d520"
+      },
+      {
+        "seq": 6,
+        "at": 1791142159648,
+        "actor": "lkBeNd0DrTuv8gVQ-crAADIulm7cowodVcZ63UCyU-M",
+        "actorName": "Priya's phone",
+        "role": "member",
+        "action": "bot.create",
+        "target": "Tester",
+        "detail": {
+          "botId": "ead7661b-06c0-43d7-a18f-e09b012fb07b",
+          "agent": "custom",
+          "kind": "agent"
+        },
+        "hash": "c5bf9eb4503b99fea7cbed64f9b47a2df48b9006f3ab8c99f5f38bef3ac65ab2"
+      },
+      {
+        "seq": 5,
+        "at": 1791142159644,
+        "actor": "lkBeNd0DrTuv8gVQ-crAADIulm7cowodVcZ63UCyU-M",
+        "actorName": "Priya's phone",
+        "role": "member",
+        "action": "blocked",
+        "target": "createBot",
+        "detail": {
+          "reason": "Your team's rules don't allow the agent “claude”. Pick another one."
+        },
+        "hash": "7b2481a51e78434f4faef9b975a0f84744b20b9bcb1adfedd2d5b3cfde46c1fe"
+      },
+      {
+        "seq": 4,
+        "at": 1791142159638,
+        "actor": "T53oBdatyaaCHYUFS7-DS7zl6tvtumOE0J8PmdDU6ZQ",
+        "actorName": "Arjun's Pixel",
+        "role": "admin",
+        "action": "policy.change",
+        "target": "Team rules",
+        "detail": {
+          "allowedAgents": [
+            "custom"
+          ],
+          "adminApprovesFrom": "low",
+          "protectedBranches": [
+            "main"
+          ]
+        },
+        "hash": "dffb7e23204c7483787bf37bee833164104398b4638512aa8536478685f41a92"
+      },
+      {
+        "seq": 3,
+        "at": 1791142159634,
+        "actor": "lkBeNd0DrTuv8gVQ-crAADIulm7cowodVcZ63UCyU-M",
+        "actorName": "Priya's phone",
+        "role": "member",
+        "action": "blocked",
+        "target": "setPolicies",
+        "detail": {
+          "reason": "You're a member on this computer, so you can't change this. Ask an admin."
+        },
+        "hash": "af8089c7c3f9644c80b17088155a132b9adac27ad7d9a1dfad605460afb1c1c9"
+      },
+      {
+        "seq": 2,
+        "at": 1791142159602,
+        "actor": "local",
+        "actorName": "This computer",
+        "role": "admin",
+        "action": "role.change",
+        "target": "Arjun's Pixel",
+        "detail": {
+          "key": "T53oBdatyaaCHYUFS7-DS7zl6tvtumOE0J8PmdDU6ZQ",
+          "role": "admin"
+        },
+        "hash": "3283d19d3f2f68a5c417c83c9fdcfb79869cc5323a84506c9f3cdd28c3e0686f"
+      },
+      {
+        "seq": 1,
+        "at": 1791142159563,
+        "actor": "local",
+        "actorName": "This computer",
+        "role": "admin",
+        "action": "role.default",
+        "target": "New devices",
+        "detail": {
+          "defaultRole": "member"
+        },
+        "hash": "452d38cc1da1920c9559cabf2c7a66397e2549396aacc469cf5e437ea44febed"
+      }
+    ],
+    "totals": {
+      "spend": 0.0,
+      "todaySpend": 0.0,
+      "todayTasks": 0,
+      "approvals": 1,
+      "blocked": 5
+    }
+  }
+}

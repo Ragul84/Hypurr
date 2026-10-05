@@ -53,6 +53,17 @@ Remote activity content contains only `status`, empty `activity`, and `startedAt
 
 An existing activity can receive background APNs updates. Automatically starting activities for tasks initiated elsewhere is not enabled: that requires a separate push-to-start token flow and product preferences. Home Screen widgets keep their existing WidgetKit refresh scheduling and do not become real-time feeds through this change.
 
+## Android (FCM)
+
+The Android app follows the same contract with FCM in place of APNs: it registers its FCM token with
+`POST /register {token, env: "fcm", kind: "alert"}` and hands the ticket and its X25519 push key to
+`registerDevice`. The host's `push-batch` is unchanged; for an `fcm` ticket the Worker sends an FCM
+HTTP v1 data message (generic `title`/`body`, `sealed`, `botId`, `computerId`, `ctx`, `threadId`,
+`category`) and the app's `FirebaseMessagingService` decrypts `sealed` before showing it. A dead token
+(`UNREGISTERED` / 404) answers 410 so the host drops the ticket. There are no Live Activity tickets on
+Android, and an open Android event stream holds pushes like the iOS app. Setup:
+[Android guide](../guides/android.md#push-notifications-fcm).
+
 ## Worker contract
 
 Alert kinds are `done`, `needsInput`, and `failed`.

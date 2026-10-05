@@ -45,6 +45,8 @@ public struct Bot: Codable, Identifiable, Hashable, Sendable {
     public var unread: Int
     public var lastMessage: String?
     public var lastAt: Int64
+    /// Set when this bot runs a beginner task (host `tasks`).
+    public var task: TaskInfo? = nil
 
     public var isGroup: Bool { kind == "group" }
     public var isWorking: Bool { status == "working" || status == "needsInput" }
@@ -135,6 +137,19 @@ public struct EntryData: Codable, Hashable, Sendable {
     public var attachments: [Attachment]?
     /// notice: a finished voice call's length.
     public var callSeconds: Int?
+    /// permission: low | medium | high, from the host's risk rules.
+    public var risk: String?
+    /// permission: one plain sentence ("The agent wants to delete build and everything inside.").
+    public var explain: String?
+    public var riskReasons: [String]?
+    /// permission: the safety net refused it without asking; why, in plain words.
+    public var blocked: String?
+    /// permission: the task checkpoint saved just before it (Undo goes back here).
+    public var checkpoint: String?
+    /// notice: a finished task's "What changed" card (learning mode, PR, cost).
+    public var learning: TaskLearning?
+    /// permission: the team's rules say an admin approves this one.
+    public var needsAdmin: Bool?
 
     public init(text: String? = nil, status: String? = nil, clientNonce: String? = nil) {
         self.text = text
@@ -333,6 +348,19 @@ public struct Hello: Codable, Sendable {
     public var `protocol`: Int?
     /// The cloud relay the host uses; nil = cloud off.
     public var cloud: String?
+    /// Who this device is on the computer (team admin); missing from older hosts.
+    public var you: TeamActor?
+}
+
+/// A person (device) on the computer and their role: `admin` | `member` | `viewer`.
+public struct TeamActor: Codable, Hashable, Sendable {
+    public var key: String
+    public var name: String
+    public var role: String
+
+    public var isAdmin: Bool { role == "admin" }
+    /// Viewers can only look.
+    public var canAct: Bool { role != "viewer" }
 }
 
 /// The computer's remote screen: whether phones can view/control it, and who's in control.
@@ -524,5 +552,93 @@ extension Bot {
         unread = try c.decodeIfPresent(Int.self, forKey: .unread) ?? 0
         lastMessage = try c.decodeIfPresent(String.self, forKey: .lastMessage)
         lastAt = try c.decodeIfPresent(Int64.self, forKey: .lastAt) ?? createdAt
+        task = try? c.decodeIfPresent(TaskInfo.self, forKey: .task)
     }
+}
+
+/// A saved point on a task's branch.
+public struct TaskCheckpoint: Codable, Hashable, Sendable, Identifiable {
+    public var id: String
+    public var label: String?
+    public var at: Int64?
+    public var files: [String]?
+}
+
+/// A beginner task (host `tasks::Task`), carried on its bot. Everything but `id` is optional: lenient.
+public struct TaskInfo: Codable, Hashable, Sendable, Identifiable {
+    public var id: String
+    public var goal: String?
+    public var title: String?
+    public var template: String?
+    public var project: String?
+    public var projectName: String?
+    public var backend: String?
+    /// worktree | none
+    public var safety: String?
+    public var branch: String?
+    public var base: String?
+    public var worktree: String?
+    /// active | finishing | finished
+    public var status: String?
+    public var checkpoints: [TaskCheckpoint]?
+    /// The GitHub issue or Jira ticket it started from.
+    public var issue: TaskIssue?
+    public var usage: TaskUsage?
+    /// The learning-mode summary, once finished.
+    public var summary: String?
+    public var pr: TaskPullRequest?
+
+    public var hasSafetyNet: Bool { safety != "none" && branch != nil && worktree != nil }
+    public var isActive: Bool { status != "finished" && status != "finishing" }
+    public var isFinishing: Bool { status == "finishing" }
+}
+
+public struct TaskIssue: Codable, Hashable, Sendable {
+    /// github | jira
+    public var source: String?
+    public var key: String?
+    public var title: String?
+    public var url: String?
+}
+
+public struct TaskPullRequest: Codable, Hashable, Sendable {
+    public var number: Int?
+    public var url: String?
+}
+
+public struct TaskFileChange: Codable, Hashable, Sendable {
+    public var path: String
+    public var added: Int?
+    public var removed: Int?
+}
+
+/// Per-task tokens and cost (host `tasks::cost`); `estimated` when priced from list rates.
+public struct TaskUsage: Codable, Hashable, Sendable {
+    public var totalTokens: Int?
+    public var cost: Double?
+    public var currency: String?
+    public var estimated: Bool?
+    public var turns: Int?
+
+    /// "$0.12", "≈ $0.12" or "less than $0.01".
+    public var label: String {
+        let c = cost ?? 0
+        let amount = c > 0 && c < 0.01 ? "less than $0.01" : "$" + String(format: "%.2f", c)
+        return estimated == true ? "≈ " + amount : amount
+    }
+}
+
+/// Learning mode: what a finished task changed and why.
+public struct TaskLearning: Codable, Hashable, Sendable {
+    public var title: String?
+    public var summary: String?
+    public var files: [TaskFileChange]?
+    public var added: Int?
+    public var removed: Int?
+    public var branch: String?
+    public var pr: TaskPullRequest?
+    public var cost: TaskUsage?
+    /// slack | teams | jira
+    public var posted: [String]?
+    public var errors: [String]?
 }

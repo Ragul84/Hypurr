@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Direct connections are ws:// to the computer's LAN / Tailscale address. Every message on them is
+     end-to-end encrypted and authenticated by the channel (docs/reference/remote-relay.md §6), so
+     cleartext transport is allowed; the cloud relay and the push relay are https only. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

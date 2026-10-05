@@ -31,8 +31,11 @@ Hypurr turns the coding agents on your computer — Claude Code, Codex, Cursor, 
 - **Free and open source.** No subscription, no paid tier, MIT licensed. It runs on your computer with the agents and accounts you already have.
 - **Bring any coding agent.** Claude Code, Codex, Cursor, Gemini, Copilot, OpenCode, Pi, Grok Build and ~40 more — everything in the [ACP registry](https://agentclientprotocol.com/registry). Installed agents are found automatically, the rest are fetched on first use, and every bot picks its own. Mix them freely: a Claude bot can ask a Codex bot for a review.
 - **Many bots, one team.** Run as many bots as you like side by side, each with its own agent, project folder and approvals, all working at once. Put several in a **group chat** and they answer in turn, like a team channel; `@name` picks who replies. Start a **thread** on any message to branch off without cluttering the main chat.
+- **Safe for beginners at work.** Describe what you need in plain words or pick a template (write tests, fix this error, review my PR, update dependencies, explain this code). Hypurr picks the project and agent, runs the task on its own branch with checkpoints you can go back to in one tap, explains every approval in plain words with a risk level, and blocks risky moves like pushing to `main`. See [tasks and the safety net](docs/features/tasks-and-safety.md).
+- **Fits how your team works.** Paste a screenshot or error into a new task, or start from a GitHub issue or Jira ticket. When it's done, Hypurr explains what changed and why in plain words (learning mode), opens a pull request, comments on the ticket, posts to Slack or Teams, and shows what each task cost. See [work tools](docs/features/integrations.md).
+- **Ready for teams.** Give each phone a role (admin, member, viewer), set the rules once (allowed agents, daily and per-task spending limits, which risks always ask or need an admin, protected branches), see what everyone's agents did, and keep an append-only, tamper-evident audit log. See [team admin](docs/features/team-admin.md).
 - **Built in Rust.** `hypurr-host` is one small, fast Rust binary for macOS and Linux (static on Linux, runs on any distro) that drives every agent, keeps the transcripts and serves every client.
-- **Native on every platform.** SwiftUI on iPhone and Mac, GTK 4 / libadwaita on Linux, and a terminal UI for SSH. No web views, no Electron.
+- **Native on every platform.** SwiftUI on iPhone and Mac, Jetpack Compose on Android, GTK 4 / libadwaita on Linux, and a terminal UI for SSH. No web views, no Electron.
 - **A 1:1 Grok Bot / Muse alternative.** Persistent named bots, group chats, reply threads, bots asking each other for help, approval cards, per-bot memory, remote screen, voice calls and "needs you / done" notifications — the same features, without being tied to one model or one subscription.
 - **Reach your computer from anywhere.** Deploy the included Cloudflare relay (`cloud/`) on your own account: no Tailscale, no VPN, no port forwarding. Traffic is end-to-end encrypted between your phone and your computer, so the relay only forwards ciphertext. Same Wi-Fi or Tailscale? The phone connects directly instead.
 - **Every computer, one app.** Sign in and your iPhone lists every computer on your account (Mac, Linux desktop, server or cloud VM); tap **Connect**, confirm a 6-digit code on that computer, and its bots show up next to the others. A new bot can live on any of them, and the Mac app reaches your SSH machines too. Each computer approves each device itself, so an account alone never unlocks a computer.
@@ -45,6 +48,7 @@ Hypurr turns the coding agents on your computer — Claude Code, Codex, Cursor, 
 | | Platform | App | Highlights |
 |---|---|---|---|
 | 📱 | **iPhone** | Native SwiftUI | Chat with bots, approvals, push notifications, Live Activity, widgets, remote screen, voice calls |
+| 🤖 | **Android** | Native Kotlin + Jetpack Compose (Material 3) | QR pairing, chat with bots, approvals, "needs you", push via FCM (remote screen and voice not yet) |
 | 💻 | **macOS** | Native SwiftUI, menu bar + window | Runs the host, chat window, usage in the menu bar, iPhone pairing |
 | 🐧 | **Linux** | Native GTK 4 / libadwaita | Runs the host (desktop or headless server), chat app |
 | ⌨️ | **Terminal** | `hypurr-host tui` | Message your bots from any terminal, over SSH too |
@@ -54,9 +58,9 @@ The host (`hypurr-host`, Rust) runs on macOS and Linux; every client talks to it
 ## How it works
 
 ```text
-Remote Apple client ⇄ encrypted channel (direct or Cloudflare cloud/) ⇄ hypurr-host ⇄ ACP agent
+Remote phone/Mac    ⇄ encrypted channel (direct or Cloudflare cloud/) ⇄ hypurr-host ⇄ ACP agent
 Local / SSH client  ⇄ loopback HTTP + SSE                             ⇄ hypurr-host
-Host notifications → APNs worker (relay/) → iPhone
+Host notifications → push worker (relay/) → APNs → iPhone · FCM → Android
 ```
 
 - **Bots** have a name, a character avatar, standing instructions, an agent backend, a project folder and a permission policy. Each bot has **a persistent main chat and optional reply threads**; the agent sessions underneath are an implementation detail (resumed with `session/load`, restarted with *New session*).
@@ -91,6 +95,8 @@ All three install the same signed, notarized app.
 Open Hypurr: it sets up the host on first launch. **Open Hypurr** opens the full window; **Pair iPhone…** shows the QR code.
 
 **iPhone** — [get Hypurr on the App Store](https://apps.apple.com/app/hypurr/id0000000000) (iOS 18+, free), then scan the QR code from **Pair iPhone…** on the Mac, the Linux app or `hypurr-host pair`.
+
+**Android** — build the debug APK from `apps/android/` (`./gradlew assembleDebug`, JDK 17+ and the Android SDK; CI attaches it to every run as `hypurr-debug-apk`), install it, then scan the same QR code. Details and push setup: [Android guide](docs/guides/android.md).
 
 **Linux** — the host, plus the native GTK 4 / libadwaita app:
 
@@ -140,11 +146,12 @@ Data lives in `~/.hypurr`. The local bearer token authorizes loopback helpers an
 | `apps/ios/Widgets/` | Bots, usage and per-provider usage widgets + bot Live Activity |
 | `apps/macos/` | Menu bar + native chat window; installs/monitors the host |
 | `apps/linux/` | Native Linux app (GTK 4 + libadwaita, Rust) |
+| `apps/android/` | Native Android app (Kotlin, Jetpack Compose, Material 3): pairing, chat, approvals, FCM push |
 | `cloud/` | Cloudflare accounts, D1, encrypted channel relay and offline mailbox |
 | `apps/shared/` | Shared Apple account integration and environment configuration |
 | `apps/screen-macos/`, `apps/screen-linux/` | Platform screen capture/input helpers |
 | `docs/` | [Documentation index](docs/README.md) and [file structure](docs/architecture/file-structure.md) |
-| `relay/` | Cloudflare Worker APNs relay with encrypted per-device tickets |
+| `relay/` | Cloudflare Worker push relay (APNs and FCM) with encrypted per-device tickets |
 | `web/` | Website (Next.js static export, deployed on Vercel) |
 | `packaging/` | Homebrew cask and formula templates (published to `Ragul84/homebrew-hypurr` on release) and `install.sh` (the curl installer) |
 
@@ -156,6 +163,7 @@ The Xcode project is generated: `xcodegen generate --spec apps/project.yml`.
 cd host && cargo test            # host
 cd kit && swift test             # shared Swift
 cd apps/linux && cargo test      # Linux app (needs GTK dev packages)
+cd apps/android && ./gradlew assembleDebug testDebugUnitTest   # Android app (JDK 17+, Android SDK)
 cd cloud && npm test            # cloud API / channel relay
 cd relay && npm test             # relay tickets
 ```

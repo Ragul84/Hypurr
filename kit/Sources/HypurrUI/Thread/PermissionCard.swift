@@ -8,14 +8,42 @@ struct PermissionCard: View {
     let hostName: String
     /// The option whose answer is on its way to the computer, if any.
     var answering: String?
+    /// The bot runs a task with a safety net: an approved card can be undone.
+    var canUndo = false
+    var undo: () -> Void = {}
     let respond: (String?) -> Void
     @State private var expanded = false
 
     private var d: EntryData { entry.data }
     private var pending: Bool { d.status == "pending" }
 
+    private var blocked: Bool { d.blocked != nil }
+
+    /// Risk level colour (host risk rules): low = added, medium = warning, high = danger.
+    private var riskColor: Color {
+        switch d.risk {
+        case "low": Palette.added
+        case "high": Palette.danger
+        default: Palette.warning
+        }
+    }
+
+    private var riskLabel: String {
+        switch d.risk {
+        case "low": "Low risk"
+        case "high": "High risk"
+        default: "Medium risk"
+        }
+    }
+
+    private var approved: Bool {
+        guard d.status == "answered", let chosen = d.options?.first(where: { $0.optionId == d.selected }) else { return false }
+        return chosen.kind.hasPrefix("allow")
+    }
+
     private var headline: String {
-        switch d.toolKind {
+        if blocked { return "Blocked by the safety net" }
+        return switch d.toolKind {
         case "execute": "Wants to run a command"
         case "edit", "delete", "move": "Wants to change files"
         case "fetch": "Wants to access the web"
@@ -27,15 +55,32 @@ struct PermissionCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Text(headline).font(.headline).foregroundStyle(Palette.text)
+                Text(headline).font(.headline).foregroundStyle(blocked ? Palette.danger : Palette.text)
                 if pending {
                     Circle().fill(Palette.warning).frame(width: 7, height: 7)
                 }
+                Spacer(minLength: 0)
+                if d.risk != nil {
+                    Text(riskLabel)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(riskColor)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(riskColor.opacity(0.14), in: Capsule())
+                }
             }
-            Text(d.title ?? "")
-                .font(.subheadline.monospaced())
-                .foregroundStyle(Palette.secondary)
-                .lineLimit(expanded ? nil : 3)
+            if let explain = d.explain {
+                // Explain-as-you-go: the plain sentence leads; the raw request is in Details.
+                Text(explain).font(.body).foregroundStyle(Palette.text)
+                if let why = d.blocked ?? d.riskReasons?.first {
+                    Text(why).font(.subheadline).foregroundStyle(Palette.secondary)
+                }
+            } else {
+                Text(d.title ?? "")
+                    .font(.subheadline.monospaced())
+                    .foregroundStyle(Palette.secondary)
+                    .lineLimit(expanded ? nil : 3)
+            }
             Label("Runs on \(hostName)\(d.cwd.map { " · \(($0 as NSString).lastPathComponent)" } ?? "")", systemImage: "desktopcomputer")
                 .font(.caption)
                 .foregroundStyle(Palette.tertiary)
@@ -43,6 +88,12 @@ struct PermissionCard: View {
             if hasDetail {
                 Disclosure(isExpanded: $expanded) {
                     VStack(alignment: .leading, spacing: 8) {
+                        if d.explain != nil, let title = d.title {
+                            Text(title).font(.subheadline.monospaced()).foregroundStyle(Palette.secondary)
+                        }
+                        ForEach(Array((d.riskReasons ?? []).dropFirst().enumerated()), id: \.offset) { _, reason in
+                            Text("• \(reason)").font(.caption).foregroundStyle(Palette.secondary)
+                        }
                         if let command = d.command, !command.isEmpty {
                             CodeBox(text: command)
                         }
@@ -57,12 +108,28 @@ struct PermissionCard: View {
                 }
             }
 
+            if pending && d.needsAdmin == true {
+                Label("Your team's rules: an admin approves this", systemImage: "person.badge.shield.checkmark")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(Palette.accent)
+            }
             if pending {
                 buttons
-            } else {
-                Text(outcome)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(Palette.secondary)
+            } else if !blocked {
+                HStack {
+                    Text(outcome)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(Palette.secondary)
+                    Spacer(minLength: 0)
+                    if canUndo, approved, d.checkpoint != nil {
+                        Button(action: undo) {
+                            Label("Undo", systemImage: "arrow.uturn.backward")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(Palette.warning)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
             }
         }
         .padding(16)
@@ -71,7 +138,7 @@ struct PermissionCard: View {
     }
 
     private var hasDetail: Bool {
-        !(d.command ?? "").isEmpty || !(d.detail ?? "").isEmpty || !(d.diffs ?? []).isEmpty
+        (d.explain != nil && d.title != nil) || !(d.command ?? "").isEmpty || !(d.detail ?? "").isEmpty || !(d.diffs ?? []).isEmpty
     }
 
     /// Ordered like Grok Bot: Allow once, Always allow, then Deny.

@@ -392,7 +392,9 @@ pub fn permission_card(ui: &App, st: &State, e: &Value, group: bool) -> gtk::Wid
         .css_classes(["perm-card"])
         .margin_end(40)
         .build();
+    let blocked = d["blocked"].as_str();
     let headline = match d["toolKind"].as_str() {
+        _ if blocked.is_some() => "Blocked by the safety net",
         Some("execute") => "Wants to run a command",
         Some("edit" | "delete" | "move") => "Wants to change files",
         Some("fetch") => "Wants to access the web",
@@ -400,7 +402,21 @@ pub fn permission_card(ui: &App, st: &State, e: &Value, group: bool) -> gtk::Wid
         _ => "Wants to use a tool",
     };
     let top = gtk::Box::builder().spacing(8).build();
-    top.append(&label(headline, &["headline"]));
+    let head_classes: &[&str] = if blocked.is_some() {
+        &["headline", "danger-text"]
+    } else {
+        &["headline"]
+    };
+    top.append(&label(headline, head_classes));
+    // Risk level from the host's rules (host/src/tasks/risk.rs).
+    if let Some(risk) = d["risk"].as_str() {
+        let (text, class) = match risk {
+            "low" => ("Low risk", "secondary"),
+            "high" => ("High risk", "danger-text"),
+            _ => ("Medium risk", "warning-text"),
+        };
+        top.append(&label(text, &["footnote", class]));
+    }
     if pending {
         let dot = gtk::DrawingArea::builder()
             .content_width(7)
@@ -417,6 +433,17 @@ pub fn permission_card(ui: &App, st: &State, e: &Value, group: bool) -> gtk::Wid
         top.append(&dot);
     }
     card.append(&top);
+    // Explain-as-you-go: the plain sentence leads, then why.
+    if let Some(explain) = d["explain"].as_str() {
+        let plain = label(explain, &[]);
+        plain.set_wrap(true);
+        card.append(&plain);
+        if let Some(why) = blocked.or(d["riskReasons"][0].as_str()) {
+            let why = label(why, &["small", "secondary"]);
+            why.set_wrap(true);
+            card.append(&why);
+        }
+    }
     let title = label(
         d["title"].as_str().unwrap_or(""),
         &["small", "mono", "secondary"],
