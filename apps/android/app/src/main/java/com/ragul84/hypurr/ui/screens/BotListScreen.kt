@@ -143,15 +143,13 @@ fun BotListScreen(
                 Text("Bots", style = MaterialTheme.typography.headlineLarge, color = c.text, fontWeight = FontWeight.ExtraBold)
                 val quiet = bots.count { !it.needsInput }
                 val need = needsYou.size
-                Text(
-                    when {
-                        need == 0 -> computerName
-                        need == 1 -> "One needs you · $quiet quiet"
-                        else -> "$need need you · $quiet quiet"
-                    },
-                    style = MaterialTheme.typography.bodyMedium, color = c.secondary, maxLines = 1,
-                    overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp),
-                )
+                if (need > 0) {
+                    Text(
+                        if (need == 1) "One needs you · $quiet quiet" else "$need need you · $quiet quiet",
+                        style = MaterialTheme.typography.bodyMedium, color = c.secondary, maxLines = 1,
+                        overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
                     Text(computerName, style = MaterialTheme.typography.labelMedium, color = c.tertiary, maxLines = 1,
                         overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 160.dp))

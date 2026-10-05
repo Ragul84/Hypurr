@@ -112,6 +112,7 @@ import com.ragul84.hypurr.ui.riskColor
 import com.ragul84.hypurr.ui.riskLabel
 import com.ragul84.hypurr.ui.ApprovalActions
 import com.ragul84.hypurr.ui.BotAvatar
+import com.ragul84.hypurr.ui.FlowOrb
 import com.ragul84.hypurr.ui.CatFace
 import com.ragul84.hypurr.ui.CreamPlate
 import com.ragul84.hypurr.ui.InkTile
@@ -220,7 +221,7 @@ fun ChatScreen(
             Spacer(Modifier.width(8.dp))
             Row(Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).then(if (onEdit != null && !inThread) Modifier.pressable("${bot.name} settings", onClick = onEdit) else Modifier),
                 verticalAlignment = Alignment.CenterVertically) {
-                if (bot.isGroup) GroupAvatar(bot, bots, 40.dp) else BotAvatar(bot, 40.dp)
+                if (bot.isGroup) GroupAvatar(bot, bots, 40.dp) else BotAvatar(bot.copy(status = "idle"), 40.dp)
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
                     Text(if (inThread) "Thread" else bot.name, style = MaterialTheme.typography.titleLarge, color = c.text, maxLines = 1,

@@ -59,13 +59,12 @@ data class PairingUiState(val link: String = "", val busy: Boolean = false, val 
 /** The colour-flow glow behind onboarding and empty states. */
 @Composable
 fun FlowBackdrop(modifier: Modifier = Modifier) {
-    val alpha = if (Hypurr.colors.dark) 0.38f else 0.26f
-    // Radial glows rather than blur: identical on every API level (blur needs Android 12).
+    val alpha = if (Hypurr.colors.dark) 0.22f else 0.14f
     fun glow(color: androidx.compose.ui.graphics.Color, a: Float) = Brush.radialGradient(listOf(color.copy(alpha = a), color.copy(alpha = 0f)))
     Box(modifier.fillMaxSize()) {
-        Box(Modifier.size(420.dp).offset((-150).dp, (-130).dp).background(glow(ColorFlow.signal, alpha * 0.45f), CircleShape))
-        Box(Modifier.size(380.dp).align(Alignment.TopEnd).offset(150.dp, 60.dp).background(glow(ColorFlow.signalDeep, alpha * 0.35f), CircleShape))
-        Box(Modifier.size(420.dp).align(Alignment.BottomCenter).offset(60.dp, 170.dp).background(glow(ColorFlow.signal, alpha * 0.25f), CircleShape))
+        Box(Modifier.size(420.dp).offset((-150).dp, (-130).dp).background(glow(ColorFlow.cream, alpha * 0.9f), CircleShape))
+        Box(Modifier.size(380.dp).align(Alignment.TopEnd).offset(150.dp, 60.dp).background(glow(ColorFlow.signal, alpha * 0.55f), CircleShape))
+        Box(Modifier.size(420.dp).align(Alignment.BottomCenter).offset(60.dp, 170.dp).background(glow(ColorFlow.sunflower, alpha * 0.4f), CircleShape))
     }
 }
 
@@ -80,7 +79,6 @@ fun PairingScreen(
     val c = Hypurr.colors
     Box(Modifier.fillMaxSize().background(c.bg)) {
         FlowBackdrop()
-        CatAssemble(playing = true, Modifier.align(Alignment.TopCenter).padding(top = 72.dp), size = 64.dp)
         Column(
             Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -88,8 +86,7 @@ fun PairingScreen(
             Spacer(Modifier.height(56.dp))
             FlowOrb(104.dp, animate = state.busy)
             Spacer(Modifier.height(28.dp))
-            Text("Hypurr", style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold,
-                brush = Brush.linearGradient(listOf(ColorFlow.signal, ColorFlow.signalDeep))))
+            Text("Hypurr", style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.ExtraBold), color = c.accent)
             Spacer(Modifier.height(8.dp))
             Text("Your coding bots, on your phone.", style = MaterialTheme.typography.titleMedium, color = c.secondary,
                 textAlign = TextAlign.Center)
@@ -127,7 +124,7 @@ fun PairingScreen(
                             Icon(Icons.Rounded.Link, null, tint = c.tertiary, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(10.dp))
                             Box(Modifier.weight(1f)) {
-                                if (state.link.isEmpty()) Text("hypurr://pair?…", color = c.tertiary, style = MaterialTheme.typography.bodyLarge)
+                                if (state.link.isEmpty()) Text("hypurr://pair?…", color = c.secondary, style = MaterialTheme.typography.bodyLarge)
                                 BasicTextField(state.link, onLinkChange, singleLine = true, cursorBrush = SolidColor(c.accent),
                                     textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.text), modifier = Modifier.fillMaxWidth())
                             }

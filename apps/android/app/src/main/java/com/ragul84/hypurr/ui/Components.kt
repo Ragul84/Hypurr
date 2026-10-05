@@ -144,21 +144,26 @@ fun SoftButton(text: String, modifier: Modifier = Modifier, icon: ImageVector? =
     }
 }
 
-/** The thinking orb (Swift `ThinkingOrb(flow:)`): teal signal sweep, breathing while working. */
+/** Sunfield orb: solid forest (light) / sunflower (dark), soft cream highlight, gentle breath. */
 @Composable
 fun FlowOrb(size: Dp, modifier: Modifier = Modifier, animate: Boolean = true) {
-    val still = LocalInspectionMode.current || !animate
+    val c = Hypurr.colors
+    val still = LocalInspectionMode.current || !animate || reduceMotion()
     val t = rememberInfiniteTransition(label = "orb")
-    val angle by t.animateFloat(0f, 360f, infiniteRepeatable(tween(2400, easing = LinearEasing)), label = "angle")
-    val breath by t.animateFloat(0.92f, 1.04f, infiniteRepeatable(tween(1100), RepeatMode.Reverse), label = "breath")
+    val breath by t.animateFloat(0.94f, 1.03f, infiniteRepeatable(tween(1200), RepeatMode.Reverse), label = "breath")
+    val fill = if (c.dark) ColorFlow.sunflower else ColorFlow.signal
     Box(modifier.size(size), contentAlignment = Alignment.Center) {
-        Canvas(Modifier.size(size).scale(if (still) 1f else breath).rotate(if (still) 30f else angle)) {
-            drawCircle(ColorFlow.sweep())
+        Canvas(Modifier.size(size).scale(if (still) 1f else breath)) {
+            drawCircle(fill)
             drawCircle(
-                Brush.radialGradient(listOf(Color.White.copy(alpha = 0.55f), Color.Transparent),
-                    center = Offset(this.size.width * 0.35f, this.size.height * 0.3f), radius = this.size.minDimension * 0.6f),
+                Brush.radialGradient(
+                    listOf(ColorFlow.cream.copy(alpha = 0.45f), Color.Transparent),
+                    center = Offset(this.size.width * 0.35f, this.size.height * 0.3f),
+                    radius = this.size.minDimension * 0.55f,
+                ),
             )
         }
+        CatFace(if (c.dark) ColorFlow.signal else ColorFlow.cream, size * 0.48f)
     }
 }
 
