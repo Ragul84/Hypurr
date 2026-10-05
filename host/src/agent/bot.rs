@@ -1059,7 +1059,12 @@ impl Actor {
             _ => {}
         }
         // A task saves a checkpoint after every step.
-        crate::tasks::after_turn(&self.hub, &self.cfg.id);
+        crate::tasks::after_turn(
+            &self.hub,
+            &self.cfg.id,
+            final_text.as_deref(),
+            done.as_ref().ok().map(|v| &v["usage"]),
+        );
         let failed = done.is_err() && !self.stop_requested;
         let delegated = self.active_ask.is_some();
         let reply = if stopped {
@@ -1233,6 +1238,7 @@ impl Actor {
                 }
             }
             "usage_update" => {
+                crate::tasks::usage_update(&self.hub, &self.cfg.id, u);
                 let info = &u["_meta"]["_claude/rateLimit"];
                 if info.is_object() {
                     crate::usage::ingest_claude_rate_limit(&self.hub, info);

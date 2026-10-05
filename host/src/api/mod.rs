@@ -474,8 +474,13 @@ pub async fn dispatch(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value) -
         // One chunk of a file for a later `send` (`attachments`); base64 `data` at `offset`.
         "upload" => {
             use base64::Engine as _;
-            let row = hub.store.bot(str_arg(&b, "botId")?)?.filter(|r| !r.deleted && !r.config.is_group());
-            let root = crate::chat::uploads::root(&row.ok_or_else(|| anyhow!("unknown bot"))?.config);
+            // `draftId` instead of `botId`: a file for a task that hasn't started yet.
+            let root = if let Some(draft) = b["draftId"].as_str() {
+                crate::chat::uploads::draft_root(draft)?
+            } else {
+                let row = hub.store.bot(str_arg(&b, "botId")?)?.filter(|r| !r.deleted && !r.config.is_group());
+                crate::chat::uploads::root(&row.ok_or_else(|| anyhow!("unknown bot"))?.config)
+            };
             let (id, name) = (str_arg(&b, "uploadId")?.to_owned(), str_arg(&b, "name")?.to_owned());
             let data =
                 base64::engine::general_purpose::STANDARD.decode(str_arg(&b, "data")?).context("invalid data")?;
@@ -635,7 +640,22 @@ pub async fn dispatch(hub: &Arc<Hub>, caller: &Caller, method: &str, b: Value) -
                 .await?
         }
         "rollbackTask" => crate::tasks::rollback(hub, str_arg(&b, "taskId")?, str_arg(&b, "checkpointId")?).await?,
-        "finishTask" => crate::tasks::finish(hub, str_arg(&b, "taskId")?).await?,
+        "finishTask" => crate::tasks::finish::finish(hub, str_arg(&b, "taskId")?, &b).await?,
+        "taskCosts" => crate::tasks::costs(&hub.store)?,
+        "integrations" => json!({"integrations": crate::integrations::Integrations::load(&hub.store).public()}),
+        "setIntegrations" => json!({"integrations": crate::integrations::update(&hub.store, &b)?.public()}),
+        "testIntegration" => crate::integrations::test(&hub.store, str_arg(&b, "kind")?).await?,
+        "issues" => {
+            let projects = {
+                let hub = hub.clone();
+                tokio::task::spawn_blocking(move || crate::tasks::projects(&hub.store)).await?
+            };
+            let projects: Vec<_> = match b["project"].as_str() {
+                Some(p) => projects.into_iter().filter(|x| x.path == p).collect(),
+                None => projects,
+            };
+            crate::integrations::issues(&hub.store, &projects).await
+        }
         "taskTemplates" => json!({"templates": crate::tasks::templates::all(&hub.store)}),
         "saveTemplate" => {
             let t: crate::tasks::templates::Template = serde_json::from_value(b).context("invalid template")?;

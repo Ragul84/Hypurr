@@ -104,4 +104,40 @@ class ScreenshotTest {
         BotListScreen(Samples.computer.name, LinkState.Ready(Route.Direct), emptyList(), synced = true,
             onOpen = {}, onSettings = {}, onRetry = {}, now = Samples.NOW)
     }
+
+    // Stage B: screenshot/error paste, integrations, learning mode, cost tracker.
+
+    @Test
+    @Config(qualifiers = "w412dp-h1180dp-xxhdpi")
+    fun newTaskAttach() = shoot("newtask-attach") {
+        NewTaskUiState(Samples.setupWork, template = "fix-error", input = "TypeError: Cannot read properties of undefined (reading 'total')",
+            files = listOf(Samples.screenshot()), issue = Samples.ghIssue, route = Samples.route).let { NewTaskScreen(it, {}, {}, {}) }
+    }
+
+    @Test
+    fun issuePicker() = shoot("issues") {
+        NewTaskScreen(NewTaskUiState(Samples.setupWork, pickingIssue = true, issues = Samples.issues, route = Samples.route), {}, {}, {})
+    }
+
+    @Test
+    fun finishTask() = shoot("finish") {
+        ChatScreen(Samples.workBot, Samples.workChat.take(2), "", {}, onBack = {}, onSend = {}, onStop = {}, onRespond = { _, _ -> },
+            integrations = Samples.integrations, initialCheckpointsOpen = true, initialFinishOpen = true, now = Samples.NOW)
+    }
+
+    @Test
+    fun learningCard() = shoot("learning") {
+        ChatScreen(Samples.finishedBot, Samples.workChat, "", {}, onBack = {}, onSend = {}, onStop = {}, onRespond = { _, _ -> },
+            integrations = Samples.integrations, now = Samples.NOW)
+    }
+
+    /** Tall, so Work tools and Spending are both in frame. */
+    @Test
+    @Config(qualifiers = "w412dp-h2600dp-xxhdpi")
+    fun settingsWork() = shoot("settings-work") {
+        SettingsScreen(SettingsUiState(Samples.computer, LinkState.Ready(Route.Relay), ThemeMode.System, dynamicColor = false,
+            notifications = true, pushAvailable = false, version = "2.4.0", dynamicSupported = true, safety = Samples.safety,
+            integrations = Samples.integrations, costs = Samples.costs, testResults = mapOf("slack" to "Sent a test message")),
+            {}, {}, {}, {}, {})
+    }
 }

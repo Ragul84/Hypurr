@@ -53,6 +53,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ContentPaste
+import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Image
+import androidx.compose.material.icons.rounded.TaskAlt
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import com.ragul84.hypurr.data.PickedFile
+import com.ragul84.hypurr.model.Issue
+import com.ragul84.hypurr.model.IssueList
 import com.ragul84.hypurr.model.TaskRoute
 import com.ragul84.hypurr.model.TaskSetup
 import com.ragul84.hypurr.model.TaskTemplate
@@ -77,20 +90,37 @@ data class NewTaskUiState(
     val agent: String? = null,
     val busy: Boolean = false,
     val error: String? = null,
+    /** Screenshots and files to send with the task. */
+    val files: List<PickedFile> = emptyList(),
+    /** The GitHub issue or Jira ticket it starts from. */
+    val issue: Issue? = null,
+    /** The issue picker: open, and what the host found (null while loading). */
+    val pickingIssue: Boolean = false,
+    val issues: IssueList? = null,
 ) {
+    /** What the router reads: the goal, or the picked issue. */
+    val routeText: String get() = listOf(goal, issue?.title.orEmpty(), input).filter { it.isNotBlank() }.joinToString(" ")
     val selectedTemplate: TaskTemplate? get() = setup?.templates?.firstOrNull { it.id == template }
     val projectPath: String? get() = project ?: route?.project?.path
     val projectName: String? get() = setup?.projects?.firstOrNull { it.path == projectPath }?.name
         ?: route?.project?.takeIf { it.path == projectPath }?.name ?: projectPath?.substringAfterLast('/')
     val agentId: String? get() = agent ?: route?.agent?.id
     val agentName: String? get() = setup?.agents?.firstOrNull { it.id == agentId }?.name ?: route?.agent?.name ?: agentId
-    val canStart: Boolean get() = !busy && (goal.isNotBlank() || template != null) && projectPath != null && agentId != null
+    val canStart: Boolean get() = !busy && (goal.isNotBlank() || template != null || issue != null) && projectPath != null && agentId != null
 }
 
 /** Plain-language tasks: describe the goal (or tap a template); Hypurr picks project and agent, the user can override. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun NewTaskScreen(state: NewTaskUiState, onChange: (NewTaskUiState) -> Unit, onStart: () -> Unit, onBack: () -> Unit) {
+fun NewTaskScreen(
+    state: NewTaskUiState,
+    onChange: (NewTaskUiState) -> Unit,
+    onStart: () -> Unit,
+    onBack: () -> Unit,
+    onAddImage: () -> Unit = {},
+    onPaste: () -> Unit = {},
+    onPickIssue: () -> Unit = {},
+) {
     val c = Hypurr.colors
     val template = state.selectedTemplate
     Column(Modifier.fillMaxSize().background(c.bg).safeDrawingPadding().imePadding()) {
@@ -105,6 +135,30 @@ fun NewTaskScreen(state: NewTaskUiState, onChange: (NewTaskUiState) -> Unit, onS
                 color = c.secondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
             Field(state.goal, template?.goalHint?.takeIf { it.isNotEmpty() } ?: "e.g. Fix the login bug in ticket 142",
                 minHeight = 96.dp) { onChange(state.copy(goal = it, error = null)) }
+            // Screenshot / error paste, and tickets.
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ActionChip(Icons.Rounded.Image, "Add screenshot", onAddImage)
+                ActionChip(Icons.Rounded.ContentPaste, "Paste", onPaste)
+                if (state.setup?.integrations?.anyIssues == true) ActionChip(Icons.Rounded.TaskAlt, "From an issue", onPickIssue)
+            }
+            AnimatedVisibility(state.files.isNotEmpty(), enter = expandVertically(Motion.spatialDefault()) + fadeIn(),
+                exit = shrinkVertically() + fadeOut()) {
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    state.files.forEach { f -> FileChip(f) { onChange(state.copy(files = state.files - f)) } }
+                }
+            }
+            AnimatedVisibility(state.issue != null, enter = expandVertically(Motion.spatialDefault()) + fadeIn(),
+                exit = shrinkVertically() + fadeOut()) {
+                state.issue?.let { IssueRow(it, Modifier.padding(top = 10.dp), onRemove = { onChange(state.copy(issue = null)) }) }
+            }
+            AnimatedVisibility(state.pickingIssue, enter = expandVertically(Motion.spatialDefault()) + fadeIn(),
+                exit = shrinkVertically() + fadeOut()) {
+                IssuePicker(state.issues, onPick = { i ->
+                    onChange(state.copy(issue = i, pickingIssue = false, project = i.project ?: state.project, error = null))
+                }, onClose = { onChange(state.copy(pickingIssue = false)) })
+            }
 
             Text("OR START FROM A TEMPLATE", color = c.tertiary, style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
                 modifier = Modifier.padding(start = 6.dp, top = 20.dp, bottom = 8.dp))
@@ -241,4 +295,88 @@ private fun Choice(text: String, selected: Boolean, onClick: () -> Unit) {
     Text(text, color = if (selected) c.onAccent else c.accent, style = MaterialTheme.typography.labelLarge,
         modifier = Modifier.clip(RoundedCornerShape(50)).background(fill).pressable(text, role = Role.RadioButton, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 9.dp))
+}
+
+@Composable
+private fun ActionChip(icon: ImageVector, label: String, onClick: () -> Unit) {
+    val c = Hypurr.colors
+    Row(Modifier.clip(RoundedCornerShape(50)).background(c.accent.copy(alpha = 0.10f)).pressable(label, onClick = onClick)
+        .padding(horizontal = 14.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = c.accent, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(label, color = c.accent, style = MaterialTheme.typography.labelLarge)
+    }
+}
+
+/** A picked screenshot (thumbnail) or file (name), with remove. */
+@Composable
+private fun FileChip(file: PickedFile, onRemove: () -> Unit) {
+    val c = Hypurr.colors
+    val bitmap = remember(file) {
+        if (file.isImage) runCatching { BitmapFactory.decodeByteArray(file.bytes, 0, file.bytes.size)?.asImageBitmap() }.getOrNull() else null
+    }
+    Box(Modifier.size(width = if (bitmap != null) 76.dp else 150.dp, height = 76.dp).glass(RoundedCornerShape(16.dp), c.surface)) {
+        if (bitmap != null) {
+            Image(bitmap, file.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        } else {
+            Row(Modifier.fillMaxSize().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.Description, null, tint = c.accent, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(file.name, color = c.text, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        Box(Modifier.align(Alignment.TopEnd).padding(4.dp).size(22.dp).clip(RoundedCornerShape(50))
+            .background(c.bg.copy(alpha = 0.85f)).pressable("Remove ${file.name}", onClick = onRemove), contentAlignment = Alignment.Center) {
+            Icon(Icons.Rounded.Close, null, tint = c.text, modifier = Modifier.size(14.dp))
+        }
+    }
+}
+
+@Composable
+private fun SourceTag(source: String) {
+    val c = Hypurr.colors
+    val (label, color) = if (source == "jira") "Jira" to c.accent else "GitHub" to c.text
+    Text(label, color = color, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.clip(RoundedCornerShape(50)).background(color.copy(alpha = 0.12f)).padding(horizontal = 8.dp, vertical = 3.dp))
+}
+
+@Composable
+private fun IssueRow(issue: Issue, modifier: Modifier = Modifier, onRemove: (() -> Unit)? = null, onClick: (() -> Unit)? = null) {
+    val c = Hypurr.colors
+    Row(modifier.fillMaxWidth().glass(RoundedCornerShape(18.dp), c.surface)
+        .then(if (onClick != null) Modifier.pressable("${issue.key} ${issue.title}", onClick = onClick) else Modifier)
+        .padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SourceTag(issue.source)
+                Spacer(Modifier.width(8.dp))
+                Text(issue.key, color = c.secondary, style = MaterialTheme.typography.labelLarge)
+            }
+            Text(issue.title, color = c.text, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 4.dp))
+        }
+        if (onRemove != null) IconBubble(Icons.Rounded.Close, "Remove the issue", onClick = onRemove)
+    }
+}
+
+/** Open issues and tickets from GitHub and Jira; tap one to start from it. */
+@Composable
+private fun IssuePicker(list: IssueList?, onPick: (Issue) -> Unit, onClose: () -> Unit) {
+    val c = Hypurr.colors
+    Column(Modifier.fillMaxWidth().padding(top = 10.dp).glass(RoundedCornerShape(22.dp), c.surface).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Pick an issue", color = c.text, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+            IconBubble(Icons.Rounded.Close, "Close", onClick = onClose)
+        }
+        when {
+            list == null -> Box(Modifier.fillMaxWidth().height(64.dp), contentAlignment = Alignment.Center) { FlowOrb(28.dp) }
+            list.issues.isEmpty() && list.errors.isEmpty() ->
+                Text("No open issues assigned to you.", color = c.secondary, style = MaterialTheme.typography.bodySmall)
+        }
+        list?.issues.orEmpty().forEach { i -> IssueRow(i, onClick = { onPick(i) }) }
+        list?.errors.orEmpty().forEach { e ->
+            Text(e.message, color = c.danger, style = MaterialTheme.typography.bodySmall)
+        }
+    }
 }

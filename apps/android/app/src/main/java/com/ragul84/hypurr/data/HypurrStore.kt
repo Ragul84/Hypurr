@@ -6,7 +6,11 @@ import com.ragul84.hypurr.model.Entry
 import com.ragul84.hypurr.model.EntryData
 import com.ragul84.hypurr.model.HypurrJson
 import com.ragul84.hypurr.model.Pairing
+import com.ragul84.hypurr.model.Integrations
+import com.ragul84.hypurr.model.Issue
+import com.ragul84.hypurr.model.IssueList
 import com.ragul84.hypurr.model.SafetySettings
+import com.ragul84.hypurr.model.TaskCosts
 import com.ragul84.hypurr.model.TaskRoute
 import com.ragul84.hypurr.model.TaskSetup
 import com.ragul84.hypurr.model.TaskTemplate
@@ -29,7 +33,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonObject
 import java.util.UUID
+
+/** A screenshot, photo or file picked on the phone, waiting to go with a task. */
+class PickedFile(val name: String, val bytes: ByteArray, val mime: String = "application/octet-stream") {
+    val isImage: Boolean get() = mime.startsWith("image/")
+    val size: Long get() = bytes.size.toLong()
+}
 
 enum class ThemeMode { System, Light, Dark }
 
@@ -260,13 +271,51 @@ class HypurrStore(
 
     suspend fun route(goal: String, template: String?): TaskRoute? = client?.routeTask(goal, template)
 
-    /** Starts a task and returns its bot id (the chat to open). */
+    /**
+     * Starts a task and returns its bot id (the chat to open). Files go up first as a draft
+     * (the bot doesn't exist yet); the host moves them into the task's chat.
+     */
     suspend fun startTask(goal: String, template: String?, input: String, project: String?, backend: String?,
-                          attachments: List<String> = emptyList()): String {
+                          files: List<PickedFile> = emptyList(), issue: Issue? = null): String {
         val c = client ?: throw HostException.unreachable()
-        val bot = c.startTask(goal, template, input, project, backend, attachments)
+        val draft = if (files.isEmpty()) null else UUID.randomUUID().toString()
+        val ids = files.map { f ->
+            val id = UUID.randomUUID().toString()
+            c.upload(id, f.name, f.bytes, draftId = draft)
+            id
+        }
+        val bot = c.startTask(goal, template, input, project, backend, ids, draftId = draft, issue = issue)
         upsert(bot)
         return bot.id
+    }
+
+    /** Open GitHub issues and Jira tickets to start a task from. */
+    suspend fun issues(): IssueList = client?.issues() ?: IssueList()
+
+    // MARK: work tools and costs
+
+    private val _integrations = MutableStateFlow<Integrations?>(null)
+    val integrations: StateFlow<Integrations?> = _integrations.asStateFlow()
+
+    suspend fun loadIntegrations(): Integrations? {
+        val c = client ?: return _integrations.value
+        return runCatching { c.integrations() }.getOrNull()?.also { _integrations.value = it } ?: _integrations.value
+    }
+
+    suspend fun setIntegrations(patch: JsonObject) {
+        val saved = client?.setIntegrations(patch) ?: throw HostException.unreachable()
+        _integrations.value = saved
+        _setup.update { it?.copy(integrations = saved) }
+    }
+
+    suspend fun testIntegration(kind: String): String = client?.testIntegration(kind) ?: throw HostException.unreachable()
+
+    private val _costs = MutableStateFlow<TaskCosts?>(null)
+    val costs: StateFlow<TaskCosts?> = _costs.asStateFlow()
+
+    suspend fun loadCosts(): TaskCosts? {
+        val c = client ?: return _costs.value
+        return runCatching { c.taskCosts() }.getOrNull()?.also { _costs.value = it } ?: _costs.value
     }
 
     /** Undo / go back: stops a working agent first, then restores the checkpoint. */
@@ -293,9 +342,9 @@ class HypurrStore(
         last?.let { throw it }
     }
 
-    suspend fun finishTask(botId: String) {
+    suspend fun finishTask(botId: String, openPr: Boolean? = null, notify: Boolean? = null, learning: Boolean? = null) {
         val task = _bots.value[botId]?.task ?: return
-        client?.finishTask(task.id)
+        client?.finishTask(task.id, openPr, notify, learning)
     }
 
     suspend fun saveCheckpoint(botId: String) {

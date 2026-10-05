@@ -260,7 +260,9 @@ struct NoticeRow: View {
 
     var body: some View {
         let text = entry.data.text ?? ""
-        if let seconds = entry.data.callSeconds {
+        if let learning = entry.data.learning {
+            LearningCard(learning: learning)
+        } else if let seconds = entry.data.callSeconds {
             Label("\(text) · \(String(format: "%02d:%02d", seconds / 60, seconds % 60))", systemImage: "waveform")
                 .font(.footnote.monospacedDigit())
                 .foregroundStyle(Palette.secondary)
@@ -301,6 +303,61 @@ struct NoticeRow: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
         }
+    }
+}
+
+/// Learning mode: a finished task's plain summary, the files it changed, its pull request and cost.
+struct LearningCard: View {
+    let learning: TaskLearning
+
+    private var postedText: String? {
+        let names = (learning.posted ?? []).map { kind -> String in
+            switch kind {
+            case "slack": return "Slack"
+            case "teams": return "Teams"
+            case "jira": return "Jira"
+            default: return kind
+            }
+        }
+        return names.isEmpty ? nil : "Posted to " + names.joined(separator: ", ")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "graduationcap.fill").foregroundStyle(Palette.added)
+                Text("What changed and why").font(.subheadline.weight(.semibold)).foregroundStyle(Palette.added)
+                Spacer(minLength: 0)
+                if let cost = learning.cost {
+                    Text(cost.label).font(.caption.weight(.semibold)).foregroundStyle(Palette.accent)
+                }
+            }
+            Text(learning.summary ?? "").font(.body).foregroundStyle(Palette.text).textSelection(.enabled)
+            ForEach(Array((learning.files ?? []).prefix(8).enumerated()), id: \.offset) { _, file in
+                HStack(spacing: 6) {
+                    Text(file.path).font(.caption.monospaced()).foregroundStyle(Palette.text).lineLimit(1)
+                    Spacer(minLength: 0)
+                    Text("+\(file.added ?? 0)").font(.caption).foregroundStyle(Palette.added)
+                    Text("−\(file.removed ?? 0)").font(.caption).foregroundStyle(Palette.removed)
+                }
+            }
+            if let posted = postedText {
+                Text(posted).font(.caption).foregroundStyle(Palette.secondary)
+            }
+            ForEach(Array((learning.errors ?? []).enumerated()), id: \.offset) { _, error in
+                Text(error).font(.caption).foregroundStyle(Palette.danger)
+            }
+            if let pr = learning.pr, let raw = pr.url, let url = URL(string: raw) {
+                Link(destination: url) {
+                    Label("Open pull request #\(pr.number ?? 0)", systemImage: "arrow.up.right.square")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Palette.accent)
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Palette.added.opacity(0.10), in: RoundedRectangle(cornerRadius: 16))
     }
 }
 

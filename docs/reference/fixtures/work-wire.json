@@ -1,0 +1,223 @@
+{
+  "bot": {
+    "id": "357e5bdf-1a3d-4bcc-8329-d21c6cabb684",
+    "kind": "agent",
+    "members": [],
+    "name": "#142 Checkout button does nothing",
+    "description": "#142 Checkout button does nothing",
+    "avatarColor": "blue",
+    "avatarShape": "squircle",
+    "backend": "custom",
+    "command": "claude-code-acp",
+    "cwd": "/Users/priya/.hypurr/worktrees/30be7ce5-e487-4b66-bb6d-6be9c3c190a8",
+    "permission": "ask",
+    "model": null,
+    "pinned": false,
+    "hidden": false,
+    "notify": null,
+    "connectors": [],
+    "skills": [],
+    "computer": false,
+    "autoName": false,
+    "createdAt": 1791140424090,
+    "managedWorkspace": false,
+    "rev": 28,
+    "deleted": false,
+    "status": "idle",
+    "activity": "",
+    "startedAt": null,
+    "workingChat": null,
+    "workingThread": null,
+    "unread": 1,
+    "lastMessage": "- I changed fix.txt so the checkout button calls submit().\n- Why: the click handler was missing.\n- Check: click Checkout on Safari.",
+    "lastAt": 1791140424677,
+    "task": {
+      "id": "30be7ce5-e487-4b66-bb6d-6be9c3c190a8",
+      "botId": "357e5bdf-1a3d-4bcc-8329-d21c6cabb684",
+      "goal": "#142 Checkout button does nothing",
+      "title": "#142 Checkout button does nothing",
+      "template": "fix-error",
+      "project": "/Users/priya/shop",
+      "projectName": "Shop",
+      "backend": "custom",
+      "safety": "worktree",
+      "branch": "hypurr/142-checkout-button-does-nothing-30be7ce5",
+      "base": "main",
+      "worktree": "/Users/priya/.hypurr/worktrees/30be7ce5-e487-4b66-bb6d-6be9c3c190a8",
+      "status": "finished",
+      "checkpoints": [
+        {
+          "id": "73e11a9873c9835438764bd3a1d581b79787ac07",
+          "label": "Start (from main)",
+          "at": 1791140424090,
+          "files": []
+        },
+        {
+          "id": "b8da7be21582dad50338891414d37d354a04683d",
+          "label": "After step 1",
+          "at": 1791140424542,
+          "files": [
+            "fix.txt"
+          ]
+        }
+      ],
+      "createdAt": 1791140424072,
+      "updatedAt": 1791140424849,
+      "issue": {
+        "source": "github",
+        "key": "#142",
+        "title": "Checkout button does nothing",
+        "url": "https://github.com/acme/shop/issues/142",
+        "body": "Clicking it on Safari does nothing.",
+        "project": "/Users/priya/shop"
+      },
+      "usage": {
+        "inputTokens": 1600,
+        "outputTokens": 400,
+        "totalTokens": 2000,
+        "cost": 0.05,
+        "currency": "USD",
+        "estimated": false,
+        "turns": 2
+      },
+      "summary": "- I changed fix.txt so the checkout button calls submit().\n- Why: the click handler was missing.\n- Check: click Checkout on Safari.",
+      "changes": {
+        "files": 1,
+        "added": 1,
+        "removed": 0
+      },
+      "pr": {
+        "number": 7,
+        "url": "https://github.com/acme/shop/pull/7",
+        "repo": "acme/shop"
+      }
+    }
+  },
+  "learningCard": {
+    "id": "c61d540b-a7b6-40da-b3ce-808539ad4255",
+    "seq": 5,
+    "botId": "357e5bdf-1a3d-4bcc-8329-d21c6cabb684",
+    "threadId": null,
+    "rev": 27,
+    "kind": "notice",
+    "turn": 2,
+    "data": {
+      "text": "What changed: Changed 1 file: fix.txt (1 line added, 0 removed). Pull request: https://github.com/acme/shop/pull/7 Cost: $0.05.",
+      "style": "info",
+      "learning": {
+        "taskId": "30be7ce5-e487-4b66-bb6d-6be9c3c190a8",
+        "title": "#142 Checkout button does nothing",
+        "summary": "- I changed fix.txt so the checkout button calls submit().\n- Why: the click handler was missing.\n- Check: click Checkout on Safari.",
+        "files": [
+          {
+            "path": "fix.txt",
+            "added": 1,
+            "removed": 0
+          }
+        ],
+        "added": 1,
+        "removed": 0,
+        "branch": "hypurr/142-checkout-button-does-nothing-30be7ce5",
+        "base": "main",
+        "pr": {
+          "number": 7,
+          "url": "https://github.com/acme/shop/pull/7",
+          "repo": "acme/shop"
+        },
+        "cost": {
+          "inputTokens": 1600,
+          "outputTokens": 400,
+          "totalTokens": 2000,
+          "cost": 0.05,
+          "currency": "USD",
+          "estimated": false,
+          "turns": 2
+        },
+        "posted": [
+          "slack",
+          "teams"
+        ],
+        "errors": []
+      }
+    },
+    "createdAt": 1791140424850,
+    "updatedAt": 1791140424850
+  },
+  "issues": {
+    "issues": [
+      {
+        "source": "github",
+        "key": "#142",
+        "title": "Checkout button does nothing",
+        "url": "https://github.com/acme/shop/issues/142",
+        "body": "Clicking it on Safari does nothing.",
+        "project": "/Users/priya/shop"
+      },
+      {
+        "source": "jira",
+        "key": "SHOP-9",
+        "title": "Fix VAT rounding",
+        "url": "https://acme.atlassian.net/browse/SHOP-9",
+        "body": "Totals are off by 1p",
+        "project": null
+      }
+    ],
+    "errors": []
+  },
+  "integrations": {
+    "integrations": {
+      "github": {
+        "configured": true,
+        "tokenHint": "…abcd",
+        "usesCli": false,
+        "apiUrl": ""
+      },
+      "jira": {
+        "configured": true,
+        "baseUrl": "https://acme.atlassian.net",
+        "email": "priya@acme.in",
+        "tokenHint": "…wxyz",
+        "jql": "assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC"
+      },
+      "slack": {
+        "configured": true,
+        "urlHint": "…lack"
+      },
+      "teams": {
+        "configured": true,
+        "urlHint": "…eams"
+      },
+      "learning": true,
+      "autoPr": true,
+      "notify": true
+    }
+  },
+  "costs": {
+    "tasks": [
+      {
+        "taskId": "30be7ce5-e487-4b66-bb6d-6be9c3c190a8",
+        "botId": "357e5bdf-1a3d-4bcc-8329-d21c6cabb684",
+        "title": "#142 Checkout button does nothing",
+        "createdAt": 1791140424072,
+        "usage": {
+          "inputTokens": 1600,
+          "outputTokens": 400,
+          "totalTokens": 2000,
+          "cost": 0.05,
+          "currency": "USD",
+          "estimated": false,
+          "turns": 2
+        }
+      }
+    ],
+    "total": {
+      "cost": 0.05,
+      "tokens": 2000,
+      "tasks": 1,
+      "estimated": false
+    },
+    "week": 0.05,
+    "today": 0.05,
+    "currency": "USD"
+  }
+}

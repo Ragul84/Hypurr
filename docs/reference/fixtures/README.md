@@ -22,4 +22,9 @@ Consumers:
 - `apps/android/app/src/test/java/com/ragul84/hypurr/model/TaskWireTest.kt` (via the `hypurr.taskWire` system property)
 - `kit/Tests/HypurrKitTests/TaskWireTests.swift`
 
+[work-wire.json](work-wire.json) is real `hypurr-host` output from `host/tests/tasks_e2e.rs` (`HYPURR_WIRE_OUT`) for a finished workplace task: the task bot (issue, usage, PR), the learning-mode "What changed" notice, `issues`, `integrations` (masked) and `taskCosts`. Consumers:
+
+- `apps/android/app/src/test/java/com/ragul84/hypurr/model/WorkWireTest.kt` (via the `hypurr.workWire` system property)
+- `kit/Tests/HypurrKitTests/WorkWireTests.swift`
+
 When moving or changing a fixture, update those paths and the cloud/kit/host CI path filters. Run the affected vector tests; a Markdown link check alone cannot validate executable imports. [Protocol reference](../remote-relay.md).
