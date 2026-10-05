@@ -240,6 +240,12 @@ data class TaskCosts(
     val week: Double = 0.0,
     val today: Double = 0.0,
     val currency: String = "USD",
+    /** Hypurr gateway free tokens remaining today (formatted). */
+    val gatewayFreeRemaining: String? = null,
+    /** Credits balance label, e.g. "$5.00". */
+    val gatewayCreditsLabel: String? = null,
+    /** Stripe Checkout URL (placeholder until live). */
+    val buyCreditsUrl: String? = null,
 )
 
 @Serializable
@@ -282,7 +288,7 @@ data class Backend(
     val consent: String? = null,
 )
 
-/** A model an agent can run (OpenCode free Zen models, or whatever `agentModels` returns). */
+/** A model an agent can run (Hypurr free gateway models, or whatever `agentModels` returns). */
 @Serializable
 data class AgentModel(val id: String, val name: String = "", val description: String = "", val free: Boolean = false)
 

@@ -67,7 +67,7 @@ data class BotEditorState(
     val description: String = "",
     val avatarColor: String = "blue",
     val backend: String? = null,
-    /** OpenCode free model id (`opencode/big-pickle`), when the built-in agent is selected. */
+    /** Hypurr free model id (`hypurr/hypurr-free`), when the built-in agent is selected. */
     val model: String? = null,
     /** Null = a personal workspace Hypurr makes for the bot. */
     val folder: String? = null,
@@ -204,7 +204,7 @@ fun BotEditorScreen(
             } else {
                 Section("Agent") {
                     if (backends.isEmpty()) {
-                        Text("No agent your team allows is installed on the computer. Install Hypurr's built-in agent (OpenCode, free models) or Claude Code / Codex from the computer.",
+                        Text("No agent your team allows is installed on the computer. Install Hypurr Agent (free models) or Claude Code / Codex from the computer.",
                             color = c.warning, style = MaterialTheme.typography.bodyMedium)
                     }
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -225,7 +225,7 @@ fun BotEditorScreen(
                     val selected = backends.firstOrNull { it.id == state.backend }
                     if (selected != null && (selected.free || selected.builtin) && selected.freeModels.isNotEmpty()) {
                         Text("Free model", color = c.secondary, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
-                        Text(selected.subtitle.ifEmpty { "OpenCode Zen · no API key needed for free models" }, color = c.tertiary,
+                        Text(selected.subtitle.ifEmpty { "Hypurr gateway · free daily allowance" }, color = c.tertiary,
                             style = MaterialTheme.typography.bodySmall)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.padding(top = 8.dp)) {

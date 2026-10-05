@@ -221,7 +221,7 @@ impl Hub {
     pub fn create_bot(self: &Arc<Self>, mut cfg: BotConfig) -> Result<Value> {
         cfg.id = uuid::Uuid::new_v4().to_string();
         cfg.created_at = crate::store::now_ms();
-        // Built-in OpenCode: default to a free Zen model when the client didn't pick one.
+        // Built-in Hypurr Agent: default to a free gateway model when the client didn't pick one.
         if cfg.backend == crate::agent::builtin::BACKEND_ID && cfg.model.as_deref().unwrap_or("").is_empty() {
             cfg.model = Some(crate::agent::builtin::DEFAULT_MODEL.to_owned());
         }

@@ -329,7 +329,7 @@ class HypurrStore(
         client?.react(entryId, emoji)?.let(::upsert)
     }
 
-    /** Installs Hypurr's built-in OpenCode agent after the user consents. */
+    /** Installs Hypurr's built-in Hypurr Agent after the user consents. */
     suspend fun installBuiltinAgent(): Backend {
         val b = (client ?: throw HostException.unreachable()).installBuiltinAgent()
         refreshHello()

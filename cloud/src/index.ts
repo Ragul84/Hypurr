@@ -3,6 +3,7 @@
 // metadata; the host stays the sole authority on which devices may decrypt (docs/reference/remote-relay.md).
 
 import * as api from "./api";
+import * as gateway from "./gateway/handler";
 import { ApiError, type Ctx } from "./api";
 import type { ComputerRelay } from "./relay";
 
@@ -25,7 +26,18 @@ export interface Env {
   CLERK_JWT_KEY?: string;
   CLERK_AUTHORIZED_PARTIES?: string;
   CLERK_WEBHOOK_SECRET?: string;
+  /** Hypurr Agent gateway */
+  GATEWAY_CONFIG_JSON?: string;
+  GATEWAY_UPSTREAM_OVERRIDE?: string;
+  UPSTREAM_OPENROUTER_API_KEY?: string;
+  UPSTREAM_GROQ_API_KEY?: string;
+  UPSTREAM_TOGETHER_API_KEY?: string;
+  UPSTREAM_DEEPINFRA_API_KEY?: string;
+  UPSTREAM_FAKE_API_KEY?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_SECRET_KEY?: string;
 }
+
 
 type Handler = (c: Ctx, params: string[]) => Promise<unknown>;
 
@@ -63,6 +75,12 @@ const routes: [string, RegExp, Handler][] = [
   ["GET", /^\/v1\/relay\/device\/([^/]+)$/, api.relayDevice],
   ["POST", /^\/v1\/webhooks\/clerk$/, api.clerkWebhook],
   ["POST", new RegExp(`^/v1/hooks/${ID}/${ID}$`), api.routineHook],
+  ["POST", /^\/v1\/chat\/completions$/, gateway.chatCompletions],
+  ["GET", /^\/v1\/models$/, gateway.listModels],
+  ["GET", /^\/v1\/gateway\/balance$/, gateway.spendingBalance],
+  ["POST", /^\/v1\/gateway\/trial-key$/, gateway.issueTrial],
+  ["POST", /^\/v1\/gateway\/checkout$/, gateway.createCheckout],
+  ["POST", /^\/v1\/webhooks\/stripe$/, gateway.stripeWebhook],
 ];
 
 export default {
@@ -74,9 +92,11 @@ export default {
         const m = pattern.exec(url.pathname);
         if (!m || req.method !== method) continue;
         // Every route takes small bodies; refuse a big one before reading it.
-        if (Number(req.headers.get("content-length") ?? 0) > MAX_REQUEST) throw new ApiError("tooLarge");
+        const gatewayChat = url.pathname === "/v1/chat/completions";
+        const limit = gatewayChat ? 2 * 1024 * 1024 : MAX_REQUEST;
+        if (Number(req.headers.get("content-length") ?? 0) > limit) throw new ApiError("tooLarge");
         const raw = new Uint8Array(await req.arrayBuffer());
-        if (raw.length > MAX_REQUEST) throw new ApiError("tooLarge");
+        if (raw.length > limit) throw new ApiError("tooLarge");
         const out = await handler({ req, env, exec, url, raw, now: Date.now() }, m.slice(1));
         return out instanceof Response ? out : Response.json(out);
       }

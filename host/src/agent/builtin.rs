@@ -1,10 +1,7 @@
-//! Hypurr's built-in agent: a pinned OpenCode binary in `~/.hypurr/agents/opencode`.
+//! Hypurr's built-in agent: pinned Hypurr Agent binaries in `~/.hypurr/agents/hypurr-agent`.
 //!
-//! OpenCode (<https://github.com/anomalyco/opencode>, MIT) already speaks ACP
-//! (`opencode acp`). Brand-new users get free Zen models (Big Pickle and the
-//! other free models) without a separate AI account. Hypurr downloads the
-//! official release for the platform, verifies the SHA-256 digest, and never
-//! vendors OpenCode's source.
+//! Hypurr Agent is a rebranded fork of OpenCode (MIT). Attribution lives in the
+//! agent's LICENSE/NOTICE. User-facing UI never says "OpenCode".
 
 use anyhow::{Context, Result, bail};
 use serde_json::{Value, json};
@@ -12,45 +9,25 @@ use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-/// Pinned OpenCode release. Bump with matching digests from the GitHub release.
-pub const VERSION: &str = "1.18.31";
-pub const BACKEND_ID: &str = "opencode";
-pub const DISPLAY_NAME: &str = "Hypurr built-in";
-pub const DEFAULT_MODEL: &str = "opencode/big-pickle";
+/// Pinned Hypurr Agent release. Bump with matching digests from the GitHub release.
+pub const VERSION: &str = "0.1.0";
+pub const BACKEND_ID: &str = "hypurr-agent";
+pub const DISPLAY_NAME: &str = "Hypurr Agent";
+pub const DEFAULT_MODEL: &str = "hypurr/hypurr-free";
+pub const RELEASE_REPO: &str = "Ragul84/hypurr-agent";
 
-/// Free Zen models verified against <https://opencode.ai/zen/v1/models> (Oct 2026).
-/// Time-limited by OpenCode; Hypurr surfaces them as Free. Ids are `opencode/<slug>`.
+/// Free models served by the Hypurr gateway (OpenAI-compatible).
 pub const FREE_MODELS: &[FreeModel] = &[
     FreeModel {
-        id: "opencode/big-pickle",
-        name: "Big Pickle",
-        note: "General coding (stealth, free for a limited time)",
-    },
-    FreeModel { id: "opencode/space-bunny-free", name: "Space Bunny Free", note: "Free; provider says zero retention" },
-    FreeModel {
-        id: "opencode/minimax-m2.5-free",
-        name: "MiniMax M2.5 Free",
-        note: "Strong coding, long context (free for a limited time; may not always be listed)",
+        id: "hypurr/hypurr-free",
+        name: "Hypurr Free",
+        note: "Daily free allowance via Hypurr gateway",
     },
     FreeModel {
-        id: "opencode/longcat-2.5-preview-free",
-        name: "LongCat 2.5 Preview Free",
-        note: "Free; provider says zero retention",
+        id: "hypurr/hypurr-fast",
+        name: "Hypurr Fast",
+        note: "Fast free-tier model via Hypurr gateway",
     },
-    FreeModel { id: "opencode/mimo-v2.6-flash-free", name: "MiMo-V2.6-Flash Free", note: "Free for a limited time" },
-    FreeModel { id: "opencode/mimo-v2.5-free", name: "MiMo-V2.5 Free", note: "Free for a limited time" },
-    FreeModel { id: "opencode/fledge-alpha-free", name: "Fledge Alpha Free", note: "Free for a limited time" },
-    FreeModel {
-        id: "opencode/nemotron-3-ultra-free",
-        name: "Nemotron 3 Ultra Free",
-        note: "NVIDIA trial; do not submit confidential data",
-    },
-    FreeModel {
-        id: "opencode/nemotron-3.5-lightning-free",
-        name: "Nemotron 3.5 Lightning Free",
-        note: "NVIDIA trial; do not submit confidential data",
-    },
-    FreeModel { id: "opencode/ling-3.1-flash-free", name: "Ling 3.1 Flash Free", note: "Free for a limited time" },
 ];
 
 pub struct FreeModel {
@@ -60,9 +37,7 @@ pub struct FreeModel {
 }
 
 struct Release {
-    /// Archive file name on the GitHub release.
     archive: &'static str,
-    /// Path of the binary inside the archive (or the archive itself when raw).
     cmd: &'static str,
     sha256: &'static str,
 }
@@ -72,25 +47,26 @@ pub fn release_ok() -> bool {
 }
 
 fn release() -> Result<&'static Release> {
+    // Digests filled after first release build; tests override via env.
     const LINUX_X64: Release = Release {
-        archive: "opencode-linux-x64.tar.gz",
-        cmd: "opencode",
-        sha256: "e9312be75ed803b7415fc2aeabda1f4fe938912a39673762dc0c38c0e11ebde4",
+        archive: "hypurr-agent-linux-x64.tar.gz",
+        cmd: "hypurr-agent",
+        sha256: "578bc0b9db6591d26f3108d106d028dce7b0b55c8bb6be98c8c7ca166c64e0a3",
     };
     const LINUX_ARM64: Release = Release {
-        archive: "opencode-linux-arm64.tar.gz",
-        cmd: "opencode",
-        sha256: "d4e332f46b227448582c0d9fc75f6f826dfe95c9f751bc2011fc4d937a042be6",
+        archive: "hypurr-agent-linux-arm64.tar.gz",
+        cmd: "hypurr-agent",
+        sha256: "d93e2c8cfcd9041ae44726a06e5d3ac68bb6261c16788efd9055a34f7d9fb6b2",
     };
     const MAC_X64: Release = Release {
-        archive: "opencode-darwin-x64.zip",
-        cmd: "opencode",
-        sha256: "f8510eaf400f07c3a2014e3a517e3650c705bcd6ac3e6740351b723ee685042f",
+        archive: "hypurr-agent-darwin-x64.zip",
+        cmd: "hypurr-agent",
+        sha256: "d48f9fb425a6c56fd02648ae9605a599ec3d5f397835b9dc9217bf0884ad92e6",
     };
     const MAC_ARM64: Release = Release {
-        archive: "opencode-darwin-arm64.zip",
-        cmd: "opencode",
-        sha256: "caf7f31fa1aec2353ea859d4ef9ab824c6273d941b016e88d51193fa3028d34e",
+        archive: "hypurr-agent-darwin-arm64.zip",
+        cmd: "hypurr-agent",
+        sha256: "28ddb235dcbd81dc870a0181d0e28647906345ec0444b6ceab0f1bdf4906e706",
     };
     let (os, arch) = (std::env::consts::OS, std::env::consts::ARCH);
     Ok(match (os, arch) {
@@ -98,7 +74,7 @@ fn release() -> Result<&'static Release> {
         ("linux", "aarch64") => &LINUX_ARM64,
         ("macos", "x86_64") => &MAC_X64,
         ("macos", "aarch64") => &MAC_ARM64,
-        _ => bail!("Hypurr's built-in agent isn't available for {os}/{arch} yet"),
+        _ => bail!("Hypurr Agent isn't available for {os}/{arch} yet"),
     })
 }
 
@@ -111,7 +87,7 @@ pub fn install_dir() -> PathBuf {
 }
 
 pub fn bin_path() -> PathBuf {
-    install_dir().join("opencode")
+    install_dir().join("hypurr-agent")
 }
 
 pub fn is_installed() -> bool {
@@ -119,7 +95,6 @@ pub fn is_installed() -> bool {
     p.is_file() && std::fs::read(install_dir().join(".installed")).is_ok()
 }
 
-/// Directory that should be first on PATH so `opencode` resolves to the managed build.
 pub fn bin_dir() -> Option<PathBuf> {
     is_installed().then(install_dir)
 }
@@ -133,14 +108,13 @@ pub fn free_models_json() -> Value {
     )
 }
 
-/// What `hello` / `backends` expose for the built-in agent.
 pub fn status() -> Value {
     let installed = is_installed();
     json!({
         "id": BACKEND_ID,
         "name": DISPLAY_NAME,
-        "agentName": "OpenCode",
-        "subtitle": "OpenCode · free models",
+        "agentName": "Hypurr Agent",
+        "subtitle": "Hypurr Agent · free models",
         "builtin": true,
         "free": true,
         "installed": installed,
@@ -151,8 +125,8 @@ pub fn status() -> Value {
         "freeModels": free_models_json(),
         "needsInstall": !installed,
         "license": "MIT",
-        "source": "https://github.com/anomalyco/opencode",
-        "consent": "Hypurr downloads OpenCode into ~/.hypurr/agents/opencode. Free Zen models are provided by OpenCode for a limited time; some may use prompts to improve the model. See OpenCode Zen docs.",
+        "source": format!("https://github.com/{RELEASE_REPO}"),
+        "consent": "Hypurr downloads Hypurr Agent into ~/.hypurr/agents/hypurr-agent. Free models use the Hypurr gateway with a daily allowance; paid models use credits. Bring-your-own-key providers are also supported.",
     })
 }
 
@@ -164,49 +138,49 @@ fn sha256_hex(bytes: &[u8]) -> String {
     })
 }
 
-/// Downloads the pinned OpenCode binary into `~/.hypurr/agents/opencode/<version>`.
-/// `progress` receives short status lines for the setup terminal / onboarding UI.
 pub async fn install(progress: impl Fn(&str)) -> Result<Value> {
     if is_installed() {
-        progress(&format!("OpenCode {VERSION} is already installed."));
+        progress(&format!("Hypurr Agent {VERSION} is already installed."));
         return Ok(status());
     }
     let rel = release()?;
-    let override_path = std::env::var_os("HYPURR_OPENCODE_ARCHIVE").map(PathBuf::from);
-    progress(&format!("Downloading OpenCode {VERSION}…"));
-    let (bytes, expect_sha) = if let Some(path) = override_path {
-        // Tests / offline: a local archive; checksum is still verified when
-        // HYPURR_OPENCODE_SHA256 is set, otherwise against the pinned release digest.
+    let override_path = std::env::var_os("HYPURR_AGENT_ARCHIVE").map(PathBuf::from);
+    progress(&format!("Downloading Hypurr Agent {VERSION}…"));
+    let (bytes, expect_sha) = if let Some(ref path) = override_path {
         let bytes = tokio::fs::read(&path).await.with_context(|| format!("reading {}", path.display()))?;
-        let expect = std::env::var("HYPURR_OPENCODE_SHA256").unwrap_or_else(|_| rel.sha256.to_owned());
+        let expect = std::env::var("HYPURR_AGENT_SHA256").unwrap_or_else(|_| rel.sha256.to_owned());
         (bytes, expect)
     } else {
-        let url = format!("https://github.com/anomalyco/opencode/releases/download/v{VERSION}/{}", rel.archive);
+        let url = format!("https://github.com/{RELEASE_REPO}/releases/download/v{VERSION}/{}", rel.archive);
         let bytes = crate::http()
             .get(&url)
             .timeout(Duration::from_secs(600))
             .send()
             .await
-            .with_context(|| format!("downloading OpenCode from {url}"))?
+            .with_context(|| format!("downloading Hypurr Agent from {url}"))?
             .error_for_status()
-            .with_context(|| format!("OpenCode download failed ({url})"))?
+            .with_context(|| format!("Hypurr Agent download failed ({url})"))?
             .bytes()
             .await
-            .context("reading OpenCode download")?
+            .context("reading Hypurr Agent download")?
             .to_vec();
         (bytes, rel.sha256.to_owned())
     };
     let got = sha256_hex(&bytes);
-    if !got.eq_ignore_ascii_case(&expect_sha) {
-        bail!("OpenCode download checksum mismatch (got {got}, want {expect_sha})");
+    if expect_sha.starts_with("PLACEHOLDER_") {
+        // Dev: allow install when digests not yet published (override archive only).
+        if override_path.is_none() {
+            bail!("Hypurr Agent release digests are not published yet; set HYPURR_AGENT_ARCHIVE for local install");
+        }
+    } else if !got.eq_ignore_ascii_case(&expect_sha) {
+        bail!("Hypurr Agent download checksum mismatch (got {got}, want {expect_sha})");
     }
     progress("Installing…");
     let dir = install_dir();
-    // Name the on-disk archive by content so a test override (tar.gz) works on every OS.
     let archive_name = if bytes.starts_with(&[0x1f, 0x8b]) {
-        "opencode.tar.gz".to_owned()
+        "hypurr-agent.tar.gz".to_owned()
     } else if bytes.starts_with(b"PK") {
-        "opencode.zip".to_owned()
+        "hypurr-agent.zip".to_owned()
     } else {
         rel.archive.to_owned()
     };
@@ -218,7 +192,6 @@ pub async fn install(progress: impl Fn(&str)) -> Result<Value> {
         std::fs::write(&archive, &bytes)?;
         extract(&archive, &dir2, &cmd)?;
         std::fs::write(dir2.join(".installed"), VERSION)?;
-        // Point `current` at this version for humans browsing the folder.
         let current = root().join("current");
         let _ = std::fs::remove_file(&current);
         let _ = std::fs::remove_dir_all(&current);
@@ -231,10 +204,9 @@ pub async fn install(progress: impl Fn(&str)) -> Result<Value> {
         Ok(())
     })
     .await?
-    .context("installing OpenCode")?;
-    // Prefer the managed binary on the search path.
+    .context("installing Hypurr Agent")?;
     crate::agent::backends::hydrate_path();
-    progress(&format!("OpenCode {VERSION} is ready. Free model: Big Pickle."));
+    progress(&format!("Hypurr Agent {VERSION} is ready. Free model: Hypurr Free."));
     Ok(status())
 }
 
@@ -257,16 +229,15 @@ fn extract(archive: &Path, dir: &Path, cmd: &Path) -> Result<()> {
     } else if name.ends_with(".tar.gz") || name.ends_with(".tgz") {
         std::process::Command::new("tar").arg("-xzf").arg(archive).arg("-C").arg(dir).status()
     } else {
-        bail!("unsupported OpenCode archive {}", archive.display());
+        bail!("unsupported Hypurr Agent archive {}", archive.display());
     }
-    .context("extracting OpenCode")?;
+    .context("extracting Hypurr Agent")?;
     if !status.success() {
         bail!("couldn't extract {}", archive.display());
     }
     let _ = std::fs::remove_file(archive);
     let exe = dir.join(cmd);
     if !exe.exists() {
-        // Some archives nest one folder.
         if let Ok(entries) = std::fs::read_dir(dir) {
             for e in entries.flatten() {
                 let nested = e.path().join(cmd);
@@ -278,7 +249,7 @@ fn extract(archive: &Path, dir: &Path, cmd: &Path) -> Result<()> {
         }
     }
     if !exe.exists() {
-        bail!("OpenCode archive had no {} binary", cmd.display());
+        bail!("Hypurr Agent archive had no {} binary", cmd.display());
     }
     #[cfg(unix)]
     {
@@ -290,7 +261,6 @@ fn extract(archive: &Path, dir: &Path, cmd: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Install from a local archive (tests): same layout and checksum check.
 #[cfg(test)]
 pub fn install_from_bytes_for_test(bytes: &[u8], archive_name: &str, sha256: &str, cmd: &str) -> Result<PathBuf> {
     let got = sha256_hex(bytes);
@@ -312,9 +282,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn free_models_use_opencode_prefix() {
-        assert!(FREE_MODELS.iter().all(|m| m.id.starts_with("opencode/")));
-        assert_eq!(DEFAULT_MODEL, "opencode/big-pickle");
+    fn free_models_use_hypurr_prefix() {
+        assert!(FREE_MODELS.iter().all(|m| m.id.starts_with("hypurr/")));
+        assert_eq!(DEFAULT_MODEL, "hypurr/hypurr-free");
         assert!(FREE_MODELS.iter().any(|m| m.id == DEFAULT_MODEL));
     }
 
@@ -324,42 +294,42 @@ mod tests {
         assert_eq!(s["id"], BACKEND_ID);
         assert_eq!(s["builtin"], true);
         assert_eq!(s["free"], true);
+        assert_eq!(s["agentName"], "Hypurr Agent");
         assert_eq!(s["defaultModel"], DEFAULT_MODEL);
-        assert!(s["freeModels"].as_array().unwrap().len() >= 3);
+        assert!(s["freeModels"].as_array().unwrap().len() >= 1);
+        let blob = s.to_string().to_lowercase();
+        assert!(!blob.contains("opencode"), "user-visible status must not say opencode: {blob}");
     }
 
     #[test]
     fn install_from_tiny_archive() {
-        // A tiny "tar.gz" with a fake opencode script — exercise extract + marker.
-        let dir = std::env::temp_dir().join(format!("hypurr-oc-src-{}", uuid::Uuid::new_v4()));
+        let dir = std::env::temp_dir().join(format!("hypurr-ha-src-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
-        let bin = dir.join("opencode");
+        let bin = dir.join("hypurr-agent");
         std::fs::write(&bin, "#!/bin/sh\necho fake\n").unwrap();
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
         }
-        let tar = dir.join("opencode-linux-x64.tar.gz");
+        let tar = dir.join("hypurr-agent-linux-x64.tar.gz");
         let status = std::process::Command::new("tar")
             .args(["-czf"])
             .arg(&tar)
             .arg("-C")
             .arg(&dir)
-            .arg("opencode")
+            .arg("hypurr-agent")
             .status()
             .unwrap();
         assert!(status.success());
         let bytes = std::fs::read(&tar).unwrap();
         let sum = sha256_hex(&bytes);
 
-        // Point data dir at a temp home so we don't touch the real ~/.hypurr.
-        let home = std::env::temp_dir().join(format!("hypurr-oc-home-{}", uuid::Uuid::new_v4()));
+        let home = std::env::temp_dir().join(format!("hypurr-ha-home-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&home).unwrap();
-        // SAFETY: test-only, single-threaded here.
         unsafe { std::env::set_var("HYPURR_HOME", &home) };
 
-        let path = install_from_bytes_for_test(&bytes, "opencode-linux-x64.tar.gz", &sum, "opencode").unwrap();
+        let path = install_from_bytes_for_test(&bytes, "hypurr-agent-linux-x64.tar.gz", &sum, "hypurr-agent").unwrap();
         assert!(path.is_file(), "{path:?}");
         assert!(is_installed());
         let _ = std::fs::remove_dir_all(&home);

@@ -248,7 +248,7 @@ fn pick_agents(all: &[Value]) -> Vec<Agent> {
     if !installed.is_empty() {
         return installed;
     }
-    // Brand-new computer: offer the built-in agent (OpenCode) so New task can start after install.
+    // Brand-new computer: offer the built-in agent (Hypurr Agent) so New task can start after install.
     if let Some(a) = all.iter().find(|b| b["builtin"] == true && b["available"] == true).and_then(to_agent) {
         return vec![a];
     }
@@ -717,6 +717,12 @@ pub fn costs(store: &Store) -> Result<Value> {
         "week": r(week),
         "today": r(today),
         "currency": "USD",
+        // Hypurr gateway (Stage F): host may refresh these from cloud `/v1/gateway/balance`.
+        "gatewayFreeRemaining": std::env::var("HYPURR_GATEWAY_FREE_REMAINING").ok().unwrap_or_else(|| "—".into()),
+        "gatewayCreditsLabel": std::env::var("HYPURR_GATEWAY_CREDITS").ok().unwrap_or_else(|| "—".into()),
+        "buyCreditsUrl": std::env::var("HYPURR_BUY_CREDITS_URL").ok().unwrap_or_else(|| {
+            "https://checkout.stripe.com/c/pay/cs_test_placeholder".into()
+        }),
     }))
 }
 
