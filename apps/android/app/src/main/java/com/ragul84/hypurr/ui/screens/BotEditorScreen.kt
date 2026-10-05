@@ -67,6 +67,8 @@ data class BotEditorState(
     val description: String = "",
     val avatarColor: String = "blue",
     val backend: String? = null,
+    /** OpenCode free model id (`opencode/big-pickle`), when the built-in agent is selected. */
+    val model: String? = null,
     /** Null = a personal workspace Hypurr makes for the bot. */
     val folder: String? = null,
     /** ask | auto */
@@ -95,6 +97,7 @@ data class BotEditorState(
             put("description", description.trim())
             put("avatarColor", avatarColor)
             backend?.takeIf { isNew || it != original?.backend }?.let { put("backend", it) }
+            model?.takeIf { it.isNotBlank() && (isNew || it != original?.model) }?.let { put("model", it) }
             if (isNew) put("cwd", folder.orEmpty())
             put("permission", permission)
         }
@@ -102,11 +105,14 @@ data class BotEditorState(
     }
 
     companion object {
-        fun newBot(backends: List<Backend>): BotEditorState = BotEditorState(backend = backends.singleOrNull()?.id)
+        fun newBot(backends: List<Backend>): BotEditorState {
+            val pick = backends.firstOrNull { it.builtin } ?: backends.singleOrNull() ?: backends.firstOrNull()
+            return BotEditorState(backend = pick?.id, model = pick?.defaultModel ?: pick?.freeModels?.firstOrNull()?.id)
+        }
         fun newGroup(members: List<String> = emptyList()) = BotEditorState(group = true, members = members)
         fun of(bot: Bot) = BotEditorState(
             group = bot.isGroup, id = bot.id, name = bot.name, description = bot.description, avatarColor = bot.avatarColor,
-            backend = bot.backend.ifEmpty { null }, folder = if (bot.managedWorkspace) null else bot.cwd, permission = bot.permission,
+            backend = bot.backend.ifEmpty { null }, model = bot.model, folder = if (bot.managedWorkspace) null else bot.cwd, permission = bot.permission,
             members = bot.members, pinned = bot.pinned,
         )
     }
@@ -115,6 +121,7 @@ data class BotEditorState(
 /** Agents a new bot can use: installed and runnable, and allowed by the team's rules. */
 fun usableBackends(backends: List<Backend>, allowed: List<String>): List<Backend> =
     backends.filter { it.available && (allowed.isEmpty() || it.id in allowed) }
+        .sortedByDescending { it.builtin }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -197,13 +204,36 @@ fun BotEditorScreen(
             } else {
                 Section("Agent") {
                     if (backends.isEmpty()) {
-                        Text("No agent your team allows is installed on the computer. Install one (like Claude Code or Codex) from the Mac or Linux app.",
+                        Text("No agent your team allows is installed on the computer. Install Hypurr's built-in agent (OpenCode, free models) or Claude Code / Codex from the computer.",
                             color = c.warning, style = MaterialTheme.typography.bodyMedium)
                     }
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         val shown = backends.ifEmpty { listOfNotNull(state.backend?.let { Backend(it, it) }) }
                         shown.forEach { b ->
-                            Choice(b.name.ifEmpty { b.id }, state.backend == b.id) { onChange(state.copy(backend = b.id)) }
+                            Choice(
+                                label = b.name.ifEmpty { b.id },
+                                on = state.backend == b.id,
+                                badge = when {
+                                    b.free || b.builtin -> "Free"
+                                    else -> null
+                                },
+                            ) {
+                                onChange(state.copy(backend = b.id, model = b.defaultModel ?: b.freeModels.firstOrNull()?.id ?: state.model))
+                            }
+                        }
+                    }
+                    val selected = backends.firstOrNull { it.id == state.backend }
+                    if (selected != null && (selected.free || selected.builtin) && selected.freeModels.isNotEmpty()) {
+                        Text("Free model", color = c.secondary, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
+                        Text(selected.subtitle.ifEmpty { "OpenCode Zen · no API key needed for free models" }, color = c.tertiary,
+                            style = MaterialTheme.typography.bodySmall)
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(top = 8.dp)) {
+                            selected.freeModels.forEach { m ->
+                                Choice(m.name.ifEmpty { m.id.substringAfterLast('/') }, state.model == m.id, badge = "Free") {
+                                    onChange(state.copy(model = m.id))
+                                }
+                            }
                         }
                     }
                 }
@@ -263,7 +293,7 @@ fun BotEditorScreen(
 }
 
 @Composable
-private fun Choice(label: String, on: Boolean, modifier: Modifier = Modifier, icon: androidx.compose.ui.graphics.vector.ImageVector? = null, onClick: () -> Unit) {
+private fun Choice(label: String, on: Boolean, modifier: Modifier = Modifier, icon: androidx.compose.ui.graphics.vector.ImageVector? = null, badge: String? = null, onClick: () -> Unit) {
     val c = Hypurr.colors
     Row(modifier.clip(RoundedCornerShape(16.dp)).background(if (on) c.accent.copy(alpha = 0.14f) else c.bg.copy(alpha = 0.6f))
         .pressable(label, role = Role.RadioButton, onClick = onClick).padding(horizontal = 14.dp, vertical = 11.dp),
@@ -274,6 +304,10 @@ private fun Choice(label: String, on: Boolean, modifier: Modifier = Modifier, ic
         }
         Text(label, color = if (on) c.accent else c.text, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false))
+        if (badge != null) {
+            Spacer(Modifier.width(8.dp))
+            Pill(badge, c.success)
+        }
     }
 }
 

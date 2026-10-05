@@ -101,6 +101,9 @@ impl Terms {
     ) -> Result<String> {
         let h = backends::harness(backend);
         let name = h.map_or(backend, |h| h.name);
+        if step == Step::Install && matches!(h.and_then(|h| h.install), Some(backends::Install::Managed)) {
+            return Ok(self.spawn_managed(backend));
+        }
         let command = match step {
             Step::Install => {
                 let h = h.ok_or_else(|| anyhow!("Hypurr downloads {name} by itself"))?;
@@ -115,6 +118,59 @@ impl Terms {
             },
         };
         self.spawn((backend.to_owned(), step), &command, cols, rows)
+    }
+
+    /// Streams `builtin::install` progress into a setup terminal (no PTY).
+    fn spawn_managed(self: &Arc<Self>, backend: &str) -> String {
+        let key = (backend.to_owned(), Step::Install);
+        {
+            let map = self.0.locked();
+            if let Some((id, _)) = map.iter().find(|(_, t)| t.key == key && t.output.locked().exit.is_none()) {
+                return id.clone();
+            }
+        }
+        let (tx, _rx) = mpsc::unbounded_channel();
+        let term = Arc::new(Term {
+            key,
+            input: tx,
+            output: Mutex::new(Output { scrollback: vec![], exit: None }),
+            events: broadcast::channel(256).0,
+        });
+        let id = uuid::Uuid::new_v4().to_string();
+        self.0.locked().insert(id.clone(), term.clone());
+        let terms = Arc::clone(self);
+        let tid = id.clone();
+        tokio::spawn(async move {
+            let progress = {
+                let term = Arc::clone(&term);
+                move |line: &str| {
+                    term.push(
+                        format!(
+                            "{line}
+"
+                        )
+                        .as_bytes(),
+                    );
+                }
+            };
+            let code = match crate::agent::builtin::install(progress).await {
+                Ok(_) => 0,
+                Err(e) => {
+                    term.push(
+                        format!(
+                            "Error: {e:#}
+"
+                        )
+                        .as_bytes(),
+                    );
+                    1
+                }
+            };
+            term.finish(code);
+            tokio::time::sleep(LINGER).await;
+            terms.0.locked().remove(&tid);
+        });
+        id
     }
 
     fn spawn(self: &Arc<Self>, key: (String, Step), command: &str, cols: u16, rows: u16) -> Result<String> {

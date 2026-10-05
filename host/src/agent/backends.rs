@@ -39,6 +39,8 @@ pub enum Install {
     Script(&'static str),
     /// A global npm package.
     Npm(&'static str),
+    /// Hypurr downloads a pinned build into `~/.hypurr/agents` (OpenCode).
+    Managed,
 }
 
 impl Install {
@@ -48,6 +50,8 @@ impl Install {
             Self::Npm(pkg) => format!(
                 "command -v npm >/dev/null || {{ echo 'This needs Node.js first: https://nodejs.org'; exit 1; }}; npm install -g {pkg}"
             ),
+            // Managed installs run inside the host (see `term` / `installBuiltinAgent`), not a shell.
+            Self::Managed => String::new(),
         }
     }
 }
@@ -123,12 +127,12 @@ pub const HARNESSES: &[Harness] = &[
     },
     Harness {
         id: "opencode",
-        name: "OpenCode",
+        name: "Hypurr built-in",
         bins: &["opencode"],
         local: Some("{bin} acp"),
         registry: Some("opencode"),
-        setup: "Install OpenCode (curl -fsSL https://opencode.ai/install | bash) and run `opencode auth login`.",
-        install: Some(Install::Script("curl -fsSL https://opencode.ai/install | bash")),
+        setup: "Hypurr can install OpenCode for you (free Zen models). Or install it yourself: curl -fsSL https://opencode.ai/install | bash.",
+        install: Some(Install::Managed),
         login: "{bin} auth login",
         signed_in: None,
     },
@@ -414,11 +418,16 @@ fn node_version(dir: &Path) -> Vec<u32> {
 
 fn well_known_dirs() -> Vec<PathBuf> {
     let Some(home) = dirs::home_dir() else { return vec![] };
-    let mut dirs: Vec<PathBuf> =
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    // Managed OpenCode first so the built-in agent wins over a random PATH copy.
+    if let Some(d) = crate::agent::builtin::bin_dir() {
+        dirs.push(d);
+    }
+    dirs.extend(
         ["/opt/homebrew/bin", "/usr/local/bin", "/home/linuxbrew/.linuxbrew/bin", "/usr/bin", "/bin"]
             .iter()
-            .map(PathBuf::from)
-            .collect();
+            .map(PathBuf::from),
+    );
     for rel in [
         ".local/bin",
         ".bun/bin",
@@ -508,20 +517,44 @@ pub fn list() -> Vec<Value> {
             let reg = h.registry.and_then(|id| registry.iter().find(|a| a["id"] == id));
             let runnable =
                 (path.is_some() && h.local.is_some()) || reg.is_some_and(|a| registry::launch_kind(a).is_some());
-            json!({
+            let managed = h.id == crate::agent::builtin::BACKEND_ID;
+            let installed = path.is_some() || (managed && crate::agent::builtin::is_installed());
+            let mut row = json!({
                 "id": h.id,
                 "name": h.name,
-                "installed": path.is_some(),
-                "available": path.is_some() && runnable,
-                "path": path.map(|p| p.to_string_lossy().into_owned()),
-                "description": reg.and_then(|a| a["description"].as_str()).unwrap_or_default(),
+                "installed": installed,
+                "available": (path.is_some() && runnable) || (managed && (crate::agent::builtin::is_installed() || crate::agent::builtin::release_ok())),
+                "path": path.as_ref().map(|p| p.to_string_lossy().into_owned()),
+                "description": if managed {
+                    "OpenCode with free Zen models — Hypurr's built-in agent.".into()
+                } else {
+                    reg.and_then(|a| a["description"].as_str()).unwrap_or_default().to_owned()
+                },
                 "installHint": h.setup,
                 "signedIn": signed_in(h.id),
                 "canInstall": h.install.is_some(),
                 "command": h.local.unwrap_or_default(),
                 "registry": h.registry,
                 "curated": true,
-            })
+            });
+            if managed {
+                let st = crate::agent::builtin::status();
+                for k in ["builtin", "free", "defaultModel", "freeModels", "needsInstall", "version", "subtitle", "agentName", "consent", "license", "source"] {
+                    row[k] = st[k].clone();
+                }
+                row["name"] = if crate::agent::builtin::is_installed() || path.is_some() {
+                    json!(crate::agent::builtin::DISPLAY_NAME)
+                } else {
+                    json!("Hypurr built-in (OpenCode, free models)")
+                };
+                // Managed binary path when we installed it.
+                if crate::agent::builtin::is_installed() {
+                    row["path"] = json!(crate::agent::builtin::bin_path().to_string_lossy());
+                    row["installed"] = json!(true);
+                    row["available"] = json!(true);
+                }
+            }
+            row
         })
         .collect();
     // Registry agents we don't know by name: runnable, but you sign in yourself.
@@ -545,7 +578,13 @@ pub fn list() -> Vec<Value> {
             "curated": false,
         }));
     }
-    out.sort_by_key(|v| (!v["installed"].as_bool().unwrap_or(false), !v["curated"].as_bool().unwrap_or(false)));
+    out.sort_by_key(|v| {
+        (
+            !v["builtin"].as_bool().unwrap_or(false),
+            !v["installed"].as_bool().unwrap_or(false),
+            !v["curated"].as_bool().unwrap_or(false),
+        )
+    });
     out
 }
 
@@ -661,7 +700,11 @@ pub async fn login_command(id: &str) -> anyhow::Result<String> {
 pub fn local_candidate(id: &str) -> Option<registry::Cmd> {
     let h = harness(id)?;
     let template = h.local?;
-    let path = h.bins.iter().find_map(|b| which(b))?;
+    let path = if id == crate::agent::builtin::BACKEND_ID && crate::agent::builtin::is_installed() {
+        Some(crate::agent::builtin::bin_path())
+    } else {
+        h.bins.iter().find_map(|b| which(b))
+    }?;
     let args = template.strip_prefix("{bin}").unwrap_or(template).trim().to_owned();
     Some(registry::Cmd { program: shell_quote(&path.to_string_lossy()), args })
 }

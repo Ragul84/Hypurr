@@ -55,6 +55,7 @@ import org.webrtc.SurfaceViewRenderer
 import com.ragul84.hypurr.model.Pairing
 import com.ragul84.hypurr.net.LinkState
 import com.ragul84.hypurr.ui.screens.BotListScreen
+import com.ragul84.hypurr.ui.screens.BuiltinInstallPrompt
 import com.ragul84.hypurr.ui.screens.ChatScreen
 import com.ragul84.hypurr.ui.screens.NewTaskScreen
 import com.ragul84.hypurr.ui.screens.NewTaskUiState
@@ -219,6 +220,8 @@ class MainActivity : ComponentActivity() {
         val requested by openBot.collectAsState()
         val you by store.you.collectAsState()
         var screen by rememberSaveable { mutableStateOf("list") }
+        var builtinBusy by remember { mutableStateOf(false) }
+        var builtinError by remember { mutableStateOf<String?>(null) }
         requested?.let {
             openBot.value = null
             screen = "chat:$it"
@@ -490,6 +493,10 @@ class MainActivity : ComponentActivity() {
                 }
                 else -> {
                     val hello by store.hello.collectAsState()
+                    val builtin = hello?.builtinAgent
+                    val prompt = if (you?.canAct != false && builtin != null && (builtin.needsInstall || (!builtin.installed && builtin.available))) {
+                        BuiltinInstallPrompt(busy = builtinBusy, error = builtinError, consent = builtin.consent ?: BuiltinInstallPrompt().consent)
+                    } else null
                     BotListScreen(
                         current.name, linkState, rosterOrder(bots.values), synced,
                         onOpen = { screen = "chat:${it.id}" },
@@ -501,6 +508,15 @@ class MainActivity : ComponentActivity() {
                         onNewGroup = { screen = "group:new" },
                         canCreate = you?.canAct != false,
                         onScreen = if (hello?.screen?.enabled == true && you?.canAct != false) ({ screen = "screen" }) else null,
+                        builtinInstall = prompt,
+                        onInstallBuiltin = {
+                            builtinBusy = true; builtinError = null
+                            lifecycleScope.launch {
+                                runCatching { store.installBuiltinAgent() }
+                                    .onFailure { builtinError = it.message ?: "Couldn't install OpenCode" }
+                                builtinBusy = false
+                            }
+                        },
                     )
                 }
             }

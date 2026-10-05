@@ -22,6 +22,7 @@ import com.ragul84.hypurr.ui.theme.HypurrTheme
 import com.ragul84.hypurr.data.PickedFile
 import com.ragul84.hypurr.screen.ScreenPhase
 import com.ragul84.hypurr.ui.screens.BotEditorScreen
+import com.ragul84.hypurr.ui.screens.BuiltinInstallPrompt
 import com.ragul84.hypurr.ui.screens.BotEditorState
 import com.ragul84.hypurr.ui.screens.ComposerFiles
 import com.ragul84.hypurr.ui.screens.ScreenScreen
@@ -250,6 +251,22 @@ class ScreenshotTest {
     fun screenOff() = shoot("screen-off") {
         ScreenScreen(ScreenUiState("Kevin's Mac Studio", com.ragul84.hypurr.model.ScreenState()), {}, {}, {}, {}) { }
     }
+
+    @Test
+    @Config(qualifiers = "w412dp-h1600dp-xxhdpi")
+    fun newBotBuiltin() = shoot("new-bot-builtin") {
+        BotEditorScreen(
+            BotEditorState(name = "Helper", description = "First bot on a new computer", avatarColor = "violet",
+                backend = "opencode", model = "opencode/big-pickle"),
+            Samples.backends, emptyList(), {}, {}, {}, {}, {})
+    }
+
+    @Test
+    fun rosterBuiltinInstall() = shoot("builtin-install") {
+        BotListScreen(Samples.computer.name, LinkState.Ready(Route.Direct), emptyList(), synced = true,
+            onOpen = {}, onSettings = {}, onRetry = {}, now = Samples.NOW, byId = emptyMap(),
+            builtinInstall = BuiltinInstallPrompt())
+    }
 }
 
 /** Stands in for the WebRTC video in screenshots: a desktop with a window, letterboxed like the real video. */
@@ -270,4 +287,5 @@ private fun FakeDesktop(modifier: androidx.compose.ui.Modifier) {
                 size = androidx.compose.ui.geometry.Size(size.width, size.height * 0.06f))
         }
     }
+
 }

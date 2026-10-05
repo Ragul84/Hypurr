@@ -266,8 +266,25 @@ data class Entry(
 }
 
 @Serializable
-data class Backend(val id: String, val name: String = "", val available: Boolean = true, val installed: Boolean = true,
-                   val description: String = "")
+data class Backend(
+    val id: String,
+    val name: String = "",
+    val available: Boolean = true,
+    val installed: Boolean = true,
+    val description: String = "",
+    val builtin: Boolean = false,
+    val free: Boolean = false,
+    val subtitle: String = "",
+    val defaultModel: String? = null,
+    val freeModels: List<AgentModel> = emptyList(),
+    val needsInstall: Boolean = false,
+    val version: String? = null,
+    val consent: String? = null,
+)
+
+/** A model an agent can run (OpenCode free Zen models, or whatever `agentModels` returns). */
+@Serializable
+data class AgentModel(val id: String, val name: String = "", val description: String = "", val free: Boolean = false)
 
 @Serializable
 data class Hello(
@@ -286,6 +303,7 @@ data class Hello(
     val you: Actor? = null,
     /** Agents the computer knows; `available` ones can run a new bot. */
     val backends: List<Backend> = emptyList(),
+    val builtinAgent: Backend? = null,
     val home: String? = null,
     val screen: ScreenState? = null,
 )

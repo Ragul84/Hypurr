@@ -35,8 +35,8 @@ pub struct Route {
     pub reason: String,
 }
 
-const PREFER_CHANGES: &[&str] = &["claude", "codex", "cursor", "gemini", "opencode", "grok", "pi"];
-const PREFER_READING: &[&str] = &["claude", "gemini", "codex", "cursor", "opencode", "grok", "pi"];
+const PREFER_CHANGES: &[&str] = &["opencode", "claude", "codex", "cursor", "gemini", "grok", "pi"];
+const PREFER_READING: &[&str] = &["opencode", "claude", "gemini", "codex", "cursor", "grok", "pi"];
 
 fn words(text: &str) -> Vec<String> {
     text.to_lowercase().split(|c: char| !c.is_alphanumeric()).filter(|w| w.len() > 1).map(str::to_owned).collect()
@@ -136,5 +136,16 @@ mod tests {
         assert_eq!(r.agent.unwrap().id, "codex");
         assert!(r.reason.contains("you asked for Codex"));
         assert!(route("x", false, &[], &[], None).reason.starts_with("Add a project folder first"));
+    }
+
+    #[test]
+    fn prefers_builtin_opencode_when_available() {
+        let projects = [p("Shop", "/w/shop", &[])];
+        let agents = [a("opencode", "Hypurr built-in"), a("claude", "Claude Code")];
+        let r = route("Fix the checkout total", false, &projects, &agents, None);
+        assert_eq!(r.agent.unwrap().id, "opencode");
+        let only = [a("opencode", "Hypurr built-in")];
+        let r = route("Explain main.rs", true, &projects, &only, None);
+        assert_eq!(r.agent.unwrap().id, "opencode");
     }
 }
