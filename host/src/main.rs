@@ -11,6 +11,7 @@ mod routines;
 mod screen;
 mod service;
 mod store;
+mod tasks;
 mod tui;
 mod update;
 mod usage;

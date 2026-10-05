@@ -6,6 +6,10 @@ import com.ragul84.hypurr.model.Entry
 import com.ragul84.hypurr.model.EntryData
 import com.ragul84.hypurr.model.HypurrJson
 import com.ragul84.hypurr.model.Pairing
+import com.ragul84.hypurr.model.SafetySettings
+import com.ragul84.hypurr.model.TaskRoute
+import com.ragul84.hypurr.model.TaskSetup
+import com.ragul84.hypurr.model.TaskTemplate
 import com.ragul84.hypurr.net.ChannelTransport
 import com.ragul84.hypurr.net.Dialer
 import com.ragul84.hypurr.net.HostClient
@@ -242,6 +246,77 @@ class HypurrStore(
     suspend fun stop(botId: String) = client?.stop(botId)
 
     suspend fun respond(entryId: String, optionId: String?) = client?.respondPermission(entryId, optionId)
+
+    // MARK: tasks and the safety net
+
+    private val _setup = MutableStateFlow<TaskSetup?>(null)
+    /** Templates, projects, agents and safety settings for the New task screen. */
+    val setup: StateFlow<TaskSetup?> = _setup.asStateFlow()
+
+    suspend fun loadSetup(): TaskSetup? {
+        val c = client ?: return _setup.value
+        return runCatching { c.taskSetup() }.getOrNull()?.also { _setup.value = it } ?: _setup.value
+    }
+
+    suspend fun route(goal: String, template: String?): TaskRoute? = client?.routeTask(goal, template)
+
+    /** Starts a task and returns its bot id (the chat to open). */
+    suspend fun startTask(goal: String, template: String?, input: String, project: String?, backend: String?,
+                          attachments: List<String> = emptyList()): String {
+        val c = client ?: throw HostException.unreachable()
+        val bot = c.startTask(goal, template, input, project, backend, attachments)
+        upsert(bot)
+        return bot.id
+    }
+
+    /** Undo / go back: stops a working agent first, then restores the checkpoint. */
+    suspend fun rollback(botId: String, checkpointId: String) {
+        val c = client ?: throw HostException.unreachable()
+        val bot = _bots.value[botId] ?: return
+        val task = bot.task ?: return
+        if (bot.status == "working" || bot.status == "needsInput") {
+            runCatching { c.stop(botId) }
+            // The host refuses a rollback while the turn is still winding down.
+            var waited = 0
+            while (_bots.value[botId]?.status == "working" && waited++ < 20) delay(250)
+        }
+        var last: Exception? = null
+        repeat(5) {
+            try {
+                c.rollbackTask(task.id, checkpointId)
+                return
+            } catch (e: HostException) {
+                last = e
+                delay(400)
+            }
+        }
+        last?.let { throw it }
+    }
+
+    suspend fun finishTask(botId: String) {
+        val task = _bots.value[botId]?.task ?: return
+        client?.finishTask(task.id)
+    }
+
+    suspend fun saveCheckpoint(botId: String) {
+        val task = _bots.value[botId]?.task ?: return
+        client?.taskCheckpoint(task.id, "Saved by you")
+    }
+
+    suspend fun saveTemplate(template: TaskTemplate) {
+        client?.saveTemplate(template)
+        loadSetup()
+    }
+
+    suspend fun deleteTemplate(id: String) {
+        client?.deleteTemplate(id)
+        loadSetup()
+    }
+
+    suspend fun setSafety(settings: SafetySettings) {
+        val saved = client?.setSafety(settings) ?: return
+        _setup.update { it?.copy(safety = saved) ?: TaskSetup(safety = saved) }
+    }
 
     val route: Route? get() = (link.value as? LinkState.Ready)?.route
 

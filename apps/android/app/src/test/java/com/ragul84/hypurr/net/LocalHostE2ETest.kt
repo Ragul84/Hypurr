@@ -69,6 +69,46 @@ class LocalHostE2ETest {
             assertTrue(history.any { it.id == sent.id })
             println("e2e: sent ${sent.id} to $botId, saw it on the event stream and in history (${history.size} entries)")
         }
+        val project = System.getenv("HYPURR_E2E_PROJECT")?.takeIf { it.isNotBlank() }
+        val agent = System.getenv("HYPURR_E2E_AGENT")?.takeIf { it.isNotBlank() }
+        if (project != null && agent != null) beginnerTask(client, project, agent)
         t.shutdown()
+    }
+
+    /** Stage A over the encrypted channel: setup, route, start a task, explained cards, approve, checkpoint, rollback. */
+    private suspend fun beginnerTask(client: HostClient, project: String, agent: String) {
+        val setup = client.taskSetup()
+        assertEquals(5, setup.templates.count { it.builtin })
+        val route = client.routeTask("write tests for the shop checkout", "write-tests")
+        println("e2e: route project=${route.project?.name} reason=\"${route.reason}\"")
+        val rev = client.sync(0).rev
+        val cards = scope.async {
+            client.events(rev).filterIsInstance<HostEvent.EntryChanged>()
+                .first { it.entry.kind == "permission" && it.entry.data.status == "pending" }
+        }
+        kotlinx.coroutines.delay(300)
+        val bot = client.startTask("the checkout button", "write-tests", "", project, "custom", command = agent)
+        val task = bot.task!!
+        assertTrue(task.hasSafetyNet)
+        println("e2e: task ${task.id} on ${task.branch} in ${task.worktree}")
+        val card = withTimeout(20_000) { cards.await() }.entry
+        assertEquals("high", card.data.risk)
+        println("e2e: card risk=${card.data.risk} explain=\"${card.data.explain}\" checkpoint=${card.data.checkpoint}")
+        val blocked = client.history(bot.id).first { it.data.blocked != null }
+        println("e2e: blocked=\"${blocked.data.blocked}\"")
+        client.respondPermission(card.id, "allow")
+        val after = withTimeout(20_000) {
+            var t: com.ragul84.hypurr.model.TaskInfo? = null
+            while (t == null) {
+                t = client.sync(0).bots.firstOrNull { it.id == bot.id }?.task?.takeIf { tk -> tk.checkpoints.any { it.label.startsWith("After step") } }
+                if (t == null) kotlinx.coroutines.delay(200)
+            }
+            t
+        }
+        println("e2e: checkpoints=${after.checkpoints.map { it.label }}")
+        val back = client.rollbackTask(task.id, task.checkpoints.first().id)
+        assertTrue(back.checkpoints.any { it.label.startsWith("Went back") || it.label == "Before going back" })
+        println("e2e: rolled back; checkpoints now ${back.checkpoints.size}")
+        client.finishTask(task.id)
     }
 }

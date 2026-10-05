@@ -1058,6 +1058,8 @@ impl Actor {
             (_, "refusal") => self.notice("The agent declined to continue.", NoticeStyle::Info),
             _ => {}
         }
+        // A task saves a checkpoint after every step.
+        crate::tasks::after_turn(&self.hub, &self.cfg.id);
         let failed = done.is_err() && !self.stop_requested;
         let delegated = self.active_ask.is_some();
         let reply = if stopped {
@@ -1256,19 +1258,6 @@ impl Actor {
     async fn on_permission(&mut self, rpc_id: Value, params: Value) {
         let options = params["options"].as_array().cloned().unwrap_or_default();
         let tool = &params["toolCall"];
-        if self.cfg.permission == Permission::Auto {
-            let pick = ["allow_once", "allow_always"]
-                .iter()
-                .find_map(|k| options.iter().find(|o| o["kind"] == *k))
-                .or_else(|| options.first());
-            if let (Some(o), Some(conn)) = (pick, &self.conn) {
-                let _ = conn
-                    .acp
-                    .respond(rpc_id, json!({"outcome": {"outcome": "selected", "optionId": o["optionId"]}}))
-                    .await;
-                return;
-            }
-        }
         let title = tool["title"]
             .as_str()
             .filter(|t| !t.is_empty())
@@ -1284,7 +1273,7 @@ impl Actor {
         let command = raw["command"].as_str().map(str::to_owned).or_else(|| {
             raw["command"].as_array().map(|a| a.iter().filter_map(Value::as_str).collect::<Vec<_>>().join(" "))
         });
-        let data = json!({
+        let mut data = json!({
             "title": title,
             "toolKind": tool["kind"].as_str().unwrap_or("other"),
             "command": command,
@@ -1295,7 +1284,54 @@ impl Actor {
             "status": "pending",
             "selected": Value::Null,
         });
+        // Explain-as-you-go: plain sentence + risk level from the host's rules.
+        let assessment = crate::tasks::assess_permission(&self.hub.store, &data);
+        data["risk"] = json!(assessment.risk);
+        data["explain"] = assessment.explain.clone().into();
+        data["riskReasons"] = json!(assessment.reasons);
         let turn = self.turn.unwrap_or(0);
+        // The safety net refuses this one outright: answer "reject" and leave a card saying why.
+        if let Some(reason) = assessment.blocked.clone() {
+            let reject = ["reject_once", "reject_always"].iter().find_map(|k| options.iter().find(|o| o["kind"] == *k));
+            let outcome = reject.map_or_else(
+                || json!({"outcome": {"outcome": "cancelled"}}),
+                |o| json!({"outcome": {"outcome": "selected", "optionId": o["optionId"]}}),
+            );
+            if let Some(conn) = &self.conn {
+                let _ = conn.acp.respond(rpc_id, outcome).await;
+            }
+            data["status"] = "answered".into();
+            data["selected"] = reject.map_or(Value::Null, |o| o["optionId"].clone());
+            data["blocked"] = reason.into();
+            self.close_seg();
+            self.add(EntryKind::Permission, turn, data);
+            return;
+        }
+        let settings = crate::tasks::SafetySettings::load(&self.hub.store);
+        let must_ask = settings.always_ask_high && assessment.risk == crate::tasks::risk::Risk::High;
+        if self.cfg.permission == Permission::Auto && !must_ask {
+            let pick = ["allow_once", "allow_always"]
+                .iter()
+                .find_map(|k| options.iter().find(|o| o["kind"] == *k))
+                .or_else(|| options.first());
+            if let (Some(o), Some(conn)) = (pick, &self.conn) {
+                let _ = conn
+                    .acp
+                    .respond(rpc_id, json!({"outcome": {"outcome": "selected", "optionId": o["optionId"]}}))
+                    .await;
+                return;
+            }
+        }
+        // A task saves a checkpoint before anything that changes files, so the card can offer Undo.
+        if assessment.risk > crate::tasks::risk::Risk::Low || data["toolKind"] != "read" {
+            let (hub, bot) = (self.hub.clone(), self.cfg.id.clone());
+            let label = format!("Before: {}", acp::truncate(&title, 60));
+            if let Ok(Ok(Some(cp))) =
+                tokio::task::spawn_blocking(move || crate::tasks::checkpoint_bot(&hub, &bot, &label)).await
+            {
+                data["checkpoint"] = cp.id.into();
+            }
+        }
         self.close_seg();
         if let Some(e) = self.add(EntryKind::Permission, turn, data) {
             self.perms.insert(e.id, rpc_id);
@@ -1306,12 +1342,13 @@ impl Actor {
         });
         // Tapping it opens where the card is: the group, for a room turn.
         let target = self.hub.store.bot(&self.lane.chat).ok().flatten().map_or_else(|| self.cfg.clone(), |r| r.config);
+        let risk_word = if assessment.risk == crate::tasks::risk::Risk::High { "High risk: " } else { "" };
         push::notify(
             &self.hub,
             &target,
             Some(&self.cfg.id),
             &format!("{} needs you", self.cfg.name),
-            &title,
+            &format!("{risk_word}{}", assessment.explain),
             AlertKind::NeedsInput,
         );
     }

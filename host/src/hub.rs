@@ -182,6 +182,9 @@ impl Hub {
         });
         v["lastMessage"] = preview.map(|p| crate::agent::acp::truncate(&p, 280)).into();
         v["lastAt"] = last.map_or(cfg.created_at, |l| l.at).into();
+        if let Some(task) = crate::tasks::Task::for_bot(&self.store, &cfg.id) {
+            v["task"] = task.public();
+        }
         v
     }
 
@@ -285,6 +288,7 @@ impl Hub {
         self.groups.stop(self, id);
         let _ = self.send_cmd(id, Cmd::Shutdown);
         self.bots.locked().remove(id);
+        crate::tasks::bot_deleted(self, id);
         self.runtime.locked().remove(id);
         {
             let _g = self.emit_lock.locked();

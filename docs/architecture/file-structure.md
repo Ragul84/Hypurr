@@ -69,6 +69,7 @@ Hypurr/
 | API, caller permissions, event ordering | `host/src/api/`, `hub.rs` |
 | SQLite transcript, bots, lanes and sessions | `host/src/store.rs` |
 | Agent process, ACP, queue and session lifecycle | `host/src/agent/bot.rs`, `acp.rs` |
+| Beginner tasks: router, templates, safety net, risk rules | `host/src/tasks/` |
 | Group room turns / bot-to-bot requests | `host/src/chat/group.rs` / `team.rs` |
 | Prompt snapshots and memory keeper | `host/src/chat/context.rs`, `memory.rs` |
 | Identity, encryption and direct channel | `host/src/remote/identity.rs`, `crypto.rs`, `channel.rs` |

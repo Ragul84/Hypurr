@@ -41,7 +41,9 @@ struct ChatRow: View {
         case "permission":
             VStack(alignment: .leading, spacing: 4) {
                 if chat?.isGroup == true { AuthorLabel(botId: entry.data.author) }
-                PermissionCard(entry: entry, hostName: model.hostName, answering: model.answering[entry.id]) { option in
+                PermissionCard(entry: entry, hostName: model.hostName, answering: model.answering[entry.id],
+                               canUndo: chat?.task.map { $0.hasSafetyNet && $0.isActive } ?? false,
+                               undo: { model.undo(entry) }) { option in
                     model.respond(entry, option: option)
                 }
             }
