@@ -438,6 +438,81 @@ pub fn team(store: &Store) -> Result<Value> {
     Ok(json!({"available": true, "since": w.since, "people": people}))
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct Reminder {
+    pub enabled: bool,
+    /// `HH:MM`, weekdays only.
+    pub time: String,
+    pub time_zone: String,
+    pub bot_id: String,
+    pub routine_id: String,
+}
+
+const REMINDER_KEY: &str = "standup.reminder";
+
+/// `HH:MM` → the weekday cron expression (`30 9 * * 1-5`).
+pub fn cron_for(time: &str) -> Option<String> {
+    let (h, m) = time.trim().split_once(':')?;
+    let (h, m) = (h.parse::<u32>().ok()?, m.parse::<u32>().ok()?);
+    (h < 24 && m < 60).then(|| format!("{m} {h} * * 1-5"))
+}
+
+pub fn reminder(store: &Store) -> Value {
+    let r: Option<Reminder> = store.kv_get(REMINDER_KEY).and_then(|s| serde_json::from_str(&s).ok());
+    json!({"reminder": r})
+}
+
+/// `setStandupReminder {enabled, time?, timeZone?, botId?}`: a weekday routine on a bot whose
+/// instruction carries [`ROUTINE_MARKER`], so each run gets the gathered facts. The bot posts the
+/// standup in its chat and the phone gets the usual "done" notification. It never posts anywhere else.
+pub fn set_reminder(hub: &Hub, b: &Value) -> Result<Value> {
+    let old: Option<Reminder> = hub.store.kv_get(REMINDER_KEY).and_then(|s| serde_json::from_str(&s).ok());
+    let enabled = b["enabled"].as_bool().unwrap_or(true);
+    if !enabled {
+        if let Some(mut r) = old {
+            let _ = hub.routines.set_enabled(&hub.store, &r.bot_id, &r.routine_id, false);
+            r.enabled = false;
+            hub.store.kv_set(REMINDER_KEY, &serde_json::to_string(&r)?)?;
+            return Ok(json!({"reminder": r}));
+        }
+        return Ok(json!({"reminder": null}));
+    }
+    let time = b["time"]
+        .as_str()
+        .map(str::to_owned)
+        .or_else(|| old.as_ref().map(|r| r.time.clone()))
+        .unwrap_or_else(|| "09:30".into());
+    let cron = cron_for(&time).ok_or_else(|| anyhow::anyhow!("Pick a time like 09:30."))?;
+    let tz = b["timeZone"]
+        .as_str()
+        .map(str::to_owned)
+        .or_else(|| old.as_ref().map(|r| r.time_zone.clone()))
+        .unwrap_or_else(|| "Asia/Kolkata".into());
+    let bot = pick_bot(&hub.store, b["botId"].as_str().or(old.as_ref().map(|r| r.bot_id.as_str())))
+        .ok_or_else(|| anyhow::anyhow!("Create a bot first; the reminder runs on one."))?;
+    let mut body = json!({
+        "name": "Daily standup",
+        "instruction": format!("{ROUTINE_MARKER} Write my daily standup (Yesterday / Today / Blockers) from the facts below, in plain words. Don't post it anywhere; I'll copy and share it myself."),
+        "triggers": [{"type": "cron", "expression": cron, "timeZone": tz}],
+        "enabled": true,
+        "timeoutSeconds": 600,
+    });
+    if let Some(o) = old.as_ref().filter(|o| o.bot_id == bot.id) {
+        body["id"] = json!(o.routine_id);
+    }
+    let saved = hub.routines.save(hub, &bot.id, &body)?;
+    let r = Reminder {
+        enabled: true,
+        time,
+        time_zone: tz,
+        bot_id: bot.id.clone(),
+        routine_id: saved["routine"]["id"].as_str().unwrap_or_default().to_owned(),
+    };
+    hub.store.kv_set(REMINDER_KEY, &serde_json::to_string(&r)?)?;
+    Ok(json!({"reminder": r}))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -500,6 +575,14 @@ mod tests {
         let text = s.text();
         assert!(text.starts_with("Yesterday\n• "));
         assert!(text.contains("\n\nBlockers\n• Waiting"));
+    }
+
+    #[test]
+    fn reminder_times_become_weekday_crons() {
+        assert_eq!(cron_for("09:30").as_deref(), Some("30 9 * * 1-5"));
+        assert_eq!(cron_for("18:05").as_deref(), Some("5 18 * * 1-5"));
+        assert_eq!(cron_for("24:00"), None);
+        assert_eq!(cron_for("nine"), None);
     }
 
     #[test]
