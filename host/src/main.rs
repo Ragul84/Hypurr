@@ -14,6 +14,7 @@ mod screen;
 mod service;
 mod store;
 mod tasks;
+mod triage;
 mod tui;
 mod update;
 mod usage;
