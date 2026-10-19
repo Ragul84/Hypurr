@@ -386,6 +386,10 @@ pub fn is_assignment(w: &str) -> bool {
 mod tests {
     use super::*;
 
+    fn real(p: &str) -> Option<PathBuf> {
+        super::super::scope::real_path(std::path::Path::new("/"), p)
+    }
+
     fn texts(s: &Simple) -> Vec<&str> {
         s.words.iter().map(|w| w.text.as_str()).collect()
     }
@@ -405,13 +409,13 @@ mod tests {
         let p = parse("cd -; rm x", Some("/r".into()));
         assert_eq!(p[1].cwd, None);
         let p = parse("cd $X; cd /tmp; rm y", Some("/r".into()));
-        assert_eq!(p[2].cwd.as_deref(), Some(std::path::Path::new("/tmp")));
+        assert_eq!(p[2].cwd, real("/tmp"), "macOS: /tmp is a link to /private/tmp");
     }
 
     #[test]
     fn subshell_cd_does_not_leak() {
         let p = parse("(cd /tmp; rm a); rm b", Some("/r".into()));
-        assert_eq!(p[1].cwd.as_deref(), Some(std::path::Path::new("/tmp")));
+        assert_eq!(p[1].cwd, real("/tmp"));
         assert_eq!(p[2].cwd.as_deref(), Some(std::path::Path::new("/r")));
     }
 
