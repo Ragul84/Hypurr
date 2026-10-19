@@ -547,6 +547,27 @@ class HypurrStore(
     private val _audit = MutableStateFlow<AuditLog?>(null)
     val audit: StateFlow<AuditLog?> = _audit.asStateFlow()
 
+    private val _spend = MutableStateFlow<com.ragul84.hypurr.model.SpendByPerson?>(null)
+    val spendByPerson: StateFlow<com.ragul84.hypurr.model.SpendByPerson?> = _spend.asStateFlow()
+    private val _itKit = MutableStateFlow<com.ragul84.hypurr.model.ItKit?>(null)
+    val itKit: StateFlow<com.ragul84.hypurr.model.ItKit?> = _itKit.asStateFlow()
+    private val _pricing = MutableStateFlow<com.ragul84.hypurr.model.Pricing?>(null)
+    val pricing: StateFlow<com.ragul84.hypurr.model.Pricing?> = _pricing.asStateFlow()
+
+    suspend fun loadItKit() {
+        val c = client ?: return
+        runCatching { c.itKit() }.getOrNull()?.let { _itKit.value = it }
+    }
+
+    suspend fun loadPricing() {
+        val c = client ?: return
+        runCatching { c.pricing() }.getOrNull()?.let { _pricing.value = it }
+    }
+
+    /** The audit log as a CSV file, for the share sheet (admins only). */
+    suspend fun auditExport(): com.ragul84.hypurr.model.AuditExport =
+        client?.auditExport("csv") ?: throw HostException.unreachable()
+
     /** Loads what the Team admin screen shows; admin-only parts are skipped for others. */
     suspend fun loadAdmin() {
         val c = client ?: return
@@ -558,6 +579,7 @@ class HypurrStore(
         if (_you.value?.isAdmin != false) {
             runCatching { c.activity() }.getOrNull()?.let { _activity.value = it }
             runCatching { c.auditLog() }.getOrNull()?.let { _audit.value = it }
+            runCatching { c.spendByPerson() }.getOrNull()?.let { _spend.value = it }
         }
     }
 
@@ -572,6 +594,7 @@ class HypurrStore(
         _policies.value = saved
         _setup.update { it?.copy(safety = saved.safety) }
         runCatching { client?.auditLog() }.getOrNull()?.let { _audit.value = it }
+        runCatching { client?.spendByPerson() }.getOrNull()?.let { _spend.value = it }
     }
 
     suspend fun setRole(key: String, role: String?) {

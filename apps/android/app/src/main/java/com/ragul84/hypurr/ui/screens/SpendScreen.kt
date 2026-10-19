@@ -67,6 +67,8 @@ fun SpendScreen(
     onTab: (HomeTab) -> Unit = {},
     onBuyCredits: ((String) -> Unit)? = null,
     onLimits: () -> Unit = { onTab(HomeTab.You) },
+    /** Plans in rupees from the computer; null hides the card. */
+    pricing: com.ragul84.hypurr.model.Pricing? = null,
     /** Day the chart ends on; tests pin it. */
     now: Long = System.currentTimeMillis(),
 ) {
@@ -179,6 +181,9 @@ fun SpendScreen(
                             }
                         }
                     }
+                }
+                pricing?.takeIf { it.plans.isNotEmpty() }?.let { pr ->
+                    item { PlansCard(pr, modifier = Modifier.padding(top = 8.dp)) }
                 }
                 item {
                     Text("Using your own Claude or OpenAI key? That's free here.", color = c.tertiary,

@@ -89,6 +89,8 @@ data class SettingsUiState(
     val profile: com.ragul84.hypurr.data.UserProfile? = null,
     /** Default project folder for new tasks; null = none picked. */
     val projectFolder: String? = null,
+    /** Plans in rupees from the computer (pricing/plans.json). */
+    val pricing: com.ragul84.hypurr.model.Pricing? = null,
 )
 
 @Composable
@@ -105,6 +107,7 @@ fun SettingsScreen(
     onIntegrations: (JsonObject) -> Unit = {},
     onTestIntegration: (String) -> Unit = {},
     onTeamAdmin: () -> Unit = {},
+    onItKit: () -> Unit = {},
     onEditProfile: () -> Unit = {},
     onClearProfile: () -> Unit = {},
     onPickFolder: () -> Unit = {},
@@ -168,6 +171,20 @@ fun SettingsScreen(
                 Icon(signalIcon(SignalIcons.Chevron), null, tint = c.tertiary, modifier = Modifier.size(18.dp))
             }
         }
+        Section("IT approval") {
+            Row(Modifier.fillMaxWidth().pressable("Share with IT", onClick = onItKit), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(c.surface2), contentAlignment = Alignment.Center) {
+                    Icon(signalIcon(SignalIcons.Docs), null, tint = c.text, modifier = Modifier.size(22.dp))
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Share with IT", style = MaterialTheme.typography.titleMedium, color = c.text)
+                    Text("Data flow, security FAQ, allowlist and local-only mode", color = c.secondary, style = MaterialTheme.typography.bodySmall)
+                }
+                Icon(signalIcon(SignalIcons.Chevron), null, tint = c.tertiary, modifier = Modifier.size(18.dp))
+            }
+        }
+        state.pricing?.takeIf { it.plans.isNotEmpty() }?.let { PlansCard(it, modifier = Modifier.padding(top = 18.dp)) }
         Section("Appearance") {
             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(c.surface2).padding(4.dp)) {
                 ThemeMode.entries.forEach { mode ->
