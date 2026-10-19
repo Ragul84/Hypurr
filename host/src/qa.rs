@@ -259,7 +259,10 @@ pub async fn cases(hub: &Arc<Hub>, b: &Value, actor_key: &str) -> Result<Value> 
         let p = PathBuf::from(&project);
         tokio::task::spawn_blocking(move || frameworks(&p)).await?
     };
-    let profile = crate::chat::profile::load(&hub.store, Some(actor_key)).render();
+    let prof = crate::chat::profile::load(&hub.store, Some(actor_key));
+    // New to QA (or a student): the phone shows the "why" under each case by default.
+    let explain = prof.experience.as_deref() == Some("New") || prof.role.as_deref() == Some("Student");
+    let profile = prof.render();
     let mut list = fallback_cases(if b["source"] == "feature" { &input } else { &subject });
     let mut by = "template";
     if let Some(cfg) = pick_bot(&hub.store, b["botId"].as_str()) {
@@ -277,7 +280,7 @@ pub async fn cases(hub: &Arc<Hub>, b: &Value, actor_key: &str) -> Result<Value> 
             Err(_) => tracing::info!("qa agent timed out"),
         }
     }
-    Ok(json!({"cases": list, "by": by, "frameworks": fws, "ticket": ticket}))
+    Ok(json!({"cases": list, "by": by, "frameworks": fws, "ticket": ticket, "explain": explain}))
 }
 
 fn pick_bot(store: &crate::store::Store, wanted: Option<&str>) -> Option<crate::store::BotConfig> {

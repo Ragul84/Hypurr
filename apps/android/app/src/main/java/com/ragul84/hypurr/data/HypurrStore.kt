@@ -6,6 +6,9 @@ import com.ragul84.hypurr.model.AuditLog
 import com.ragul84.hypurr.model.Backend
 import com.ragul84.hypurr.model.Bot
 import com.ragul84.hypurr.model.TicketSetup
+import com.ragul84.hypurr.model.QaCase
+import com.ragul84.hypurr.model.QaCasesResult
+import com.ragul84.hypurr.model.QaRunResult
 import com.ragul84.hypurr.model.TicketResolve
 import com.ragul84.hypurr.model.TicketPlanResult
 import com.ragul84.hypurr.model.TicketPlan
@@ -461,6 +464,13 @@ class HypurrStore(
     }
 
     // MARK: Ticket to PR
+    suspend fun qaCases(source: String, input: String, project: String?): QaCasesResult = cl().qaCases(source, input, project)
+    suspend fun qaAutomate(cases: List<QaCase>, framework: String, project: String): String {
+        val bot = cl().qaAutomate(cases, framework, project)
+        upsert(bot)
+        return bot.id
+    }
+    suspend fun qaRun(taskId: String): QaRunResult = cl().qaRun(taskId)
 
     private fun cl() = client ?: throw HostException.unreachable()
     suspend fun ticketSetup(): TicketSetup = cl().ticketSetup()

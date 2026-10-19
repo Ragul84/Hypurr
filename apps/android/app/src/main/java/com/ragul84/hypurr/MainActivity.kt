@@ -58,6 +58,8 @@ import com.ragul84.hypurr.ui.screens.BotListScreen
 import com.ragul84.hypurr.ui.screens.HomeTab
 import com.ragul84.hypurr.ui.screens.TasksScreen
 import com.ragul84.hypurr.ui.screens.TicketScreen
+import com.ragul84.hypurr.ui.screens.QaScreen
+import com.ragul84.hypurr.ui.screens.QaStep
 import com.ragul84.hypurr.ui.screens.TicketStep
 import com.ragul84.hypurr.ui.screens.SpendScreen
 import com.ragul84.hypurr.ui.screens.NeedsYouAsk
@@ -244,6 +246,7 @@ class MainActivity : ComponentActivity() {
         var screen by rememberSaveable { mutableStateOf("list") }
         // The new-task draft survives a trip to the folder picker.
         var taskDraft by remember { mutableStateOf<NewTaskUiState?>(null) }
+        var qaDraft by remember { mutableStateOf<com.ragul84.hypurr.ui.screens.QaUiState?>(null) }
         var ticketDraft by remember { mutableStateOf<com.ragul84.hypurr.ui.screens.TicketUiState?>(null) }
         val projectFolder by store.projectFolder.collectAsState()
         // Right after pairing, ask once which folder the agent may work in (can wait).
@@ -399,6 +402,7 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 target == "screen" -> ScreenRoute(store, current.name) { screen = "list" }
+                target == "qa" -> QaRoute(store, projectFolder, qaDraft, { qaDraft = it }) { screen = it }
                 target == "ticket" -> TicketRoute(store, projectFolder, ticketDraft, { ticketDraft = it }) { screen = it }
                 target == "newtask" -> {
                     val setup by store.setup.collectAsState()
@@ -499,6 +503,7 @@ class MainActivity : ComponentActivity() {
                         recent = rosterOrder(bots.values),
                         onNewTask = { screen = "newtask" },
                         onTicket = { screen = "ticket" },
+                        onQa = { screen = "qa" },
                         onOpenTemplate = { screen = "newtask" },
                         onOpenBot = { screen = "chat:${it.id}" },
                         onTab = ::go,
@@ -727,7 +732,7 @@ class MainActivity : ComponentActivity() {
         screen == "folderpick:newtask" -> "newtask"
         screen.startsWith("folderpick:chat:") -> screen.removePrefix("folderpick:")
         screen == "spend" || screen == "tasks" -> "list"
-        screen == "ticket" -> "tasks"
+        screen == "ticket" || screen == "qa" -> "tasks"
         else -> "list"
     }
 
@@ -738,6 +743,99 @@ class MainActivity : ComponentActivity() {
     private fun shareText(text: String) {
         val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
         runCatching { startActivity(Intent.createChooser(send, null)) }
+    }
+
+    /** QA test writer: cases → edit → export (copy / share) or automate → run → coverage. */
+    @Composable
+    private fun QaRoute(
+        store: HypurrStore,
+        projectFolder: String?,
+        draft: com.ragul84.hypurr.ui.screens.QaUiState?,
+        saveDraft: (com.ragul84.hypurr.ui.screens.QaUiState?) -> Unit,
+        go: (String) -> Unit,
+    ) {
+        val scope = rememberCoroutineScope()
+        val setup by store.setup.collectAsState()
+        val bots by store.bots.collectAsState()
+        var st by remember { mutableStateOf(draft ?: com.ragul84.hypurr.ui.screens.QaUiState()) }
+        SideEffect { saveDraft(st) }
+        LaunchedEffect(Unit) { store.loadSetup() }
+        LaunchedEffect(setup) {
+            val projects = setup?.projects.orEmpty()
+            val pick = st.project ?: projects.firstOrNull { projectFolder != null && projectFolder.startsWith(it.path) }?.path ?: projects.firstOrNull()?.path
+            st = st.copy(projects = projects, project = pick)
+        }
+        val bot = st.botId?.let { bots[it] }
+        LaunchedEffect(bot?.status, bot?.task?.id) {
+            if (bot != null) st = st.copy(agentStatus = when {
+                bot.needsInput -> "needsInput"
+                bot.isWorking -> "working"
+                else -> "idle"
+            }, taskId = bot.task?.id ?: st.taskId)
+        }
+        fun fail(e: Throwable, what: String) { st = st.copy(busy = false, error = e.message ?: what) }
+        fun exportText() = com.ragul84.hypurr.qa.QaExport.export(st.cases, st.format, st.automated)
+        fun run() {
+            val id = st.taskId ?: return
+            st = st.copy(busy = true, busyLabel = "Running ${st.selectedFramework?.command ?: "the tests"} on the computer", error = null)
+            scope.launch {
+                runCatching { store.qaRun(id) }
+                    .onSuccess { r -> st = st.copy(busy = false, step = QaStep.Result, result = r) }
+                    .onFailure { fail(it, "Couldn't run the tests.") }
+            }
+        }
+        fun back() {
+            st = when (st.step) {
+                QaStep.Cases -> st.copy(step = QaStep.Input, error = null)
+                QaStep.Export -> st.copy(step = if (st.result != null) QaStep.Result else QaStep.Cases)
+                QaStep.Result -> st.copy(step = QaStep.Cases)
+                QaStep.Running -> { go("tasks"); st }
+                QaStep.Input -> { saveDraft(null); go("tasks"); st }
+            }
+        }
+        BackHandler { back() }
+        QaScreen(
+            st,
+            onBack = ::back,
+            onChange = { st = it },
+            onPaste = {
+                val text = getSystemService(ClipboardManager::class.java).primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)
+                    ?.coerceToText(this@MainActivity)?.toString()?.trim().orEmpty()
+                if (text.isNotEmpty()) st = st.copy(input = text, error = null)
+            },
+            onWrite = {
+                st = st.copy(busy = true, busyLabel = "Writing test cases", error = null, needsSetup = null)
+                scope.launch {
+                    runCatching { store.qaCases(st.sourceName, st.input, st.project) }
+                        .onSuccess { r ->
+                            st = if (r.needsSetup != null) st.copy(busy = false, needsSetup = r.needsSetup)
+                            else st.copy(busy = false, step = QaStep.Cases, cases = r.cases, by = r.by, frameworks = r.frameworks,
+                                framework = r.frameworks.firstOrNull()?.id, picked = emptySet(), result = null, explain = st.explain || r.explain)
+                        }
+                        .onFailure { fail(it, "Couldn't write test cases.") }
+                }
+            },
+            onCopy = { copyText("Test cases", exportText()); st = st.copy(copied = true) },
+            onShare = {
+                val send = Intent(Intent.ACTION_SEND).setType(if (st.format.csv) "text/csv" else "text/plain")
+                    .putExtra(Intent.EXTRA_TEXT, exportText())
+                    .putExtra(Intent.EXTRA_SUBJECT, com.ragul84.hypurr.qa.QaExport.fileName(st.format))
+                runCatching { startActivity(Intent.createChooser(send, null)) }
+            },
+            onAutomate = {
+                val project = st.project ?: return@QaScreen
+                val f = st.selectedFramework ?: return@QaScreen
+                val cases = st.cases.filter { it.id in st.picked }
+                st = st.copy(busy = true, busyLabel = "Starting on a safe branch", error = null)
+                scope.launch {
+                    runCatching { store.qaAutomate(cases, f.id, project) }
+                        .onSuccess { botId -> st = st.copy(busy = false, step = QaStep.Running, botId = botId, agentStatus = "working"); go("chat:$botId") }
+                        .onFailure { fail(it, "Couldn't start the task.") }
+                }
+            },
+            onOpenTask = { st.botId?.let { go("chat:$it") } },
+            onRun = ::run,
+        )
     }
 
     /** Ticket to PR: paste → plan → task on the safe branch → review → approved upload. */
