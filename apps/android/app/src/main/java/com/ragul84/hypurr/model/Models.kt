@@ -590,3 +590,62 @@ data class Activity(
 
 /** "$4.20" for a limit; "No limit" for 0. */
 fun limitLabel(x: Double): String = if (x <= 0.0) "No limit" else "$" + String.format(java.util.Locale.US, "%.2f", x)
+
+// Daily standup (host `standup`, `teamStandup`, `standupReminder`).
+
+@Serializable
+data class Standup(
+    val yesterday: List<String> = emptyList(),
+    val today: List<String> = emptyList(),
+    val blockers: List<String> = emptyList(),
+)
+
+@Serializable
+data class StandupCommit(val project: String = "", val sha: String = "", val subject: String = "", val at: Long = 0, val today: Boolean = false)
+
+@Serializable
+data class StandupTask(
+    val title: String = "",
+    val project: String = "",
+    val status: String = "",
+    val today: Boolean = false,
+    val waiting: Boolean = false,
+    val pr: String? = null,
+    val ticket: String? = null,
+)
+
+@Serializable
+data class StandupFacts(
+    val projects: List<String> = emptyList(),
+    val commits: List<StandupCommit> = emptyList(),
+    val tasks: List<StandupTask> = emptyList(),
+)
+
+@Serializable
+data class StandupResult(
+    val standup: Standup = Standup(),
+    val text: String = "",
+    /** `agent` when an agent wrote it, `facts` for the plain draft. */
+    val by: String = "facts",
+    val facts: StandupFacts = StandupFacts(),
+    val date: String = "",
+)
+
+@Serializable
+data class StandupReminder(val enabled: Boolean = false, val time: String = "09:30", val timeZone: String = "Asia/Kolkata")
+
+@Serializable
+data class StandupReminderReply(val reminder: StandupReminder? = null)
+
+@Serializable
+data class TeamStandupPerson(
+    val key: String = "",
+    val name: String? = null,
+    val yesterday: List<String> = emptyList(),
+    val today: List<String> = emptyList(),
+    val finished: Int = 0,
+    val open: Int = 0,
+)
+
+@Serializable
+data class TeamStandup(val available: Boolean = false, val reason: String? = null, val people: List<TeamStandupPerson> = emptyList())

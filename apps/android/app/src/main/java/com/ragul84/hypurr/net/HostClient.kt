@@ -374,6 +374,24 @@ class HostClient(val transport: ChannelTransport) {
 
     suspend fun activity(days: Int = 7): Activity = call("activity", buildJsonObject { put("days", days) })
 
+    /** The agent may take a minute to write it; the host falls back to a plain draft. */
+    suspend fun standup(projects: List<String>, useAgent: Boolean = true): com.ragul84.hypurr.model.StandupResult =
+        call("standup", buildJsonObject {
+            put("projects", kotlinx.serialization.json.JsonArray(projects.map { kotlinx.serialization.json.JsonPrimitive(it) }))
+            put("useAgent", useAgent)
+        }, timeoutMs = 150_000)
+
+    suspend fun teamStandup(): com.ragul84.hypurr.model.TeamStandup = call("teamStandup")
+
+    suspend fun standupReminder(): com.ragul84.hypurr.model.StandupReminderReply = call("standupReminder")
+
+    suspend fun setStandupReminder(enabled: Boolean, time: String, timeZone: String): com.ragul84.hypurr.model.StandupReminderReply =
+        call("setStandupReminder", buildJsonObject {
+            put("enabled", enabled)
+            put("time", time)
+            put("timeZone", timeZone)
+        })
+
     fun events(since: Long): Flow<HostEvent> = transport.events(since).mapNotNull(HostEvent::parse)
 }
 
