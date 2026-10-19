@@ -280,7 +280,7 @@ fun Segmented(options: List<String>, selected: Int, modifier: Modifier = Modifie
 fun DotFigure(text: String, style: TextStyle, color: Color, modifier: Modifier = Modifier) {
     val annotated = buildAnnotatedString {
         text.forEach { ch ->
-            if (ch == '₹' || ch == '€' || ch == '£') withStyle(SpanStyle(fontFamily = InterFamily, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)) { append(ch) }
+            if (ch == '₹' || ch == '€' || ch == '£' || ch == '.') withStyle(SpanStyle(fontFamily = InterFamily, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)) { append(ch) }
             else append(ch)
         }
     }

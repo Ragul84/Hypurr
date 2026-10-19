@@ -36,27 +36,36 @@ public extension Color {
     }
 }
 
-/// Hypurr Sunfield Panel: sunflower ground, cream plates, forest primary.
-/// Dark = deep forest + sunflower accents (never black+teal).
+/// Hypurr Signal: black and white on a light grey ground, white rounded cards, black pills.
+/// Red is the only colour and always means "needs you". Dark = true black, #111 cards.
 /// Shared with GTK / Android / web (docs/design/hypurr-design-system.md).
 public enum Palette {
-    public static let background = Color(light: 0xF2B90D, dark: 0x0E4A38)
-    public static let surface = Color(light: 0xFFF8E8, dark: 0x143D30)
-    public static let bubbleAgent = Color(light: 0xFFF8E8, dark: 0x1A4A3A)
-    public static let bubbleUser = Color(light: 0x17140A, dark: 0xF2B90D)
-    public static let border = Color(light: 0x1F17140A, dark: 0x1FFFF8E8)
-    public static let text = Color(light: 0x17140A, dark: 0xFFF8E8)
-    public static let secondary = Color(light: 0x5C5640, dark: 0xC8E0D4)
-    public static let tertiary = Color(light: 0x8A8168, dark: 0x7A9E8E)
-    public static let accentFill = Color(light: 0x0E4A38, dark: 0xF2B90D)
-    public static let accent = Color(light: 0x0E4A38, dark: 0xF2B90D)
-    public static let onAccent = Color(light: 0xFFF8E8, dark: 0x0E4A38)
-    public static let accentDim = Color(light: 0xFFE7A8, dark: 0x1A4A3A)
-    public static let danger = Color(light: 0xA1281C, dark: 0xF5A090)
-    public static let warning = Color(light: 0x0E4A38, dark: 0xF2B90D)
-    public static let codeBackground = Color(light: 0xFFE7A8, dark: 0x0A3428)
-    public static let added = Color(light: 0x0E4A38, dark: 0x5DDB9A)
-    public static let removed = Color(light: 0xA1281C, dark: 0xF5A090)
+    public static let background = Color(light: 0xEDEDEA, dark: 0x000000)
+    public static let surface = Color(light: 0xFFFFFF, dark: 0x111111)
+    public static let surface2 = Color(light: 0xF2F2EF, dark: 0x1C1C1E)
+    public static let bubbleAgent = Color(light: 0xFFFFFF, dark: 0x111111)
+    public static let bubbleUser = Color(light: 0x0E0E0E, dark: 0xF5F5F2)
+    public static let onBubbleUser = Color(light: 0xFFFFFF, dark: 0x0E0E0E)
+    public static let border = Color(light: 0xE0E0DC, dark: 0x242426)
+    public static let borderStrong = Color(light: 0xCFCFCA, dark: 0x3A3A3D)
+    public static let text = Color(light: 0x0E0E0E, dark: 0xF5F5F2)
+    /// 5.65:1 on the ground, 6.63:1 on white; 11.45:1 on #111.
+    public static let secondary = Color(light: 0x34343A, dark: 0xC9C9CE)
+    public static let tertiary = Color(light: 0x5C5C63, dark: 0x9A9AA1)
+    public static let accentFill = Color(light: 0x0E0E0E, dark: 0xF5F5F2)
+    public static let accent = Color(light: 0x0E0E0E, dark: 0xF5F5F2)
+    public static let onAccent = Color(light: 0xFFFFFF, dark: 0x0E0E0E)
+    public static let accentDim = Color(light: 0xF2F2EF, dark: 0x1C1C1E)
+    /// Fill red (badges, stop, today's bar). White on it is 5.3:1.
+    public static let needs = Color(hex: 0xD21F26)
+    /// Red text: 5.09:1 on the light ground, 5.78:1 on #111.
+    public static let needsText = Color(light: 0xC41A20, dark: 0xFF4D4F)
+    public static let dotOff = Color(light: 0xD6D6D1, dark: 0x2E2E31)
+    public static let danger = Color(light: 0xC41A20, dark: 0xFF4D4F)
+    public static let warning = Color(light: 0xC41A20, dark: 0xFF4D4F)
+    public static let codeBackground = Color(light: 0xF2F2EF, dark: 0x1C1C1E)
+    public static let added = Color(light: 0x0E0E0E, dark: 0xF5F5F2)
+    public static let removed = Color(light: 0xC41A20, dark: 0xFF4D4F)
 }
 
 public enum AvatarPalette {
@@ -67,23 +76,23 @@ public enum AvatarPalette {
         public var color: Color { Color(hex: hex) }
     }
 
+    /// Signal avatars are monochrome tones; legacy ids map onto them.
     public static let colors: [Swatch] = [
-        .init(id: "black", label: "Ink", hex: 0x17140A),
-        .init(id: "asphalt", label: "Forest", hex: 0x0E4A38),
-        .init(id: "teal", label: "Sunflower", hex: 0xF2B90D),
-        .init(id: "cyan", label: "Cream", hex: 0xFFE7A8),
-        .init(id: "green", label: "Forest", hex: 0x0E4A38),
-        .init(id: "ink", label: "Ink", hex: 0x17140A),
-        .init(id: "gray", label: "Warm gray", hex: 0x5C5640),
-        .init(id: "attention", label: "Attention", hex: 0xFFB020),
-        .init(id: "red", label: "Red", hex: 0xFF6B5A),
-        .init(id: "brown", label: "Brown", hex: 0x5A4A3A),
-        .init(id: "blue", label: "Blue", hex: 0x2A6B66),
-        // Legacy ids remap to asphalt/teal neutrals (no confetti violet/magenta brand).
-        .init(id: "violet", label: "Ink", hex: 0x3D5552),
-        .init(id: "magenta", label: "Mist", hex: 0x7FA8A3),
-        .init(id: "orange", label: "Attention", hex: 0xFFB020),
-        .init(id: "yellow", label: "Gold", hex: 0xC9A227),
+        .init(id: "black", label: "Ink", hex: 0x0E0E0E),
+        .init(id: "asphalt", label: "Graphite", hex: 0x34343A),
+        .init(id: "teal", label: "Slate", hex: 0x5C5C63),
+        .init(id: "cyan", label: "Steel", hex: 0x7A7A82),
+        .init(id: "green", label: "Graphite", hex: 0x3A3A40),
+        .init(id: "ink", label: "Ink", hex: 0x0E0E0E),
+        .init(id: "gray", label: "Gray", hex: 0x8A8A8F),
+        .init(id: "attention", label: "Signal red", hex: 0xD21F26),
+        .init(id: "red", label: "Signal red", hex: 0xD21F26),
+        .init(id: "brown", label: "Graphite", hex: 0x34343A),
+        .init(id: "blue", label: "Graphite", hex: 0x3A3A40),
+        .init(id: "violet", label: "Steel", hex: 0x7A7A82),
+        .init(id: "magenta", label: "Steel", hex: 0x7A7A82),
+        .init(id: "orange", label: "Slate", hex: 0x5C5C63),
+        .init(id: "yellow", label: "Slate", hex: 0x5C5C63),
     ]
 
     public static let shapes = ["blob", "pebble", "squircle", "tablet", "wedge", "hex", "cloud", "teardrop"]
@@ -146,4 +155,3 @@ public enum BackendInfo {
     }
 }
 
-// sunfield-polish: path-filter touch for CI

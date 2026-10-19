@@ -5,6 +5,7 @@ import com.ragul84.hypurr.ui.signalIcon
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -171,6 +172,7 @@ fun BotEditorScreen(
                         AvatarColors.forEach { id ->
                             val on = state.avatarColor == id
                             Box(Modifier.size(34.dp).clip(CircleShape).background(avatarColor(id))
+                                .border(if (on) 2.dp else 1.dp, if (on) c.text else c.borderStrong, CircleShape)
                                 .pressable("Colour $id", role = Role.RadioButton) { onChange(state.copy(avatarColor = id)) },
                                 contentAlignment = Alignment.Center) {
                                 if (on) Icon(signalIcon(SignalIcons.Check), null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(18.dp))
@@ -265,7 +267,7 @@ fun BotEditorScreen(
                 Section("More") {
                     ToggleRow("Pin to the top", "Keeps it first in the list", state.pinned, true) { onChange(state.copy(pinned = it)) }
                     AnimatedVisibility(!state.confirmDelete) {
-                        SoftButton(if (state.group) "Delete group" else "Delete bot", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Close), tint = c.danger) {
+                        SoftButton(if (state.group) "Delete group" else "Delete bot", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Close), tint = c.needsText) {
                             onChange(state.copy(confirmDelete = true))
                         }
                     }
@@ -274,14 +276,14 @@ fun BotEditorScreen(
                             Text(if (state.group) "The group and its chat go away. Its bots stay." else "The bot and its chat go away. Its folder stays on the computer.",
                                 color = c.secondary, style = MaterialTheme.typography.bodyMedium)
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                SoftButton("Delete", Modifier.weight(1f), tint = c.danger, onClick = onDelete)
+                                SoftButton("Delete", Modifier.weight(1f), tint = c.needsText, onClick = onDelete)
                                 SoftButton("Keep", Modifier.weight(1f), tint = c.secondary) { onChange(state.copy(confirmDelete = false)) }
                             }
                         }
                     }
                 }
             }
-            state.error?.let { Text(it, color = c.danger, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 12.dp, start = 8.dp)) }
+            state.error?.let { Text(it, color = c.needsText, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 12.dp, start = 8.dp)) }
         }
         if (state.isNew && !state.group && state.busy) {
             Box(
@@ -304,14 +306,14 @@ fun BotEditorScreen(
 @Composable
 private fun Choice(label: String, on: Boolean, modifier: Modifier = Modifier, icon: androidx.compose.ui.graphics.vector.ImageVector? = null, badge: String? = null, onClick: () -> Unit) {
     val c = Hypurr.colors
-    Row(modifier.clip(RoundedCornerShape(16.dp)).background(if (on) c.accent.copy(alpha = 0.14f) else c.bg.copy(alpha = 0.6f))
+    Row(modifier.clip(RoundedCornerShape(16.dp)).background(if (on) c.accent else c.surface2)
         .pressable(label, role = Role.RadioButton, onClick = onClick).padding(horizontal = 14.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically) {
         if (icon != null) {
-            Icon(icon, null, tint = if (on) c.accent else c.secondary, modifier = Modifier.size(18.dp))
+            Icon(icon, null, tint = if (on) c.onAccent else c.secondary, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
         }
-        Text(label, color = if (on) c.accent else c.text, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
+        Text(label, color = if (on) c.onAccent else c.text, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false))
         if (badge != null) {
             Spacer(Modifier.width(8.dp))
@@ -324,7 +326,7 @@ private fun Choice(label: String, on: Boolean, modifier: Modifier = Modifier, ic
 @Composable
 private fun FolderBrowser(listing: DirListing, picked: String?, onPick: (String) -> Unit, onBrowse: (String?) -> Unit) {
     val c = Hypurr.colors
-    Column(Modifier.fillMaxWidth().panel(RoundedCornerShape(18.dp), c.bg.copy(alpha = 0.5f)).padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(Modifier.fillMaxWidth().panel(RoundedCornerShape(18.dp), c.surface2).padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             listing.parent?.let { IconBubble(signalIcon(SignalIcons.Back), "Up one folder", size = 34.dp) { onBrowse(it) } }
             Spacer(Modifier.width(8.dp))

@@ -256,7 +256,7 @@ fun MarkdownText(text: String, modifier: Modifier = Modifier, color: Color = Hyp
                     Box(Modifier.width(4.dp))
                     Text(md(b.text), style = body)
                 }
-                is MdBlock.Code -> Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.bg.copy(alpha = 0.7f)).padding(10.dp)) {
+                is MdBlock.Code -> Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(c.surface2).padding(10.dp)) {
                     if (b.language.isNotEmpty()) Text(b.language, color = c.tertiary, style = MaterialTheme.typography.labelSmall)
                     Text(b.code, color = color, fontFamily = FontFamily.Monospace, fontSize = 13.sp, softWrap = false,
                         modifier = Modifier.horizontalScroll(rememberScrollState()))
@@ -266,7 +266,7 @@ fun MarkdownText(text: String, modifier: Modifier = Modifier, color: Color = Hyp
                     Box(Modifier.width(10.dp))
                     Text(md(b.text), style = body.copy(color = c.secondary))
                 }
-                is MdBlock.Table -> Column(Modifier.clip(RoundedCornerShape(10.dp)).background(c.bg.copy(alpha = 0.5f))
+                is MdBlock.Table -> Column(Modifier.clip(RoundedCornerShape(10.dp)).background(c.surface2)
                     .horizontalScroll(rememberScrollState()).padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     (listOf(b.header) + b.rows).forEachIndexed { r, row ->
                         Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {

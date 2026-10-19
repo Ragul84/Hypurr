@@ -93,7 +93,7 @@ fun SpendScreen(
     val today0 = now - Math.floorMod(now + java.util.TimeZone.getDefault().getOffset(now), DAY) // local midnight
     val days = (6 downTo 0).map { back -> today0 - back * DAY }
     val perDay = days.map { start -> data.tasks.filter { it.createdAt in start until start + DAY }.sumOf { it.usage.cost }.toFloat() }
-    val labels = days.map { java.text.SimpleDateFormat("EEEEE", java.util.Locale.ENGLISH).format(java.util.Date(it + 1)) }
+    val labels = days.map { java.text.SimpleDateFormat("EEEEE", java.util.Locale.ENGLISH).format(java.util.Date(it + 1)).take(1) }
     val spent = if (range == 0) data.week else data.total.cost
 
     Box(Modifier.fillMaxSize().background(c.bg)) {

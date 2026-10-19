@@ -10,19 +10,20 @@ use std::f64::consts::PI;
 pub const SHAPES: &[&str] = &[
     "blob", "pebble", "squircle", "tablet", "wedge", "hex", "cloud", "teardrop",
 ];
+// Signal avatars are monochrome tones; red is reserved for "needs you".
 pub const COLORS: &[(&str, u32)] = &[
-    ("black", 0x17140A),
-    ("brown", 0x936439),
-    ("red", 0xFF263C),
-    ("orange", 0xFF6700),
-    ("yellow", 0xFF9800),
-    ("green", 0x00C972),
-    ("teal", 0xF2B90D),
-    ("cyan", 0xFFE7A8),
-    ("blue", 0x1084FE),
-    ("violet", 0x3D5552),
-    ("magenta", 0x7FA8A3),
-    ("gray", 0x777777),
+    ("black", 0x0E0E0E),
+    ("brown", 0x34343A),
+    ("red", 0x3A3A40),
+    ("orange", 0x5C5C63),
+    ("yellow", 0x5C5C63),
+    ("green", 0x3A3A40),
+    ("teal", 0x5C5C63),
+    ("cyan", 0x7A7A82),
+    ("blue", 0x3A3A40),
+    ("violet", 0x7A7A82),
+    ("magenta", 0x7A7A82),
+    ("gray", 0x8A8A8F),
 ];
 
 pub fn rgb(hex: u32) -> (f64, f64, f64) {
@@ -366,14 +367,14 @@ fn area(parts: Vec<Part>, size: i32, badge: Badge) -> gtk::DrawingArea {
             let d = s * if badge == Badge::Needs { 0.36 } else { 0.28 };
             let (cx, cy) = (s - d / 2.0, s - d / 2.0);
             let dark = adw::StyleManager::default().is_dark();
-            // The window background (Hypurr's tinted neutrals) as a cut-out ring.
-            let (br, bgc, bb) = if dark { rgb(0x0E4A38) } else { rgb(0xF2B90D) };
+            // The window background (Signal ground) as a cut-out ring.
+            let (br, bgc, bb) = if dark { rgb(0x000000) } else { rgb(0xEDEDEA) };
             cr.arc(cx, cy, d / 2.0 + 2.0, 0.0, 2.0 * PI);
             cr.set_source_rgb(br, bgc, bb);
             cr.fill().ok();
             cr.arc(cx, cy, d / 2.0, 0.0, 2.0 * PI);
             if badge == Badge::Needs {
-                let (r, g, b) = rgb(0xFFB020);
+                let (r, g, b) = rgb(0xD21F26);
                 cr.set_source_rgb(r, g, b);
                 cr.fill().ok();
                 cr.set_source_rgb(1.0, 1.0, 1.0);

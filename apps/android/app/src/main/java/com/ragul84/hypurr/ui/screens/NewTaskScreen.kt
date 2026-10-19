@@ -178,7 +178,7 @@ fun NewTaskScreen(
             }
             Plan(state, onChange, onPickFolder)
             AnimatedVisibility(state.error != null) {
-                Text(state.error.orEmpty(), color = c.danger, style = MaterialTheme.typography.bodyMedium,
+                Text(state.error.orEmpty(), color = c.needsText, style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(top = 12.dp, start = 6.dp))
             }
             Spacer(Modifier.height(16.dp))
@@ -202,11 +202,11 @@ private fun Field(value: String, hint: String, minHeight: androidx.compose.ui.un
 @Composable
 private fun TemplateCard(t: TaskTemplate, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val c = Hypurr.colors
-    val fill by animateColorAsState(if (selected) c.accent.copy(alpha = 0.16f) else c.surface, Motion.effects(), label = "tpl")
+    val fill by animateColorAsState(if (selected) c.surface2 else c.surface, Motion.effects(), label = "tpl")
     Column(modifier.heightIn(min = 104.dp).panel(RoundedCornerShape(22.dp), fill)
         .pressable(t.title, role = Role.RadioButton, onClick = onClick).padding(14.dp)) {
         Box(Modifier.size(34.dp).clip(RoundedCornerShape(11.dp))
-            .background(if (selected) SolidColor(c.accent) else SolidColor(c.accent.copy(alpha = 0.12f))), contentAlignment = Alignment.Center) {
+            .background(if (selected) SolidColor(c.accent) else SolidColor(c.surface2)), contentAlignment = Alignment.Center) {
             Icon(templateIcon(t.icon), null, tint = if (selected) c.onAccent else c.accent, modifier = Modifier.size(19.dp))
         }
         Text(t.title, color = c.text, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold,
@@ -259,7 +259,7 @@ private fun Plan(state: NewTaskUiState, onChange: (NewTaskUiState) -> Unit, onPi
             else -> state.route?.reason
         }
         if (!reason.isNullOrEmpty()) Text(reason, color = c.secondary, style = MaterialTheme.typography.bodySmall)
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.success.copy(alpha = 0.10f)).padding(12.dp),
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.surface2).padding(12.dp),
             verticalAlignment = Alignment.Top) {
             Icon(signalIcon(SignalIcons.Shield), null, tint = c.success, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(10.dp))
@@ -286,7 +286,7 @@ private fun PlanRow(icon: ImageVector, label: String, value: String, onClick: ()
 @Composable
 private fun Choice(text: String, selected: Boolean, onClick: () -> Unit) {
     val c = Hypurr.colors
-    val fill by animateColorAsState(if (selected) c.accent else c.accent.copy(alpha = 0.10f), Motion.effects(), label = "choice")
+    val fill by animateColorAsState(if (selected) c.accent else c.surface2, Motion.effects(), label = "choice")
     Text(text, color = if (selected) c.onAccent else c.accent, style = MaterialTheme.typography.labelLarge,
         modifier = Modifier.clip(RoundedCornerShape(50)).background(fill).pressable(text, role = Role.RadioButton, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 9.dp))
@@ -295,7 +295,7 @@ private fun Choice(text: String, selected: Boolean, onClick: () -> Unit) {
 @Composable
 private fun ActionChip(icon: ImageVector, label: String, onClick: () -> Unit) {
     val c = Hypurr.colors
-    Row(Modifier.clip(RoundedCornerShape(50)).background(c.accent.copy(alpha = 0.10f)).pressable(label, onClick = onClick)
+    Row(Modifier.clip(RoundedCornerShape(50)).background(c.surface2).pressable(label, onClick = onClick)
         .padding(horizontal = 14.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(icon, null, tint = c.accent, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(6.dp))
@@ -321,7 +321,7 @@ private fun FileChip(file: PickedFile, onRemove: () -> Unit) {
             }
         }
         Box(Modifier.align(Alignment.TopEnd).padding(4.dp).size(22.dp).clip(RoundedCornerShape(50))
-            .background(c.bg.copy(alpha = 0.85f)).pressable("Remove ${file.name}", onClick = onRemove), contentAlignment = Alignment.Center) {
+            .background(c.surface2).pressable("Remove ${file.name}", onClick = onRemove), contentAlignment = Alignment.Center) {
             Icon(signalIcon(SignalIcons.Close), null, tint = c.text, modifier = Modifier.size(14.dp))
         }
     }
@@ -371,7 +371,7 @@ private fun IssuePicker(list: IssueList?, onPick: (Issue) -> Unit, onClose: () -
         }
         list?.issues.orEmpty().forEach { i -> IssueRow(i, onClick = { onPick(i) }) }
         list?.errors.orEmpty().forEach { e ->
-            Text(e.message, color = c.danger, style = MaterialTheme.typography.bodySmall)
+            Text(e.message, color = c.needsText, style = MaterialTheme.typography.bodySmall)
         }
     }
 }

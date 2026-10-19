@@ -30,46 +30,47 @@ struct Palette {
     danger: &'static str,
     code: &'static str,
     panel: &'static str,
-    /// "Needs you" (amber attention — not brand accent).
+    /// "Needs you" red (the only colour in Signal).
     warning: &'static str,
 }
 
-// Hypurr tokens (docs/design/hypurr-design-system.md): Sunfield Panel —
-// sunflower ground, cream plates, forest primary.
+// Hypurr tokens (docs/design/hypurr-design-system.md): Signal —
+// black and white on light grey, white cards, black pills; red only means "needs you".
 const LIGHT: Palette = Palette {
-    background: "#F2B90D",
-    surface: "#FFF8E8",
-    bubble_agent: "#FFF8E8",
-    bubble_user: "#17140A",
-    border: "#E8DFC8",
-    text: "#17140A",
-    secondary: "#5C5640",
-    tertiary: "#8A8168",
-    accent_fill: "#0E4A38",
-    on_accent: "#FFF8E8",
-    accent_dim: "#FFE7A8",
-    danger: "#A1281C",
-    code: "#E8EEEC",
+    background: "#EDEDEA",
+    surface: "#FFFFFF",
+    bubble_agent: "#FFFFFF",
+    bubble_user: "#0E0E0E",
+    border: "#E0E0DC",
+    text: "#0E0E0E",
+    secondary: "#34343A",
+    tertiary: "#5C5C63",
+    accent_fill: "#0E0E0E",
+    on_accent: "#FFFFFF",
+    accent_dim: "#F2F2EF",
+    danger: "#C41A20",
+    code: "#F2F2EF",
     panel: "#FFFFFF",
-    warning: "#0E4A38",
+    warning: "#C41A20",
 };
 
+// True black, #111 cards; red text lifts to #FF4D4F for AA on #111.
 const DARK: Palette = Palette {
-    background: "#0E4A38",
-    surface: "#143D30",
-    bubble_agent: "#1A4A3A",
-    bubble_user: "#F2B90D",
-    border: "#1F5542",
-    text: "#FFF8E8",
-    secondary: "#C8E0D4",
-    tertiary: "#7A9E8E",
-    accent_fill: "#F2B90D",
-    on_accent: "#0E4A38",
-    accent_dim: "#1A4A3A",
-    danger: "#F5A090",
-    code: "#080C0B",
-    panel: "#0B1211",
-    warning: "#F2B90D",
+    background: "#000000",
+    surface: "#111111",
+    bubble_agent: "#111111",
+    bubble_user: "#F5F5F2",
+    border: "#242426",
+    text: "#F5F5F2",
+    secondary: "#C9C9CE",
+    tertiary: "#9A9AA1",
+    accent_fill: "#F5F5F2",
+    on_accent: "#0E0E0E",
+    accent_dim: "#1C1C1E",
+    danger: "#FF4D4F",
+    code: "#1C1C1E",
+    panel: "#111111",
+    warning: "#FF4D4F",
 };
 
 fn colors(p: &Palette) -> String {
@@ -78,8 +79,8 @@ fn colors(p: &Palette) -> String {
          @define-color cd_border {};\n@define-color cd_text {};\n@define-color cd_secondary {};\n@define-color cd_tertiary {};\n\
          @define-color cd_accent {};\n@define-color cd_on_accent {};\n@define-color cd_accent_dim {};\n@define-color cd_danger {};\n\
          @define-color cd_code {};\n@define-color cd_panel {};\n@define-color cd_warning {};\n\
-         @define-color cd_flow1 #F2B90D;\n@define-color cd_flow2 #0E4A38;\n@define-color cd_flow3 #E8C46A;\n\
-         @define-color cd_on_flow #021412;\n",
+         @define-color cd_flow1 #0E0E0E;\n@define-color cd_flow2 #34343A;\n@define-color cd_flow3 #5C5C63;\n\
+         @define-color cd_on_flow #FFFFFF;\n",
         p.background,
         p.surface,
         p.bubble_agent,
@@ -122,7 +123,7 @@ const CSS: &str = r#"
 @define-color accent_color @cd_text;
 switch:checked > slider { background: @cd_on_accent; }
 
-window { font-size: 12px; }
+window { font-family: "Inter", "Cantarell", sans-serif; font-size: 12px; }
 .surface { background: @cd_surface; }
 .chat-bg { background: @cd_bg; }
 headerbar.flat-header { background: transparent; box-shadow: none; border: none; min-height: 44px; padding: 0; }
@@ -157,8 +158,8 @@ button.primary-pill { background: @cd_accent; color: @cd_on_accent; border-radiu
   font-weight: 500; font-size: 13px; box-shadow: none; border: none; min-height: 0; }
 button.primary-pill:hover { background: alpha(@cd_accent, 0.88); }
 button.primary-pill:disabled { opacity: 0.4; }
-button.secondary-pill { background: @cd_user; color: @cd_text; border-radius: 999px; padding: 6px 14px;
-  font-weight: 500; box-shadow: none; border: none; min-height: 0; }
+button.secondary-pill { background: @cd_surface; color: @cd_text; border: 1px solid @cd_border; border-radius: 999px; padding: 6px 14px;
+  font-weight: 500; box-shadow: none; min-height: 0; }
 button.secondary-pill.danger-text { color: @cd_danger; }
 
 /* Sidebar */
@@ -175,7 +176,7 @@ list.roster > row:selected, list.roster > row:selected:hover { background: @cd_u
 button.footer-row { border-radius: 10px; padding: 0 8px; min-height: 38px; background: transparent; box-shadow: none;
   border: none; font-size: 13px; font-weight: 500; color: @cd_text; transition: background 120ms; }
 button.footer-row:hover, button.footer-row:checked { background: @cd_agent; }
-.person-circle { background: @cd_user; border-radius: 999px; color: @cd_secondary; }
+.person-circle { background: @cd_accent_dim; border-radius: 999px; color: @cd_secondary; }
 
 /* Menus: a floating panel of rows (DesktopActionMenu / SidebarAccountPanel). */
 popover.panel > contents { background: @cd_panel; border-radius: 18px; padding: 7px; box-shadow: 0 8px 20px rgba(0,0,0,0.25); }
@@ -319,5 +320,3 @@ fn main() -> gtk::glib::ExitCode {
     // Our own flags (`--bot <id>`) are read in ui::connect; keep GTK from rejecting them.
     app.run_with_args(&std::env::args().take(1).collect::<Vec<_>>())
 }
-
-// sunfield-polish: path-filter touch for CI

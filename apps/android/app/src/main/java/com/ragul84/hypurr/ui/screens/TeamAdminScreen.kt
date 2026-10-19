@@ -102,7 +102,7 @@ fun TeamAdminScreen(
         }
         Segmented(tabs.map { it.name to it.label }, tab.name, true) { name -> onTab(AdminTab.valueOf(name)) }
         state.error?.let {
-            Text(it, color = c.danger, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 10.dp, start = 8.dp))
+            Text(it, color = c.needsText, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 10.dp, start = 8.dp))
         }
         when (tab) {
             AdminTab.Activity -> state.activity?.let { ActivityTab(it, state.now) } ?: Loading()
@@ -142,7 +142,7 @@ internal fun Segmented(options: List<Pair<String, String>>, selected: String, en
 @Composable
 private fun Stat(value: String, label: String, modifier: Modifier, tint: Color = Hypurr.colors.text) {
     val c = Hypurr.colors
-    Column(modifier.clip(RoundedCornerShape(16.dp)).background(c.bg.copy(alpha = 0.5f)).padding(10.dp)) {
+    Column(modifier.clip(RoundedCornerShape(16.dp)).background(c.surface2).padding(10.dp)) {
         Text(value, color = tint, style = MaterialTheme.typography.titleMedium)
         Text(label, color = c.secondary, style = MaterialTheme.typography.labelSmall, maxLines = 1)
     }
@@ -253,7 +253,7 @@ private fun RulesTab(info: PolicyInfo, admin: Boolean, onSave: (JsonObject) -> U
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 ids.forEach { (id, name) ->
                     val on = id in p.allowedAgents
-                    Row(Modifier.clip(RoundedCornerShape(50)).background(if (on) c.accent.copy(alpha = 0.16f) else c.bg.copy(alpha = 0.5f))
+                    Row(Modifier.clip(RoundedCornerShape(50)).background(if (on) c.surface2 else c.surface2)
                         .pressable(name, role = Role.Checkbox, enabled = admin) {
                             val next = if (on) p.allowedAgents - id else p.allowedAgents + id
                             if (next.isNotEmpty()) onSave(buildJsonObject {
@@ -327,7 +327,7 @@ private fun LimitRow(title: String, subtitle: String, value: String, enabled: Bo
             Text(subtitle, color = c.secondary, style = MaterialTheme.typography.bodySmall)
         }
         Spacer(Modifier.width(10.dp))
-        Row(Modifier.width(112.dp).clip(RoundedCornerShape(14.dp)).background(c.bg.copy(alpha = 0.6f)).padding(horizontal = 10.dp, vertical = 10.dp),
+        Row(Modifier.width(112.dp).clip(RoundedCornerShape(14.dp)).background(c.surface2).padding(horizontal = 10.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically) {
             Text("$", color = c.secondary)
             Spacer(Modifier.width(4.dp))
@@ -388,7 +388,7 @@ private fun AuditTab(log: AuditLog, now: Long) {
     val c = Hypurr.colors
     val ok = log.intact
     Row(Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(18.dp))
-        .background((if (ok) c.success else c.danger).copy(alpha = 0.12f)).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        .background(c.surface2).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(if (ok) signalIcon(SignalIcons.Shield) else signalIcon(SignalIcons.Deny), null, tint = if (ok) c.success else c.danger)
         Spacer(Modifier.width(10.dp))
         Column {

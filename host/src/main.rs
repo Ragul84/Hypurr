@@ -690,5 +690,3 @@ async fn statusline(port: u16, wrapped: String) {
     }
     println!("{line}");
 }
-
-// sunfield-polish: path-filter touch for CI

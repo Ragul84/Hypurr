@@ -653,7 +653,7 @@ private fun PermissionCard(entry: Entry, task: TaskInfo?, onRespond: (Entry, Str
                 Text(label.uppercase(), color = ink, style = SignalType.eyebrow, modifier = Modifier.weight(1f))
                 if (d.risk != null && (pending || blocked)) RiskTag(d.risk)
             }
-            Text(headline, color = c.text, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(top = 10.dp))
+            Text(headline, color = c.text, style = MaterialTheme.typography.titleLarge.copy(fontSize = 18.sp, lineHeight = 24.sp), modifier = Modifier.padding(top = 10.dp))
             if (!detail.isNullOrBlank()) {
                 if (d.explain != null && !pending) {
                     Text(if (details) "Hide command" else "Show command", color = c.text, style = MaterialTheme.typography.labelLarge,
@@ -727,7 +727,7 @@ private fun LearningCard(l: Learning, onOpenLink: (String) -> Unit) {
                             overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                         Text("+${f.added}", color = c.text, style = MaterialTheme.typography.labelMedium)
                         Spacer(Modifier.width(6.dp))
-                        Text("−${f.removed}", color = c.danger, style = MaterialTheme.typography.labelMedium)
+                        Text("−${f.removed}", color = c.needsText, style = MaterialTheme.typography.labelMedium)
                     }
                 }
                 if (l.files.size > 8) Text("and ${l.files.size - 8} more", color = c.tertiary, style = MaterialTheme.typography.labelSmall)
@@ -735,7 +735,7 @@ private fun LearningCard(l: Learning, onOpenLink: (String) -> Unit) {
         }
         val posted = l.posted.map { when (it) { "slack" -> "Slack"; "teams" -> "Teams"; "jira" -> "Jira"; else -> it } }
         if (posted.isNotEmpty()) Text("Posted to ${posted.joinToString(", ")}", color = c.secondary, style = MaterialTheme.typography.bodySmall)
-        l.errors.forEach { Text(it, color = c.danger, style = MaterialTheme.typography.bodySmall) }
+        l.errors.forEach { Text(it, color = c.needsText, style = MaterialTheme.typography.bodySmall) }
         l.pr?.let { pr ->
             SoftButton("Open pull request #${pr.number}", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Link)) { onOpenLink(pr.url) }
         }

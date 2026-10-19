@@ -141,7 +141,7 @@ fun PairingScreen(
                 }
             }
             AnimatedVisibility(state.error != null) {
-                Text(state.error.orEmpty(), color = c.danger, style = MaterialTheme.typography.bodyMedium,
+                Text(state.error.orEmpty(), color = c.needsText, style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center, modifier = Modifier.padding(top = 18.dp))
             }
             Spacer(Modifier.height(24.dp))

@@ -330,7 +330,7 @@ private fun NeedsYouCard(
 ) {
     SignalCard(modifier.fillMaxWidth().pressable(bot.name, onClick = onOpen), emphasis = true) {
         Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 14.dp)) {
-            BotCardBody(bot, byId, line = ask?.title ?: plainAsk(bot.activity), meta = ask?.meta?.takeIf { it.isNotBlank() })
+            BotCardBody(bot, byId, line = ask?.title ?: plainAsk(bot.activity))
             if (ask?.entryId != null) {
                 val options = ask.options.filter { !it.kind.contains("always", true) && !it.name.contains("always", true) }
                 ApprovalActions(options, Modifier.padding(top = 12.dp), onChoose = onChoose)
@@ -350,10 +350,6 @@ private fun BotCardBody(bot: Bot, byId: Map<String, Bot>, line: String? = null, 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(bot.name, style = MaterialTheme.typography.titleMedium, color = c.text, maxLines = 1,
                     overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                if (bot.pinned) {
-                    Spacer(Modifier.width(6.dp))
-                    Box(Modifier.size(4.dp).clip(CircleShape).background(c.tertiary).semantics { contentDescription = "Pinned" })
-                }
                 Spacer(Modifier.weight(1f))
                 Spacer(Modifier.width(8.dp))
                 if (bot.unread > 0 && !bot.needsInput) {
@@ -543,7 +539,7 @@ private fun BuiltinInstallCard(prompt: BuiltinInstallPrompt, onInstall: () -> Un
         }
         Text(prompt.body, color = c.secondary, style = MaterialTheme.typography.bodyMedium)
         Text(prompt.consent, color = c.tertiary, style = MaterialTheme.typography.bodySmall)
-        prompt.error?.let { Text(it, color = c.danger, style = MaterialTheme.typography.bodySmall) }
+        prompt.error?.let { Text(it, color = c.needsText, style = MaterialTheme.typography.bodySmall) }
         PrimaryButton(if (prompt.busy) "Installing…" else "Install Hypurr Agent", Modifier.fillMaxWidth(), enabled = !prompt.busy, onClick = onInstall)
     } }
 }

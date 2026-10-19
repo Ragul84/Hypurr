@@ -214,19 +214,20 @@ private fun OptionTile(label: String, hint: String?, icon: Int?, on: Boolean, mo
     val c = Hypurr.colors
     SignalCard(modifier.pressable(label, onClick = onClick), RoundedCornerShape(20.dp), emphasis = on) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = if (hint != null) 15.dp else 17.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = if (hint != null) 15.dp else 17.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (icon != null) {
                 Icon(signalIcon(icon), null, tint = c.text, modifier = Modifier.size(22.dp))
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(8.dp))
             }
             Column(Modifier.weight(1f)) {
-                Text(label, color = c.text, style = MaterialTheme.typography.titleMedium)
+                Text(label, color = c.text, style = MaterialTheme.typography.titleMedium, maxLines = 2)
                 if (hint != null) {
                     Text(hint, color = c.tertiary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 2.dp))
                 }
             }
+            Spacer(Modifier.width(8.dp))
             Box(
                 Modifier.size(22.dp).clip(RoundedCornerShape(50)).background(if (on) c.accent else Color.Transparent)
                     .border(1.5.dp, if (on) c.accent else c.borderStrong, RoundedCornerShape(50)),
