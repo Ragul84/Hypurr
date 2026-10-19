@@ -50,6 +50,7 @@ const HOUR_MS: i64 = 60 * 60 * 1000;
 pub fn url(store: &Store) -> Option<String> {
     if std::env::var("HYPURR_CLOUD").is_ok_and(|v| v == "off")
         || store.kv_get("cloud_enabled").as_deref() == Some("false")
+        || crate::admin::local_only::on(store)
     {
         return None;
     }

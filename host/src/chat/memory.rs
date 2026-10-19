@@ -781,6 +781,7 @@ pub(crate) async fn one_shot(hub: &Arc<Hub>, cfg: &BotConfig, system: &str, user
         crate::market::vault::unlock(hub.clone()).await?;
     }
     let env = crate::agent::auth::env(&hub.store, &cfg.backend)?;
+    crate::admin::local_only::check_agent(&hub.store, &cfg.backend, &env)?;
     let mut conn = None;
     let mut last_err = None;
     for command in crate::agent::bot::launch_commands(cfg, |_| {}).await? {

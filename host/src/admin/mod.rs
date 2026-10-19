@@ -5,6 +5,9 @@
 
 pub mod activity;
 pub mod audit;
+pub mod budget;
+pub mod export;
+pub mod local_only;
 
 use crate::api::devices::Caller;
 use crate::hub::Hub;
@@ -110,6 +113,16 @@ pub struct Policies {
     pub ask_from: String,
     /// Requests at or above this risk need an admin to approve: `medium` | `high` | `off` / empty.
     pub admin_approves_from: String,
+    /// ₹ per person per day / month (0: no limit), with per-person overrides by device key.
+    pub person_daily_inr: f64,
+    pub person_monthly_inr: f64,
+    pub person_limits: BTreeMap<String, budget::PersonLimit>,
+    /// ₹ for the whole team per month. 0: no limit.
+    pub team_monthly_inr: f64,
+    /// Local-only mode: no Hypurr cloud, relay or marketplaces; agents only on approved endpoints.
+    pub local_only: bool,
+    /// Approved model endpoints (company gateway or local model server base URLs).
+    pub model_endpoints: Vec<String>,
 }
 
 fn parse_risk(s: &str) -> Option<Risk> {
@@ -126,7 +139,7 @@ impl Policies {
         store.kv_get("policies").and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
     }
 
-    fn save(&self, store: &Store) -> Result<()> {
+    pub(crate) fn save(&self, store: &Store) -> Result<()> {
         store.kv_set("policies", &serde_json::to_string(self)?)
     }
 
@@ -160,6 +173,13 @@ impl Policies {
             "taskLimit": self.task_limit,
             "askFrom": ask,
             "adminApprovesFrom": admin,
+            "personDailyInr": self.person_daily_inr,
+            "personMonthlyInr": self.person_monthly_inr,
+            "personLimits": self.person_limits,
+            "teamMonthlyInr": self.team_monthly_inr,
+            "localOnly": self.local_only || local_only::active(),
+            "modelEndpoints": self.model_endpoints,
+            "usdToInr": crate::pricing::usd_to_inr(),
         })
     }
 }
@@ -188,6 +208,53 @@ pub fn set_policies(store: &Store, b: &Value) -> Result<Value> {
             *slot = (n * 100.0).round() / 100.0;
         }
     }
+    for (key, slot) in [
+        ("personDailyInr", &mut p.person_daily_inr),
+        ("personMonthlyInr", &mut p.person_monthly_inr),
+        ("teamMonthlyInr", &mut p.team_monthly_inr),
+    ] {
+        if let Some(v) = b.get(key).filter(|v| !v.is_null()) {
+            let Some(n) = v.as_f64().filter(|n| n.is_finite() && *n >= 0.0) else {
+                bail!("{key} must be rupees, 0 or more")
+            };
+            *slot = n.round();
+        }
+    }
+    if let Some(map) = b["personLimits"].as_object() {
+        for (k, v) in map {
+            if v.is_null() {
+                p.person_limits.remove(k);
+                continue;
+            }
+            let l: budget::PersonLimit = serde_json::from_value(v.clone())
+                .map_err(|_| anyhow::anyhow!("personLimits.{k} must be {{dailyInr, monthlyInr}}"))?;
+            if [l.daily_inr, l.monthly_inr].iter().any(|n| !n.is_finite() || *n < 0.0) {
+                bail!("person limits must be rupees, 0 or more");
+            }
+            if l == budget::PersonLimit::default() {
+                p.person_limits.remove(k);
+            } else {
+                p.person_limits.insert(k.clone(), l);
+            }
+        }
+    }
+    if let Some(v) = b["localOnly"].as_bool() {
+        p.local_only = v;
+    }
+    if let Some(list) = b["modelEndpoints"].as_array() {
+        let mut eps = vec![];
+        for e in list.iter().filter_map(Value::as_str).map(str::trim).filter(|s| !s.is_empty()) {
+            if !(e.starts_with("https://")
+                || e.starts_with("http://localhost")
+                || e.starts_with("http://127.0.0.1")
+                || e.starts_with("http://[::1]"))
+            {
+                bail!("{e}: an approved endpoint must be https://, or http:// on this computer (a local model)");
+            }
+            eps.push(e.trim_end_matches('/').to_owned());
+        }
+        p.model_endpoints = eps;
+    }
     let mut safety = b.clone();
     if let Some(s) = b["askFrom"].as_str() {
         if !matches!(s, "low" | "medium" | "high" | "never") {
@@ -206,6 +273,7 @@ pub fn set_policies(store: &Store, b: &Value) -> Result<Value> {
         p.admin_approves_from = if s == "off" { String::new() } else { s.to_owned() };
     }
     p.save(store)?;
+    local_only::sync(store);
     crate::tasks::set_safety(store, &safety)?;
     Ok(policies(store))
 }
@@ -229,6 +297,8 @@ const ADMIN_ONLY: &[&str] = &[
     "setRole",
     "setTeam",
     "auditLog",
+    "auditExport",
+    "spendByPerson",
     "activity",
     "setIntegrations",
     "testIntegration",
@@ -258,6 +328,8 @@ const ADMIN_ONLY: &[&str] = &[
 /// What a viewer may call: reading, plus its own device registration.
 const VIEWER_OK: &[&str] = &[
     "hello",
+    "pricing",
+    "itKit",
     "sync",
     "history",
     "thread",
@@ -312,6 +384,7 @@ pub fn authorize(store: &Store, actor: &Actor, method: &str, b: &mut Value) -> R
             actor.role.as_str()
         )));
     }
+    local_only::check_method(store, method)?;
     let policies = Policies::load(store);
     match method {
         "respondPermission" => {
@@ -331,6 +404,7 @@ pub fn authorize(store: &Store, actor: &Actor, method: &str, b: &mut Value) -> R
         }
         "startTask" => {
             check_daily(store, &policies)?;
+            budget::check(store, &policies, &actor.key)?;
             if let Some(backend) = b["backend"].as_str().filter(|s| !s.is_empty()) {
                 check_agent(&policies, backend)?;
             }
@@ -340,6 +414,8 @@ pub fn authorize(store: &Store, actor: &Actor, method: &str, b: &mut Value) -> R
             if let Some(task) = b["botId"].as_str().and_then(|id| crate::tasks::Task::for_bot(store, id)) {
                 check_daily(store, &policies)?;
                 check_task(&policies, &task)?;
+                let who = task.extra.get("startedBy").and_then(|v| v["key"].as_str()).unwrap_or("local").to_owned();
+                budget::check(store, &policies, &who)?;
             }
         }
         "createBot" if b["kind"] != "group" => {
@@ -404,7 +480,11 @@ pub fn after_usage(hub: &Hub, task: &mut crate::tasks::Task) {
     if task.extra.get("limitHit").is_some_and(|v| v == true) {
         return;
     }
-    let over = check_task(&p, task).err().or_else(|| check_daily(store, &p).err());
+    let who = task.extra.get("startedBy").and_then(|v| v["key"].as_str()).unwrap_or("local").to_owned();
+    let over = check_task(&p, task)
+        .err()
+        .or_else(|| check_daily(store, &p).err())
+        .or_else(|| budget::check(store, &p, &who).err());
     let Some(NotAllowed(reason)) = over else { return };
     task.extra.insert("limitHit".into(), true.into());
     let _ = task.save(store);
