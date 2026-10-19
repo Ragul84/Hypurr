@@ -773,6 +773,17 @@ class MainActivity : ComponentActivity() {
                 else -> "idle"
             }, taskId = bot.task?.id ?: st.taskId)
         }
+        // Cases live on the computer, per project: load last time's, save edits (debounced).
+        LaunchedEffect(st.project) {
+            val p = st.project ?: return@LaunchedEffect
+            if (st.cases.isEmpty()) runCatching { store.qaSavedCases(p) }.getOrNull()?.let { st = st.copy(saved = it) }
+        }
+        LaunchedEffect(st.cases) {
+            val p = st.project ?: return@LaunchedEffect
+            if (st.cases.isEmpty()) return@LaunchedEffect
+            delay(800)
+            runCatching { store.qaSaveCases(p, st.cases, st.input, st.sourceName) }
+        }
         fun fail(e: Throwable, what: String) { st = st.copy(busy = false, error = e.message ?: what) }
         fun exportText() = com.ragul84.hypurr.qa.QaExport.export(st.cases, st.format, st.automated)
         fun run() {

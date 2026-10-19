@@ -689,6 +689,9 @@ data class QaCasesResult(
 )
 
 @Serializable
+data class QaSaved(val cases: List<QaCase> = emptyList(), val input: String = "", val source: String = "text", val savedAt: Long = 0)
+
+@Serializable
 data class QaRunResult(
     val ok: Boolean = false,
     val passed: Long = 0,

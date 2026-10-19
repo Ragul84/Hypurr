@@ -358,6 +358,16 @@ class HostClient(val transport: ChannelTransport) {
         return HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("bot"))
     }
 
+    suspend fun qaSaveCases(project: String, cases: List<QaCase>, input: String, source: String) {
+        transport.call("qaSaveCases", buildJsonObject {
+            put("project", project); put("input", input); put("source", source)
+            put("cases", HypurrJson.encodeToJsonElement(kotlinx.serialization.builtins.ListSerializer(QaCase.serializer()), cases))
+        })
+    }
+
+    suspend fun qaSavedCases(project: String): com.ragul84.hypurr.model.QaSaved =
+        call("qaSavedCases", buildJsonObject { put("project", project) })
+
     suspend fun qaRun(taskId: String): QaRunResult {
         val res = transport.call("qaRun", buildJsonObject { put("taskId", taskId) }, timeoutMs = 960_000)
         return HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("result"))

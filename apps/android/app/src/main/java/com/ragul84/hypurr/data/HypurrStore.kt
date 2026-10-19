@@ -470,6 +470,8 @@ class HypurrStore(
         upsert(bot)
         return bot.id
     }
+    suspend fun qaSaveCases(project: String, cases: List<QaCase>, input: String, source: String) = cl().qaSaveCases(project, cases, input, source)
+    suspend fun qaSavedCases(project: String) = cl().qaSavedCases(project)
     suspend fun qaRun(taskId: String): QaRunResult = cl().qaRun(taskId)
 
     private fun cl() = client ?: throw HostException.unreachable()

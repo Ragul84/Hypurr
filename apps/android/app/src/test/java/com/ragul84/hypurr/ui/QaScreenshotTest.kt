@@ -64,6 +64,10 @@ class QaScreenshotTest {
         QaScreen(base.copy(input = "Coupons: a valid code lowers the cart total by its amount. Expired codes show an error. The total never goes below zero.", explain = true))
     }
 
+    @Test fun saved() = shoot("saved") {
+        QaScreen(base.copy(saved = com.ragul84.hypurr.model.QaSaved(cases = cases, input = "Coupons", savedAt = 1)))
+    }
+
     @Test fun writing() = shoot("writing") { QaScreen(base.copy(source = 2, input = "Checkout", busy = true, busyLabel = "Writing test cases")) }
 
     @Test fun cases() = shoot("cases") { QaScreen(withCases.copy(picked = setOf("TC-1", "TC-2", "TC-3"))) }

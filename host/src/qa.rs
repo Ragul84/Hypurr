@@ -445,6 +445,42 @@ pub async fn run(hub: &Arc<Hub>, b: &Value) -> Result<Value> {
     Ok(json!({"result": result}))
 }
 
+fn saved_key(project: &str) -> String {
+    format!("qa:cases:{project}")
+}
+
+/// `qaSaveCases {project, cases, input?, source?}`: keeps the edited cases on the computer,
+/// per project, so an app restart (or another phone) doesn't lose them.
+pub fn save_cases(store: &crate::store::Store, b: &Value) -> Result<Value> {
+    let project = b["project"].as_str().unwrap_or_default();
+    ensure!(!project.is_empty(), "missing project");
+    let cases: Vec<Case> = serde_json::from_value(b["cases"].clone()).map_err(|_| anyhow!("missing cases"))?;
+    ensure!(cases.len() <= 200, "That's more than 200 cases; split them up.");
+    let saved = json!({
+        "cases": cases,
+        "input": crate::agent::acp::truncate(b["input"].as_str().unwrap_or_default(), 8000),
+        "source": b["source"].as_str().unwrap_or("text"),
+        "savedAt": chrono_now(),
+    });
+    store.kv_set(&saved_key(project), &saved.to_string())?;
+    Ok(json!({"saved": cases.len()}))
+}
+
+/// `qaSavedCases {project}` → the last saved cases, or `{cases: []}`.
+pub fn saved_cases(store: &crate::store::Store, b: &Value) -> Value {
+    let project = b["project"].as_str().unwrap_or_default();
+    store
+        .kv_get(&saved_key(project))
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_else(|| json!({"cases": []}))
+}
+
+fn chrono_now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis().try_into().unwrap_or(0))
+}
+
 /// `qaFrameworks {project}`.
 pub async fn detect(b: &Value) -> Result<Value> {
     let p = PathBuf::from(b["project"].as_str().unwrap_or_default());
@@ -473,6 +509,19 @@ mod tests {
         assert_eq!(c[1].id, "TC-2");
         assert_eq!(c[1].expected, "'This code has expired' and the total stays");
         assert_eq!(c[1].steps, ["Apply OLD5"]);
+    }
+
+    #[test]
+    fn saved_cases_round_trip_per_project() {
+        let store = crate::store::Store::open(Path::new(":memory:")).unwrap();
+        assert_eq!(saved_cases(&store, &json!({"project": "/a"}))["cases"], json!([]));
+        let cases = fallback_cases("Login");
+        save_cases(&store, &json!({"project": "/a", "cases": cases, "input": "Login"})).unwrap();
+        let back: Vec<Case> =
+            serde_json::from_value(saved_cases(&store, &json!({"project": "/a"}))["cases"].clone()).unwrap();
+        assert_eq!(back, cases);
+        assert_eq!(saved_cases(&store, &json!({"project": "/b"}))["cases"], json!([]));
+        assert!(save_cases(&store, &json!({"project": "", "cases": []})).is_err());
     }
 
     #[test]

@@ -672,6 +672,8 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
         "qaCases" => crate::qa::cases(hub, &b, &actor.key).await?,
         "qaFrameworks" => crate::qa::detect(&b).await?,
         "qaAutomate" => crate::qa::automate(hub, &b).await?,
+        "qaSaveCases" => crate::qa::save_cases(&hub.store, &b)?,
+        "qaSavedCases" => crate::qa::saved_cases(&hub.store, &b),
         "qaRun" => crate::qa::run(hub, &b).await?,
         "ticketSetup" => {
             let hub = hub.clone();

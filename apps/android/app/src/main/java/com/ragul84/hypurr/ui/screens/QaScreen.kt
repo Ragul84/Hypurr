@@ -83,6 +83,8 @@ data class QaUiState(
     val busyLabel: String = "",
     val error: String? = null,
     val copied: Boolean = false,
+    /** Cases saved on the computer for this project from last time. */
+    val saved: com.ragul84.hypurr.model.QaSaved? = null,
 ) {
     val sourceName: String get() = listOf("ticket", "text", "feature")[source]
     val projectName: String? get() = projects.firstOrNull { it.path == project }?.name ?: project?.substringAfterLast('/')
@@ -143,6 +145,7 @@ fun QaScreen(
         ) {
             when (state.step) {
                 QaStep.Input -> {
+                    state.saved?.takeIf { it.cases.isNotEmpty() && state.cases.isEmpty() }?.let { sv -> item { SavedCard(sv, state, onChange) } }
                     item { InputCard(state, onChange, onPaste) }
                     if (state.projects.size > 1) item { ProjectPicker(state, onChange) }
                     item { ExplainToggle(state, onChange) }
@@ -236,6 +239,22 @@ private fun Field(value: String, onValue: (String) -> Unit, placeholder: String,
     Box(Modifier.fillMaxWidth().heightIn(min = minHeight.dp).clip(RoundedCornerShape(14.dp)).background(c.surface2).padding(horizontal = 14.dp, vertical = 10.dp)) {
         if (value.isEmpty()) Text(placeholder, style = style.copy(color = c.tertiary))
         BasicTextField(value, onValue, Modifier.fillMaxWidth(), textStyle = style, cursorBrush = SolidColor(c.text))
+    }
+}
+
+@Composable
+private fun SavedCard(sv: com.ragul84.hypurr.model.QaSaved, state: QaUiState, onChange: (QaUiState) -> Unit) {
+    val c = Hypurr.colors
+    SignalCard(Modifier.fillMaxWidth().pressable("Open saved cases") {
+        onChange(state.copy(step = QaStep.Cases, cases = sv.cases, input = sv.input, source = listOf("ticket", "text", "feature").indexOf(sv.source).coerceAtLeast(0)))
+    }) {
+        Row(Modifier.padding(horizontal = 18.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Continue where you left off", color = c.text, style = MaterialTheme.typography.titleSmall)
+                Text("${sv.cases.size} cases saved on the computer for ${state.projectName ?: "this project"}", color = c.tertiary, style = MaterialTheme.typography.bodySmall)
+            }
+            Icon(signalIcon(SignalIcons.Chevron), null, tint = c.tertiary, modifier = Modifier.size(16.dp))
+        }
     }
 }
 
