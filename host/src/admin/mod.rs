@@ -17,6 +17,7 @@ use anyhow::{Result, bail};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
+use std::path::Path;
 
 /// What a person may do. Ordered: viewer < member < admin.
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
@@ -123,6 +124,8 @@ pub struct Policies {
     pub local_only: bool,
     /// Approved model endpoints (company gateway or local model server base URLs).
     pub model_endpoints: Vec<String>,
+    /// Folder rules: tasks and bots may only work inside these folders. Empty: any folder.
+    pub allowed_folders: Vec<String>,
 }
 
 fn parse_risk(s: &str) -> Option<Risk> {
@@ -179,6 +182,7 @@ impl Policies {
             "teamMonthlyInr": self.team_monthly_inr,
             "localOnly": self.local_only || local_only::active(),
             "modelEndpoints": self.model_endpoints,
+            "allowedFolders": self.allowed_folders,
             "usdToInr": crate::pricing::usd_to_inr(),
         })
     }
@@ -254,6 +258,16 @@ pub fn set_policies(store: &Store, b: &Value) -> Result<Value> {
             eps.push(e.trim_end_matches('/').to_owned());
         }
         p.model_endpoints = eps;
+    }
+    if let Some(list) = b["allowedFolders"].as_array() {
+        let mut dirs = vec![];
+        for d in list.iter().filter_map(Value::as_str).map(str::trim).filter(|s| !s.is_empty()) {
+            if !Path::new(d).is_absolute() {
+                bail!("{d}: a folder rule must be a full path, like /Users/asha/work");
+            }
+            dirs.push(d.trim_end_matches('/').to_owned());
+        }
+        p.allowed_folders = dirs;
     }
     let mut safety = b.clone();
     if let Some(s) = b["askFrom"].as_str() {
@@ -422,10 +436,16 @@ pub fn authorize(store: &Store, actor: &Actor, method: &str, b: &mut Value) -> R
             if let Some(backend) = b["backend"].as_str().filter(|s| !s.is_empty()) {
                 check_agent(&policies, backend)?;
             }
+            if let Some(cwd) = b["cwd"].as_str().filter(|s| !s.is_empty()) {
+                check_folder(&policies, cwd)?;
+            }
         }
         "updateBot" => {
             if let Some(backend) = b["backend"].as_str().filter(|s| !s.is_empty()) {
                 check_agent(&policies, backend)?;
+            }
+            if let Some(cwd) = b["cwd"].as_str().filter(|s| !s.is_empty()) {
+                check_folder(&policies, cwd)?;
             }
         }
         _ => {}
@@ -443,6 +463,25 @@ fn risk_word(r: Risk) -> &'static str {
 
 fn money(x: f64) -> String {
     format!("${x:.2}")
+}
+
+/// Folder rules: `path` must be one of the allowed folders or inside one (whole path parts).
+pub fn check_folder(p: &Policies, path: &str) -> Result<(), NotAllowed> {
+    if p.allowed_folders.is_empty() {
+        return Ok(());
+    }
+    let path = Path::new(path);
+    if p.allowed_folders.iter().any(|d| path.starts_with(d))
+        && !path.components().any(|c| c == std::path::Component::ParentDir)
+    {
+        Ok(())
+    } else {
+        Err(NotAllowed(format!(
+            "Your team's folder rules don't include {}. Allowed: {}.",
+            path.display(),
+            p.allowed_folders.join(", ")
+        )))
+    }
 }
 
 fn check_agent(p: &Policies, backend: &str) -> Result<(), NotAllowed> {
@@ -565,7 +604,7 @@ mod tests {
     use super::*;
 
     fn store() -> Store {
-        Store::open(std::path::Path::new(":memory:")).unwrap()
+        Store::open(Path::new(":memory:")).unwrap()
     }
 
     fn device(store: &Store, key: &str) -> Actor {
@@ -670,5 +709,22 @@ mod tests {
         assert!(authorize(&s, &member, "createBot", &mut json!({"kind": "group", "backend": "codex"})).is_ok());
         assert!(authorize(&s, &member, "updateBot", &mut json!({"botId": "b", "backend": "codex"})).is_err());
         assert!(authorize(&s, &member, "updateBot", &mut json!({"botId": "b", "name": "x"})).is_ok());
+    }
+
+    #[test]
+    fn folder_rules_apply_to_bots_and_paths() {
+        let s = store();
+        assert!(set_policies(&s, &json!({"allowedFolders": ["work"]})).is_err(), "relative");
+        set_policies(&s, &json!({"allowedFolders": ["/home/asha/work/"]})).unwrap();
+        let p = Policies::load(&s);
+        assert!(check_folder(&p, "/home/asha/work").is_ok());
+        assert!(check_folder(&p, "/home/asha/work/api").is_ok());
+        assert!(check_folder(&p, "/home/asha/workshop").is_err(), "whole path parts only");
+        assert!(check_folder(&p, "/home/asha/work/../secrets").is_err());
+        let member = Actor { key: "m".into(), name: "M".into(), role: Role::Member };
+        assert!(authorize(&s, &member, "createBot", &mut json!({"cwd": "/tmp"})).is_err());
+        assert!(authorize(&s, &member, "createBot", &mut json!({"cwd": "/home/asha/work/api"})).is_ok());
+        set_policies(&s, &json!({"allowedFolders": []})).unwrap();
+        assert!(check_folder(&Policies::load(&s), "/tmp").is_ok());
     }
 }
