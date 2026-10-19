@@ -45,3 +45,16 @@ for cx, cy, r in dots(0, 0, cell, cell * 0.36): svg.append(f'<circle cx="{cx}" c
 svg.append('</svg>')
 open(os.path.join(root, "docs/brand/cat-dots.svg"), "w").write("\n".join(svg) + "\n")
 print("ok")
+
+# Brand marks: the app icon (white dot cat on a black squircle) and the small glyph.
+def tile_svg(size, rx, pad, on="#FFFFFF", off="#2A2A2D", bg="#0E0E0E"):
+    cell = (size - 2 * pad) / 9
+    out = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {size} {size}" width="{size}" height="{size}">',
+           f'<rect width="{size}" height="{size}" rx="{rx}" fill="{bg}"/>']
+    for cx, cy, r in dots(pad, pad, cell, cell * 0.36, on=False): out.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r:.1f}" fill="{off}"/>')
+    for cx, cy, r in dots(pad, pad, cell, cell * 0.36): out.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="{r:.1f}" fill="{on}"/>')
+    out.append('</svg>')
+    return "\n".join(out) + "\n"
+
+open(os.path.join(root, "docs/brand/hypurr-icon.svg"), "w").write(tile_svg(1024, 230, 232))
+open(os.path.join(root, "docs/brand/hypurr-glyph.svg"), "w").write(tile_svg(64, 16, 12))
