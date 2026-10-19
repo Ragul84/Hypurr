@@ -57,6 +57,8 @@ import com.ragul84.hypurr.net.LinkState
 import com.ragul84.hypurr.ui.screens.BotListScreen
 import com.ragul84.hypurr.ui.screens.HomeTab
 import com.ragul84.hypurr.ui.screens.TasksScreen
+import com.ragul84.hypurr.ui.screens.TicketScreen
+import com.ragul84.hypurr.ui.screens.TicketStep
 import com.ragul84.hypurr.ui.screens.SpendScreen
 import com.ragul84.hypurr.ui.screens.NeedsYouAsk
 import com.ragul84.hypurr.ui.screens.BuiltinInstallPrompt
@@ -242,6 +244,7 @@ class MainActivity : ComponentActivity() {
         var screen by rememberSaveable { mutableStateOf("list") }
         // The new-task draft survives a trip to the folder picker.
         var taskDraft by remember { mutableStateOf<NewTaskUiState?>(null) }
+        var ticketDraft by remember { mutableStateOf<com.ragul84.hypurr.ui.screens.TicketUiState?>(null) }
         val projectFolder by store.projectFolder.collectAsState()
         // Right after pairing, ask once which folder the agent may work in (can wait).
         LaunchedEffect(justPaired) {
@@ -396,6 +399,7 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 target == "screen" -> ScreenRoute(store, current.name) { screen = "list" }
+                target == "ticket" -> TicketRoute(store, projectFolder, ticketDraft, { ticketDraft = it }) { screen = it }
                 target == "newtask" -> {
                     val setup by store.setup.collectAsState()
                     var task by remember { mutableStateOf(taskDraft ?: NewTaskUiState(project = projectFolder)) }
@@ -494,6 +498,7 @@ class MainActivity : ComponentActivity() {
                         templates = templates,
                         recent = rosterOrder(bots.values),
                         onNewTask = { screen = "newtask" },
+                        onTicket = { screen = "ticket" },
                         onOpenTemplate = { screen = "newtask" },
                         onOpenBot = { screen = "chat:${it.id}" },
                         onTab = ::go,
@@ -722,7 +727,164 @@ class MainActivity : ComponentActivity() {
         screen == "folderpick:newtask" -> "newtask"
         screen.startsWith("folderpick:chat:") -> screen.removePrefix("folderpick:")
         screen == "spend" || screen == "tasks" -> "list"
+        screen == "ticket" -> "tasks"
         else -> "list"
+    }
+
+    private fun copyText(label: String, text: String) {
+        getSystemService(ClipboardManager::class.java).setPrimaryClip(android.content.ClipData.newPlainText(label, text))
+    }
+
+    private fun shareText(text: String) {
+        val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
+        runCatching { startActivity(Intent.createChooser(send, null)) }
+    }
+
+    /** Ticket to PR: paste → plan → task on the safe branch → review → approved upload. */
+    @Composable
+    private fun TicketRoute(
+        store: HypurrStore,
+        projectFolder: String?,
+        draft: com.ragul84.hypurr.ui.screens.TicketUiState?,
+        saveDraft: (com.ragul84.hypurr.ui.screens.TicketUiState?) -> Unit,
+        go: (String) -> Unit,
+    ) {
+        val scope = rememberCoroutineScope()
+        val setup by store.setup.collectAsState()
+        val bots by store.bots.collectAsState()
+        var st by remember { mutableStateOf(draft ?: com.ragul84.hypurr.ui.screens.TicketUiState()) }
+        SideEffect { saveDraft(st) }
+        LaunchedEffect(Unit) { store.loadSetup() }
+        LaunchedEffect(setup) {
+            val projects = setup?.projects.orEmpty()
+            val pick = st.project ?: projects.firstOrNull { projectFolder != null && projectFolder.startsWith(it.path) }?.path ?: projects.firstOrNull()?.path
+            st = st.copy(projects = projects, project = pick)
+        }
+        // Follow the running task's agent.
+        val bot = st.botId?.let { bots[it] }
+        LaunchedEffect(bot?.status, bot?.task?.branch) {
+            if (bot != null) st = st.copy(agentStatus = when {
+                bot.needsInput -> "needsInput"
+                bot.isWorking -> "working"
+                else -> "idle"
+            }, branch = bot.task?.branch ?: st.branch, taskId = bot.task?.id ?: st.taskId)
+        }
+        fun fail(e: Throwable, what: String) { st = st.copy(busy = false, error = e.message ?: what) }
+        fun loadPlan(ticket: com.ragul84.hypurr.model.Issue, project: String) {
+            st = st.copy(busy = true, busyLabel = "Reading the code and making a plan", error = null)
+            scope.launch {
+                runCatching { store.ticketPlan(ticket, project) }
+                    .onSuccess { r -> st = st.copy(busy = false, step = TicketStep.Plan, plan = r.plan, planBy = r.by, checksText = r.plan.checks.joinToString("\n")) }
+                    .onFailure { fail(it, "Couldn't make a plan.") }
+            }
+        }
+        fun review() {
+            val id = st.taskId ?: return
+            st = st.copy(busy = true, busyLabel = "Summarising the changes", error = null)
+            scope.launch {
+                runCatching { store.ticketReview(id) }
+                    .onSuccess { r -> st = st.copy(busy = false, step = TicketStep.Review, review = r, prTitle = r.prTitle, prBody = r.prBody) }
+                    .onFailure { fail(it, "Couldn't read the changes.") }
+            }
+        }
+        fun openSetup() {
+            st = st.copy(step = TicketStep.Setup, busy = true, busyLabel = "Checking the computer", error = null, setupNote = null)
+            scope.launch {
+                runCatching { store.ticketSetup() }
+                    .onSuccess { s -> st = st.copy(busy = false, setup = s, jiraUrl = s.integrations.jira.baseUrl, jiraEmail = s.integrations.jira.email) }
+                    .onFailure { fail(it, "Couldn't reach the computer.") }
+            }
+        }
+        BackHandler {
+            st = when (st.step) {
+                TicketStep.Setup, TicketStep.Plan -> st.copy(step = TicketStep.Input, error = null)
+                TicketStep.Review -> st.copy(step = TicketStep.Running, confirmPush = false, error = null)
+                else -> { go("tasks"); st }
+            }
+        }
+        TicketScreen(
+            st,
+            onBack = {
+                when (st.step) {
+                    TicketStep.Setup, TicketStep.Plan -> st = st.copy(step = TicketStep.Input, error = null)
+                    TicketStep.Review -> st = st.copy(step = TicketStep.Running, confirmPush = false, error = null)
+                    TicketStep.Running -> go("tasks")
+                    TicketStep.Input -> { saveDraft(null); go("tasks") }
+                }
+            },
+            onChange = { st = it },
+            onPaste = {
+                val text = getSystemService(ClipboardManager::class.java).primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)
+                    ?.coerceToText(this@MainActivity)?.toString()?.trim().orEmpty()
+                if (text.isNotEmpty()) st = st.copy(input = text, needsSetup = null, error = null)
+            },
+            onRead = {
+                val project = st.project ?: return@TicketScreen
+                st = st.copy(busy = true, busyLabel = "Reading the ticket", error = null, needsSetup = null)
+                scope.launch {
+                    runCatching { store.ticketResolve(st.input, project) }
+                        .onSuccess { r ->
+                            val t = r.ticket
+                            if (t == null) st = st.copy(busy = false, needsSetup = r.needsSetup)
+                            else { st = st.copy(ticket = t); loadPlan(t, project) }
+                        }
+                        .onFailure { fail(it, "Couldn't read the ticket.") }
+                }
+            },
+            onSetup = ::openSetup,
+            onApprovePlan = {
+                val (t, p, project) = Triple(st.ticket, st.editedPlan(), st.project)
+                if (t == null || p == null || project == null) return@TicketScreen
+                st = st.copy(busy = true, busyLabel = "Starting on a safe branch", error = null)
+                scope.launch {
+                    runCatching { store.ticketStart(t, p, project) }
+                        .onSuccess { botId -> st = st.copy(busy = false, step = TicketStep.Running, botId = botId, plan = p); go("chat:$botId") }
+                        .onFailure { fail(it, "Couldn't start the task.") }
+                }
+            },
+            onRedoPlan = { val t = st.ticket; val p = st.project; if (t != null && p != null) loadPlan(t, p) },
+            onOpenTask = { st.botId?.let { go("chat:$it") } },
+            onReview = ::review,
+            onApprovePush = {
+                val id = st.taskId ?: return@TicketScreen
+                st = st.copy(confirmPush = false, busy = true, busyLabel = "Uploading the branch", error = null)
+                scope.launch {
+                    runCatching { store.ticketPublish(id, st.prTitle, st.prBody) }
+                        .onSuccess { pr ->
+                            val r = st.review
+                            st = st.copy(busy = false, review = r?.copy(pr = pr, comment = if (pr.url != null) r.comment.replace("A pull request is on its way for review.", "Pull request for review: ${pr.url}") else r.comment))
+                        }
+                        .onFailure { fail(it, "Couldn't upload the branch.") }
+                }
+            },
+            onCopy = { label, text -> copyText(label, text); st = st.copy(copied = label) },
+            onShare = ::shareText,
+            onOpenUrl = { url -> runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } },
+            onSaveSetup = {
+                val patch = kotlinx.serialization.json.buildJsonObject {
+                    if (st.githubToken.isNotBlank()) put("github", kotlinx.serialization.json.buildJsonObject { put("token", kotlinx.serialization.json.JsonPrimitive(st.githubToken.trim())) })
+                    if (st.jiraUrl.isNotBlank() || st.jiraEmail.isNotBlank() || st.jiraToken.isNotBlank()) put("jira", kotlinx.serialization.json.buildJsonObject {
+                        put("baseUrl", kotlinx.serialization.json.JsonPrimitive(st.jiraUrl.trim()))
+                        put("email", kotlinx.serialization.json.JsonPrimitive(st.jiraEmail.trim()))
+                        if (st.jiraToken.isNotBlank()) put("token", kotlinx.serialization.json.JsonPrimitive(st.jiraToken.trim()))
+                    })
+                }
+                st = st.copy(busy = true, busyLabel = "Saving on the computer", error = null)
+                scope.launch {
+                    runCatching { store.setIntegrations(patch); store.ticketSetup() }
+                        .onSuccess { s -> st = st.copy(busy = false, setup = s, githubToken = "", jiraToken = "", setupNote = "Saved on the computer.") }
+                        .onFailure { fail(it, "Couldn't save. Only an admin can change trackers.") }
+                }
+            },
+            onTest = { kind ->
+                st = st.copy(busy = true, busyLabel = "Testing", error = null)
+                scope.launch {
+                    runCatching { store.testIntegration(kind) }
+                        .onSuccess { st = st.copy(busy = false, setupNote = it) }
+                        .onFailure { fail(it, "Test failed.") }
+                }
+            },
+        )
     }
 
     /** The computer's screen over WebRTC; the session lives as long as this screen is open. */

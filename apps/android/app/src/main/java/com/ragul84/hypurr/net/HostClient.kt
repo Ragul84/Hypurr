@@ -3,6 +3,12 @@ package com.ragul84.hypurr.net
 import com.ragul84.hypurr.data.DeviceIdentity
 import com.ragul84.hypurr.model.Backend
 import com.ragul84.hypurr.model.Bot
+import com.ragul84.hypurr.model.TicketSetup
+import com.ragul84.hypurr.model.TicketResolve
+import com.ragul84.hypurr.model.TicketPlanResult
+import com.ragul84.hypurr.model.TicketPlan
+import com.ragul84.hypurr.model.TicketReview
+import com.ragul84.hypurr.model.TicketPr
 import com.ragul84.hypurr.model.Computer
 import com.ragul84.hypurr.model.Entry
 import com.ragul84.hypurr.model.Hello
@@ -335,6 +341,40 @@ class HostClient(val transport: ChannelTransport) {
         call("issues", buildJsonObject { project?.let { put("project", it) } }, timeoutMs = 45_000)
 
     suspend fun taskCosts(): TaskCosts = call("taskCosts")
+
+    // Ticket to PR
+    suspend fun ticketSetup(): TicketSetup = call("ticketSetup", timeoutMs = 30_000)
+
+    suspend fun ticketResolve(input: String, project: String?): TicketResolve =
+        call("ticketResolve", buildJsonObject { put("input", input); project?.let { put("project", it) } }, timeoutMs = 45_000)
+
+    suspend fun ticketPlan(ticket: Issue, project: String): TicketPlanResult = call("ticketPlan", buildJsonObject {
+        put("ticket", HypurrJson.encodeToJsonElement(Issue.serializer(), ticket))
+        put("project", project)
+    }, timeoutMs = 180_000)
+
+    suspend fun ticketStart(ticket: Issue, plan: TicketPlan, project: String): Bot {
+        val res = transport.call("ticketStart", buildJsonObject {
+            put("ticket", HypurrJson.encodeToJsonElement(Issue.serializer(), ticket))
+            put("plan", HypurrJson.encodeToJsonElement(TicketPlan.serializer(), plan))
+            put("project", project)
+        }, timeoutMs = 120_000)
+        return HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("bot"))
+    }
+
+    suspend fun ticketReview(taskId: String): TicketReview =
+        call("ticketReview", buildJsonObject { put("taskId", taskId) }, timeoutMs = 180_000)
+
+    /** Uploads the branch and opens the PR. Only called from the Needs-you approval. */
+    suspend fun ticketPublish(taskId: String, title: String, body: String): TicketPr {
+        val res = transport.call("ticketPublish", buildJsonObject {
+            put("taskId", taskId)
+            put("approved", true)
+            put("title", title)
+            put("body", body)
+        }, timeoutMs = 120_000)
+        return HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("pr"))
+    }
 
     suspend fun saveTemplate(template: TaskTemplate): TaskTemplate {
         val res = transport.call("saveTemplate", HypurrJson.encodeToJsonElement(TaskTemplate.serializer(), template).jsonObject)
