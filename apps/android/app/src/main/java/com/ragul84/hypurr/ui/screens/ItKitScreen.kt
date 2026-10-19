@@ -25,6 +25,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.ragul84.hypurr.model.ItKit
@@ -94,7 +95,8 @@ fun ItKitScreen(
                                 Icon(signalIcon(SignalIcons.Docs), null, tint = c.text, modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(12.dp))
                                 Text(page.title, color = c.text, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                                Icon(signalIcon(SignalIcons.Chevron), null, tint = c.tertiary, modifier = Modifier.size(18.dp))
+                                Icon(signalIcon(SignalIcons.Chevron), null, tint = c.tertiary,
+                                    modifier = Modifier.size(18.dp).rotate(if (isOpen) 90f else 0f))
                             }
                             if (isOpen) {
                                 MarkdownText(page.markdown.substringAfter('\n').trim(), Modifier.padding(bottom = 14.dp))

@@ -161,6 +161,9 @@ fun SpendScreen(
                         }
                     }
                 }
+                pricing?.takeIf { it.plans.isNotEmpty() }?.let { pr ->
+                    item { PlansCard(pr, modifier = Modifier.padding(top = 0.dp)) }
+                }
                 if (byBot.isNotEmpty()) {
                     item { SectionHeader("By bot", Modifier.padding(start = 4.dp), action = "See all", trailingIcon = signalIcon(SignalIcons.Chevron)) { onTab(HomeTab.Tasks) } }
                     item {
@@ -181,9 +184,6 @@ fun SpendScreen(
                             }
                         }
                     }
-                }
-                pricing?.takeIf { it.plans.isNotEmpty() }?.let { pr ->
-                    item { PlansCard(pr, modifier = Modifier.padding(top = 8.dp)) }
                 }
                 item {
                     Text("Using your own Claude or OpenAI key? That's free here.", color = c.tertiary,

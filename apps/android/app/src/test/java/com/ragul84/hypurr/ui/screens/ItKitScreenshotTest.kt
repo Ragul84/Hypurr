@@ -101,7 +101,7 @@ class ItKitScreenshotTest {
     @Test fun adminRules() = shoot("itkit-admin-rules") { TeamAdminScreen(admin(AdminTab.Rules), {}, {}) }
 
     @Test fun adminAudit() = shoot("itkit-admin-audit") {
-        TeamAdminScreen(admin(AdminTab.Audit, "15 records, chain intact."), {}, {})
+        TeamAdminScreen(admin(AdminTab.Audit, "14 records, chain intact."), {}, {})
     }
 
     @Test fun spendPlans() = shoot("itkit-spend-plans") {

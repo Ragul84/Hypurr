@@ -31,7 +31,7 @@ import com.ragul84.hypurr.ui.theme.Hypurr
  * plan in use. Payments are not live until keys are set up, and the card says so.
  */
 @Composable
-fun PlansCard(pricing: Pricing, current: String = "free", modifier: Modifier = Modifier) {
+fun PlansCard(pricing: Pricing, current: String? = null, modifier: Modifier = Modifier) {
     val c = Hypurr.colors
     SignalCard(modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
