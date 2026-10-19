@@ -147,7 +147,7 @@ public enum BackendInfo {
         switch id {
         case "claude": "Claude Code"
         case "codex": "Codex"
-        case "opencode": "OpenCode"
+        case "hypurr-agent", "opencode": "Hypurr Agent"
         case "grok": "Grok Build"
         case "gemini": "Gemini CLI"
         default: "Custom agent"

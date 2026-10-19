@@ -391,7 +391,7 @@ fun agentName(backend: String): String? = when (backend.lowercase()) {
     "claude", "claude-code" -> "Claude Code"
     "codex" -> "Codex"
     "gemini" -> "Gemini CLI"
-    "hypurr-agent" -> "Hypurr Agent"
+    "hypurr-agent", "opencode" -> "Hypurr Agent"
     "cursor" -> "Cursor"
     else -> backend.replaceFirstChar { it.uppercase() }
 }
