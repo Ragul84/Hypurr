@@ -57,6 +57,7 @@ import com.ragul84.hypurr.net.LinkState
 import com.ragul84.hypurr.ui.screens.BotListScreen
 import com.ragul84.hypurr.ui.screens.HomeTab
 import com.ragul84.hypurr.ui.screens.TasksScreen
+import com.ragul84.hypurr.ui.screens.TriageScreen
 import com.ragul84.hypurr.ui.screens.SpendScreen
 import com.ragul84.hypurr.ui.screens.NeedsYouAsk
 import com.ragul84.hypurr.ui.screens.BuiltinInstallPrompt
@@ -87,6 +88,12 @@ class MainActivity : ComponentActivity() {
     private val app get() = application as HypurrApp
     private val pendingLink = MutableStateFlow<String?>(null)
     private val openBot = MutableStateFlow<String?>(null)
+    /** A log, stack trace, text file or screenshot shared into Hypurr (opens Fix from a log). */
+    private val sharedLog = MutableStateFlow<SharedLog?>(null)
+    private val triageImage = MutableStateFlow<Uri?>(null)
+    private val pickTriageImage = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        uri?.let { triageImage.value = it }
+    }
     private val scanned = MutableStateFlow<String?>(null)
 
     private val scan = registerForActivityResult(ScanContract()) { result -> result.contents?.let { scanned.value = it } }
@@ -165,7 +172,28 @@ class MainActivity : ComponentActivity() {
         // A pairing link fills the pairing screen; the user still confirms it with Pair.
         intent?.data?.takeIf { it.scheme == "hypurr" }?.let { pendingLink.value = it.toString() }
         intent?.getStringExtra(EXTRA_BOT)?.let { openBot.value = it }
+        if (intent?.action == Intent.ACTION_SEND) {
+            val type = intent.type.orEmpty()
+            @Suppress("DEPRECATION")
+            val stream = intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
+            val text = intent.getStringExtra(Intent.EXTRA_TEXT)
+            sharedLog.value = when {
+                type.startsWith("image/") && stream != null -> SharedLog(image = stream)
+                stream != null -> SharedLog(text = readText(stream), name = readFile(stream, "log.txt")?.name)
+                !text.isNullOrBlank() -> SharedLog(text = text)
+                else -> null
+            }
+        }
     }
+
+    /** A shared text file, up to 1 MB (logs beyond that keep their end, where errors are). */
+    private fun readText(uri: Uri): String? = runCatching {
+        contentResolver.openInputStream(uri)?.use { input ->
+            val bytes = input.readBytes()
+            val tail = if (bytes.size > 1_000_000) bytes.copyOfRange(bytes.size - 1_000_000, bytes.size) else bytes
+            String(tail, Charsets.UTF_8)
+        }
+    }.getOrNull()
 
     private fun askForNotifications() {
         if (Build.VERSION.SDK_INT >= 33) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -252,6 +280,8 @@ class MainActivity : ComponentActivity() {
         }
         var builtinBusy by remember { mutableStateOf(false) }
         var builtinError by remember { mutableStateOf<String?>(null) }
+        val incoming by sharedLog.collectAsState()
+        LaunchedEffect(incoming) { if (incoming != null) screen = "triage" }
         requested?.let {
             openBot.value = null
             screen = "chat:$it"
@@ -473,6 +503,108 @@ class MainActivity : ComponentActivity() {
                     }
                     SpendScreen(current.name, linkState, costs, bots, onTab = ::go)
                 }
+                target == "triage" -> {
+                    val projectName = projectFolder?.let { com.ragul84.hypurr.ui.screens.folderName(it) }
+                    var tr by remember { mutableStateOf(com.ragul84.hypurr.ui.screens.TriageUiState(projectName = projectName)) }
+                    val shared by sharedLog.collectAsState()
+                    val image by triageImage.collectAsState()
+                    suspend fun ocr(uri: Uri) {
+                        tr = tr.copy(busy = true, busyLabel = "Reading the screenshot", error = null)
+                        val text = com.ragul84.hypurr.triage.Ocr.read(this@MainActivity, uri)
+                        tr = if (text == null) tr.copy(busy = false, error = "Couldn't read any text in that image.")
+                        else tr.copy(busy = false, input = text, sourceLabel = "Screenshot · text read on this phone")
+                    }
+                    LaunchedEffect(shared) {
+                        val s = shared ?: return@LaunchedEffect
+                        sharedLog.value = null
+                        tr = com.ragul84.hypurr.ui.screens.TriageUiState(projectName = projectName)
+                        when {
+                            s.image != null -> ocr(s.image)
+                            s.text != null -> tr = tr.copy(input = s.text, sourceLabel = s.name?.let { "Shared file · $it" } ?: "Shared text")
+                        }
+                    }
+                    LaunchedEffect(image) {
+                        val u = image ?: return@LaunchedEffect
+                        triageImage.value = null
+                        ocr(u)
+                    }
+                    // What the computer will remove, shown before anything is explained.
+                    LaunchedEffect(tr.input) {
+                        if (tr.input.isBlank()) return@LaunchedEffect
+                        delay(500)
+                        runCatching { store.triageRedact(tr.input) }.onSuccess { tr = tr.copy(preview = it.redactions) }
+                    }
+                    fun explain(mode: String = "explain") {
+                        val previous = tr.result?.triage
+                        tr = tr.copy(busy = true, error = null, busyLabel = if (mode == "more") "Looking deeper" else "Reading the log")
+                        scope.launch {
+                            runCatching { store.triage(tr.input, projectFolder, mode, previous) }
+                                .onSuccess { tr = tr.copy(busy = false, result = it, ticket = it.ticket) }
+                                .onFailure { tr = tr.copy(busy = false, error = it.message ?: "Couldn't reach your computer.") }
+                        }
+                    }
+                    TriageScreen(
+                        tr,
+                        onBack = {
+                            when {
+                                tr.showTicket -> tr = tr.copy(showTicket = false)
+                                tr.result != null -> tr = tr.copy(result = null)
+                                else -> screen = "tasks"
+                            }
+                        },
+                        onChange = { tr = it },
+                        onPaste = {
+                            val item = getSystemService(ClipboardManager::class.java).primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)
+                            val uri = item?.uri
+                            if (uri != null && contentResolver.getType(uri)?.startsWith("image/") == true) scope.launch { ocr(uri) }
+                            else item?.coerceToText(this@MainActivity)?.toString()?.takeIf { it.isNotBlank() }?.let {
+                                tr = tr.copy(input = it, sourceLabel = "Pasted")
+                            }
+                        },
+                        onScreenshot = { pickTriageImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                        onFromProject = {
+                            val folder = projectFolder
+                            if (folder == null) {
+                                tr = tr.copy(error = "Pick a project folder first (You → Project folder).")
+                            } else {
+                                tr = tr.copy(pickingSource = true, sources = null)
+                                scope.launch {
+                                    runCatching { store.triageSources(folder) }
+                                        .onSuccess { tr = tr.copy(sources = it) }
+                                        .onFailure { tr = tr.copy(sources = emptyList(), error = it.message) }
+                                }
+                            }
+                        },
+                        onPickSource = { s ->
+                            val folder = projectFolder ?: return@TriageScreen
+                            tr = tr.copy(busy = true, busyLabel = "Fetching ${s.title}", pickingSource = false)
+                            scope.launch {
+                                runCatching { store.triageSource(folder, s.kind, s.id) }
+                                    .onSuccess { tr = tr.copy(busy = false, input = it, sourceLabel = (if (s.kind == "ci") "CI · " else "File · ") + s.title) }
+                                    .onFailure { tr = tr.copy(busy = false, error = it.message) }
+                            }
+                        },
+                        onExplain = { explain() },
+                        onMore = { explain("more") },
+                        onTicket = { tr = tr.copy(showTicket = true, copied = false) },
+                        onFixIt = {
+                            val goal = tr.result?.fixGoal ?: return@TriageScreen
+                            scope.launch {
+                                runCatching { store.startTask(goal, null, "", projectFolder, null) }
+                                    .onSuccess { screen = "chat:$it" }
+                                    .onFailure { tr = tr.copy(error = it.message ?: "Couldn't start the task.") }
+                            }
+                        },
+                        onCopyTicket = {
+                            getSystemService(ClipboardManager::class.java).setPrimaryClip(android.content.ClipData.newPlainText("Ticket", tr.ticket))
+                            tr = tr.copy(copied = true)
+                        },
+                        onShareTicket = {
+                            val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, tr.ticket)
+                            startActivity(Intent.createChooser(send, "Share ticket note"))
+                        },
+                    )
+                }
                 target == "tasks" -> {
                     val setup by store.setup.collectAsState()
                     LaunchedEffect(Unit) { store.loadSetup() }
@@ -494,6 +626,7 @@ class MainActivity : ComponentActivity() {
                         templates = templates,
                         recent = rosterOrder(bots.values),
                         onNewTask = { screen = "newtask" },
+                        onTriage = { screen = "triage" },
                         onOpenTemplate = { screen = "newtask" },
                         onOpenBot = { screen = "chat:${it.id}" },
                         onTab = ::go,
@@ -794,3 +927,6 @@ class MainActivity : ComponentActivity() {
         const val MAX_FILE = 100 * 1024 * 1024
     }
 }
+
+/** Something shared into Hypurr for Fix from a log. */
+data class SharedLog(val text: String? = null, val image: Uri? = null, val name: String? = null)

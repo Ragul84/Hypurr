@@ -54,6 +54,7 @@ fun TasksScreen(
     recent: List<Bot>,
     now: Long = System.currentTimeMillis(),
     onNewTask: () -> Unit = {},
+    onTriage: () -> Unit = {},
     onOpenTemplate: (TaskTemplate) -> Unit = {},
     onOpenBot: (Bot) -> Unit = {},
     onTab: (HomeTab) -> Unit = {},
@@ -72,6 +73,22 @@ fun TasksScreen(
             ) {
                 item {
                     PrimaryButton("New task", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Plus), onClick = onNewTask)
+                }
+                item {
+                    SignalCard(Modifier.fillMaxWidth().pressable("Fix from a log", onClick = onTriage)) {
+                        Row(Modifier.padding(horizontal = 14.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(c.surface2), contentAlignment = Alignment.Center) {
+                                Icon(signalIcon(SignalIcons.FixError), null, tint = c.text, modifier = Modifier.size(20.dp))
+                            }
+                            Spacer(Modifier.width(14.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("Fix from a log", color = c.text, style = MaterialTheme.typography.titleSmall)
+                                Text("Paste an error or share a screenshot; get the cause in plain words", color = c.tertiary,
+                                    style = MaterialTheme.typography.bodySmall)
+                            }
+                            Icon(signalIcon(SignalIcons.Chevron), null, tint = c.tertiary, modifier = Modifier.size(16.dp))
+                        }
+                    }
                 }
                 if (templates.isNotEmpty()) {
                     item { SectionHeader("Start from a template", Modifier.padding(start = 4.dp)) }

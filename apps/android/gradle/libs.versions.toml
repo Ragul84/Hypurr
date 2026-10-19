@@ -1,4 +1,5 @@
 [versions]
+mlkitText = "19.0.1"
 agp = "8.7.3"
 kotlin = "2.1.0"
 composeBom = "2024.12.01"
@@ -18,6 +19,7 @@ robolectric = "4.14.1"
 roborazzi = "1.39.0"
 
 [libraries]
+mlkit-text = { module = "com.google.android.gms:play-services-mlkit-text-recognition", version.ref = "mlkitText" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
 androidx-lifecycle-runtime = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }

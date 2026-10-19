@@ -590,3 +590,46 @@ data class Activity(
 
 /** "$4.20" for a limit; "No limit" for 0. */
 fun limitLabel(x: Double): String = if (x <= 0.0) "No limit" else "$" + String.format(java.util.Locale.US, "%.2f", x)
+
+// Fix from a log (host `triage`, `triageRedact`, `triageSources`, `triageSource`).
+
+@Serializable
+data class Redaction(val kind: String = "", val count: Int = 0, val hint: String = "")
+
+@Serializable
+data class CodePlace(val path: String = "", val line: Int = 0, val snippet: String = "", val note: String = "")
+
+@Serializable
+data class Triage(
+    val broke: String = "",
+    val cause: String = "",
+    val places: List<CodePlace> = emptyList(),
+    /** low | medium | high */
+    val confidence: String = "low",
+    val confidenceWhy: String = "",
+    val fix: List<String> = emptyList(),
+    val more: String = "",
+)
+
+@Serializable
+data class TriageResult(
+    val triage: Triage = Triage(),
+    /** `agent`, or `log` when only the first error line could be picked out. */
+    val by: String = "log",
+    val redactions: List<Redaction> = emptyList(),
+    val redactedText: String = "",
+    val ticket: String = "",
+    val fixGoal: String = "",
+)
+
+@Serializable
+data class RedactPreview(val text: String = "", val redactions: List<Redaction> = emptyList())
+
+@Serializable
+data class TriageSource(val kind: String = "", val id: String = "", val title: String = "", val detail: String = "", val at: Long = 0)
+
+@Serializable
+data class TriageSources(val sources: List<TriageSource> = emptyList())
+
+@Serializable
+data class TriageSourceText(val text: String = "")
