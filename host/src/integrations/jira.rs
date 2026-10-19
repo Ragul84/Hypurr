@@ -64,6 +64,20 @@ pub async fn issues(cfg: &JiraConfig) -> Result<Vec<Issue>> {
         .collect())
 }
 
+/// One ticket by key.
+pub async fn issue(cfg: &JiraConfig, key: &str) -> Result<Issue> {
+    let i =
+        check(get(cfg, &format!("/rest/api/3/issue/{key}?fields=summary,description")).send().await?, "Jira").await?;
+    Ok(Issue {
+        source: "jira".into(),
+        url: format!("{}/browse/{key}", cfg.base_url),
+        key: key.to_owned(),
+        title: i["fields"]["summary"].as_str().unwrap_or_default().to_owned(),
+        body: crate::agent::acp::truncate(&adf_text(&i["fields"]["description"]), 6000),
+        project: None,
+    })
+}
+
 pub async fn comment(cfg: &JiraConfig, key: &str, text: &str, link: Option<&str>) -> Result<()> {
     let mut content = vec![json!({"type": "paragraph", "content": [{"type": "text", "text": text}]})];
     if let Some(url) = link {

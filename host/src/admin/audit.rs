@@ -35,6 +35,8 @@ pub fn system(store: &Store, action: &str, target: &str, detail: Value) {
 const AUDITED: &[&str] = &[
     "startTask",
     "finishTask",
+    "ticketStart",
+    "ticketPublish",
     "rollbackTask",
     "taskCheckpoint",
     "respondPermission",
