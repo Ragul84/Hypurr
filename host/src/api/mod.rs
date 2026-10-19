@@ -669,6 +669,10 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
         }
         "rollbackTask" => crate::tasks::rollback(hub, str_arg(&b, "taskId")?, str_arg(&b, "checkpointId")?).await?,
         "finishTask" => crate::tasks::finish::finish(hub, str_arg(&b, "taskId")?, &b).await?,
+        "qaCases" => crate::qa::cases(hub, &b, &actor.key).await?,
+        "qaFrameworks" => crate::qa::detect(&b).await?,
+        "qaAutomate" => crate::qa::automate(hub, &b).await?,
+        "qaRun" => crate::qa::run(hub, &b).await?,
         "ticketSetup" => {
             let hub = hub.clone();
             tokio::task::spawn_blocking(move || crate::ticket::setup(&hub.store)).await?

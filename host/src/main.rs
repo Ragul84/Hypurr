@@ -8,6 +8,7 @@ mod hub;
 mod integrations;
 mod market;
 mod mcp;
+mod qa;
 mod remote;
 mod routines;
 mod screen;
