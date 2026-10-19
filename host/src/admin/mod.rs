@@ -230,6 +230,7 @@ const ADMIN_ONLY: &[&str] = &[
     "setTeam",
     "auditLog",
     "activity",
+    "teamStandup",
     "setIntegrations",
     "testIntegration",
     "saveProject",

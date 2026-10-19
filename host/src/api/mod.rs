@@ -707,6 +707,8 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
         "setPolicies" => crate::admin::set_policies(&hub.store, &b)?,
         "auditLog" => crate::admin::audit::list(&hub.store, &b)?,
         "activity" => crate::admin::activity::activity(&hub.store, &b)?,
+        "standup" => crate::standup::write(hub, &b, &actor.key).await?,
+        "teamStandup" => crate::standup::team(&hub.store)?,
         "setSafetySettings" => json!({"safety": crate::tasks::set_safety(&hub.store, &b)?}),
         // Non-sensitive local user preferences from the phone (tone + defaults for the agent).
         // Only fixed choices are kept (see `chat::profile`); an empty body clears it.

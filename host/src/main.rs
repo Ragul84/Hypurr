@@ -12,6 +12,7 @@ mod remote;
 mod routines;
 mod screen;
 mod service;
+mod standup;
 mod store;
 mod tasks;
 mod tui;
