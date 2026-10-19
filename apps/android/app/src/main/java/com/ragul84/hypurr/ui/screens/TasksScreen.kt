@@ -76,6 +76,22 @@ fun TasksScreen(
                     PrimaryButton("New task", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Plus), onClick = onNewTask)
                 }
                 item {
+                    SignalCard(Modifier.fillMaxWidth().pressable("Write tests", onClick = onQa)) {
+                        Row(Modifier.padding(horizontal = 14.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(c.surface2), contentAlignment = Alignment.Center) {
+                                Icon(signalIcon(SignalIcons.Tests), null, tint = c.text, modifier = Modifier.size(20.dp))
+                            }
+                            Spacer(Modifier.width(14.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("Write tests", color = c.text, style = MaterialTheme.typography.titleSmall)
+                                Text("Test cases from a ticket or requirements; export or automate them", color = c.tertiary,
+                                    style = MaterialTheme.typography.bodySmall)
+                            }
+                            Icon(signalIcon(SignalIcons.Chevron), null, tint = c.tertiary, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+                item {
                     SignalCard(Modifier.fillMaxWidth().pressable("Ticket to PR", onClick = onTicket)) {
                         Row(Modifier.padding(horizontal = 14.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                             Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(c.surface2), contentAlignment = Alignment.Center) {
@@ -92,23 +108,7 @@ fun TasksScreen(
                     }
                 }
                 if (templates.isNotEmpty()) {
-                    item {
-                    SignalCard(Modifier.fillMaxWidth().pressable("Write tests", onClick = onQa)) {
-                        Row(Modifier.padding(horizontal = 14.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(c.surface2), contentAlignment = Alignment.Center) {
-                                Icon(signalIcon(SignalIcons.Tests), null, tint = c.text, modifier = Modifier.size(20.dp))
-                            }
-                            Spacer(Modifier.width(14.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text("Write tests", color = c.text, style = MaterialTheme.typography.titleSmall)
-                                Text("Test cases from a ticket or requirements; export or automate them", color = c.tertiary,
-                                    style = MaterialTheme.typography.bodySmall)
-                            }
-                            Icon(signalIcon(SignalIcons.Chevron), null, tint = c.tertiary, modifier = Modifier.size(16.dp))
-                        }
-                    }
-                }
-                item { SectionHeader("Start from a template", Modifier.padding(start = 4.dp)) }
+                    item { SectionHeader("Start from a template", Modifier.padding(start = 4.dp)) }
                     item {
                         SignalCard(Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(horizontal = 14.dp, vertical = 4.dp)) {
