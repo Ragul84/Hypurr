@@ -708,6 +708,21 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
         "auditLog" => crate::admin::audit::list(&hub.store, &b)?,
         "activity" => crate::admin::activity::activity(&hub.store, &b)?,
         "setSafetySettings" => json!({"safety": crate::tasks::set_safety(&hub.store, &b)?}),
+        // Non-sensitive local user preferences from the phone (tone + defaults for the agent).
+        "setUserProfile" => {
+            let context = b["context"].as_str().unwrap_or("").trim().to_owned();
+            hub.store.kv_set("user.profile", &serde_json::to_string(&b)?)?;
+            if context.is_empty() {
+                let _ = hub.store.kv_set("user.profile.context", "");
+            } else {
+                hub.store.kv_set("user.profile.context", &context)?;
+            }
+            json!({"ok": true})
+        }
+        "userProfile" => {
+            let raw = hub.store.kv_get("user.profile").unwrap_or_else(|| "{}".into());
+            serde_json::from_str(&raw).unwrap_or_else(|_| json!({}))
+        },
         "registerDevice" => {
             let ticket = str_arg(&b, "ticket")?;
             if let Some(relay) = b["relay"].as_str().filter(|r| r.starts_with("https://")) {

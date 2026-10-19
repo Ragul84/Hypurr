@@ -141,6 +141,10 @@ pub fn render(store: &Store, cfg: &BotConfig) -> String {
         lines.push(skills);
     }
     let mut out = lines.join("\n");
+    if let Some(block) = store.kv_get("user.profile.context").filter(|s| !s.trim().is_empty()) {
+        out.push_str("\n\n");
+        out.push_str(&block);
+    }
     match Memory::for_bot(&cfg.id) {
         Ok(mem) => {
             let (section, _) = memory::render(&mem.recall(memory::RECENT_PROMPT_LIMIT), mem.location());

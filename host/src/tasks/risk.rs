@@ -27,6 +27,9 @@ pub struct Assessment {
     pub reasons: Vec<String>,
     /// Set when the safety net refuses the request without asking (plain reason).
     pub blocked: Option<String>,
+    /// Always surface a Needs-you card (outside project folder, deletes, pushes) — even if the bot is set to auto-approve.
+    #[serde(default)]
+    pub must_ask: bool,
 }
 
 /// A permission request, as the bot actor sees it.
@@ -112,7 +115,17 @@ pub fn assess(req: &Request) -> Assessment {
         }
     }
     let blocked = ranked.iter().find_map(|f| f.blocked.clone());
-    Assessment { risk, explain, reasons, blocked }
+    let must_ask = blocked.is_none()
+        && (risk >= Risk::High
+            || reasons.iter().any(|r| {
+                let l = r.to_lowercase();
+                l.contains("outside the project")
+                    || l.contains("can't be undone")
+                    || l.contains("force-push")
+                    || l.contains("protected branch")
+                    || l.contains("deleting")
+            }));
+    Assessment { risk, explain, reasons, blocked, must_ask }
 }
 
 fn join_and(items: &[&str]) -> String {
@@ -736,5 +749,27 @@ mod tests {
         assert_eq!(cmd("kubectl delete pod x").risk, Risk::High);
         assert_eq!(cmd("kubectl get pods").risk, Risk::Medium);
         assert_eq!(cmd("terraform apply").risk, Risk::High);
+    }
+
+    #[test]
+    fn outside_project_always_must_ask() {
+        let a = edit(&["/other/secret.txt"]);
+        assert_eq!(a.risk, Risk::High);
+        assert!(a.must_ask, "outside-folder edits must Needs-you even if bot is auto");
+        assert!(a.reasons.iter().any(|r| r.to_lowercase().contains("outside")));
+    }
+
+    #[test]
+    fn inside_project_low_edit_need_not_force_ask() {
+        let a = edit(&["/work/repo/src/main.rs"]);
+        assert!(!a.must_ask || a.risk < Risk::High);
+    }
+
+    #[test]
+    fn push_and_delete_force_must_ask() {
+        let a = cmd("git push origin main");
+        assert!(a.must_ask || a.blocked.is_some(), "push should ask or block");
+        let a = cmd("rm -rf /tmp/stuff");
+        assert!(a.must_ask || a.risk >= Risk::High);
     }
 }

@@ -178,6 +178,13 @@ class HostClient(val transport: ChannelTransport) {
         transport.call("deleteBot", buildJsonObject { put("botId", botId) })
     }
 
+    /** Local user preferences for agent tone/defaults (non-sensitive). */
+    suspend fun setUserProfile(body: JsonObject): JsonObject =
+        transport.call("setUserProfile", body).jsonObject
+
+    suspend fun userProfile(): JsonObject =
+        transport.call("userProfile").jsonObject
+
     /** Folders on the computer (`path` null = home). */
     suspend fun listDirs(path: String?): DirListing = call("listDirs", buildJsonObject { path?.let { put("path", it) } })
 

@@ -67,6 +67,9 @@ import com.ragul84.hypurr.model.TaskTemplate
 import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.delay
 import com.ragul84.hypurr.ui.screens.PairingScreen
+import com.ragul84.hypurr.ui.screens.ProjectFolderPickerScreen
+import com.ragul84.hypurr.ui.screens.OnboardingScreen
+import com.ragul84.hypurr.data.UserProfile
 import com.ragul84.hypurr.ui.screens.PairingUiState
 import com.ragul84.hypurr.ui.screens.SettingsScreen
 import com.ragul84.hypurr.ui.screens.AdminTab
@@ -197,6 +200,16 @@ class MainActivity : ComponentActivity() {
         scan?.let {
             scanned.value = null
             pair(it)
+        }
+
+        val profile by store.userProfile.collectAsState()
+        if (!profile.completed) {
+            OnboardingScreen(
+                initial = profile,
+                onFinished = { store.setUserProfile(it) },
+                onSkipAll = { store.setUserProfile(UserProfile(completed = true, skipped = true)) },
+            )
+            return
         }
 
         val current = computer
@@ -366,9 +379,13 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 target == "screen" -> ScreenRoute(store, current.name) { screen = "list" }
-                target == "newtask" -> {
+                target == "newtask" || target.startsWith("newtask:") -> {
                     val setup by store.setup.collectAsState()
-                    var task by remember { mutableStateOf(NewTaskUiState()) }
+                    val userProfile by store.userProfile.collectAsState()
+                    val seededPath = target.removePrefix("newtask").removePrefix(":").ifBlank { null }
+                    var task by remember(target) {
+                        mutableStateOf(NewTaskUiState(project = seededPath))
+                    }
                     LaunchedEffect(Unit) { store.loadSetup() }
                     // Ask the host for its pick as the user types (debounced).
                     LaunchedEffect(task.goal, task.template, task.issue, setup) {
@@ -412,6 +429,7 @@ class MainActivity : ComponentActivity() {
                                 else task.copy(goal = text)
                             }
                         },
+                        onPickFolder = { screen = "folderpick" },
                         onPickIssue = {
                             task = task.copy(pickingIssue = true, issues = null)
                             scope.launch {
@@ -448,14 +466,54 @@ class MainActivity : ComponentActivity() {
                             HomeTab.You -> "settings"
                         }
                     }
+                    val userProfile by store.userProfile.collectAsState()
+                    val templates = setup?.templates.orEmpty().let { list ->
+                        val order = userProfile.preferTemplateIds(list.map { it.id })
+                        list.sortedBy { order.indexOf(it.id).let { i -> if (i < 0) 999 else i } }
+                    }
                     TasksScreen(
                         current.name, linkState,
-                        templates = setup?.templates.orEmpty(),
+                        templates = templates,
                         recent = rosterOrder(bots.values),
                         onNewTask = { screen = "newtask" },
                         onOpenTemplate = { screen = "newtask" },
                         onOpenBot = { screen = "chat:${it.id}" },
                         onTab = ::go,
+                    )
+                }
+                target == "profile" -> {
+                    val userProfile by store.userProfile.collectAsState()
+                    OnboardingScreen(
+                        initial = userProfile,
+                        editing = true,
+                        onFinished = {
+                            store.setUserProfile(it)
+                            screen = "settings"
+                        },
+                        onSkipAll = { screen = "settings" },
+                    )
+                }
+                target == "folderpick" -> {
+                    val setup by store.setup.collectAsState()
+                    var browsing by remember { mutableStateOf<com.ragul84.hypurr.model.DirListing?>(null) }
+                    var selected by remember { mutableStateOf<String?>(null) }
+                    LaunchedEffect(Unit) { store.loadSetup() }
+                    ProjectFolderPickerScreen(
+                        projects = setup?.projects.orEmpty(),
+                        browsing = browsing,
+                        selectedPath = selected,
+                        onBack = { screen = "newtask" },
+                        onBrowse = { path ->
+                            scope.launch {
+                                runCatching { store.listDirs(path) }
+                                    .onSuccess { browsing = it }
+                            }
+                        },
+                        onSelect = { selected = it },
+                        onConfirm = {
+                            // Stash path for NewTask via a simple approach: open newtask with query
+                            screen = "newtask:${selected.orEmpty()}"
+                        },
                     )
                 }
                 target == "settings" -> {
@@ -471,10 +529,13 @@ class MainActivity : ComponentActivity() {
                         store.loadIntegrations()
                         store.loadCosts()
                     }
+                    val userProfile by store.userProfile.collectAsState()
                     SettingsScreen(
                         SettingsUiState(current, linkState, theme, dynamic, notify, app.pushAvailable, BuildConfig.VERSION_NAME,
                             safety = setup?.safety, customTemplates = setup?.templates.orEmpty().filter { !it.builtin },
-                            integrations = integrations, costs = costs, testResults = tests, you = you),
+                            integrations = integrations, costs = costs, testResults = tests, you = you, profile = userProfile),
+                        onEditProfile = { screen = "profile" },
+                        onClearProfile = { store.clearUserProfile() },
                         onTeamAdmin = { screen = "team" },
                         onBack = { screen = "list" },
                         showHomeTabs = true,

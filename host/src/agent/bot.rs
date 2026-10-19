@@ -1321,7 +1321,8 @@ impl Actor {
         }
         // The team's approval level: at or above it, even auto-approve bots ask.
         let policies = crate::admin::Policies::load(&self.hub.store);
-        let must_ask = policies.ask_from_risk(&self.hub.store).is_some_and(|from| assessment.risk >= from);
+        let must_ask = assessment.must_ask
+            || policies.ask_from_risk(&self.hub.store).is_some_and(|from| assessment.risk >= from);
         if crate::admin::needs_admin(&self.hub.store, assessment.risk) {
             data["needsAdmin"] = true.into();
         }
