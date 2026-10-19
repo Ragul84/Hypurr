@@ -46,11 +46,14 @@ fun ProjectFolderPickerScreen(
     browsing: DirListing?,
     selectedPath: String?,
     title: String = "Project folder",
-    subtitle: String = "The agent reads freely here. Edits stay on a safe branch. Outside this folder, deletes, pushes, and risky commands need your OK.",
+    subtitle: String = "Pick the folder this work is about.",
     onBack: () -> Unit,
     onBrowse: (String?) -> Unit,
     onSelect: (String) -> Unit,
     onConfirm: () -> Unit,
+    /** Shown when picking can wait (right after pairing). */
+    onLater: (() -> Unit)? = null,
+    confirmLabel: String? = null,
 ) {
     val c = Hypurr.colors
     Column(Modifier.fillMaxSize().background(c.bg).safeDrawingPadding().padding(horizontal = 16.dp)) {
@@ -60,7 +63,9 @@ fun ProjectFolderPickerScreen(
             Text(title, style = MaterialTheme.typography.headlineSmall, color = c.text, fontWeight = FontWeight.ExtraBold)
         }
         Text(subtitle, color = c.secondary, style = MaterialTheme.typography.bodyMedium)
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(12.dp))
+        ScopeRules()
+        Spacer(Modifier.height(20.dp))
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (projects.isNotEmpty()) {
                 item {
@@ -133,10 +138,54 @@ fun ProjectFolderPickerScreen(
             item { Spacer(Modifier.height(80.dp)) }
         }
         FlowButton(
-            if (selectedPath != null) "Continue with ${selectedPath.substringAfterLast('/')}" else "Pick a folder first",
-            Modifier.fillMaxWidth().padding(bottom = 16.dp),
+            if (selectedPath != null) confirmLabel ?: "Use ${folderName(selectedPath)}" else "Pick a folder first",
+            Modifier.fillMaxWidth().padding(bottom = if (onLater != null) 10.dp else 16.dp),
             enabled = selectedPath != null,
             onClick = onConfirm,
         )
+        if (onLater != null) {
+            SoftButton("Later", Modifier.fillMaxWidth().padding(bottom = 16.dp), tint = c.text, onClick = onLater)
+        }
+    }
+}
+
+fun folderName(path: String): String = path.trimEnd('/').substringAfterLast('/').ifEmpty { path }
+
+/** What the folder means for the agent, in three short lines. */
+@Composable
+private fun ScopeRules() {
+    val c = Hypurr.colors
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        listOf(
+            SunfieldIcons.Explain to "Reads inside it freely",
+            SunfieldIcons.Shield to "Edits go to a safe branch, one-tap undo",
+            SunfieldIcons.NeedsYou to "Outside it, deletes, pushes: asks you first",
+        ).forEach { (icon, text) ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(sunfieldVector(icon), null, tint = c.accent, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(text, color = c.text, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+/** The task's project folder as a small tappable chip (chat header, new task, settings). */
+@Composable
+fun FolderChip(path: String, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+    val c = Hypurr.colors
+    Row(
+        modifier.clip(RoundedCornerShape(50)).background(c.accent.copy(alpha = 0.12f))
+            .then(if (onClick != null) Modifier.pressable("Project folder ${folderName(path)}", onClick = onClick) else Modifier)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(sunfieldVector(SunfieldIcons.Folder), null, tint = c.accent, modifier = Modifier.size(15.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(folderName(path), color = c.text, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, maxLines = 1)
+        if (onClick != null) {
+            Spacer(Modifier.width(8.dp))
+            Text("Change", color = c.accent, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+        }
     }
 }

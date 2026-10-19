@@ -138,6 +138,14 @@ class HypurrStore(
         scope.launch { syncUserProfileToHost() }
     }
 
+    /** Default project folder for new tasks (picked after pairing or under You). */
+    val projectFolder = MutableStateFlow(persistence.read(PROJECT_FOLDER)?.takeIf { it.isNotBlank() })
+
+    fun setProjectFolder(path: String?) {
+        projectFolder.value = path?.takeIf { it.isNotBlank() }
+        persistence.write(PROJECT_FOLDER, projectFolder.value)
+    }
+
     fun clearUserProfile() {
         setUserProfile(UserProfile(completed = true, skipped = true))
     }
@@ -155,7 +163,6 @@ class HypurrStore(
                 p.experience?.let { put("experience", it) }
                 putJsonArray("stacks") { p.stacks.forEach { add(JsonPrimitive(it)) } }
                 putJsonArray("goals") { p.goals.forEach { add(JsonPrimitive(it)) } }
-                put("context", p.agentContextBlock())
             })
         }
     }
@@ -237,6 +244,7 @@ class HypurrStore(
         _threads.value = emptyMap()
         _files.value = emptyMap()
         _hello.value = null
+        setProjectFolder(null)
     }
 
     /** Sync, then follow the event stream; a dropped channel resubscribes from the last rev. */
@@ -582,6 +590,7 @@ class HypurrStore(
         const val DYNAMIC = "dynamicColor"
         const val NOTIFY = "notifications"
         const val USER_PROFILE = "user.profile"
+        const val PROJECT_FOLDER = "project.folder"
         /** Pictures larger than this show as file cards instead of previews. */
         const val MAX_PREVIEW = 20L * 1024 * 1024
     }

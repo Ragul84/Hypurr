@@ -110,6 +110,8 @@ fun NewTaskScreen(
     onAddImage: () -> Unit = {},
     onPaste: () -> Unit = {},
     onPickIssue: () -> Unit = {},
+    /** Opens the project-folder picker (folders listed by the computer). */
+    onPickFolder: () -> Unit = {},
 ) {
     val c = Hypurr.colors
     val template = state.selectedTemplate
@@ -174,7 +176,7 @@ fun NewTaskScreen(
                     Field(state.input, "Paste it here", minHeight = 88.dp, mono = true) { onChange(state.copy(input = it, error = null)) }
                 }
             }
-            Plan(state, onChange)
+            Plan(state, onChange, onPickFolder)
             AnimatedVisibility(state.error != null) {
                 Text(state.error.orEmpty(), color = c.danger, style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(top = 12.dp, start = 6.dp))
@@ -216,7 +218,7 @@ private fun TemplateCard(t: TaskTemplate, selected: Boolean, modifier: Modifier,
 /** Hypurr's pick of project and agent, why, and the safety promise. Each pick can be changed in place. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Plan(state: NewTaskUiState, onChange: (NewTaskUiState) -> Unit) {
+private fun Plan(state: NewTaskUiState, onChange: (NewTaskUiState) -> Unit, onPickFolder: () -> Unit) {
     val c = Hypurr.colors
     var choosing by remember { mutableStateOf<String?>(null) }
     Text("HYPURR'S PLAN", color = c.tertiary, style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
@@ -232,9 +234,12 @@ private fun Plan(state: NewTaskUiState, onChange: (NewTaskUiState) -> Unit) {
                         choosing = null
                     }
                 }
-                if (state.setup?.projects.isNullOrEmpty()) {
-                    Text("No projects yet. Add one on your computer, or create a bot in a project folder.", color = c.secondary,
-                        style = MaterialTheme.typography.bodySmall)
+                state.projectPath?.takeIf { p -> state.setup?.projects.orEmpty().none { it.path == p } }?.let { p ->
+                    Choice(folderName(p), true) { choosing = null }
+                }
+                Choice("Browse folders…", false) {
+                    choosing = null
+                    onPickFolder()
                 }
             }
         }

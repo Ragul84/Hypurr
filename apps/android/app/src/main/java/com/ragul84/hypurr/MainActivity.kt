@@ -65,6 +65,7 @@ import com.ragul84.hypurr.ui.screens.NewTaskScreen
 import com.ragul84.hypurr.ui.screens.NewTaskUiState
 import com.ragul84.hypurr.model.TaskTemplate
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import kotlinx.coroutines.delay
 import com.ragul84.hypurr.ui.screens.PairingScreen
 import com.ragul84.hypurr.ui.screens.ProjectFolderPickerScreen
@@ -175,6 +176,7 @@ class MainActivity : ComponentActivity() {
         val computer by store.computer.collectAsState()
         val scope = rememberCoroutineScope()
         var pairing by remember { mutableStateOf(PairingUiState()) }
+        var justPaired by remember { mutableStateOf(false) }
         val link by pendingLink.collectAsState()
         val scan by scanned.collectAsState()
 
@@ -186,6 +188,7 @@ class MainActivity : ComponentActivity() {
             scope.launch {
                 pairing = try {
                     store.pair(text)
+                    justPaired = true
                     askForNotifications()
                     PairingUiState()
                 } catch (e: Exception) {
@@ -237,13 +240,26 @@ class MainActivity : ComponentActivity() {
         val requested by openBot.collectAsState()
         val you by store.you.collectAsState()
         var screen by rememberSaveable { mutableStateOf("list") }
+        // The new-task draft survives a trip to the folder picker.
+        var taskDraft by remember { mutableStateOf<NewTaskUiState?>(null) }
+        val projectFolder by store.projectFolder.collectAsState()
+        // Right after pairing, ask once which folder the agent may work in (can wait).
+        LaunchedEffect(justPaired) {
+            if (justPaired) {
+                justPaired = false
+                if (projectFolder == null) screen = "folderpick:pair"
+            }
+        }
         var builtinBusy by remember { mutableStateOf(false) }
         var builtinError by remember { mutableStateOf<String?>(null) }
         requested?.let {
             openBot.value = null
             screen = "chat:$it"
         }
-        BackHandler(screen != "list") { screen = parentOf(screen) }
+        BackHandler(screen != "list") {
+            if (screen == "newtask") taskDraft = null
+            screen = parentOf(screen)
+        }
 
         AnimatedContent(
             screen,
@@ -320,6 +336,7 @@ class MainActivity : ComponentActivity() {
                         onOpenThread = { e -> screen = "thread:$id:${e.id}" },
                         onReact = { e, emoji -> scope.launch { runCatching { store.react(e.id, emoji) } } },
                         onEdit = if (you?.canAct != false) ({ screen = "edit:$id" }) else null,
+                        onChangeFolder = if (you?.canAct != false && !bot.isGroup) ({ screen = "folderpick:chat:$id" }) else null,
                     )
                 }
                 target == "bot:new" || target == "group:new" || target.startsWith("edit:") -> {
@@ -379,13 +396,10 @@ class MainActivity : ComponentActivity() {
                     )
                 }
                 target == "screen" -> ScreenRoute(store, current.name) { screen = "list" }
-                target == "newtask" || target.startsWith("newtask:") -> {
+                target == "newtask" -> {
                     val setup by store.setup.collectAsState()
-                    val userProfile by store.userProfile.collectAsState()
-                    val seededPath = target.removePrefix("newtask").removePrefix(":").ifBlank { null }
-                    var task by remember(target) {
-                        mutableStateOf(NewTaskUiState(project = seededPath))
-                    }
+                    var task by remember { mutableStateOf(taskDraft ?: NewTaskUiState(project = projectFolder)) }
+                    SideEffect { taskDraft = task }
                     LaunchedEffect(Unit) { store.loadSetup() }
                     // Ask the host for its pick as the user types (debounced).
                     LaunchedEffect(task.goal, task.template, task.issue, setup) {
@@ -407,13 +421,17 @@ class MainActivity : ComponentActivity() {
                                 try {
                                     val botId = store.startTask(task.goal, task.template, task.input, task.projectPath, task.agentId,
                                         task.files, task.issue)
+                                    taskDraft = null
                                     screen = "chat:$botId"
                                 } catch (e: Exception) {
                                     task = task.copy(busy = false, error = e.message ?: "Couldn't start the task.")
                                 }
                             }
                         },
-                        onBack = { screen = "list" },
+                        onBack = {
+                            taskDraft = null
+                            screen = "list"
+                        },
                         onAddImage = { pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                         onPaste = {
                             // An image on the clipboard becomes an attachment; text goes where the error belongs.
@@ -429,7 +447,7 @@ class MainActivity : ComponentActivity() {
                                 else task.copy(goal = text)
                             }
                         },
-                        onPickFolder = { screen = "folderpick" },
+                        onPickFolder = { screen = "folderpick:newtask" },
                         onPickIssue = {
                             task = task.copy(pickingIssue = true, issues = null)
                             scope.launch {
@@ -493,27 +511,59 @@ class MainActivity : ComponentActivity() {
                         onSkipAll = { screen = "settings" },
                     )
                 }
-                target == "folderpick" -> {
+                target.startsWith("folderpick:") -> {
+                    // folderpick:newtask | folderpick:settings | folderpick:pair | folderpick:chat:<botId>
+                    val mode = target.removePrefix("folderpick:")
+                    val back = when {
+                        mode == "newtask" -> "newtask"
+                        mode == "settings" -> "settings"
+                        mode.startsWith("chat:") -> mode
+                        else -> "list"
+                    }
                     val setup by store.setup.collectAsState()
                     var browsing by remember { mutableStateOf<com.ragul84.hypurr.model.DirListing?>(null) }
-                    var selected by remember { mutableStateOf<String?>(null) }
-                    LaunchedEffect(Unit) { store.loadSetup() }
+                    var selected by remember {
+                        mutableStateOf(if (mode == "newtask") taskDraft?.project ?: projectFolder else projectFolder)
+                    }
+                    fun browse(path: String?) {
+                        scope.launch { runCatching { store.listDirs(path) }.onSuccess { browsing = it } }
+                    }
+                    LaunchedEffect(Unit) {
+                        store.loadSetup()
+                        if (store.setup.value?.projects.isNullOrEmpty()) browse(null)
+                    }
                     ProjectFolderPickerScreen(
                         projects = setup?.projects.orEmpty(),
                         browsing = browsing,
                         selectedPath = selected,
-                        onBack = { screen = "newtask" },
-                        onBrowse = { path ->
-                            scope.launch {
-                                runCatching { store.listDirs(path) }
-                                    .onSuccess { browsing = it }
-                            }
+                        subtitle = when {
+                            mode == "pair" -> "Which folder should agents work in? You can change it anytime under You."
+                            mode == "settings" -> "New tasks start in this folder."
+                            mode.startsWith("chat:") -> "Pick a folder for a new task. This chat keeps its own folder."
+                            else -> "Pick the folder this task is about."
                         },
+                        confirmLabel = if (mode.startsWith("chat:")) selected?.let { "New task in ${com.ragul84.hypurr.ui.screens.folderName(it)}" } else null,
+                        onBack = { screen = back },
+                        onBrowse = ::browse,
                         onSelect = { selected = it },
                         onConfirm = {
-                            // Stash path for NewTask via a simple approach: open newtask with query
-                            screen = "newtask:${selected.orEmpty()}"
+                            val path = selected ?: return@ProjectFolderPickerScreen
+                            when {
+                                mode == "newtask" -> {
+                                    taskDraft = (taskDraft ?: NewTaskUiState()).copy(project = path)
+                                    screen = "newtask"
+                                }
+                                mode.startsWith("chat:") -> {
+                                    taskDraft = NewTaskUiState(project = path)
+                                    screen = "newtask"
+                                }
+                                else -> {
+                                    store.setProjectFolder(path)
+                                    screen = back
+                                }
+                            }
                         },
+                        onLater = if (mode == "pair") ({ screen = "list" }) else null,
                     )
                 }
                 target == "settings" -> {
@@ -533,8 +583,10 @@ class MainActivity : ComponentActivity() {
                     SettingsScreen(
                         SettingsUiState(current, linkState, theme, dynamic, notify, app.pushAvailable, BuildConfig.VERSION_NAME,
                             safety = setup?.safety, customTemplates = setup?.templates.orEmpty().filter { !it.builtin },
-                            integrations = integrations, costs = costs, testResults = tests, you = you, profile = userProfile),
+                            integrations = integrations, costs = costs, testResults = tests, you = you, profile = userProfile,
+                            projectFolder = projectFolder),
                         onEditProfile = { screen = "profile" },
+                        onPickFolder = { screen = "folderpick:settings" },
                         onClearProfile = { store.clearUserProfile() },
                         onTeamAdmin = { screen = "team" },
                         onBack = { screen = "list" },
@@ -665,7 +717,10 @@ class MainActivity : ComponentActivity() {
     private fun parentOf(screen: String): String = when {
         screen.startsWith("thread:") -> "chat:" + screen.split(':')[1]
         screen.startsWith("edit:") -> "chat:" + screen.removePrefix("edit:")
-        screen == "team" -> "settings"
+        screen == "team" || screen == "profile" -> "settings"
+        screen == "folderpick:settings" -> "settings"
+        screen == "folderpick:newtask" -> "newtask"
+        screen.startsWith("folderpick:chat:") -> screen.removePrefix("folderpick:")
         screen == "spend" || screen == "tasks" -> "list"
         else -> "list"
     }

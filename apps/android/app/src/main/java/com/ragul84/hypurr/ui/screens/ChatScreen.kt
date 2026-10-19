@@ -157,12 +157,15 @@ fun ChatScreen(
     /** Opens the bot's (or group's) settings; null hides it. */
     onEdit: (() -> Unit)? = null,
     initialActionsFor: String? = null,
+    /** Opens the folder picker (a new task in another folder); null hides "Change". */
+    onChangeFolder: (() -> Unit)? = null,
 ) {
     val c = Hypurr.colors
     val inThread = threadRoot != null
     val chat = entries.filter { it.isChat }.reversed()
     val list = rememberLazyListState()
     val task = bot.task.takeIf { !inThread }
+    val folder = (task?.project?.takeIf { it.isNotBlank() } ?: bot.cwd.takeIf { it.isNotBlank() && !bot.isGroup })?.takeIf { !inThread }
     var checkpointsOpen by remember { mutableStateOf(initialCheckpointsOpen) }
     var actionsFor by remember { mutableStateOf(initialActionsFor?.let { id -> (entries + listOfNotNull(threadRoot)).firstOrNull { it.id == id } }) }
     var viewing by remember { mutableStateOf<Attachment?>(null) }
@@ -172,7 +175,7 @@ fun ChatScreen(
             Modifier.fillMaxSize(),
             state = list,
             reverseLayout = true,
-            contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = if (task != null) 168.dp else 112.dp,
+            contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = (if (task != null) 168.dp else 112.dp) + (if (folder != null) 40.dp else 0.dp),
                 bottom = if (composer.files.isEmpty()) 108.dp else 176.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -196,7 +199,7 @@ fun ChatScreen(
             } else if (chat.isEmpty()) item(key = "empty") { EmptyChat(bot, bots) }
         }
         // Sunfield header: sunflower ground, chunky ink tiles — no glass scrim.
-        Column(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 10.dp)) {
+        Column(Modifier.fillMaxWidth().background(c.bg).statusBarsPadding().padding(horizontal = 12.dp, vertical = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             InkTile(sunfieldVector(SunfieldIcons.Back), "Back", onClick = onBack)
             Spacer(Modifier.width(8.dp))
@@ -227,6 +230,7 @@ fun ChatScreen(
             }
         }
         if (task != null) TaskStrip(task) { checkpointsOpen = true }
+        if (folder != null) FolderChip(folder, Modifier.padding(top = 8.dp), onClick = onChangeFolder)
         }
         Composer(draft, onDraftChange, onSend, Modifier.align(Alignment.BottomCenter), composer, images, onAttach, onRemoveFile,
             if (inThread) "Reply in thread" else if (bot.isGroup) "Message ${bot.name}" else "Ask ${bot.name}…")

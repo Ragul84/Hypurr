@@ -3,9 +3,11 @@ package com.ragul84.hypurr.data
 import kotlinx.serialization.Serializable
 
 /**
- * Local-only first-run profile (Persistence / SharedPreferences).
+ * Optional first-run profile, kept on this phone (app-private storage).
  * Never collects employee ID, company, salary, or other sensitive identifiers.
- * Synced to the host as non-sensitive agent context (tone + defaults).
+ * Only the fixed choices are sent to the computer, which renders its own agent guidance
+ * (host `chat::profile`): plain words + test-first + stricter approvals for cautious
+ * profiles, terse replies for comfortable developers.
  */
 @Serializable
 data class UserProfile(
@@ -18,39 +20,6 @@ data class UserProfile(
 ) {
     val hasAnswers: Boolean
         get() = role != null || experience != null || stacks.isNotEmpty() || goals.isNotEmpty()
-
-    /** Plain prompt block for the host / agent. */
-    fun agentContextBlock(): String {
-        if (!hasAnswers) return ""
-        val lines = mutableListOf("User preferences (local profile — adapt tone and defaults):")
-        role?.let { lines += "- Role: $it" }
-        experience?.let { lines += "- Coding experience: $it" }
-        if (stacks.isNotEmpty()) lines += "- Main stack: ${stacks.joinToString(", ")}"
-        if (goals.isNotEmpty()) lines += "- Mostly wants to: ${goals.joinToString(", ")}"
-        when {
-            isNewAndCautious -> {
-                lines += "- Prefer plain explanations, short steps, and test-first suggestions."
-                lines += "- Ask before risky edits, deletes, pushes, or work outside the project folder."
-            }
-            isComfortableDev -> {
-                lines += "- Prefer terse replies; fewer confirmations for routine low-risk edits inside the project."
-            }
-            else -> lines += "- Keep replies phone-friendly and clear."
-        }
-        return lines.joinToString("\n")
-    }
-
-    val isNewAndCautious: Boolean
-        get() = experience.equals("New", true) ||
-            role in listOf("Tester/QA", "Student", "Support", "Manager")
-
-    val isComfortableDev: Boolean
-        get() = experience.equals("Comfortable", true) &&
-            role in listOf("Developer", "DevOps")
-
-    /** Default bot permission: cautious roles ask; comfortable devs may auto low-risk. */
-    val suggestedPermission: String
-        get() = if (isComfortableDev) "auto" else "ask"
 
     /** Template id preference order for Tasks. */
     fun preferTemplateIds(ids: List<String>): List<String> {

@@ -84,6 +84,10 @@ data class SettingsUiState(
     val testResults: Map<String, String> = emptyMap(),
     /** This phone's role on the computer; null until the host says. */
     val you: com.ragul84.hypurr.model.Actor? = null,
+    /** The optional first-run profile (local to this phone). */
+    val profile: com.ragul84.hypurr.data.UserProfile? = null,
+    /** Default project folder for new tasks; null = none picked. */
+    val projectFolder: String? = null,
 )
 
 @Composable
@@ -100,6 +104,9 @@ fun SettingsScreen(
     onIntegrations: (JsonObject) -> Unit = {},
     onTestIntegration: (String) -> Unit = {},
     onTeamAdmin: () -> Unit = {},
+    onEditProfile: () -> Unit = {},
+    onClearProfile: () -> Unit = {},
+    onPickFolder: () -> Unit = {},
     showHomeTabs: Boolean = false,
     onTab: (HomeTab) -> Unit = {},
 ) {
@@ -129,6 +136,17 @@ fun SettingsScreen(
             Detail("Direct", state.computer.urls.joinToString("\n").ifEmpty { "None" })
             Detail("Cloud relay", state.computer.cloud ?: "Off on this computer")
             SoftButton("Forget this computer", Modifier.fillMaxWidth().padding(top = 6.dp), tint = c.danger, onClick = onForget)
+        }
+        state.profile?.let { ProfileSection(it, onEditProfile, onClearProfile) }
+        Section("Project folder") {
+            Text("New tasks start here. The agent reads inside it freely; anything outside it, deletes and pushes ask you first.",
+                color = c.secondary, style = MaterialTheme.typography.bodySmall)
+            if (state.projectFolder != null) {
+                FolderChip(state.projectFolder, onClick = onPickFolder)
+                Text(state.projectFolder, color = c.tertiary, fontFamily = FontFamily.Monospace, fontSize = 12.sp, maxLines = 2)
+            } else {
+                SoftButton("Pick a folder", Modifier.fillMaxWidth(), icon = sunfieldVector(SunfieldIcons.Folder), onClick = onPickFolder)
+            }
         }
         Section("Team") {
             Row(Modifier.fillMaxWidth().pressable("Team admin", onClick = onTeamAdmin), verticalAlignment = Alignment.CenterVertically) {
@@ -437,6 +455,34 @@ private fun Spending(costs: TaskCosts) {
             try {
                 ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
             } catch (_: Exception) { }
+        }
+    }
+}
+
+/** You tab: what the agent knows about you, with edit and delete. */
+@Composable
+private fun ProfileSection(p: com.ragul84.hypurr.data.UserProfile, onEdit: () -> Unit, onClear: () -> Unit) {
+    val c = Hypurr.colors
+    var confirm by remember { mutableStateOf(false) }
+    Section("Your profile") {
+        if (p.hasAnswers) {
+            p.role?.let { Detail("Role", it) }
+            p.experience?.let { Detail("Experience", it) }
+            if (p.stacks.isNotEmpty()) Detail("Stack", p.stacks.joinToString(", "))
+            if (p.goals.isNotEmpty()) Detail("Mostly", p.goals.joinToString(", "))
+        } else {
+            Text("Not set. Answer four quick questions so agents match your tone and pick the right templates.",
+                color = c.secondary, style = MaterialTheme.typography.bodySmall)
+        }
+        Text("Stays on this phone. Only these choices go to your computer, to tune the agent.",
+            color = c.tertiary, style = MaterialTheme.typography.labelSmall)
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            SoftButton(if (p.hasAnswers) "Edit" else "Set up", Modifier.weight(1f), onClick = onEdit)
+            if (p.hasAnswers) {
+                SoftButton(if (confirm) "Tap again to delete" else "Delete", Modifier.weight(1f), tint = c.danger) {
+                    if (confirm) { onClear(); confirm = false } else confirm = true
+                }
+            }
         }
     }
 }
