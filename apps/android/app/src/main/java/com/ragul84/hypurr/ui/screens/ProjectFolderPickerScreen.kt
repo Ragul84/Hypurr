@@ -27,13 +27,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ragul84.hypurr.model.DirListing
 import com.ragul84.hypurr.model.Project
-import com.ragul84.hypurr.ui.CreamPlate
-import com.ragul84.hypurr.ui.FlowButton
+import com.ragul84.hypurr.ui.SignalCard
+import com.ragul84.hypurr.ui.PrimaryButton
 import com.ragul84.hypurr.ui.IconBubble
 import com.ragul84.hypurr.ui.SoftButton
-import com.ragul84.hypurr.ui.SunfieldIcons
+import com.ragul84.hypurr.ui.SignalIcons
 import com.ragul84.hypurr.ui.pressable
-import com.ragul84.hypurr.ui.sunfieldVector
+import com.ragul84.hypurr.ui.signalIcon
 import com.ragul84.hypurr.ui.theme.Hypurr
 
 /**
@@ -58,9 +58,9 @@ fun ProjectFolderPickerScreen(
     val c = Hypurr.colors
     Column(Modifier.fillMaxSize().background(c.bg).safeDrawingPadding().padding(horizontal = 16.dp)) {
         Row(Modifier.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconBubble(sunfieldVector(SunfieldIcons.Back), "Back", onClick = onBack)
+            IconBubble(signalIcon(SignalIcons.Back), "Back", onClick = onBack)
             Spacer(Modifier.width(12.dp))
-            Text(title, style = MaterialTheme.typography.headlineSmall, color = c.text, fontWeight = FontWeight.ExtraBold)
+            Text(title, style = MaterialTheme.typography.headlineSmall, color = c.text)
         }
         Text(subtitle, color = c.secondary, style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.height(12.dp))
@@ -69,50 +69,49 @@ fun ProjectFolderPickerScreen(
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (projects.isNotEmpty()) {
                 item {
-                    Text("Saved projects", color = c.tertiary, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                    com.ragul84.hypurr.ui.Eyebrow("Saved projects", Modifier.padding(start = 4.dp))
                 }
                 items(projects, key = { it.path }) { p ->
                     val on = p.path == selectedPath
-                    CreamPlate(Modifier.fillMaxWidth().pressable(p.name) { onSelect(p.path) }) {
-                        Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(sunfieldVector(SunfieldIcons.Folder), null, tint = if (on) c.accent else c.secondary, modifier = Modifier.size(22.dp))
+                    SignalCard(Modifier.fillMaxWidth().pressable(p.name) { onSelect(p.path) }, emphasis = on) {
+                        Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(signalIcon(SignalIcons.Folder), null, tint = c.text, modifier = Modifier.size(22.dp))
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
-                                Text(p.name, color = c.text, fontWeight = FontWeight.Bold)
-                                Text(p.path, color = c.tertiary, style = MaterialTheme.typography.labelSmall, fontFamily = FontFamily.Monospace, maxLines = 1)
+                                Text(p.name, color = c.text, style = MaterialTheme.typography.titleMedium)
+                                Text(p.path, color = c.tertiary, style = com.ragul84.hypurr.ui.theme.SignalType.mono, maxLines = 1)
                             }
-                            if (on) Icon(sunfieldVector(SunfieldIcons.Check), null, tint = c.accent, modifier = Modifier.size(18.dp))
+                            if (on) Icon(signalIcon(SignalIcons.Check), null, tint = c.accent, modifier = Modifier.size(18.dp))
                         }
                     }
                 }
             }
             item {
-                Text("Browse computer", color = c.tertiary, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(top = 8.dp))
+                com.ragul84.hypurr.ui.Eyebrow("Browse computer", Modifier.padding(start = 4.dp, top = 8.dp))
             }
             item {
                 SoftButton(
                     if (browsing == null) "Open folders…" else "Refresh",
                     Modifier.fillMaxWidth(),
-                    icon = sunfieldVector(SunfieldIcons.Folder),
+                    icon = signalIcon(SignalIcons.Folder),
                 ) { onBrowse(browsing?.path) }
             }
             browsing?.let { listing ->
                 item {
-                    CreamPlate(Modifier.fillMaxWidth()) {
+                    SignalCard(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 listing.parent?.let {
-                                    IconBubble(sunfieldVector(SunfieldIcons.Back), "Up", size = 34.dp) { onBrowse(it) }
+                                    IconBubble(signalIcon(SignalIcons.Back), "Up", size = 34.dp) { onBrowse(it) }
                                     Spacer(Modifier.width(8.dp))
                                 }
-                                Text(listing.path, color = c.text, fontFamily = FontFamily.Monospace,
-                                    style = MaterialTheme.typography.bodySmall, maxLines = 2, modifier = Modifier.weight(1f))
+                                Text(listing.path, color = c.text, style = com.ragul84.hypurr.ui.theme.SignalType.mono, maxLines = 2,
+                                    modifier = Modifier.weight(1f))
                             }
                             SoftButton(
                                 if (selectedPath == listing.path) "Selected" else "Use this folder",
                                 Modifier.fillMaxWidth(),
-                                icon = sunfieldVector(SunfieldIcons.Check),
+                                icon = signalIcon(SignalIcons.Check),
                                 tint = if (selectedPath == listing.path) c.accent else c.text,
                             ) { onSelect(listing.path) }
                             if (listing.dirs.isEmpty()) {
@@ -125,9 +124,10 @@ fun ProjectFolderPickerScreen(
                                             .padding(horizontal = 10.dp, vertical = 10.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                     ) {
-                                        Icon(sunfieldVector(SunfieldIcons.Folder), null, tint = c.accent, modifier = Modifier.size(18.dp))
+                                        Icon(signalIcon(SignalIcons.Folder), null, tint = c.text, modifier = Modifier.size(18.dp))
                                         Spacer(Modifier.width(10.dp))
-                                        Text(d.name, color = c.text, modifier = Modifier.weight(1f))
+                                        Text(d.name, color = c.text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                                        Icon(signalIcon(SignalIcons.Chevron), null, tint = c.tertiary, modifier = Modifier.size(16.dp))
                                     }
                                 }
                             }
@@ -137,7 +137,7 @@ fun ProjectFolderPickerScreen(
             }
             item { Spacer(Modifier.height(80.dp)) }
         }
-        FlowButton(
+        PrimaryButton(
             if (selectedPath != null) confirmLabel ?: "Use ${folderName(selectedPath)}" else "Pick a folder first",
             Modifier.fillMaxWidth().padding(bottom = if (onLater != null) 10.dp else 16.dp),
             enabled = selectedPath != null,
@@ -151,41 +151,37 @@ fun ProjectFolderPickerScreen(
 
 fun folderName(path: String): String = path.trimEnd('/').substringAfterLast('/').ifEmpty { path }
 
-/** What the folder means for the agent, in three short lines. */
+/** What the folder means for the agent: three short lines in one card. Red marks the line that asks you. */
 @Composable
 private fun ScopeRules() {
     val c = Hypurr.colors
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        listOf(
-            SunfieldIcons.Explain to "Reads inside it freely",
-            SunfieldIcons.Shield to "Edits go to a safe branch, one-tap undo",
-            SunfieldIcons.NeedsYou to "Outside it, deletes, pushes: asks you first",
-        ).forEach { (icon, text) ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(sunfieldVector(icon), null, tint = c.accent, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(text, color = c.text, style = MaterialTheme.typography.bodySmall)
+    SignalCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            listOf(
+                Triple(SignalIcons.Review, "Reads inside it freely", false),
+                Triple(SignalIcons.Branch, "Edits go to a safe branch, one-tap undo", false),
+                Triple(SignalIcons.NeedsYou, "Outside it, deletes, pushes: asks you first", true),
+            ).forEach { (icon, text, needs) ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(signalIcon(icon), null, tint = if (needs) c.needsText else c.text, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text(text, color = c.text, style = MaterialTheme.typography.bodyMedium)
+                }
             }
         }
     }
 }
 
-/** The task's project folder as a small tappable chip (chat header, new task, settings). */
+/** The task's project folder as a mono chip (chat header, new task, settings), like the mockup's ~/work/shop-web. */
 @Composable
 fun FolderChip(path: String, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
-    val c = Hypurr.colors
-    Row(
-        modifier.clip(RoundedCornerShape(50)).background(c.accent.copy(alpha = 0.12f))
-            .then(if (onClick != null) Modifier.pressable("Project folder ${folderName(path)}", onClick = onClick) else Modifier)
-            .padding(horizontal = 12.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(sunfieldVector(SunfieldIcons.Folder), null, tint = c.accent, modifier = Modifier.size(15.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(folderName(path), color = c.text, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, maxLines = 1)
-        if (onClick != null) {
-            Spacer(Modifier.width(8.dp))
-            Text("Change", color = c.accent, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-        }
-    }
+    com.ragul84.hypurr.ui.SignalChip(signalIcon(SignalIcons.Folder), shortPath(path), modifier, onClick = onClick)
+}
+
+/** /Users/arjun/work/shop-web → ~/work/shop-web; long paths keep their last two parts. */
+fun shortPath(path: String): String {
+    val home = Regex("^/(Users|home)/[^/]+").find(path)?.value
+    val p = if (home != null) "~" + path.removePrefix(home) else path
+    val parts = p.trimEnd('/').split('/')
+    return if (parts.size > 4) "…/" + parts.takeLast(2).joinToString("/") else p.trimEnd('/')
 }

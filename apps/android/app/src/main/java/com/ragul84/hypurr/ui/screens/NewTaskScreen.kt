@@ -1,6 +1,6 @@
 package com.ragul84.hypurr.ui.screens
-import com.ragul84.hypurr.ui.SunfieldIcons
-import com.ragul84.hypurr.ui.sunfieldVector
+import com.ragul84.hypurr.ui.SignalIcons
+import com.ragul84.hypurr.ui.signalIcon
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
@@ -60,10 +60,10 @@ import com.ragul84.hypurr.model.IssueList
 import com.ragul84.hypurr.model.TaskRoute
 import com.ragul84.hypurr.model.TaskSetup
 import com.ragul84.hypurr.model.TaskTemplate
-import com.ragul84.hypurr.ui.FlowButton
-import com.ragul84.hypurr.ui.FlowOrb
+import com.ragul84.hypurr.ui.PrimaryButton
+import com.ragul84.hypurr.ui.motion.DotCatMark
 import com.ragul84.hypurr.ui.IconBubble
-import com.ragul84.hypurr.ui.glass
+import com.ragul84.hypurr.ui.panel
 import com.ragul84.hypurr.ui.pressable
 import com.ragul84.hypurr.ui.templateIcon
 import com.ragul84.hypurr.ui.theme.Hypurr
@@ -117,7 +117,7 @@ fun NewTaskScreen(
     val template = state.selectedTemplate
     Column(Modifier.fillMaxSize().background(c.bg).safeDrawingPadding().imePadding()) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconBubble(sunfieldVector(SunfieldIcons.Back), "Back", onClick = onBack)
+            IconBubble(signalIcon(SignalIcons.Back), "Back", onClick = onBack)
             Spacer(Modifier.width(12.dp))
             Text("New task", style = MaterialTheme.typography.headlineMedium, color = c.text)
         }
@@ -130,9 +130,9 @@ fun NewTaskScreen(
             // Screenshot / error paste, and tickets.
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ActionChip(sunfieldVector(SunfieldIcons.Image), "Add screenshot", onAddImage)
-                ActionChip(sunfieldVector(SunfieldIcons.Paste), "Paste", onPaste)
-                if (state.setup?.integrations?.anyIssues == true) ActionChip(sunfieldVector(SunfieldIcons.Check), "From an issue", onPickIssue)
+                ActionChip(signalIcon(SignalIcons.Image), "Add screenshot", onAddImage)
+                ActionChip(signalIcon(SignalIcons.Paste), "Paste", onPaste)
+                if (state.setup?.integrations?.anyIssues == true) ActionChip(signalIcon(SignalIcons.Check), "From an issue", onPickIssue)
             }
             AnimatedVisibility(state.files.isNotEmpty(), enter = expandVertically(Motion.spatialDefault()) + fadeIn(),
                 exit = shrinkVertically() + fadeOut()) {
@@ -156,7 +156,7 @@ fun NewTaskScreen(
                 modifier = Modifier.padding(start = 6.dp, top = 20.dp, bottom = 8.dp))
             val templates = state.setup?.templates.orEmpty()
             if (templates.isEmpty()) {
-                Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) { FlowOrb(32.dp) }
+                Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) { DotCatMark(32.dp) }
             }
             templates.chunked(2).forEach { row ->
                 Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -183,8 +183,8 @@ fun NewTaskScreen(
             }
             Spacer(Modifier.height(16.dp))
         }
-        FlowButton(if (state.busy) "Starting…" else "Start task", Modifier.fillMaxWidth().padding(16.dp),
-            enabled = state.canStart, icon = sunfieldVector(SunfieldIcons.Play), onClick = onStart)
+        PrimaryButton(if (state.busy) "Starting…" else "Start task", Modifier.fillMaxWidth().padding(16.dp),
+            enabled = state.canStart, icon = signalIcon(SignalIcons.Play), onClick = onStart)
     }
 }
 
@@ -193,7 +193,7 @@ private fun Field(value: String, hint: String, minHeight: androidx.compose.ui.un
     val c = Hypurr.colors
     val style = MaterialTheme.typography.bodyLarge.copy(color = c.text, fontFamily = if (mono) FontFamily.Monospace else null,
         fontSize = if (mono) 14.sp else MaterialTheme.typography.bodyLarge.fontSize)
-    Box(Modifier.fillMaxWidth().heightIn(min = minHeight).glass(RoundedCornerShape(22.dp), c.surface).padding(16.dp)) {
+    Box(Modifier.fillMaxWidth().heightIn(min = minHeight).panel(RoundedCornerShape(22.dp), c.surface).padding(16.dp)) {
         if (value.isEmpty()) Text(hint, color = c.tertiary, style = style.copy(color = c.tertiary))
         BasicTextField(value, onChange, textStyle = style, cursorBrush = SolidColor(c.accent), modifier = Modifier.fillMaxWidth())
     }
@@ -203,7 +203,7 @@ private fun Field(value: String, hint: String, minHeight: androidx.compose.ui.un
 private fun TemplateCard(t: TaskTemplate, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val c = Hypurr.colors
     val fill by animateColorAsState(if (selected) c.accent.copy(alpha = 0.16f) else c.surface, Motion.effects(), label = "tpl")
-    Column(modifier.heightIn(min = 104.dp).glass(RoundedCornerShape(22.dp), fill)
+    Column(modifier.heightIn(min = 104.dp).panel(RoundedCornerShape(22.dp), fill)
         .pressable(t.title, role = Role.RadioButton, onClick = onClick).padding(14.dp)) {
         Box(Modifier.size(34.dp).clip(RoundedCornerShape(11.dp))
             .background(if (selected) SolidColor(c.accent) else SolidColor(c.accent.copy(alpha = 0.12f))), contentAlignment = Alignment.Center) {
@@ -223,9 +223,9 @@ private fun Plan(state: NewTaskUiState, onChange: (NewTaskUiState) -> Unit, onPi
     var choosing by remember { mutableStateOf<String?>(null) }
     Text("HYPURR'S PLAN", color = c.tertiary, style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
         modifier = Modifier.padding(start = 6.dp, top = 20.dp, bottom = 8.dp))
-    Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(20.dp), c.surface).padding(16.dp).animateContentSize(Motion.spatialDefault()),
+    Column(Modifier.fillMaxWidth().panel(RoundedCornerShape(20.dp), c.surface).padding(16.dp).animateContentSize(Motion.spatialDefault()),
         verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        PlanRow(sunfieldVector(SunfieldIcons.Folder), "Project", state.projectName ?: "Pick a project") { choosing = if (choosing == "project") null else "project" }
+        PlanRow(signalIcon(SignalIcons.Folder), "Project", state.projectName ?: "Pick a project") { choosing = if (choosing == "project") null else "project" }
         AnimatedVisibility(choosing == "project") {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 state.setup?.projects.orEmpty().forEach { p ->
@@ -243,7 +243,7 @@ private fun Plan(state: NewTaskUiState, onChange: (NewTaskUiState) -> Unit, onPi
                 }
             }
         }
-        PlanRow(sunfieldVector(SunfieldIcons.Bots), "Agent", state.agentName ?: "No agent installed") { choosing = if (choosing == "agent") null else "agent" }
+        PlanRow(signalIcon(SignalIcons.Bots), "Agent", state.agentName ?: "No agent installed") { choosing = if (choosing == "agent") null else "agent" }
         AnimatedVisibility(choosing == "agent") {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 state.setup?.agents.orEmpty().forEach { a ->
@@ -261,7 +261,7 @@ private fun Plan(state: NewTaskUiState, onChange: (NewTaskUiState) -> Unit, onPi
         if (!reason.isNullOrEmpty()) Text(reason, color = c.secondary, style = MaterialTheme.typography.bodySmall)
         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.success.copy(alpha = 0.10f)).padding(12.dp),
             verticalAlignment = Alignment.Top) {
-            Icon(sunfieldVector(SunfieldIcons.Shield), null, tint = c.success, modifier = Modifier.size(18.dp))
+            Icon(signalIcon(SignalIcons.Shield), null, tint = c.success, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(10.dp))
             Text("Runs on its own branch with a checkpoint after every step. You can go back with one tap, and main stays untouched.",
                 color = c.text, style = MaterialTheme.typography.bodySmall)
@@ -310,19 +310,19 @@ private fun FileChip(file: PickedFile, onRemove: () -> Unit) {
     val bitmap = remember(file) {
         if (file.isImage) runCatching { BitmapFactory.decodeByteArray(file.bytes, 0, file.bytes.size)?.asImageBitmap() }.getOrNull() else null
     }
-    Box(Modifier.size(width = if (bitmap != null) 76.dp else 150.dp, height = 76.dp).glass(RoundedCornerShape(20.dp), c.surface)) {
+    Box(Modifier.size(width = if (bitmap != null) 76.dp else 150.dp, height = 76.dp).panel(RoundedCornerShape(20.dp), c.surface)) {
         if (bitmap != null) {
             Image(bitmap, file.name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         } else {
             Row(Modifier.fillMaxSize().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(sunfieldVector(SunfieldIcons.Docs), null, tint = c.accent, modifier = Modifier.size(20.dp))
+                Icon(signalIcon(SignalIcons.Docs), null, tint = c.accent, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(file.name, color = c.text, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
         Box(Modifier.align(Alignment.TopEnd).padding(4.dp).size(22.dp).clip(RoundedCornerShape(50))
             .background(c.bg.copy(alpha = 0.85f)).pressable("Remove ${file.name}", onClick = onRemove), contentAlignment = Alignment.Center) {
-            Icon(sunfieldVector(SunfieldIcons.Close), null, tint = c.text, modifier = Modifier.size(14.dp))
+            Icon(signalIcon(SignalIcons.Close), null, tint = c.text, modifier = Modifier.size(14.dp))
         }
     }
 }
@@ -338,7 +338,7 @@ private fun SourceTag(source: String) {
 @Composable
 private fun IssueRow(issue: Issue, modifier: Modifier = Modifier, onRemove: (() -> Unit)? = null, onClick: (() -> Unit)? = null) {
     val c = Hypurr.colors
-    Row(modifier.fillMaxWidth().glass(RoundedCornerShape(20.dp), c.surface)
+    Row(modifier.fillMaxWidth().panel(RoundedCornerShape(20.dp), c.surface)
         .then(if (onClick != null) Modifier.pressable("${issue.key} ${issue.title}", onClick = onClick) else Modifier)
         .padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
@@ -350,7 +350,7 @@ private fun IssueRow(issue: Issue, modifier: Modifier = Modifier, onRemove: (() 
             Text(issue.title, color = c.text, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 4.dp))
         }
-        if (onRemove != null) IconBubble(sunfieldVector(SunfieldIcons.Close), "Remove the issue", onClick = onRemove)
+        if (onRemove != null) IconBubble(signalIcon(SignalIcons.Close), "Remove the issue", onClick = onRemove)
     }
 }
 
@@ -358,14 +358,14 @@ private fun IssueRow(issue: Issue, modifier: Modifier = Modifier, onRemove: (() 
 @Composable
 private fun IssuePicker(list: IssueList?, onPick: (Issue) -> Unit, onClose: () -> Unit) {
     val c = Hypurr.colors
-    Column(Modifier.fillMaxWidth().padding(top = 10.dp).glass(RoundedCornerShape(22.dp), c.surface).padding(12.dp),
+    Column(Modifier.fillMaxWidth().padding(top = 10.dp).panel(RoundedCornerShape(22.dp), c.surface).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Pick an issue", color = c.text, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-            IconBubble(sunfieldVector(SunfieldIcons.Close), "Close", onClick = onClose)
+            IconBubble(signalIcon(SignalIcons.Close), "Close", onClick = onClose)
         }
         when {
-            list == null -> Box(Modifier.fillMaxWidth().height(64.dp), contentAlignment = Alignment.Center) { FlowOrb(28.dp) }
+            list == null -> Box(Modifier.fillMaxWidth().height(64.dp), contentAlignment = Alignment.Center) { DotCatMark(28.dp) }
             list.issues.isEmpty() && list.errors.isEmpty() ->
                 Text("No open issues assigned to you.", color = c.secondary, style = MaterialTheme.typography.bodySmall)
         }

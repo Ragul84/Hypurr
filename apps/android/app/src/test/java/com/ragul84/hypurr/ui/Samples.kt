@@ -52,17 +52,17 @@ object Samples {
     )
 
     val reviewer = Bot(id = "b1", name = "Reviewer", avatarColor = "sunflower", avatarShape = "squircle", status = "needsInput",
-        activity = "Run the host tests?", lastAt = NOW - 2 * MIN, unread = 1, cwd = "/Users/kevin/hypurr")
+        activity = "Run the host tests?", lastAt = NOW - 2 * MIN, unread = 1, cwd = "/Users/kevin/hypurr", backend = "codex")
     val bots = listOf(
         reviewer,
         Bot(id = "b2", name = "Frontend", avatarColor = "ink", avatarShape = "squircle", status = "working",
-            activity = "Editing App.tsx", lastAt = NOW - 1 * MIN, pinned = true),
+            activity = "Writing tests for the refund flow", lastAt = NOW - 1 * MIN, pinned = true, backend = "claude", cwd = "/Users/kevin/code/payments-api"),
         Bot(id = "b3", name = "Docs", avatarColor = "asphalt", avatarShape = "pebble", lastMessage = "Updated the setup guide for Android.",
-            lastAt = NOW - 42 * MIN, unread = 2),
+            lastAt = NOW - 42 * MIN, unread = 2, backend = "claude", cwd = "/Users/kevin/code/docs-site"),
         Bot(id = "b4", name = "Release", avatarColor = "orange", avatarShape = "hex", status = "error",
-            lastMessage = "Notarization timed out", lastAt = NOW - 3 * 60 * MIN),
+            lastMessage = "Notarization timed out", lastAt = NOW - 3 * 60 * MIN, backend = "codex", cwd = "/Users/kevin/code/release"),
         Bot(id = "b5", name = "Host", avatarColor = "green", avatarShape = "tablet", lastMessage = "All 178 tests pass.",
-            lastAt = NOW - 26 * 60 * MIN),
+            lastAt = NOW - 26 * 60 * MIN, backend = "codex", cwd = "/Users/kevin/hypurr/host"),
     )
 
     private var seq = 0L
@@ -105,7 +105,7 @@ object Samples {
         ),
     )
     val taskBot = Bot(id = "b6", name = "Write tests: the checkout button", avatarColor = "green", avatarShape = "squircle",
-        status = "needsInput", activity = "Needs approval: Clean build", lastAt = NOW - 1 * MIN, task = task,
+        status = "needsInput", activity = "Needs approval: Clean build", lastAt = NOW - 1 * MIN, task = task, backend = "claude",
         description = "the checkout button", cwd = "/Users/priya/.hypurr/worktrees/t1")
     val botsWithTask = listOf(taskBot) + bots.drop(1)
 

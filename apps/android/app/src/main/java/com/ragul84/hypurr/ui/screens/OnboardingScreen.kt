@@ -39,14 +39,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.ragul84.hypurr.data.UserProfile
-import com.ragul84.hypurr.ui.CatFace
-import com.ragul84.hypurr.ui.CreamPlate
-import com.ragul84.hypurr.ui.FlowButton
-import com.ragul84.hypurr.ui.InkTile
+import com.ragul84.hypurr.ui.DotCat
+import com.ragul84.hypurr.ui.SignalCard
+import com.ragul84.hypurr.ui.PrimaryButton
+import com.ragul84.hypurr.ui.IconTile
 import com.ragul84.hypurr.ui.SoftButton
-import com.ragul84.hypurr.ui.SunfieldIcons
+import com.ragul84.hypurr.ui.SignalIcons
 import com.ragul84.hypurr.ui.pressable
-import com.ragul84.hypurr.ui.sunfieldVector
+import com.ragul84.hypurr.ui.signalIcon
 import com.ragul84.hypurr.ui.theme.Hypurr
 import com.ragul84.hypurr.ui.theme.Motion
 
@@ -64,14 +64,14 @@ private val ExperienceHints = mapOf(
 )
 
 private fun goalIcon(goal: String) = when (goal) {
-    "Write tests" -> SunfieldIcons.Tests
-    "Fix bugs" -> SunfieldIcons.FixError
-    "Review PRs" -> SunfieldIcons.Review
-    else -> SunfieldIcons.Explain
+    "Write tests" -> SignalIcons.Tests
+    "Fix bugs" -> SignalIcons.FixError
+    "Review PRs" -> SignalIcons.Review
+    else -> SignalIcons.Explain
 }
 
 /**
- * First-run Sunfield onboarding: four short, optional questions. "Skip for now" on every step.
+ * First-run Signal onboarding: four short, optional questions. "Skip for now" on every step.
  * Answers stay on this phone (only the fixed choices go to the computer to tune the agent).
  * Never asks for employee ID, company, salary or anything else sensitive.
  */
@@ -114,39 +114,36 @@ fun OnboardingScreen(
         // Top row: back, progress, and the step count.
         Row(Modifier.fillMaxWidth().padding(top = 12.dp).height(40.dp), verticalAlignment = Alignment.CenterVertically) {
             if (step > 0) {
-                InkTile(sunfieldVector(SunfieldIcons.Back), "Back") { step-- }
+                IconTile(signalIcon(SignalIcons.Back), "Back") { step-- }
                 Spacer(Modifier.width(14.dp))
             }
             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 steps.indices.forEach { i ->
                     Box(
-                        Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(50))
-                            .background(if (i <= step) c.accent else c.text.copy(alpha = 0.14f)),
+                        Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(50))
+                            .background(if (i <= step) c.accent else c.dotOff),
                     )
                 }
             }
             Spacer(Modifier.width(14.dp))
-            Text("${step + 1} of ${steps.size}", color = c.secondary, style = MaterialTheme.typography.labelLarge)
+            Text("${step + 1} / ${steps.size}", color = c.text, style = com.ragul84.hypurr.ui.theme.SignalType.figureSmall)
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             Spacer(Modifier.height(28.dp))
             if (step == 0) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
-                        Modifier.size(52.dp).clip(RoundedCornerShape(16.dp)).background(if (c.dark) c.surface else Color(0xFF15130F)),
+                        Modifier.size(52.dp).clip(RoundedCornerShape(16.dp)).background(c.surface).border(1.dp, c.border, RoundedCornerShape(16.dp)),
                         contentAlignment = Alignment.Center,
-                    ) { CatFace(if (c.dark) c.text else Color(0xFFFFF8E8), 32.dp) }
+                    ) { DotCat(c.text, 32.dp, off = c.dotOff) }
                     Spacer(Modifier.width(14.dp))
-                    Text(
-                        if (editing) "Your profile" else "Tune Hypurr to you",
-                        style = MaterialTheme.typography.titleMedium, color = c.secondary, fontWeight = FontWeight.Bold,
-                    )
+                    com.ragul84.hypurr.ui.Eyebrow(if (editing) "Your profile" else "Tune Hypurr to you", color = c.secondary)
                 }
                 Spacer(Modifier.height(20.dp))
             }
             AnimatedContent(current, transitionSpec = { fadeIn(Motion.effects()) togetherWith fadeOut(Motion.effects()) }, label = "step") { s ->
                 Column {
-                    Text(s.title, style = MaterialTheme.typography.headlineMedium, color = c.text, fontWeight = FontWeight.ExtraBold)
+                    Text(s.title, style = MaterialTheme.typography.headlineLarge, color = c.text)
                     Spacer(Modifier.height(6.dp))
                     Text(s.hint, style = MaterialTheme.typography.bodyLarge, color = c.secondary)
                     Spacer(Modifier.height(24.dp))
@@ -184,7 +181,7 @@ fun OnboardingScreen(
             }
             Spacer(Modifier.height(24.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                androidx.compose.material3.Icon(sunfieldVector(SunfieldIcons.Shield), null, tint = c.secondary, modifier = Modifier.size(16.dp))
+                androidx.compose.material3.Icon(signalIcon(SignalIcons.Shield), null, tint = c.secondary, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(
                     "Stays on this phone. No employee ID, company or salary, ever.",
@@ -193,7 +190,7 @@ fun OnboardingScreen(
             }
             Spacer(Modifier.height(16.dp))
         }
-        FlowButton(
+        PrimaryButton(
             when {
                 last && editing -> "Save"
                 last -> "Done"
@@ -211,28 +208,31 @@ fun OnboardingScreen(
     }
 }
 
-/** A cream answer tile; the chosen one turns forest green. */
+/** An answer card; the chosen one gets the 1.5dp ink border and a filled check, like the mockup's live bot card. */
 @Composable
 private fun OptionTile(label: String, hint: String?, icon: Int?, on: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val c = Hypurr.colors
-    CreamPlate(modifier.pressable(label, onClick = onClick), RoundedCornerShape(18.dp)) {
-        Box(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
-                .background(if (on) c.accent else Color.Transparent)
-                .padding(horizontal = 16.dp, vertical = if (hint != null) 16.dp else 18.dp),
+    SignalCard(modifier.pressable(label, onClick = onClick), RoundedCornerShape(20.dp), emphasis = on) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = if (hint != null) 15.dp else 17.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (icon != null) {
-                    Icon(sunfieldVector(icon), null, tint = if (on) c.onAccent else c.text, modifier = Modifier.size(22.dp))
-                    Spacer(Modifier.width(10.dp))
+            if (icon != null) {
+                Icon(signalIcon(icon), null, tint = c.text, modifier = Modifier.size(22.dp))
+                Spacer(Modifier.width(10.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                Text(label, color = c.text, style = MaterialTheme.typography.titleMedium)
+                if (hint != null) {
+                    Text(hint, color = c.tertiary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 2.dp))
                 }
-                Column(Modifier.weight(1f)) {
-                    Text(label, color = if (on) c.onAccent else c.text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    if (hint != null) {
-                        Text(hint, color = if (on) c.onAccent.copy(alpha = 0.8f) else c.secondary, style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-                if (on) Icon(sunfieldVector(SunfieldIcons.Check), null, tint = c.onAccent, modifier = Modifier.size(18.dp))
+            }
+            Box(
+                Modifier.size(22.dp).clip(RoundedCornerShape(50)).background(if (on) c.accent else Color.Transparent)
+                    .border(1.5.dp, if (on) c.accent else c.borderStrong, RoundedCornerShape(50)),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (on) Icon(signalIcon(SignalIcons.Check), null, tint = c.onAccent, modifier = Modifier.size(14.dp))
             }
         }
     }
@@ -244,10 +244,10 @@ private fun Chip(label: String, on: Boolean, onClick: () -> Unit) {
     Box(
         Modifier.clip(RoundedCornerShape(50))
             .background(if (on) c.accent else c.surface)
-            .border(1.dp, if (on) c.accent else c.text.copy(alpha = 0.12f), RoundedCornerShape(50))
+            .border(1.dp, if (on) c.accent else c.border, RoundedCornerShape(50))
             .pressable(label, onClick = onClick)
             .padding(horizontal = 18.dp, vertical = 12.dp),
     ) {
-        Text(label, color = if (on) c.onAccent else c.text, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Text(label, color = if (on) c.onAccent else c.text, style = MaterialTheme.typography.titleSmall)
     }
 }

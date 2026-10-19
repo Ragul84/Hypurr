@@ -1,6 +1,6 @@
 package com.ragul84.hypurr.ui.screens
-import com.ragul84.hypurr.ui.SunfieldIcons
-import com.ragul84.hypurr.ui.sunfieldVector
+import com.ragul84.hypurr.ui.SignalIcons
+import com.ragul84.hypurr.ui.signalIcon
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -33,10 +33,13 @@ import com.ragul84.hypurr.model.Bot
 import com.ragul84.hypurr.model.TaskTemplate
 import com.ragul84.hypurr.net.LinkState
 import com.ragul84.hypurr.ui.BotAvatar
-import com.ragul84.hypurr.ui.CreamPlate
-import com.ragul84.hypurr.ui.FlowButton
-import com.ragul84.hypurr.ui.LinkPill
-import com.ragul84.hypurr.ui.Pill
+import com.ragul84.hypurr.ui.SignalCard
+import com.ragul84.hypurr.ui.PrimaryButton
+import com.ragul84.hypurr.ui.Eyebrow
+import com.ragul84.hypurr.ui.HairlineDivider
+import com.ragul84.hypurr.ui.SectionHeader
+import com.ragul84.hypurr.ui.StatusLabel
+import com.ragul84.hypurr.ui.signalState
 import com.ragul84.hypurr.ui.pressable
 import com.ragul84.hypurr.ui.relativeTime
 import com.ragul84.hypurr.ui.templateIcon
@@ -58,38 +61,39 @@ fun TasksScreen(
     val c = Hypurr.colors
     Box(Modifier.fillMaxSize().background(c.bg)) {
         Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-            Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 8.dp)) {
-                Text("Tasks", style = MaterialTheme.typography.headlineLarge, color = c.text, fontWeight = FontWeight.ExtraBold)
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
-                    Text(computerName, style = MaterialTheme.typography.labelMedium, color = c.tertiary, maxLines = 1)
-                    Spacer(Modifier.width(8.dp))
-                    LinkPill(link)
-                }
+            Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 6.dp)) {
+                Text("Tasks", style = MaterialTheme.typography.headlineLarge, color = c.text)
+                Spacer(Modifier.height(6.dp))
+                Eyebrow(computerName, dot = if (link is LinkState.Ready) c.text else c.needs, color = c.secondary)
             }
             LazyColumn(
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 120.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 128.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 item {
-                    FlowButton("New task", Modifier.fillMaxWidth(), icon = sunfieldVector(SunfieldIcons.Plus), onClick = onNewTask)
+                    PrimaryButton("New task", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Plus), onClick = onNewTask)
                 }
                 if (templates.isNotEmpty()) {
+                    item { SectionHeader("Start from a template", Modifier.padding(start = 4.dp)) }
                     item {
-                        Text("Templates", color = c.tertiary, style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, top = 8.dp))
-                    }
-                    items(templates.take(6), key = { it.id }) { tpl ->
-                        CreamPlate(Modifier.fillMaxWidth().pressable(tpl.title) { onOpenTemplate(tpl) }) {
-                            Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(c.accent),
-                                    contentAlignment = Alignment.Center) {
-                                    Icon(templateIcon(tpl.icon), null, tint = c.onAccent, modifier = Modifier.size(20.dp))
-                                }
-                                Spacer(Modifier.width(12.dp))
-                                Column(Modifier.weight(1f)) {
-                                    Text(tpl.title, color = c.text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                    if (tpl.summary.isNotBlank()) {
-                                        Text(tpl.summary, color = c.secondary, style = MaterialTheme.typography.bodyMedium, maxLines = 2)
+                        SignalCard(Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(horizontal = 14.dp, vertical = 4.dp)) {
+                                templates.take(6).forEachIndexed { i, tpl ->
+                                    if (i > 0) HairlineDivider(Modifier.padding(start = 54.dp))
+                                    Row(Modifier.fillMaxWidth().pressable(tpl.title) { onOpenTemplate(tpl) }.padding(vertical = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically) {
+                                        Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(c.surface2),
+                                            contentAlignment = Alignment.Center) {
+                                            Icon(templateIcon(tpl.icon), null, tint = c.text, modifier = Modifier.size(20.dp))
+                                        }
+                                        Spacer(Modifier.width(14.dp))
+                                        Column(Modifier.weight(1f)) {
+                                            Text(tpl.title, color = c.text, style = MaterialTheme.typography.titleSmall)
+                                            if (tpl.summary.isNotBlank()) {
+                                                Text(tpl.summary, color = c.tertiary, style = MaterialTheme.typography.bodySmall, maxLines = 2)
+                                            }
+                                        }
+                                        Icon(signalIcon(SignalIcons.Chevron), null, tint = c.tertiary, modifier = Modifier.size(16.dp))
                                     }
                                 }
                             }
@@ -98,25 +102,22 @@ fun TasksScreen(
                 }
                 val taskBots = recent.filter { it.task != null }
                 if (taskBots.isNotEmpty()) {
-                    item {
-                        Text("Recent", color = c.tertiary, style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 4.dp, top = 8.dp))
-                    }
+                    item { SectionHeader("Recent", Modifier.padding(start = 4.dp)) }
                     items(taskBots, key = { it.id }) { bot ->
-                        CreamPlate(Modifier.fillMaxWidth().pressable(bot.name) { onOpenBot(bot) }) {
-                            Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                                BotAvatar(bot.copy(status = "idle"), 40.dp)
-                                Spacer(Modifier.width(12.dp))
+                        SignalCard(Modifier.fillMaxWidth().pressable(bot.name) { onOpenBot(bot) }, emphasis = bot.needsInput) {
+                            Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                BotAvatar(bot, 40.dp)
+                                Spacer(Modifier.width(14.dp))
                                 Column(Modifier.weight(1f)) {
-                                    Text(bot.name, color = c.text, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
-                                    Text(bot.activity.ifEmpty { bot.lastMessage ?: "Task" }, color = c.secondary,
-                                        style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                                    Text(bot.name, color = c.text, style = MaterialTheme.typography.titleSmall, maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                                    Text(bot.activity.ifEmpty { bot.lastMessage ?: "Task" }, color = c.tertiary,
+                                        style = MaterialTheme.typography.bodySmall, maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                                 }
-                                when {
-                                    bot.needsInput -> Pill("Needs you", c.accent)
-                                    bot.task?.isActive == false -> Pill("Done", c.tertiary)
-                                    else -> Text(relativeTime(bot.lastAt, now), color = c.tertiary, style = MaterialTheme.typography.labelMedium)
-                                }
+                                Spacer(Modifier.width(8.dp))
+                                if (bot.needsInput || bot.task?.isActive == false || bot.status == "working") StatusLabel(bot.signalState())
+                                else Text(relativeTime(bot.lastAt, now), color = c.tertiary, style = MaterialTheme.typography.labelMedium)
                             }
                         }
                     }
@@ -125,7 +126,8 @@ fun TasksScreen(
         }
         HypurrTabBar(
             selected = HomeTab.Tasks,
-            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp),
+            modifier = Modifier.align(Alignment.BottomCenter),
+            needsYou = recent.count { it.needsInput },
             onSelect = onTab,
         )
     }

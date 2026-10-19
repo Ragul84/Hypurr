@@ -27,8 +27,8 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * Sunfield v4: first-run onboarding steps, the You-tab profile editor and the project-folder
- * picker, light and dark. Written to the Roborazzi dir under `sunfield-v4/`.
+ * Signal: first-run onboarding steps, the You-tab profile editor and the project-folder picker,
+ * light and dark. Written next to the other baselines as `android-<name>-<mode>.png`.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -37,13 +37,13 @@ class OnboardingScreenshotTest {
     @get:Rule val compose = createComposeRule()
 
     private fun shoot(name: String, content: @androidx.compose.runtime.Composable () -> Unit) {
-        val dir = File(System.getProperty("roborazzi.output.dir") ?: "build/roborazzi", "sunfield-v4").apply { mkdirs() }
+        val dir = File(System.getProperty("roborazzi.output.dir") ?: "build/roborazzi").apply { mkdirs() }
         var theme by mutableStateOf(ThemeMode.Light)
         compose.setContent { HypurrTheme(theme) { content() } }
         for (mode in listOf(ThemeMode.Light, ThemeMode.Dark)) {
             theme = mode
             compose.waitForIdle()
-            compose.onRoot().captureRoboImage(File(dir, "$name-${mode.name.lowercase()}.png").absolutePath)
+            compose.onRoot().captureRoboImage(File(dir, "android-$name-${mode.name.lowercase()}.png").absolutePath)
         }
     }
 
