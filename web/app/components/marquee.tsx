@@ -1,4 +1,4 @@
-const agents = ["Claude Code", "Codex", "Cursor", "Gemini", "Copilot", "OpenCode", "Pi", "Grok Build", "Goose", "Kiro", "Qwen Code", "Junie", "Cline", "Amp", "Kimi", "Mistral Vibe"];
+const agents = ["Claude Code", "Codex", "Cursor", "Gemini", "Copilot", "Hypurr Agent", "Pi", "Grok Build", "Goose", "Kiro", "Qwen Code", "Junie", "Cline", "Amp", "Kimi", "Mistral Vibe"];
 
 // Infinite agent ribbon; the list is doubled so the loop is seamless.
 export default function Marquee() {

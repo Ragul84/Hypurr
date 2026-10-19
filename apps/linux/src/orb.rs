@@ -126,12 +126,12 @@ fn listening(size: f64, t: f64) -> Vec<Dot> {
     dots
 }
 
-/// Hypurr teal signal loop at `pos` (wraps at 1).
+/// Signal monochrome loop at `pos` (wraps at 1): ink, graphite, slate.
 fn flow_rgb(pos: f64) -> (f64, f64, f64) {
     const STOPS: [(f64, f64, f64); 3] = [
-        (0.055, 0.290, 0.220), // #00D4C8
-        (0.000, 0.478, 0.451), // #007A73
-        (0.369, 0.678, 0.541), // #5EAD8A
+        (0.055, 0.055, 0.055), // #0E0E0E
+        (0.204, 0.204, 0.227), // #34343A
+        (0.361, 0.361, 0.388), // #5C5C63
     ];
     let p = pos.rem_euclid(1.0) * 3.0;
     let i = (p.floor() as usize).min(2);

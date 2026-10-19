@@ -55,6 +55,9 @@ import org.webrtc.SurfaceViewRenderer
 import com.ragul84.hypurr.model.Pairing
 import com.ragul84.hypurr.net.LinkState
 import com.ragul84.hypurr.ui.screens.BotListScreen
+import com.ragul84.hypurr.ui.screens.HomeTab
+import com.ragul84.hypurr.ui.screens.TasksScreen
+import com.ragul84.hypurr.ui.screens.SpendScreen
 import com.ragul84.hypurr.ui.screens.NeedsYouAsk
 import com.ragul84.hypurr.ui.screens.BuiltinInstallPrompt
 import com.ragul84.hypurr.ui.screens.ChatScreen
@@ -62,8 +65,12 @@ import com.ragul84.hypurr.ui.screens.NewTaskScreen
 import com.ragul84.hypurr.ui.screens.NewTaskUiState
 import com.ragul84.hypurr.model.TaskTemplate
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import kotlinx.coroutines.delay
 import com.ragul84.hypurr.ui.screens.PairingScreen
+import com.ragul84.hypurr.ui.screens.ProjectFolderPickerScreen
+import com.ragul84.hypurr.ui.screens.OnboardingScreen
+import com.ragul84.hypurr.data.UserProfile
 import com.ragul84.hypurr.ui.screens.PairingUiState
 import com.ragul84.hypurr.ui.screens.SettingsScreen
 import com.ragul84.hypurr.ui.screens.AdminTab
@@ -169,6 +176,7 @@ class MainActivity : ComponentActivity() {
         val computer by store.computer.collectAsState()
         val scope = rememberCoroutineScope()
         var pairing by remember { mutableStateOf(PairingUiState()) }
+        var justPaired by remember { mutableStateOf(false) }
         val link by pendingLink.collectAsState()
         val scan by scanned.collectAsState()
 
@@ -180,6 +188,7 @@ class MainActivity : ComponentActivity() {
             scope.launch {
                 pairing = try {
                     store.pair(text)
+                    justPaired = true
                     askForNotifications()
                     PairingUiState()
                 } catch (e: Exception) {
@@ -194,6 +203,16 @@ class MainActivity : ComponentActivity() {
         scan?.let {
             scanned.value = null
             pair(it)
+        }
+
+        val profile by store.userProfile.collectAsState()
+        if (!profile.completed) {
+            OnboardingScreen(
+                initial = profile,
+                onFinished = { store.setUserProfile(it) },
+                onSkipAll = { store.setUserProfile(UserProfile(completed = true, skipped = true)) },
+            )
+            return
         }
 
         val current = computer
@@ -221,13 +240,26 @@ class MainActivity : ComponentActivity() {
         val requested by openBot.collectAsState()
         val you by store.you.collectAsState()
         var screen by rememberSaveable { mutableStateOf("list") }
+        // The new-task draft survives a trip to the folder picker.
+        var taskDraft by remember { mutableStateOf<NewTaskUiState?>(null) }
+        val projectFolder by store.projectFolder.collectAsState()
+        // Right after pairing, ask once which folder the agent may work in (can wait).
+        LaunchedEffect(justPaired) {
+            if (justPaired) {
+                justPaired = false
+                if (projectFolder == null) screen = "folderpick:pair"
+            }
+        }
         var builtinBusy by remember { mutableStateOf(false) }
         var builtinError by remember { mutableStateOf<String?>(null) }
         requested?.let {
             openBot.value = null
             screen = "chat:$it"
         }
-        BackHandler(screen != "list") { screen = parentOf(screen) }
+        BackHandler(screen != "list") {
+            if (screen == "newtask") taskDraft = null
+            screen = parentOf(screen)
+        }
 
         AnimatedContent(
             screen,
@@ -304,6 +336,7 @@ class MainActivity : ComponentActivity() {
                         onOpenThread = { e -> screen = "thread:$id:${e.id}" },
                         onReact = { e, emoji -> scope.launch { runCatching { store.react(e.id, emoji) } } },
                         onEdit = if (you?.canAct != false) ({ screen = "edit:$id" }) else null,
+                        onChangeFolder = if (you?.canAct != false && !bot.isGroup) ({ screen = "folderpick:chat:$id" }) else null,
                     )
                 }
                 target == "bot:new" || target == "group:new" || target.startsWith("edit:") -> {
@@ -365,7 +398,8 @@ class MainActivity : ComponentActivity() {
                 target == "screen" -> ScreenRoute(store, current.name) { screen = "list" }
                 target == "newtask" -> {
                     val setup by store.setup.collectAsState()
-                    var task by remember { mutableStateOf(NewTaskUiState()) }
+                    var task by remember { mutableStateOf(taskDraft ?: NewTaskUiState(project = projectFolder)) }
+                    SideEffect { taskDraft = task }
                     LaunchedEffect(Unit) { store.loadSetup() }
                     // Ask the host for its pick as the user types (debounced).
                     LaunchedEffect(task.goal, task.template, task.issue, setup) {
@@ -387,13 +421,17 @@ class MainActivity : ComponentActivity() {
                                 try {
                                     val botId = store.startTask(task.goal, task.template, task.input, task.projectPath, task.agentId,
                                         task.files, task.issue)
+                                    taskDraft = null
                                     screen = "chat:$botId"
                                 } catch (e: Exception) {
                                     task = task.copy(busy = false, error = e.message ?: "Couldn't start the task.")
                                 }
                             }
                         },
-                        onBack = { screen = "list" },
+                        onBack = {
+                            taskDraft = null
+                            screen = "list"
+                        },
                         onAddImage = { pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                         onPaste = {
                             // An image on the clipboard becomes an attachment; text goes where the error belongs.
@@ -409,6 +447,7 @@ class MainActivity : ComponentActivity() {
                                 else task.copy(goal = text)
                             }
                         },
+                        onPickFolder = { screen = "folderpick:newtask" },
                         onPickIssue = {
                             task = task.copy(pickingIssue = true, issues = null)
                             scope.launch {
@@ -418,6 +457,113 @@ class MainActivity : ComponentActivity() {
                                 task = task.copy(issues = list)
                             }
                         },
+                    )
+                }
+
+                target == "spend" -> {
+                    val costs by store.costs.collectAsState()
+                    LaunchedEffect(Unit) { store.loadCosts() }
+                    fun go(tab: HomeTab) {
+                        screen = when (tab) {
+                            HomeTab.Bots -> "list"
+                            HomeTab.Tasks -> "tasks"
+                            HomeTab.Spend -> "spend"
+                            HomeTab.You -> "settings"
+                        }
+                    }
+                    SpendScreen(current.name, linkState, costs, bots, onTab = ::go)
+                }
+                target == "tasks" -> {
+                    val setup by store.setup.collectAsState()
+                    LaunchedEffect(Unit) { store.loadSetup() }
+                    fun go(tab: HomeTab) {
+                        screen = when (tab) {
+                            HomeTab.Bots -> "list"
+                            HomeTab.Tasks -> "tasks"
+                            HomeTab.Spend -> "spend"
+                            HomeTab.You -> "settings"
+                        }
+                    }
+                    val userProfile by store.userProfile.collectAsState()
+                    val templates = setup?.templates.orEmpty().let { list ->
+                        val order = userProfile.preferTemplateIds(list.map { it.id })
+                        list.sortedBy { order.indexOf(it.id).let { i -> if (i < 0) 999 else i } }
+                    }
+                    TasksScreen(
+                        current.name, linkState,
+                        templates = templates,
+                        recent = rosterOrder(bots.values),
+                        onNewTask = { screen = "newtask" },
+                        onOpenTemplate = { screen = "newtask" },
+                        onOpenBot = { screen = "chat:${it.id}" },
+                        onTab = ::go,
+                    )
+                }
+                target == "profile" -> {
+                    val userProfile by store.userProfile.collectAsState()
+                    OnboardingScreen(
+                        initial = userProfile,
+                        editing = true,
+                        onFinished = {
+                            store.setUserProfile(it)
+                            screen = "settings"
+                        },
+                        onSkipAll = { screen = "settings" },
+                    )
+                }
+                target.startsWith("folderpick:") -> {
+                    // folderpick:newtask | folderpick:settings | folderpick:pair | folderpick:chat:<botId>
+                    val mode = target.removePrefix("folderpick:")
+                    val back = when {
+                        mode == "newtask" -> "newtask"
+                        mode == "settings" -> "settings"
+                        mode.startsWith("chat:") -> mode
+                        else -> "list"
+                    }
+                    val setup by store.setup.collectAsState()
+                    var browsing by remember { mutableStateOf<com.ragul84.hypurr.model.DirListing?>(null) }
+                    var selected by remember {
+                        mutableStateOf(if (mode == "newtask") taskDraft?.project ?: projectFolder else projectFolder)
+                    }
+                    fun browse(path: String?) {
+                        scope.launch { runCatching { store.listDirs(path) }.onSuccess { browsing = it } }
+                    }
+                    LaunchedEffect(Unit) {
+                        store.loadSetup()
+                        if (store.setup.value?.projects.isNullOrEmpty()) browse(null)
+                    }
+                    ProjectFolderPickerScreen(
+                        projects = setup?.projects.orEmpty(),
+                        browsing = browsing,
+                        selectedPath = selected,
+                        subtitle = when {
+                            mode == "pair" -> "Which folder should agents work in? You can change it anytime under You."
+                            mode == "settings" -> "New tasks start in this folder."
+                            mode.startsWith("chat:") -> "Pick a folder for a new task. This chat keeps its own folder."
+                            else -> "Pick the folder this task is about."
+                        },
+                        confirmLabel = if (mode.startsWith("chat:")) selected?.let { "New task in ${com.ragul84.hypurr.ui.screens.folderName(it)}" } else null,
+                        onBack = { screen = back },
+                        onBrowse = ::browse,
+                        onSelect = { selected = it },
+                        onConfirm = {
+                            val path = selected ?: return@ProjectFolderPickerScreen
+                            when {
+                                mode == "newtask" -> {
+                                    taskDraft = (taskDraft ?: NewTaskUiState()).copy(project = path)
+                                    screen = "newtask"
+                                }
+                                mode.startsWith("chat:") -> {
+                                    taskDraft = NewTaskUiState(project = path)
+                                    screen = "newtask"
+                                }
+                                else -> {
+                                    store.setProjectFolder(path)
+                                    screen = back
+                                }
+                            }
+                        },
+                        onLater = if (mode == "pair") ({ screen = "list" }) else null,
                     )
                 }
                 target == "settings" -> {
@@ -433,12 +579,26 @@ class MainActivity : ComponentActivity() {
                         store.loadIntegrations()
                         store.loadCosts()
                     }
+                    val userProfile by store.userProfile.collectAsState()
                     SettingsScreen(
                         SettingsUiState(current, linkState, theme, dynamic, notify, app.pushAvailable, BuildConfig.VERSION_NAME,
                             safety = setup?.safety, customTemplates = setup?.templates.orEmpty().filter { !it.builtin },
-                            integrations = integrations, costs = costs, testResults = tests, you = you),
+                            integrations = integrations, costs = costs, testResults = tests, you = you, profile = userProfile,
+                            projectFolder = projectFolder),
+                        onEditProfile = { screen = "profile" },
+                        onPickFolder = { screen = "folderpick:settings" },
+                        onClearProfile = { store.clearUserProfile() },
                         onTeamAdmin = { screen = "team" },
                         onBack = { screen = "list" },
+                        showHomeTabs = true,
+                        onTab = { tab ->
+                            screen = when (tab) {
+                                HomeTab.Bots -> "list"
+                                HomeTab.Tasks -> "tasks"
+                                HomeTab.Spend -> "spend"
+                                HomeTab.You -> "settings"
+                            }
+                        },
                         onTheme = store::setTheme,
                         onDynamic = store::setDynamicColor,
                         onNotifications = store::setNotifications,
@@ -545,7 +705,8 @@ class MainActivity : ComponentActivity() {
                         onRespondAsk = { _, entryId, optionId ->
                             if (entryId != null) scope.launch { runCatching { store.respond(entryId, optionId) } }
                         },
-                        onSpend = { screen = "settings" },
+                        onSpend = { screen = "spend" },
+                        onTasks = { screen = "tasks" },
                     )
                 }
             }
@@ -556,7 +717,11 @@ class MainActivity : ComponentActivity() {
     private fun parentOf(screen: String): String = when {
         screen.startsWith("thread:") -> "chat:" + screen.split(':')[1]
         screen.startsWith("edit:") -> "chat:" + screen.removePrefix("edit:")
-        screen == "team" -> "settings"
+        screen == "team" || screen == "profile" -> "settings"
+        screen == "folderpick:settings" -> "settings"
+        screen == "folderpick:newtask" -> "newtask"
+        screen.startsWith("folderpick:chat:") -> screen.removePrefix("folderpick:")
+        screen == "spend" || screen == "tasks" -> "list"
         else -> "list"
     }
 

@@ -1,10 +1,13 @@
 package com.ragul84.hypurr.ui.screens
+import com.ragul84.hypurr.ui.SignalIcons
+import com.ragul84.hypurr.ui.signalIcon
 
 import android.os.Build
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,13 +27,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.AdminPanelSettings
-import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.rounded.Computer
-import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -63,7 +60,7 @@ import com.ragul84.hypurr.net.LinkState
 import com.ragul84.hypurr.ui.IconBubble
 import com.ragul84.hypurr.ui.LinkPill
 import com.ragul84.hypurr.ui.SoftButton
-import com.ragul84.hypurr.ui.glass
+import com.ragul84.hypurr.ui.panel
 import com.ragul84.hypurr.ui.pressable
 import com.ragul84.hypurr.ui.theme.Hypurr
 import com.ragul84.hypurr.ui.theme.Motion
@@ -88,6 +85,10 @@ data class SettingsUiState(
     val testResults: Map<String, String> = emptyMap(),
     /** This phone's role on the computer; null until the host says. */
     val you: com.ragul84.hypurr.model.Actor? = null,
+    /** The optional first-run profile (local to this phone). */
+    val profile: com.ragul84.hypurr.data.UserProfile? = null,
+    /** Default project folder for new tasks; null = none picked. */
+    val projectFolder: String? = null,
 )
 
 @Composable
@@ -104,19 +105,30 @@ fun SettingsScreen(
     onIntegrations: (JsonObject) -> Unit = {},
     onTestIntegration: (String) -> Unit = {},
     onTeamAdmin: () -> Unit = {},
+    onEditProfile: () -> Unit = {},
+    onClearProfile: () -> Unit = {},
+    onPickFolder: () -> Unit = {},
+    showHomeTabs: Boolean = false,
+    onTab: (HomeTab) -> Unit = {},
 ) {
     val admin = state.you?.isAdmin != false
     val c = Hypurr.colors
-    Column(Modifier.fillMaxSize().background(c.bg).safeDrawingPadding().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+    Box(Modifier.fillMaxSize().background(c.bg)) {
+    Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(bottom = if (showHomeTabs) (56.dp + 24.dp + 16.dp) else 16.dp)) {
         Row(Modifier.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconBubble(Icons.AutoMirrored.Rounded.ArrowBack, "Back", onClick = onBack)
-            Spacer(Modifier.width(12.dp))
-            Text("Settings", style = MaterialTheme.typography.headlineMedium, color = c.text)
+            if (!showHomeTabs) {
+                IconBubble(signalIcon(SignalIcons.Back), "Back", onClick = onBack)
+                Spacer(Modifier.width(12.dp))
+            }
+            Column {
+                com.ragul84.hypurr.ui.Eyebrow(state.computer.name)
+                Text(if (showHomeTabs) "You" else "Settings", style = MaterialTheme.typography.headlineLarge, color = c.text)
+            }
         }
         Section("Computer") {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(44.dp).clip(RoundedCornerShape(20.dp)).background(c.accent), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Rounded.Computer, null, tint = c.onAccent)
+                Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(c.accent), contentAlignment = Alignment.Center) {
+                    Icon(signalIcon(SignalIcons.Host), null, tint = c.onAccent, modifier = Modifier.size(22.dp))
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
@@ -127,12 +139,23 @@ fun SettingsScreen(
             }
             Detail("Direct", state.computer.urls.joinToString("\n").ifEmpty { "None" })
             Detail("Cloud relay", state.computer.cloud ?: "Off on this computer")
-            SoftButton("Forget this computer", Modifier.fillMaxWidth().padding(top = 6.dp), tint = c.danger, onClick = onForget)
+            SoftButton("Forget this computer", Modifier.fillMaxWidth().padding(top = 6.dp), tint = c.needsText, onClick = onForget)
+        }
+        state.profile?.let { ProfileSection(it, onEditProfile, onClearProfile) }
+        Section("Project folder") {
+            Text("New tasks start here. The agent reads inside it freely; anything outside it, deletes and pushes ask you first.",
+                color = c.secondary, style = MaterialTheme.typography.bodySmall)
+            if (state.projectFolder != null) {
+                FolderChip(state.projectFolder, onClick = onPickFolder)
+                Text(state.projectFolder, color = c.tertiary, fontFamily = FontFamily.Monospace, fontSize = 12.sp, maxLines = 2)
+            } else {
+                SoftButton("Pick a folder", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Folder), onClick = onPickFolder)
+            }
         }
         Section("Team") {
             Row(Modifier.fillMaxWidth().pressable("Team admin", onClick = onTeamAdmin), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(44.dp).clip(RoundedCornerShape(20.dp)).background(c.accent.copy(alpha = 0.14f)), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Rounded.AdminPanelSettings, null, tint = c.accent)
+                Box(Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(c.surface2), contentAlignment = Alignment.Center) {
+                    Icon(signalIcon(SignalIcons.Shield), null, tint = c.text, modifier = Modifier.size(22.dp))
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
@@ -141,14 +164,15 @@ fun SettingsScreen(
                         color = c.secondary, style = MaterialTheme.typography.bodySmall)
                 }
                 state.you?.let { com.ragul84.hypurr.ui.Pill(it.role, if (it.isAdmin) c.accent else c.success) }
-                Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = c.tertiary)
+                Spacer(Modifier.width(6.dp))
+                Icon(signalIcon(SignalIcons.Chevron), null, tint = c.tertiary, modifier = Modifier.size(18.dp))
             }
         }
         Section("Appearance") {
-            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(c.bg.copy(alpha = 0.6f)).padding(4.dp)) {
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(c.surface2).padding(4.dp)) {
                 ThemeMode.entries.forEach { mode ->
                     val selected = mode == state.theme
-                    val fill by animateColorAsState(if (selected) c.accent else c.bg.copy(alpha = 0f), Motion.effects(), label = "seg")
+                    val fill by animateColorAsState(if (selected) c.accent else c.surface2.copy(alpha = 0f), Motion.effects(), label = "seg")
                     Box(Modifier.weight(1f).clip(RoundedCornerShape(50)).background(fill)
                         .pressable(mode.name, role = Role.RadioButton) { onTheme(mode) }.padding(vertical = 10.dp),
                         contentAlignment = Alignment.Center) {
@@ -156,8 +180,6 @@ fun SettingsScreen(
                     }
                 }
             }
-            ToggleRow("Wallpaper colours", if (state.dynamicSupported) "Use Android's dynamic colour instead of the Hypurr palette"
-            else "Needs Android 12 or later", state.dynamicColor && state.dynamicSupported, state.dynamicSupported, onDynamic)
         }
         state.safety?.let { safety ->
             Section("Safety net") {
@@ -181,7 +203,7 @@ fun SettingsScreen(
                             Text(t.prompt, color = c.secondary, style = MaterialTheme.typography.bodySmall, maxLines = 1,
                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                         }
-                        IconBubble(Icons.Rounded.Delete, "Delete ${t.title}", tint = c.danger, fill = c.danger.copy(alpha = 0.1f), size = 34.dp) {
+                        IconBubble(signalIcon(SignalIcons.Trash), "Delete ${t.title}", tint = c.needsText, size = 34.dp) {
                             onDeleteTemplate(t.id)
                         }
                     }
@@ -202,6 +224,14 @@ fun SettingsScreen(
         }
         Spacer(Modifier.height(24.dp))
     }
+    if (showHomeTabs) {
+        HypurrTabBar(
+            selected = HomeTab.You,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            onSelect = onTab,
+        )
+    }
+    }
 }
 
 @Composable
@@ -211,7 +241,7 @@ private fun AddTemplate(onAdd: (String, String) -> Unit) {
     var title by remember { mutableStateOf("") }
     var prompt by remember { mutableStateOf("") }
     if (!open) {
-        SoftButton("Add a template", Modifier.fillMaxWidth(), icon = Icons.Rounded.Add) { open = true }
+        SoftButton("Add a template", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Plus)) { open = true }
         return
     }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -232,7 +262,7 @@ private fun AddTemplate(onAdd: (String, String) -> Unit) {
 @Composable
 internal fun SmallField(value: String, hint: String, minLines: Int = 1, secret: Boolean = false, onChange: (String) -> Unit) {
     val c = Hypurr.colors
-    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.bg.copy(alpha = 0.6f)).padding(12.dp)) {
+    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.surface2).border(1.dp, c.border, RoundedCornerShape(16.dp)).padding(14.dp)) {
         if (value.isEmpty()) Text(hint, color = c.tertiary, style = MaterialTheme.typography.bodyMedium)
         androidx.compose.foundation.text.BasicTextField(value, onChange, minLines = minLines, singleLine = secret,
             visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
@@ -244,10 +274,9 @@ internal fun SmallField(value: String, hint: String, minLines: Int = 1, secret: 
 @Composable
 internal fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {
     val c = Hypurr.colors
-    Text(title.uppercase(), color = c.tertiary, style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
-        modifier = Modifier.padding(start = 8.dp, top = 18.dp, bottom = 8.dp))
-    Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(20.dp), c.surface).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+    com.ragul84.hypurr.ui.Eyebrow(title, Modifier.padding(start = 6.dp, top = 22.dp, bottom = 10.dp))
+    Column(Modifier.fillMaxWidth().panel(com.ragul84.hypurr.ui.CardShape, c.surface).padding(18.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp), content = content)
 }
 
 @Composable
@@ -272,8 +301,8 @@ internal fun ToggleRow(title: String, subtitle: String, on: Boolean, enabled: Bo
         Spacer(Modifier.width(12.dp))
         val knob by animateDpAsState(if (on) 22.dp else 2.dp, Motion.spatialFast(), label = "knob")
         Box(Modifier.size(50.dp, 30.dp).clip(RoundedCornerShape(50))
-            .background(if (on) androidx.compose.ui.graphics.SolidColor(c.accent) else androidx.compose.ui.graphics.SolidColor(c.border))) {
-            Box(Modifier.offset(x = knob, y = 2.dp).size(26.dp).clip(CircleShape).background(androidx.compose.ui.graphics.Color.White))
+            .background(if (on) c.accent else c.borderStrong)) {
+            Box(Modifier.offset(x = knob, y = 2.dp).size(26.dp).clip(CircleShape).background(if (on) c.onAccent else androidx.compose.ui.graphics.Color.White))
         }
     }
 }
@@ -343,7 +372,7 @@ private fun WorkTools(work: Integrations, tests: Map<String, String>, onSave: (J
                         onSave(buildJsonObject { putJsonObject(kind) { put("url", url.trim()) } })
                         url = ""
                     }
-                    if (hook.configured) SoftButton("Remove", Modifier.weight(1f), tint = c.danger) {
+                    if (hook.configured) SoftButton("Remove", Modifier.weight(1f), tint = c.needsText) {
                         onSave(buildJsonObject { putJsonObject(kind) { put("url", "") } })
                     }
                 }
@@ -357,14 +386,14 @@ private fun Service(name: String, status: String, configured: Boolean, test: Str
                     edit: @Composable ColumnScope.() -> Unit) {
     val c = Hypurr.colors
     var open by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.bg.copy(alpha = 0.5f)).padding(12.dp)
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(c.surface2).padding(14.dp)
         .animateContentSize(Motion.spatialDefault()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth().pressable("Set up $name") { open = !open }, verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(name, color = c.text, style = MaterialTheme.typography.titleSmall)
                 Text(status, color = c.secondary, style = MaterialTheme.typography.bodySmall)
             }
-            com.ragul84.hypurr.ui.Pill(if (configured) "Connected" else "Set up", if (configured) c.success else c.accent)
+            com.ragul84.hypurr.ui.Pill(if (configured) "Connected" else "Set up", if (configured) c.text else c.secondary)
         }
         if (test != null) Text(test, color = c.secondary, style = MaterialTheme.typography.bodySmall)
         androidx.compose.animation.AnimatedVisibility(open) {
@@ -385,8 +414,8 @@ private fun Spending(costs: TaskCosts) {
     Section("Spending") {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("Today" to costs.today, "7 days" to costs.week, "All time" to costs.total.cost).forEach { (label, v) ->
-                Column(Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).background(c.bg.copy(alpha = 0.5f)).padding(10.dp)) {
-                    Text(costLabel(v, est), color = c.text, style = MaterialTheme.typography.titleMedium)
+                Column(Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).background(c.surface2).padding(12.dp)) {
+                    com.ragul84.hypurr.ui.DotFigure(costLabel(v, est), com.ragul84.hypurr.ui.theme.SignalType.figureSmall, c.text)
                     Text(label, color = c.secondary, style = MaterialTheme.typography.labelSmall)
                 }
             }
@@ -423,11 +452,39 @@ private fun Spending(costs: TaskCosts) {
             Text(costs.gatewayCreditsLabel ?: "—", color = c.text, style = MaterialTheme.typography.bodyMedium)
         }
         Spacer(Modifier.height(8.dp))
-        SoftButton("Buy credits", Modifier.fillMaxWidth()) {
+        com.ragul84.hypurr.ui.PrimaryButton("Add credits", Modifier.fillMaxWidth()) {
             val url = costs.buyCreditsUrl ?: "https://checkout.stripe.com/c/pay/cs_test_placeholder"
             try {
                 ctx.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
             } catch (_: Exception) { }
+        }
+    }
+}
+
+/** You tab: what the agent knows about you, with edit and delete. */
+@Composable
+private fun ProfileSection(p: com.ragul84.hypurr.data.UserProfile, onEdit: () -> Unit, onClear: () -> Unit) {
+    val c = Hypurr.colors
+    var confirm by remember { mutableStateOf(false) }
+    Section("Your profile") {
+        if (p.hasAnswers) {
+            p.role?.let { Detail("Role", it) }
+            p.experience?.let { Detail("Experience", it) }
+            if (p.stacks.isNotEmpty()) Detail("Stack", p.stacks.joinToString(", "))
+            if (p.goals.isNotEmpty()) Detail("Mostly", p.goals.joinToString(", "))
+        } else {
+            Text("Not set. Answer four quick questions so agents match your tone and pick the right templates.",
+                color = c.secondary, style = MaterialTheme.typography.bodySmall)
+        }
+        Text("Stays on this phone. Only these choices go to your computer, to tune the agent.",
+            color = c.tertiary, style = MaterialTheme.typography.labelSmall)
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            SoftButton(if (p.hasAnswers) "Edit" else "Set up", Modifier.weight(1f), onClick = onEdit)
+            if (p.hasAnswers) {
+                SoftButton(if (confirm) "Tap again to delete" else "Delete", Modifier.weight(1f), tint = c.needsText) {
+                    if (confirm) { onClear(); confirm = false } else confirm = true
+                }
+            }
         }
     }
 }

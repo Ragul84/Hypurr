@@ -1,92 +1,107 @@
-# Hypurr design system — Sunfield Panel
+# Hypurr design system: Signal
 
-**Direction B.** One token set for every client: web (`web/app/globals.css`),
-SwiftUI (`kit/.../Theme.swift`), GTK (`apps/linux`), Android
-(`apps/android/.../Theme.kt`), and the TUI. Change a token in all of them together.
+**Direction C, approved.** One token set for every client: Android
+(`apps/android/.../ui/theme/Theme.kt`), web (`web/app/globals.css`), SwiftUI
+(`kit/Sources/HypurrKit/Design/Theme.swift`), GTK (`apps/linux/src/main.rs`) and the
+host TUI (`host/src/tui/view.rs`). Change a token in all of them together.
 
-Category defaults refused: black+teal AI neon, purple mesh, Material letter-circles,
-instrument/terminal density, congested meta columns.
+Mockups: [`signal/mockup-signal.png`](signal/mockup-signal.png) (Bots, Chat approval,
+Spend) and [`signal/mockup-compare.png`](signal/mockup-compare.png) (panel C).
+References: Nothing OS 3–5, Material 3 Expressive widgets, Teenage Engineering.
+
+Refused: black+teal AI neon, purple gradients, the Sunfield yellow/green panel,
+stock Material icons, the sparkle glyph, chunky press shadows.
 
 ## Concept
 
-Hypurr is a Teenage Engineering synth panel: sunflower colour field, cream plates
-with a chunky “press” shadow, forest-green primary actions, Cabinet Grotesk
-ExtraBold titles, and friendly cat-face bot tiles.
+Monochrome light grey with big rounded white cards and black pill buttons.
+**Inter** carries all text. **Doto** dot-matrix only for big figures (credits, counters)
+and the cat, which is drawn in dots. **Red is the only colour and always means "needs you"**:
+risk labels, the stop button, the needs-you badge, today's chart bar.
 
 ## Colour
 
-| Token | Light (default) | Dark (warm forest, not black) |
+| Token | Light | Dark (true black) | Notes |
+|---|---|---|---|
+| bg / ground | `#EDEDEA` | `#000000` | window background |
+| surface / card | `#FFFFFF` | `#111111` | every card |
+| surface2 | `#F2F2EF` | `#1C1C1E` | command box, fields, icon tiles, pills |
+| border (hairline) | `#E0E0DC` | `#242426` | 1px card edge, dividers |
+| borderStrong | `#CFCFCA` | `#3A3A3D` | outline buttons, unchecked toggles |
+| text / ink | `#0E0E0E` | `#F5F5F2` | |
+| secondary | `#34343A` | `#C9C9CE` | body copy |
+| tertiary / muted | `#5C5C63` | `#9A9AA1` | meta, eyebrows |
+| accent (primary pill) | `#0E0E0E` | `#F5F5F2` | Allow once, New task, active tab |
+| onAccent | `#FFFFFF` | `#0E0E0E` | |
+| needs (red fill) | `#D21F26` | `#D21F26` | badge, stop, HIGH RISK, today's bar |
+| needsText (red text) | `#C41A20` | `#FF4D4F` | "Needs you", failed lines |
+| dotOff | `#D6D6D1` | `#2E2E31` | unlit dots in Doto bars, progress, the cat |
+
+The live / needs-you card and the approval card get a **1.5px ink border** (emphasis).
+Success, warning and positive states are ink; there is no green or amber.
+
+### Contrast (WCAG AA, checked)
+
+| Pair | Ratio | Use |
 |---|---|---|
-| ground / background | `#F2B90D` sunflower | `#0E4A38` deep forest |
-| raised / surface | `#FFF8E8` cream | `#143D30` forest plate |
-| cream (cards always) | `#FFF8E8` | `#1A4A3A` |
-| ink / text | `#17140A` | `#FFF8E8` |
-| ink-2 / secondary | `#5C5640` | `#C8E0D4` |
-| ink-3 / tertiary | `#8A8168` | `#7A9E8E` |
-| rule / border | `rgba(23,20,10,0.12)` | `rgba(255,248,232,0.12)` |
-| accent (primary action) | `#0E4A38` forest | `#F2B90D` sunflower |
-| on-accent | `#FFF8E8` | `#0E4A38` |
-| negative / danger | `#A1281C` | `#F5A090` |
-| positive / success | `#0E4A38` | `#5DDB9A` |
-| attention / Needs-you | `#0E4A38` (chip on cream) | `#F2B90D` |
-
-Accent role: **primary action** (Allow once, New, selected tab, send).
-Needs-you uses a forest chip on cream (light) or sunflower chip on forest (dark).
-Danger red only for failed / Deny emphasis.
-
-**No teal. No cyan. No purple.**
-
-## Surfaces & shape
-
-- Content cards / bot rows: **18–22px** radius, cream fill.
-- Chunky **press shadow**: `0 4px 0 rgba(23,20,10,0.10)` light; `0 4px 0 rgba(0,0,0,0.35)` dark.
-- Needs-you hero: **26px** radius, stronger press `0 8–12px 0`.
-- Nav bar: ink pill (light) or sunflower/cream pill (dark), ~24px radius.
-- Buttons: **16px** radius; primary = forest fill.
+| `#5C5C63` on `#EDEDEA` | 5.65:1 | muted text on the ground |
+| `#5C5C63` on `#FFFFFF` | 6.63:1 | muted text on cards |
+| `#C41A20` on `#EDEDEA` | 5.09:1 | red text, light |
+| white on `#D21F26` | 5.3:1 | HIGH RISK tag, badge, stop |
+| `#FF4D4F` on `#111111` | 5.78:1 | red text, dark |
+| `#9A9AA1` on `#111111` | 6.75:1 | muted text, dark |
+| `#C9C9CE` on `#111111` | 11.45:1 | secondary, dark |
+| `#D21F26` on `#111111` | 3.56:1 | **fails for text**: fills only in dark, text uses `#FF4D4F` |
 
 ## Type
 
-- **Display / UI:** Cabinet Grotesk (Fontshare, ITF Free Font License — app embedding allowed; do not modify/redistribute the font files). Weights 400 / 500 / 700 / 800.
-- Fallback OFL: Bricolage Grotesque (bundled as spare).
-- Titles: ExtraBold 34–40, tracking −0.04em.
-- Row titles: ExtraBold 17.
-- Body: Medium 15.
-- Meta: Bold 12–13.
-- Sentence case everywhere. No ALL CAPS eyebrows.
+- **Inter** (OFL, `docs/brand/fonts/INTER-OFL.txt`), static Regular / Medium / SemiBold / Bold,
+  subset to Latin + punctuation + arrows. Titles SemiBold 29/34 with −1.0 tracking; card titles
+  SemiBold 16–18; body Regular 15; meta Medium 12–13.
+- **Doto** (OFL, `docs/brand/fonts/DOTO-OFL.txt`), one static instance (wght 800, ROND 100):
+  hero 64sp (credits), counter 36 (summary cards), figure 26/20 (costs), wordmark 22.
+  Doto has no `₹`, `€`, `£` and its period reads like a comma, so `DotFigure` sets those in Inter.
+- Eyebrows: Inter SemiBold 11.5, ALL CAPS, 1.6sp tracking, muted. Optional leading dot
+  (red pulsing when it means "needs you").
+- Mono (paths, branches, commands): system monospace 12.5.
 
-## Spacing
+## Shape & spacing
 
-- Side margin: **18–22px**.
-- Between bot cards: **8–10px**.
-- Hero → list rest: **14–22px**.
-- Max ~2 lines per bot row. Spacious over dense.
+- Cards: **24px** radius, flat white with a hairline. No shadows.
+- Pills: fully rounded, 48dp tall. Primary = black fill; secondary = outline (`borderStrong`).
+- Chips (folder, branch): surface pill with a hairline, mono label, 13px icon.
+- Small tiles: 12–16px radius on `surface2`.
+- Side margin 16–20dp, 8–12dp between cards, 14–18dp inside cards.
+- Tab bar: full-width white bar with a top hairline; the active tab's icon sits in a
+  black 52×30 pill; red badge on Bots.
 
 ## Icons
 
-Custom chunky rounded stroke set (`docs/brand/icons/`). Stroke ~2.1–2.25, round caps.
-Bot identity: cat-face tiles (ink / cream / amber fills), not letter circles.
+Custom set generated by `tools/signal-icons/icons.py` (50 icons) into
+`res/drawable/ic_sg_*.xml` and `docs/brand/icons/*.svg`: 24 grid, **1.6 stroke**, round caps
+and joins, no fills except dots. No Material Symbols, no sparkle.
 
-## Signature interaction — Press Allow
+## The cat
 
-1. Tap **Allow once**.
-2. Button presses down (translateY +2–4px, shadow collapses) → forest flash → approval card compresses into a live cream row with a cat blink.
-3. Reduced motion: 150ms crossfade; still fire success haptic.
+A 9×9 dot bitmap (`tools/signal-icons/dotcat.py`, `ui/DotCat.kt`), lit dots ink (or red when the
+bot needs you, grey when idle), unlit dots `dotOff`. The eye holes fill for a blink. App icon:
+white dots on `#0E0E0E` (`docs/brand/hypurr-icon.svg`, adaptive + monochrome launcher layers).
 
-## Motion language (Sunfield)
+## Screens
 
-Friendlier restyle of the motion PR catalogue:
-
-| Moment | Sunfield treatment |
-|---|---|
-| Thinking | Cat ear twitch / blink on the bot tile; soft ink-dot typing (not cyan scan) |
-| Creating a bot | Cream tiles assemble into cat face on sunflower |
-| Pairing | Forest label “lights on” with two soft flickers |
-| Approvals | Press-down Allow; Deny shears cream card sideways |
-| Loading | Soft cream shimmer (no rain streaks) |
-| Launch | Sunflower field fades in; title stamps with press shadow |
-
-Springs: keep M3 Expressive spatialFast / Default / Slow / effects; press scale **0.94** (chunkier).
+- **Bots:** dot cat + Doto wordmark, "<computer> is online" eyebrow, greeting, three summary
+  cards (Needs you in red Doto, Running, Done today), "Your bots" list. The needs-you card has the
+  ink border and one-tap Deny / Allow once.
+- **Chat:** back, avatar, name, "agent · status" (red when waiting), folder and branch chips under
+  the header. User bubbles black (20/20/6/20), agent replies unboxed. Approval card: NEEDS YOU
+  eyebrow + HIGH RISK tag, headline, `$ command` box, meta, "You can undo…", then
+  Deny / Always / Allow once as equal pills. Composer: white pill; send is black, or a red stop
+  while the agent works.
+- **Spend:** Week/Month segmented, "Credits left" hero in Doto, pace line, Add credits + Limits,
+  Spent card with Doto dot bars (today red), free-turns dotted progress, By bot list.
 
 ## Dark mode
 
-Warm **deep forest** ground `#0E4A38` with sunflower accent actions — never near-black + teal.
+True black ground, `#111` cards, white text and pills (black text on them), the same red fill;
+red *text* lifts to `#FF4D4F` for AA. The window background is set in `values-night/themes.xml`
+so there is no flash.

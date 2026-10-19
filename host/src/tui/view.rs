@@ -1,5 +1,5 @@
-//! Drawing. Hypurr wet-asphalt neon: asphalt neutrals, flat teal signal for the
-//! brand title and working spinners, amber means "needs you" and red means an error. Every state also has its own glyph.
+//! Drawing. Hypurr Signal: black, white and greys; the one red means "needs you"
+//! (and errors). Working shows a dot-matrix pulse. Every state also has its own glyph.
 //! Tokens mirror `docs/design/hypurr-design-system.md` and the apps' Theme.swift.
 
 // Colors are written as #RRGGBB, like the apps' Theme.swift.
@@ -88,13 +88,13 @@ pub fn theme() -> &'static Theme {
         }
         let (text, second, dim, line, band, sel, panel, btn, green, red, add_bg, rm_bg) = if light {
             (
-                0x0A1210, 0x4A5E5A, 0x8A9995, 0xD5DEDB, 0xE8EEEC, 0xD5E8E5, 0xFFFFFF, 0xC5DEDB, 0x1F7A55, 0xC23B2E,
-                0xE2F5EC, 0xFBE4EA,
+                0x0E0E0E, 0x34343A, 0x5C5C63, 0xE0E0DC, 0xF2F2EF, 0xE4E4E0, 0xFFFFFF, 0xE0E0DC, 0x0E0E0E, 0xC41A20,
+                0xF2F2EF, 0xFBE4E4,
             )
         } else {
             (
-                0xE8FFFC, 0x7FA8A3, 0x3D5552, 0x14201E, 0x0E1614, 0x12302C, 0x0B1211, 0x12302C, 0xE8C46A, 0xFF6B5A,
-                0x10261E, 0x2E1424,
+                0xF5F5F2, 0xC9C9CE, 0x9A9AA1, 0x242426, 0x111111, 0x1C1C1E, 0x0A0A0A, 0x1C1C1E, 0xF5F5F2, 0xFF4D4F,
+                0x1C1C1E, 0x2A1214,
             )
         };
         let fg = |h| s.fg(rgb(h));
@@ -105,7 +105,8 @@ pub fn theme() -> &'static Theme {
             secondary: fg(second),
             dim: fg(dim),
             line: fg(line),
-            amber: fg(if light { 0xB86A00 } else { 0xFFB020 }),
+            // Signal: "needs you" is the one red.
+            amber: fg(if light { 0xC41A20 } else { 0xFF4D4F }),
             red: fg(red),
             green: fg(green),
             code: s.bg(rgb(band)),
@@ -115,13 +116,13 @@ pub fn theme() -> &'static Theme {
             panel: s.bg(rgb(panel)),
             btn: s.bg(rgb(btn)),
             btn_primary: s
-                .fg(rgb(if light { 0xF4F6F5 } else { 0x021412 }))
-                .bg(rgb(if light { 0x0E4A38 } else { 0xF2B90D }))
+                .fg(rgb(if light { 0xFFFFFF } else { 0x0E0E0E }))
+                .bg(rgb(if light { 0x0E0E0E } else { 0xF5F5F2 }))
                 .add_modifier(Modifier::BOLD),
             added: s.fg(rgb(green)).bg(rgb(add_bg)),
             removed: s.fg(rgb(red)).bg(rgb(rm_bg)),
-            on_color: rgb(0x021412),
-            shade: rgb(if light { 0x8A9995 } else { 0x3D5552 }),
+            on_color: rgb(0xFFFFFF),
+            shade: rgb(if light { 0x8A8A8F } else { 0x3A3A3D }),
         }
     });
     &T
@@ -129,23 +130,18 @@ pub fn theme() -> &'static Theme {
 
 pub fn bot_color(name: &str) -> Color {
     let hex = match name {
-        "black" | "asphalt" | "magenta" => 0x7FA8A3,
-        "brown" => 0x5A4A3A,
-        "red" => 0xFF6B5A,
-        "orange" | "attention" => 0xFFB020,
-        "yellow" => 0xC9A227,
-        "green" => 0xE8C46A,
-        "violet" | "ink" | "gray" => 0x3D5552,
-        // "cyan" / "teal" and unknown ids → signal teal
-        _ => 0xF2B90D,
+        // Signal: bots are monochrome tones; red stays reserved for "needs you".
+        "black" | "asphalt" | "ink" => 0x8A8A8F,
+        "gray" | "magenta" | "violet" => 0x9A9AA1,
+        _ => 0x7A7A82,
     };
     rgb(hex)
 }
 
 // A full-cell orbit reads smoother at the 100 ms tick than the thin dots.
 const SPINNER: [&str; 8] = ["⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"];
-/// Thinking scan-line frames (wet-asphalt neon — flat cyan progress through a rule).
-const SCAN_LINE: [&str; 8] = ["─▸───", "──▸──", "───▸─", "────▸", "───◂─", "──◂──", "─◂───", "◂────"];
+/// Thinking pulse frames: a dot-matrix light running through five dots.
+const SCAN_LINE: [&str; 8] = ["●····", "·●···", "··●··", "···●·", "····●", "···●·", "··●··", "·●···"];
 
 fn spin(app: &App) -> &'static str {
     SPINNER[usize::try_from(app.frame % 8).unwrap_or(0)]
@@ -155,8 +151,8 @@ fn scan_line(app: &App) -> &'static str {
     SCAN_LINE[usize::try_from(app.frame % 8).unwrap_or(0)]
 }
 
-/// Hypurr teal signal stops (looping).
-const FLOW: [u32; 3] = [0xF2B90D, 0x0E4A38, 0xE8C46A];
+/// Signal monochrome stops (looping): slate, steel, mist.
+const FLOW: [u32; 3] = [0x5C5C63, 0x8A8A8F, 0xC9C9CE];
 
 /// The flow colour at `pos` per-mille along the loop (wraps).
 pub(super) fn flow_color(pos: u32) -> Color {
@@ -506,7 +502,7 @@ fn status_line(buf: &mut Buffer, r: Rect, app: &mut App) {
     let insert = app.typing && app.overlays.is_empty();
     let pill = if insert { " INSERT " } else { " NAV " };
     let pill_style = if insert {
-        Style::default().fg(t.on_color).bg(rgb(0xF2B90D)).add_modifier(Modifier::BOLD)
+        Style::default().fg(t.on_color).bg(rgb(0x5C5C63)).add_modifier(Modifier::BOLD)
     } else {
         t.btn_primary
     };
@@ -790,7 +786,7 @@ fn chat(buf: &mut Buffer, r: Rect, app: &mut App, narrow: bool) {
     }
     if !app.online {
         let bar = Rect::new(r.x, top, r.width, 1);
-        let s = if t.color { Style::default().fg(t.on_color).bg(rgb(0xFFB020)) } else { t.sel };
+        let s = if t.color { Style::default().fg(t.on_color).bg(rgb(0xD21F26)) } else { t.sel };
         fill(buf, bar, s);
         put(
             buf,

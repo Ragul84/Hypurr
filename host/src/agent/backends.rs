@@ -137,12 +137,13 @@ pub const HARNESSES: &[Harness] = &[
         signed_in: None,
     },
     Harness {
+        // Legacy id kept for compatibility (a user-installed upstream CLI); always shown as Hypurr Agent.
         id: "opencode",
-        name: "OpenCode",
+        name: "Hypurr Agent",
         bins: &["opencode"],
         local: Some("{bin} acp"),
         registry: Some("opencode"),
-        setup: "Optional: install OpenCode yourself if you already use it (curl -fsSL https://opencode.ai/install | bash). Not the default Hypurr agent.",
+        setup: "Hypurr Agent from a CLI already on your computer. Hypurr can also install Hypurr Agent for you.",
         install: None,
         login: "{bin} auth login",
         signed_in: None,
@@ -731,6 +732,13 @@ fn shell_quote(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn legacy_opencode_id_is_accepted_but_shown_as_hypurr_agent() {
+        let h = harness("opencode").expect("legacy id still accepted");
+        assert_eq!(h.name, "Hypurr Agent");
+        assert!(!h.setup.to_lowercase().contains("opencode"), "{}", h.setup);
+    }
 
     #[test]
     fn detects_executables_on_search_path() {

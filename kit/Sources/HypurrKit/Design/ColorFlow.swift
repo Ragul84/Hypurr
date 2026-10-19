@@ -1,28 +1,29 @@
 import SwiftUI
 
-/// Hypurr Sunfield signal language (replaces teal ColourFlow).
-/// Same symbol name so call sites keep compiling; fills are forest / sunflower only.
+/// Hypurr Signal fill (replaces the old colour-flow gradient).
+/// Same symbol name so call sites keep compiling; fills are ink / graphite only.
+/// Red is never used here: it is reserved for "needs you" (Palette.needs).
 public enum ColorFlow {
-    public static let signal: UInt32 = 0x0E4A38
-    public static let signalDeep: UInt32 = 0x0A3428
-    public static let sunflower: UInt32 = 0xF2B90D
-    public static let cyan: UInt32 = sunflower
-    /// Legacy aliases — resolve to forest / sunflower so no purple remains on screen.
+    public static let signal: UInt32 = 0x0E0E0E
+    public static let signalDeep: UInt32 = 0x000000
+    public static let graphite: UInt32 = 0x34343A
+    public static let cyan: UInt32 = graphite
+    /// Legacy aliases, all monochrome.
     public static let violet: UInt32 = signal
-    public static let magenta: UInt32 = sunflower
-    public static let stops: [UInt32] = [sunflower, signal, signalDeep]
+    public static let magenta: UInt32 = graphite
+    public static let stops: [UInt32] = [graphite, signal, signalDeep]
     public static let colors: [Color] = stops.map { Color(hex: $0) }
     /// Text and symbols drawn on top of the signal fill.
-    public static let ink = Color(hex: 0xFFF8E8)
+    public static let ink = Color(hex: 0xFFFFFF)
 
-    /// Resting fill: sunflower → forest (kept as LinearGradient for API compatibility).
+    /// Resting fill: graphite → ink (kept as LinearGradient for API compatibility).
     public static var linear: LinearGradient {
-        LinearGradient(colors: [Color(hex: sunflower), Color(hex: signal)], startPoint: .topLeading, endPoint: .bottomTrailing)
+        LinearGradient(colors: [Color(hex: graphite), Color(hex: signal)], startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 
     /// Closed ring for spinners.
     public static var angular: AngularGradient {
-        AngularGradient(colors: [Color(hex: sunflower), Color(hex: signal), Color(hex: sunflower)], center: .center)
+        AngularGradient(colors: [Color(hex: graphite), Color(hex: signal), Color(hex: graphite)], center: .center)
     }
 
     public static func color(at position: Double) -> Color {
@@ -39,7 +40,7 @@ public enum ColorFlow {
     }
 }
 
-/// An animated Sunfield fill. Static under Reduce Motion.
+/// An animated Signal fill (a slow graphite-to-ink drift). Static under Reduce Motion.
 public struct ColorFlowBackground: View {
     let period: Double
     @Environment(\.accessibilityReduceMotion) private var reduceMotion

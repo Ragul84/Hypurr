@@ -708,6 +708,10 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
         "auditLog" => crate::admin::audit::list(&hub.store, &b)?,
         "activity" => crate::admin::activity::activity(&hub.store, &b)?,
         "setSafetySettings" => json!({"safety": crate::tasks::set_safety(&hub.store, &b)?}),
+        // Non-sensitive local user preferences from the phone (tone + defaults for the agent).
+        // Only fixed choices are kept (see `chat::profile`); an empty body clears it.
+        "setUserProfile" => json!({"profile": crate::chat::profile::save(&hub.store, &actor.key, &b)?}),
+        "userProfile" => json!({"profile": crate::chat::profile::load(&hub.store, Some(&actor.key))}),
         "registerDevice" => {
             let ticket = str_arg(&b, "ticket")?;
             if let Some(relay) = b["relay"].as_str().filter(|r| r.starts_with("https://")) {

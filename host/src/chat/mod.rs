@@ -5,5 +5,6 @@ pub mod context;
 pub mod group;
 pub mod memory;
 pub mod naming;
+pub mod profile;
 pub mod team;
 pub mod uploads;

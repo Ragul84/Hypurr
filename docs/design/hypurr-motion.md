@@ -1,133 +1,60 @@
-# Hypurr motion — Sunfield Panel
+# Hypurr motion: Signal
 
-Friendlier restyle of the motion catalogue. Palette follows docs/design/hypurr-design-system.md (no teal).
+Subtle, precise, dot-matrix. Palette and type follow
+[`hypurr-design-system.md`](hypurr-design-system.md): monochrome, red only for "needs you".
+No glow, no bounce, no confetti, no sparkle.
 
-# Hypurr motion language
+Every moment honours **Reduce Motion** (Android animator scale 0, iOS/macOS
+`accessibilityReduceMotion`, web `prefers-reduced-motion`): loops stop on a static frame and
+transitions become a 150ms fade. Previews and screenshots render each moment's end state.
 
-Sunfield Panel motion: **sharp, dark, electric**. Outside-app refs stay Linear
-(calm density), Leica (precision body), neon in rain (one lit signal). Flat forest/sunflower
-light only — **no glow blobs, no purple, no bouncing three-dots, no confetti**.
-
-Every moment honours **Reduce Motion / `prefers-reduced-motion`**: swap loops for
-a static frame or a 150ms crossfade. Photosensitivity: neon “flicker” is at most
-**3 flashes/sec**, low contrast, never full-screen strobe.
-
-Shared with Android Compose (`ui/motion/`), SwiftUI (`HypurrKit/Design/Motion+Signal.swift`),
-web (`web/app/globals.css` + `components/motion.ts`), and the TUI thinking scan.
+Code: Android `ui/motion/MotionTokens.kt` (`HypurrMotion`) and `ui/motion/SignalMotion.kt`;
+web `web/app/globals.css` (`.hypurr-scan`, `.hypurr-needs`, `.hypurr-drop`) and
+`web/app/components/motion.ts`; TUI `host/src/tui/view.rs` (`SCAN_LINE` dot pulse);
+Swift `kit/Sources/HypurrKit/Design/SignalMotion.swift`.
 
 ## Tokens
 
-### Durations (ms)
-
 | Token | ms | Use |
 |---|---|---|
-| `strike` | 120 | Signal band flash, neon flicker steps |
-| `snap` | 180 | Crossfade labels, caret blink half-cycle |
-| `settle` | 280 | Plate collapse, chip land, shared-axis slide |
-| `draw` | 420 | Rule draw L→R, scan-line sweep one pass |
-| `assemble` | 720 | Cat-from-rain assembly, launch flicker-on |
-| `loop` | 1600 | Thinking scan loop (one full sweep) |
-| `reduced` | 150 | Universal reduced-motion crossfade |
+| `PRESS` | 120 | pill press in / out |
+| `SNAP` | 180 | label crossfades, chip land |
+| `SETTLE` | 240 | approval drop-in, shared-axis screen change |
+| `DRAW` | 420 | dotted done rule |
+| `ASSEMBLE` | 760 | dots assembling the cat |
+| `SCAN` | 1100 | one pass of the thinking pulse |
+| `PULSE` | 1400 | one needs-you ring |
+| `REDUCED` | 150 | universal reduced-motion fade |
 
-### Easings / springs
+Easing: emphasized `cubic-bezier(0.2, 0, 0, 1)` for tweens; critically damped springs
+(no overshoot) for layout. Press scale **0.97** (cards) / **0.96** (Allow once).
 
-| Token | Spec | Use |
-|---|---|---|
-| `linear` | linear | Scan band, rule draw, strike flash |
-| `emphasized` | cubic-bezier(0.2, 0, 0, 1) | Shared-axis enter/exit |
-| `spatialFast` | spring 1400 / 0.6 | Press 96%, chip settle |
-| `spatialDefault` | spring 380 / 0.8 | Layout, plate collapse |
-| `effects` | spring 1600 / 1.0 | Colour/opacity (no overshoot) |
-| `signalStrike` | spring ~900 / 0.75 | Allow collapse |
+## Moments
 
-Press scale remains **0.96**. Content plates stay **0–4px** radius; motion never
-introduces soft squircles.
-
-### Colour in motion
-
-| Role | Token | Notes |
-|---|---|---|
-| Live / scan / caret | `accent` `#00D4C8` / `#007A73` | Flat; opacity 0.55–1.0 only |
-| Needs-you label | `attention` amber | Label strike only |
-| Deny shear | `negative` | 1px hairline |
-| Ink resolve | `ink-3` → `ink` | Streaming text |
-| Rain streak | accent @ 12–22% | Diagonal 1px, never glow |
-
-## Catalogue
-
-### 1. Thinking — Scan line
-A 2–4px forest/sunflower band sweeps left→right across a short rule under the bot’s working
-row (or across the orb rail), like a neon tube flickering on in rain. Beside it,
-mono phase text cross-fades (“Reading files” → “Planning” → “Editing App.tsx”)
-on a ticker of `snap`ms. Loop `1600`ms. Reduced: static band at 40% + static phase.
-
-### 2. Streaming text
-Incoming agent text resolves word/chunk from `ink-3` to `ink` over `snap`ms.
-A **1px forest/sunflower caret** leads the frontier; blink `snap` half-cycle when idle at end.
-Reduced: instant ink, no caret blink (steady caret ok).
-
-### 3. Tool running
-Mono command line; a **progress hairline** (1px accent) fills L→R under the
-command. File/path chips tick in with `spatialFast` (opacity + 4px rise). Reduced:
-hairline at final %, chips appear static.
-
-### 4. Creating a bot
-Diagonal rain streaks (1px accent @ ~18%) converge into the cat glyph silhouette
-over `assemble`ms; then a 4px signal band flashes once (`strike`) to confirm.
-Reduced: glyph fades in 150ms, band static.
-
-### 5. Connecting / pairing
-Rain streaks converge to a point; Direct/Relay status **lights up** like a neon
-sign: 2 quick flickers (`strike` on/off) then steady. Cap ≤3 flashes/sec, ΔL low.
-Reduced: steady on, no flicker.
-
-### 6. Needs you arriving
-Plate drops in from top (~8px + fade, `emphasized`/`settle`); amber **Needs you**
-label does a 4px left-to-right strike. Light haptic where available. Reduced: fade only.
-
-### 7. Signal strike (Allow)
-Exists: press 96% → 4px forest/sunflower band full-width (`strike` 120ms) → plate collapses to
-live row (`signalStrike` ~280ms) → 3px left rail remains. Reduced: 150ms crossfade.
-
-### 8. Deny
-Plate shears sideways 4px (`snap`) and dims to 55%; a 1px `negative` hairline
-draws on the leading edge. Reduced: dim crossfade, no shear.
-
-### 9. Task done
-A forest/sunflower rule draws L→R under the summary (`draw` 420ms); checkpoint chip settles
-with `spatialFast`. Reduced: rule + chip appear static.
-
-### 10. Screen transitions
-Shared-axis: 8px slide + fade, `emphasized` / `settle`. No bouncy scale.
-Reduced: 150ms fade.
-
-### 11. Pull-to-refresh / skeletons
-**Rain-streak shimmer**: diagonal 1px forest/sunflower strokes drift across raised plates at
-low opacity (not grey pulse). Reduced: static plate, no drift.
-
-### 12. App launch
-Cat glyph, single neon flicker-on (2 frames then steady), then bots list shared-axis
-in. Reduced: glyph → list fade.
-
-## Implementation map
-
-| Moment | Android | Web | Swift | TUI |
-|---|---|---|---|---|
-| Thinking scan | `ScanLine` + `PhaseTicker` | CSS `.scan-line` | `ScanLineView` | spinner + phase |
-| Streaming | `StreamingText` | CSS caret | `StreamingText` | — |
-| Tool running | `ToolProgress` | CSS hairline | optional | — |
-| Create bot | `CatAssemble` | CSS | optional | — |
-| Pairing neon | `NeonStatus` | CSS | optional | — |
-| Needs you | `NeedsYouEnter` | CSS | optional | — |
-| Signal strike | `SignalStrike` (polish) | — | polish | — |
-| Deny | `DenyShear` | CSS | optional | — |
-| Task done | `DoneRule` | CSS | optional | — |
-| Transitions | nav anim | framer | navigation | — |
-| Skeleton | `RainShimmer` | CSS | optional | — |
-| Launch | `LaunchFlicker` | — | optional | — |
+| # | Moment | Treatment | Android |
+|---|---|---|---|
+| 1 | Thinking | Five dots, a lit head scans across (unlit dots stay so nothing jumps); a small dot cat blinks; the phase text crossfades | `ThinkingRow`, `DotPulse` |
+| 2 | Streaming | A red block caret at the end of the live agent text, 530ms blink | `StreamCaret` |
+| 3 | Needs you | A red dot with one ring breathing out every 1.4s. The only looping red. | `NeedsYouPulse` |
+| 4 | Approval arrives | The card rises 16dp with a fade, 240ms emphasized. No squash. | `ApprovalDropIn` |
+| 5 | Allow once | The black pill presses to 0.96 and releases (120ms each way), then an ink "Allowed" chip with a check scales in | `AllowPressEffect`, `AllowedChip` |
+| 6 | Deny | Two short 3dp nudges, then the control dims | `DenyNudge` |
+| 7 | Creating a bot | The cat's dots fly in from a scatter and lock to the grid (760ms), then the name types in at 28ms a letter | `CatAssemble` |
+| 8 | Pairing | The hero settles from 0.96 and the cat's eyes light | `PairingSuccess` |
+| 9 | Task done | The cat squints (eyes filled) and a dotted rule fills in under "Done" | `DoneStamp`, `DottedRule` |
+| 10 | Pull to refresh | The dot cat assembles as you pull | `CatPeek` |
+| 11 | Loading | A faint dot grid with a slow diagonal brightness wave | `DotShimmer` |
+| 12 | Brand mark | Dot cat tile that blinks now and then | `DotCatMark` |
 
 ## Proof
 
-Clips under `/workspace/hypurr-shots/motion/` (and linked from the PR): short
-2–6s MP4/GIF or frame strips for thinking, strike, deny, streaming, pairing,
-create-bot, skeleton.
+`SignalMotionReelTest` renders the real screens frame by frame (Robolectric
+`mainClock.advanceTimeBy(16)`), gated by the `HYPURR_REEL` env var so CI skips it:
+
+```sh
+cd apps/android
+HYPURR_REEL=/tmp/reel ./gradlew :app:testDebugUnitTest --tests '*SignalMotionReelTest' -Proborazzi.test.record=true
+ffmpeg -framerate 60 -pattern_type glob -i '/tmp/reel/*.png' -pix_fmt yuv420p reel.mp4
+```
+
+The current reel is [`signal/reel.mp4`](signal/reel.mp4).

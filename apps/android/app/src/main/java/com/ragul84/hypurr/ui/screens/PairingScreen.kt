@@ -1,4 +1,6 @@
 package com.ragul84.hypurr.ui.screens
+import com.ragul84.hypurr.ui.SignalIcons
+import com.ragul84.hypurr.ui.signalIcon
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -7,6 +9,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,7 +18,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
@@ -25,10 +27,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ContentPaste
-import androidx.compose.material.icons.rounded.Link
-import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -36,36 +34,33 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.ragul84.hypurr.ui.FlowButton
-import com.ragul84.hypurr.ui.FlowOrb
+import com.ragul84.hypurr.ui.DotCat
+import com.ragul84.hypurr.ui.Eyebrow
+import com.ragul84.hypurr.ui.SignalCard
+import com.ragul84.hypurr.ui.PrimaryButton
 import com.ragul84.hypurr.ui.IconBubble
 import com.ragul84.hypurr.ui.SoftButton
-import com.ragul84.hypurr.ui.glass
-import com.ragul84.hypurr.ui.theme.ColorFlow
-import com.ragul84.hypurr.ui.motion.NeonStatus
-import com.ragul84.hypurr.ui.motion.CatAssemble
+import com.ragul84.hypurr.ui.motion.PairingSuccess
 import com.ragul84.hypurr.ui.theme.Hypurr
 
-data class PairingUiState(val link: String = "", val busy: Boolean = false, val error: String? = null, val computerName: String? = null)
+data class PairingUiState(
+    val link: String = "",
+    val busy: Boolean = false,
+    val error: String? = null,
+    val computerName: String? = null,
+    val success: Boolean = false,
+)
 
-/** The colour-flow glow behind onboarding and empty states. */
 @Composable
 fun FlowBackdrop(modifier: Modifier = Modifier) {
-    val alpha = if (Hypurr.colors.dark) 0.22f else 0.14f
-    fun glow(color: androidx.compose.ui.graphics.Color, a: Float) = Brush.radialGradient(listOf(color.copy(alpha = a), color.copy(alpha = 0f)))
-    Box(modifier.fillMaxSize()) {
-        Box(Modifier.size(420.dp).offset((-150).dp, (-130).dp).background(glow(ColorFlow.cream, alpha * 0.9f), CircleShape))
-        Box(Modifier.size(380.dp).align(Alignment.TopEnd).offset(150.dp, 60.dp).background(glow(ColorFlow.signal, alpha * 0.55f), CircleShape))
-        Box(Modifier.size(420.dp).align(Alignment.BottomCenter).offset(60.dp, 170.dp).background(glow(ColorFlow.sunflower, alpha * 0.4f), CircleShape))
-    }
+    // Flat Signal ground.
+    Box(modifier.fillMaxSize().background(Hypurr.colors.bg))
 }
 
 @Composable
@@ -75,95 +70,96 @@ fun PairingScreen(
     onScan: () -> Unit,
     onPaste: () -> Unit,
     onPair: () -> Unit,
+    onInstallAgent: () -> Unit = {},
 ) {
     val c = Hypurr.colors
     Box(Modifier.fillMaxSize().background(c.bg)) {
-        FlowBackdrop()
         Column(
             Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Spacer(Modifier.height(56.dp))
-            FlowOrb(104.dp, animate = state.busy)
-            Spacer(Modifier.height(28.dp))
-            Text("Hypurr", style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.ExtraBold), color = c.accent)
-            Spacer(Modifier.height(8.dp))
-            Text("Your coding bots, on your phone.", style = MaterialTheme.typography.titleMedium, color = c.secondary,
-                textAlign = TextAlign.Center)
-            state.computerName?.let { name ->
-                Spacer(Modifier.height(16.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                    NeonStatus(on = true)
-                    Spacer(Modifier.width(8.dp))
-                    Text("$name · Direct", color = c.accent, style = MaterialTheme.typography.labelLarge)
+            Spacer(Modifier.height(48.dp))
+            PairingSuccess(success = state.success) {
+                // Dot cat on a white tile; pairing success fills its eyes (a happy squint).
+                Box(Modifier.size(104.dp).clip(RoundedCornerShape(30.dp)).background(c.surface).border(1.dp, c.border, RoundedCornerShape(30.dp)),
+                    contentAlignment = Alignment.Center) {
+                    DotCat(c.text, 62.dp, off = c.dotOff, blink = if (state.success) 1f else 0f)
                 }
             }
-            Spacer(Modifier.height(36.dp))
+            Spacer(Modifier.height(22.dp))
+            Text("Meet Hypurr", style = MaterialTheme.typography.headlineLarge, color = c.text)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "AI coding agents, safe enough for anyone. Install the agent on your computer, then pair this phone.",
+                color = c.secondary, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge,
+            )
+            if (state.success && state.computerName != null) {
+                Spacer(Modifier.height(16.dp))
+                Eyebrow("Connected to ${state.computerName}", dot = c.text, color = c.text)
+            }
+            Spacer(Modifier.height(28.dp))
             AnimatedContent(state.busy, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "pairing") { busy ->
                 if (busy) {
-                    Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(28.dp), c.glass).padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Pairing with ${state.computerName ?: "your computer"}…", style = MaterialTheme.typography.titleMedium, color = c.text)
-                        Spacer(Modifier.height(6.dp))
-                        Text("Proving the one-time code over an end-to-end encrypted channel.", color = c.secondary,
-                            style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
+                    SignalCard(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Pairing with ${state.computerName ?: "your computer"}…", style = MaterialTheme.typography.titleMedium, color = c.text)
+                            Spacer(Modifier.height(6.dp))
+                            Text("Proving the one-time code over an end-to-end encrypted channel.", color = c.secondary,
+                                style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
+                        }
                     }
                 } else {
                     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(28.dp), c.glass).padding(20.dp),
-                            verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                            Step(1, "On your computer, open Hypurr and choose Pair phone, or run", "hypurr-host pair")
-                            Step(2, "Scan the QR code it shows, or paste its pairing link below.", null)
+                        SignalCard(Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                                Step(1, "Install Hypurr Agent on your computer")
+                                Step(2, "Scan the QR it shows, or paste the pairing link")
+                                Step(3, "Run your first task from this phone")
+                            }
                         }
-                        Spacer(Modifier.height(24.dp))
-                        FlowButton("Scan pairing code", Modifier.fillMaxWidth(), icon = Icons.Rounded.QrCodeScanner, onClick = onScan)
-                        Spacer(Modifier.height(14.dp))
-                        Row(Modifier.fillMaxWidth().glass(RoundedCornerShape(50), c.surface, highlight = false)
+                        Spacer(Modifier.height(20.dp))
+                        PrimaryButton("Pair with QR", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Qr), onClick = onScan)
+                        Spacer(Modifier.height(12.dp))
+                        SoftButton("Install Hypurr Agent", Modifier.fillMaxWidth(), tint = c.text, onClick = onInstallAgent)
+                        Spacer(Modifier.height(16.dp))
+                        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(c.surface).border(1.dp, c.border, RoundedCornerShape(50))
                             .padding(start = 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
                             verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Rounded.Link, null, tint = c.tertiary, modifier = Modifier.size(20.dp))
+                            Icon(signalIcon(SignalIcons.Link), null, tint = c.tertiary, modifier = Modifier.size(20.dp))
                             Spacer(Modifier.width(10.dp))
                             Box(Modifier.weight(1f)) {
                                 if (state.link.isEmpty()) Text("hypurr://pair?…", color = c.secondary, style = MaterialTheme.typography.bodyLarge)
                                 BasicTextField(state.link, onLinkChange, singleLine = true, cursorBrush = SolidColor(c.accent),
                                     textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.text), modifier = Modifier.fillMaxWidth())
                             }
-                            IconBubble(Icons.Rounded.ContentPaste, "Paste pairing link", fill = c.bg, size = 40.dp, onClick = onPaste)
+                            IconBubble(signalIcon(SignalIcons.Paste), "Paste pairing link", fill = c.surface2, size = 40.dp, onClick = onPaste)
                         }
                         AnimatedVisibility(state.link.isNotBlank(), enter = fadeIn() + slideInVertically()) {
-                            SoftButton("Pair", Modifier.padding(top = 14.dp).fillMaxWidth(), onClick = onPair)
+                            PrimaryButton("Pair", Modifier.padding(top = 14.dp).fillMaxWidth(), onClick = onPair)
                         }
                     }
                 }
             }
             AnimatedVisibility(state.error != null) {
-                Text(state.error.orEmpty(), color = c.danger, style = MaterialTheme.typography.bodyMedium,
+                Text(state.error.orEmpty(), color = c.needsText, style = MaterialTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center, modifier = Modifier.padding(top = 18.dp))
             }
             Spacer(Modifier.height(24.dp))
-            Text("Pairing is local and end-to-end encrypted. Messages go directly over your network or Tailscale, " +
-                "or through the cloud relay, which only sees ciphertext.", color = c.tertiary,
-                style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center)
+            Text(
+                "Pairing is local and end-to-end encrypted. Messages go directly over your network or Tailscale, or through the cloud relay, which only sees ciphertext.",
+                color = c.secondary, style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center,
+            )
             Spacer(Modifier.height(24.dp))
         }
     }
 }
 
 @Composable
-private fun Step(n: Int, text: String, code: String?) {
+private fun Step(n: Int, text: String) {
     val c = Hypurr.colors
     Row(verticalAlignment = Alignment.Top) {
-        Box(Modifier.size(26.dp).clip(CircleShape).background(Hypurr.colors.accent), contentAlignment = Alignment.Center) {
-            Text("$n", color = Hypurr.colors.onAccent, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-        }
+        com.ragul84.hypurr.ui.DotFigure("$n", com.ragul84.hypurr.ui.theme.SignalType.figureSmall, c.text, Modifier.width(24.dp))
         Spacer(Modifier.width(12.dp))
-        Column {
-            Text(text, color = c.text, style = MaterialTheme.typography.bodyMedium)
-            if (code != null) {
-                Text(code, color = c.accent, style = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 14.sp),
-                    modifier = Modifier.padding(top = 6.dp).clip(RoundedCornerShape(8.dp)).background(c.accent.copy(alpha = 0.1f))
-                        .padding(horizontal = 8.dp, vertical = 3.dp))
-            }
-        }
+        Text(text, color = c.text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 1.dp))
     }
 }

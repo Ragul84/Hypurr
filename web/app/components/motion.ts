@@ -4,14 +4,15 @@ export const springBouncy = { type: "spring", stiffness: 380, damping: 18, mass:
 export const springGentle = { type: "spring", stiffness: 120, damping: 20 } as const;
 export const easeEmphasized = [0.2, 0, 0, 1] as const;
 
-/** Wet-asphalt neon timing tokens (ms). */
+/** Signal motion timing tokens (ms), mirrors HypurrMotion on Android. */
 export const HypurrMotion = {
   strike: 120,
   snap: 180,
-  settle: 280,
+  settle: 240,
   draw: 420,
-  assemble: 720,
-  loop: 1600,
+  assemble: 760,
+  loop: 1400,
+  scan: 1100,
   reduced: 150,
 } as const;
 

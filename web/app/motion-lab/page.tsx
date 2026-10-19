@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Hypurr motion lab",
-  description: "Wet-asphalt neon micro-animation catalogue",
+  description: "Signal motion catalogue",
 };
 
 export default function MotionLabPage() {

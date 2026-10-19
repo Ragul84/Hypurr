@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hypurr Signal icon "bots" (tools/signal-icons/icons.py). 24 grid, 1.6 stroke, round caps. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
+    <path android:pathData="M4.8 10.6V4.9c0-.6.7-.9 1.1-.5l3.3 2.6h5.6l3.3-2.6c.4-.4 1.1-.1 1.1.5v5.7c0 4.6-3.2 8.4-7.2 8.4s-7.2-3.8-7.2-8.4z" android:fillColor="#00000000" android:strokeColor="#FF0E0E0E" android:strokeWidth="1.6" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+    <path android:pathData="M9.3 12.2v.6M14.7 12.2v.6" android:fillColor="#00000000" android:strokeColor="#FF0E0E0E" android:strokeWidth="2.1" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+    <path android:pathData="M11 15.3h2l-1 .9z" android:fillColor="#00000000" android:strokeColor="#FF0E0E0E" android:strokeWidth="1.6" android:strokeLineCap="round" android:strokeLineJoin="round"/>
+</vector>

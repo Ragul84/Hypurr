@@ -4,7 +4,7 @@
 //! Rules are deliberately simple and conservative: anything unrecognised is medium.
 
 use serde::{Deserialize, Serialize};
-use std::path::{Component, Path, PathBuf};
+use std::path::Path;
 
 /// How risky a request is (wire values `low` / `medium` / `high`).
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
@@ -27,6 +27,9 @@ pub struct Assessment {
     pub reasons: Vec<String>,
     /// Set when the safety net refuses the request without asking (plain reason).
     pub blocked: Option<String>,
+    /// Always surface a Needs-you card (outside project folder, deletes, pushes) — even if the bot is set to auto-approve.
+    #[serde(default)]
+    pub must_ask: bool,
 }
 
 /// A permission request, as the bot actor sees it.
@@ -44,6 +47,8 @@ pub struct Request<'a> {
 
 struct Finding {
     risk: Risk,
+    /// Must reach the person even on auto-approve bots (outside the folder, deletes, pushes).
+    ask: bool,
     /// Completes "The agent wants to …".
     action: String,
     reason: Option<String>,
@@ -52,7 +57,11 @@ struct Finding {
 
 impl Finding {
     fn new(risk: Risk, action: impl Into<String>) -> Self {
-        Self { risk, action: action.into(), reason: None, blocked: None }
+        Self { risk, ask: risk >= Risk::High, action: action.into(), reason: None, blocked: None }
+    }
+    fn ask(mut self) -> Self {
+        self.ask = true;
+        self
     }
     fn because(mut self, reason: impl Into<String>) -> Self {
         self.reason = Some(reason.into());
@@ -112,7 +121,8 @@ pub fn assess(req: &Request) -> Assessment {
         }
     }
     let blocked = ranked.iter().find_map(|f| f.blocked.clone());
-    Assessment { risk, explain, reasons, blocked }
+    let must_ask = blocked.is_none() && findings.iter().any(|f| f.ask);
+    Assessment { risk, explain, reasons, blocked, must_ask }
 }
 
 fn join_and(items: &[&str]) -> String {
@@ -197,31 +207,10 @@ fn looks_secret(p: &str) -> bool {
     })
 }
 
-/// Lexically resolves `p` against `cwd` (no filesystem access).
-fn resolve(cwd: &str, p: &str) -> PathBuf {
-    let expanded = if let Some(rest) = p.strip_prefix("~/") {
-        dirs::home_dir().unwrap_or_default().join(rest)
-    } else if p == "~" {
-        dirs::home_dir().unwrap_or_default()
-    } else {
-        PathBuf::from(p)
-    };
-    let joined = if expanded.is_absolute() { expanded } else { Path::new(cwd).join(expanded) };
-    let mut out = PathBuf::new();
-    for c in joined.components() {
-        match c {
-            Component::ParentDir => {
-                out.pop();
-            }
-            Component::CurDir => {}
-            other => out.push(other),
-        }
-    }
-    out
-}
-
+/// Whether `p` falls outside the task's project folder `cwd` (symlinks, `..` and
+/// absolute paths resolved on the real filesystem; see [`super::scope`]).
 fn outside(cwd: &str, p: &str) -> bool {
-    !cwd.is_empty() && !resolve(cwd, p).starts_with(resolve(cwd, "."))
+    !super::scope::Scope::new(cwd).contains(p)
 }
 
 fn short_list(items: &[String]) -> String {
@@ -242,7 +231,8 @@ fn paths_finding(paths: &[String], cwd: &str) -> Finding {
     let out: Vec<String> = paths.iter().filter(|p| outside(cwd, p)).cloned().collect();
     if !out.is_empty() {
         return Finding::new(Risk::High, format!("change {} outside this project", short_list(&out)))
-            .because("It changes files outside the project folder, where the safety net can't undo it.");
+            .because("It changes files outside the project folder, where the safety net can't undo it.")
+            .ask();
     }
     let secret: Vec<String> = paths.iter().filter(|p| looks_secret(p)).cloned().collect();
     if !secret.is_empty() {
@@ -271,7 +261,7 @@ fn kind_finding(kind: &str, title: &str) -> Finding {
             Finding::new(Risk::Low, format!("look at files ({title})")).because("It only reads; nothing changes.")
         }
         "fetch" => Finding::new(Risk::Medium, format!("open a web page ({title})")).because("It reaches the internet."),
-        "delete" => Finding::new(Risk::High, format!("delete something ({title})")).because("It deletes files."),
+        "delete" => Finding::new(Risk::High, format!("delete something ({title})")).because("It deletes files.").ask(),
         "edit" | "move" => Finding::new(Risk::Low, format!("change files ({title})"))
             .because("Edits inside the project can be undone from a checkpoint."),
         _ => Finding::new(Risk::Medium, what).because("Hypurr doesn't recognise this tool, so it asks to be safe."),
@@ -350,6 +340,7 @@ fn git_finding(args: &[&str], req: &Request) -> Finding {
             }
             Finding::new(Risk::Medium, format!("upload this branch to {remote}"))
                 .because("It sends your code to the server where others can see it.")
+                .ask()
         }
         "reset" if has("--hard") => Finding::new(Risk::High, "throw away uncommitted changes (git reset --hard)")
             .because("Uncommitted work is lost."),
@@ -373,8 +364,9 @@ fn git_finding(args: &[&str], req: &Request) -> Finding {
             Finding::new(Risk::Medium, format!("download code (git {sub})")).because("It reaches the internet.")
         }
         "commit" | "add" | "stash" | "tag" | "restore" | "mv" | "rm" => {
-            Finding::new(Risk::Medium, format!("change the project history (git {sub})"))
-                .because("It changes what git records; checkpoints still let you go back.")
+            let f = Finding::new(Risk::Medium, format!("change the project history (git {sub})"))
+                .because("It changes what git records; checkpoints still let you go back.");
+            if sub == "rm" { f.ask() } else { f }
         }
         _ => Finding::new(Risk::Medium, format!("run git {sub}"))
             .because("Hypurr doesn't recognise this git command, so it asks to be safe."),
@@ -458,6 +450,7 @@ fn classify(prog: &str, args: &[&str], w: &[String], req: &Request, display: &st
             } else {
                 Finding::new(Risk::Medium, format!("delete {what}"))
                     .because("It deletes files; a checkpoint can bring tracked files back.")
+                    .ask()
             }
         }
         "mv" | "cp" | "ln" | "touch" | "mkdir" | "tee" | "sed" | "perl" => {
@@ -477,12 +470,17 @@ fn classify(prog: &str, args: &[&str], w: &[String], req: &Request, display: &st
                 .because("Loose file permissions can expose your computer.")
         }
         p if READ_ONLY.contains(&p) => {
-            let out: Vec<String> = targets.iter().filter(|t| outside(req.cwd, t) && t.contains('/')).cloned().collect();
+            let out: Vec<String> = targets
+                .iter()
+                .filter(|t| (t.contains('/') || t.starts_with("..") || t.starts_with('~')) && outside(req.cwd, t))
+                .cloned()
+                .collect();
             if out.is_empty() {
                 Finding::new(Risk::Low, format!("look at files ({display})")).because("It only reads; nothing changes.")
             } else {
                 Finding::new(Risk::Medium, format!("look at files outside this project ({})", short_list(&out)))
                     .because("It reads files outside the project folder.")
+                    .ask()
             }
         }
         p if NETWORK.contains(&p) => {
@@ -736,5 +734,81 @@ mod tests {
         assert_eq!(cmd("kubectl delete pod x").risk, Risk::High);
         assert_eq!(cmd("kubectl get pods").risk, Risk::Medium);
         assert_eq!(cmd("terraform apply").risk, Risk::High);
+    }
+
+    #[test]
+    fn outside_project_always_must_ask() {
+        let a = edit(&["/other/secret.txt"]);
+        assert_eq!(a.risk, Risk::High);
+        assert!(a.must_ask, "outside-folder edits must reach the person even on auto bots");
+        assert!(a.reasons.iter().any(|r| r.contains("outside")));
+    }
+
+    #[test]
+    fn inside_project_edit_does_not_force_ask() {
+        let a = edit(&["/work/repo/src/main.rs", "src/lib.rs"]);
+        assert_eq!(a.risk, Risk::Low);
+        assert!(!a.must_ask);
+        assert!(!cmd("cargo test").must_ask);
+        assert!(!cmd("cat src/main.rs").must_ask, "reading inside the folder is free");
+    }
+
+    #[test]
+    fn traversal_and_absolute_paths_must_ask() {
+        for p in ["../other/x.rs", "src/../../other/x.rs", "/etc/hosts", "~/.bashrc"] {
+            assert!(edit(&[p]).must_ask, "edit {p}");
+        }
+        for c in ["cat ../../etc/passwd", "cat /etc/passwd", "ls ~/Documents", "cp src/a.rs ../a.rs"] {
+            let a = cmd(c);
+            assert!(a.must_ask, "{c} should ask");
+            assert!(a.reasons.iter().any(|r| r.contains("outside")), "{c}: {:?}", a.reasons);
+        }
+    }
+
+    #[test]
+    fn pushes_and_deletes_must_ask() {
+        let a = cmd("git push origin feature/x");
+        assert_eq!(a.risk, Risk::Medium);
+        assert!(a.must_ask, "every push asks");
+        assert!(cmd("rm notes.txt").must_ask, "every delete asks");
+        assert!(cmd("git rm old.rs").must_ask);
+        assert!(cmd("rm -rf build").must_ask);
+        // Blocked outright: no card to ask on.
+        let a = cmd("git push --force origin main");
+        assert!(a.blocked.is_some() && !a.must_ask);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlink_out_of_the_folder_must_ask() {
+        let base = std::env::temp_dir().join(format!("hypurr-risk-{}", uuid::Uuid::new_v4()));
+        let repo = base.join("repo");
+        std::fs::create_dir_all(repo.join("src")).unwrap();
+        std::fs::create_dir_all(base.join("outside")).unwrap();
+        std::os::unix::fs::symlink(base.join("outside"), repo.join("src/link")).unwrap();
+        let cwd = repo.to_string_lossy().into_owned();
+        let paths = vec!["src/link/evil.sh".to_owned()];
+        let a = assess(&Request {
+            tool_kind: "edit",
+            title: "Edit",
+            command: None,
+            paths: &paths,
+            cwd: &cwd,
+            protected: &[],
+            block_protected: true,
+        });
+        assert_eq!(a.risk, Risk::High);
+        assert!(a.must_ask);
+        let a = assess(&Request {
+            tool_kind: "execute",
+            title: "Run",
+            command: Some("rm src/link/data.db"),
+            paths: &[],
+            cwd: &cwd,
+            protected: &[],
+            block_protected: true,
+        });
+        assert!(a.reasons.iter().any(|r| r.contains("outside")), "{:?}", a.reasons);
+        let _ = std::fs::remove_dir_all(&base);
     }
 }

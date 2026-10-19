@@ -22,14 +22,14 @@ Free, open source, native on iPhone, Mac, Linux and the terminal.
 > [docs/guides/hypurr-setup.md](docs/guides/hypurr-setup.md). Local, LAN, Tailscale
 > and SSH use work from source today.
 
-Hypurr turns the coding agents on your computer — Claude Code, Codex, Cursor, Pi, OpenCode, Grok Build, Gemini, Copilot and ~40 more — into persistent *bots* you delegate to from your iPhone, Mac, Linux desktop or any terminal, the way you'd message a colleague. Pick who, say what, put the phone away. You get a notification when a bot finishes or needs your approval.
+Hypurr turns the coding agents on your computer — Claude Code, Codex, Cursor, Pi, Hypurr Agent, Grok Build, Gemini, Copilot and ~40 more — into persistent *bots* you delegate to from your iPhone, Mac, Linux desktop or any terminal, the way you'd message a colleague. Pick who, say what, put the phone away. You get a notification when a bot finishes or needs your approval.
 
 > Why bots? On a phone, "find the right working session, then pick an environment" is too slow. With bots you already know who to hand the intent to: open the chat, type, done.
 
 ## Why Hypurr
 
 - **Free and open source.** No subscription, no paid tier, MIT licensed. It runs on your computer with the agents and accounts you already have.
-- **Bring any coding agent.** Claude Code, Codex, Cursor, Gemini, Copilot, OpenCode, Pi, Grok Build and ~40 more — everything in the [ACP registry](https://agentclientprotocol.com/registry). Installed agents are found automatically, the rest are fetched on first use, and every bot picks its own. Mix them freely: a Claude bot can ask a Codex bot for a review.
+- **Bring any coding agent.** Claude Code, Codex, Cursor, Gemini, Copilot, Hypurr Agent, Pi, Grok Build and ~40 more — everything in the [ACP registry](https://agentclientprotocol.com/registry). Installed agents are found automatically, the rest are fetched on first use, and every bot picks its own. Mix them freely: a Claude bot can ask a Codex bot for a review.
 - **Many bots, one team.** Run as many bots as you like side by side, each with its own agent, project folder and approvals, all working at once. Put several in a **group chat** and they answer in turn, like a team channel; `@name` picks who replies. Start a **thread** on any message to branch off without cluttering the main chat.
 - **Safe for beginners at work.** Describe what you need in plain words or pick a template (write tests, fix this error, review my PR, update dependencies, explain this code). Hypurr picks the project and agent, runs the task on its own branch with checkpoints you can go back to in one tap, explains every approval in plain words with a risk level, and blocks risky moves like pushing to `main`. See [tasks and the safety net](docs/features/tasks-and-safety.md).
 - **Fits how your team works.** Paste a screenshot or error into a new task, or start from a GitHub issue or Jira ticket. When it's done, Hypurr explains what changed and why in plain words (learning mode), opens a pull request, comments on the ticket, posts to Slack or Teams, and shows what each task cost. See [work tools](docs/features/integrations.md).

@@ -7,6 +7,9 @@ import com.ragul84.hypurr.data.ThemeMode
 import com.ragul84.hypurr.net.LinkState
 import com.ragul84.hypurr.net.Route
 import com.ragul84.hypurr.ui.screens.BotListScreen
+import com.ragul84.hypurr.ui.screens.HomeTab
+import com.ragul84.hypurr.ui.screens.TasksScreen
+import com.ragul84.hypurr.ui.screens.SpendScreen
 import com.ragul84.hypurr.ui.screens.NeedsYouAsk
 import com.ragul84.hypurr.ui.screens.ChatScreen
 import com.ragul84.hypurr.ui.screens.NewTaskScreen
@@ -76,6 +79,26 @@ class ScreenshotTest {
                 ),
             ),
         )
+    }
+
+    @Test
+    fun spend() = shoot("spend") {
+        SpendScreen(Samples.computer.name, LinkState.Ready(Route.Direct), Samples.costs,
+            bots = Samples.bots.associateBy { it.id }, now = Samples.NOW)
+    }
+
+    @Test
+    fun tasks() = shoot("tasks") {
+        TasksScreen(Samples.computer.name, LinkState.Ready(Route.Direct), Samples.templates,
+            recent = rosterOrder(Samples.botsWithTask), now = Samples.NOW)
+    }
+
+    @Test
+    fun you() = shoot("you") {
+        SettingsScreen(SettingsUiState(Samples.computer, LinkState.Ready(Route.Relay), ThemeMode.System, dynamicColor = false,
+            notifications = true, pushAvailable = false, version = "2.4.0", dynamicSupported = true,
+            safety = Samples.safety, customTemplates = Samples.templates.filter { !it.builtin }, costs = Samples.costs),
+            {}, {}, {}, {}, {}, showHomeTabs = true)
     }
 
     @Test
@@ -283,8 +306,8 @@ class ScreenshotTest {
 private fun FakeDesktop(modifier: androidx.compose.ui.Modifier) {
     androidx.compose.foundation.layout.Box(modifier, contentAlignment = androidx.compose.ui.Alignment.Center) {
         androidx.compose.foundation.Canvas(androidx.compose.ui.Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
-            drawRect(androidx.compose.ui.graphics.Brush.linearGradient(listOf(androidx.compose.ui.graphics.Color(0xFF3A1C71),
-                androidx.compose.ui.graphics.Color(0xFFD76D77), androidx.compose.ui.graphics.Color(0xFFFFAF7B))))
+            drawRect(androidx.compose.ui.graphics.Brush.linearGradient(listOf(androidx.compose.ui.graphics.Color(0xFF1C1C1E),
+                androidx.compose.ui.graphics.Color(0xFF5C5C63), androidx.compose.ui.graphics.Color(0xFFCFCFCA))))
             drawRect(androidx.compose.ui.graphics.Color(0xF0FFFFFF), topLeft = androidx.compose.ui.geometry.Offset(size.width * 0.12f, size.height * 0.14f),
                 size = androidx.compose.ui.geometry.Size(size.width * 0.62f, size.height * 0.66f))
             drawRect(androidx.compose.ui.graphics.Color(0xFFE8EAED), topLeft = androidx.compose.ui.geometry.Offset(size.width * 0.12f, size.height * 0.14f),

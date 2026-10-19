@@ -1,7 +1,11 @@
 package com.ragul84.hypurr.ui.screens
+import com.ragul84.hypurr.ui.SignalIcons
+import com.ragul84.hypurr.ui.motion.DotShimmer
+import com.ragul84.hypurr.ui.signalIcon
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,13 +25,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Delete
-import androidx.compose.material.icons.rounded.Folder
-import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -44,13 +41,13 @@ import com.ragul84.hypurr.model.Backend
 import com.ragul84.hypurr.model.Bot
 import com.ragul84.hypurr.model.DirListing
 import com.ragul84.hypurr.ui.BotAvatar
-import com.ragul84.hypurr.ui.FlowButton
+import com.ragul84.hypurr.ui.PrimaryButton
 import com.ragul84.hypurr.ui.IconBubble
 import com.ragul84.hypurr.ui.Pill
 import com.ragul84.hypurr.ui.SoftButton
 import com.ragul84.hypurr.ui.avatarColor
 import com.ragul84.hypurr.ui.motion.CatAssemble
-import com.ragul84.hypurr.ui.glass
+import com.ragul84.hypurr.ui.panel
 import com.ragul84.hypurr.ui.pressable
 import com.ragul84.hypurr.ui.theme.Hypurr
 import kotlinx.serialization.json.JsonArray
@@ -149,7 +146,7 @@ fun BotEditorScreen(
         Column(Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)
             .padding(bottom = 120.dp)) {
             Row(Modifier.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconBubble(Icons.AutoMirrored.Rounded.ArrowBack, "Back", onClick = onBack)
+                IconBubble(signalIcon(SignalIcons.Back), "Back", onClick = onBack)
                 Spacer(Modifier.width(12.dp))
                 Text(title, style = MaterialTheme.typography.headlineSmall, color = c.text, modifier = Modifier.weight(1f))
             }
@@ -175,9 +172,10 @@ fun BotEditorScreen(
                         AvatarColors.forEach { id ->
                             val on = state.avatarColor == id
                             Box(Modifier.size(34.dp).clip(CircleShape).background(avatarColor(id))
+                                .border(if (on) 2.dp else 1.dp, if (on) c.text else c.borderStrong, CircleShape)
                                 .pressable("Colour $id", role = Role.RadioButton) { onChange(state.copy(avatarColor = id)) },
                                 contentAlignment = Alignment.Center) {
-                                if (on) Icon(Icons.Rounded.Check, null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(18.dp))
+                                if (on) Icon(signalIcon(SignalIcons.Check), null, tint = androidx.compose.ui.graphics.Color.White, modifier = Modifier.size(18.dp))
                             }
                         }
                     }
@@ -200,7 +198,7 @@ fun BotEditorScreen(
                                     maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                             Box(Modifier.size(24.dp).clip(CircleShape).background(if (on) c.accent else c.border), contentAlignment = Alignment.Center) {
-                                if (on) Icon(Icons.Rounded.Check, null, tint = c.onAccent, modifier = Modifier.size(16.dp))
+                                if (on) Icon(signalIcon(SignalIcons.Check), null, tint = c.onAccent, modifier = Modifier.size(16.dp))
                             }
                         }
                     }
@@ -244,11 +242,11 @@ fun BotEditorScreen(
                 }
                 Section("Folder") {
                     if (state.isNew) {
-                        Choice("Personal workspace", state.folder == null, Modifier.fillMaxWidth(), Icons.Rounded.Home) {
+                        Choice("Personal workspace", state.folder == null, Modifier.fillMaxWidth(), signalIcon(SignalIcons.Host)) {
                             onChange(state.copy(folder = null, browsing = null))
                         }
                         Choice(state.folder?.substringAfterLast('/')?.let { "Folder: $it" } ?: "A folder on the computer…", state.folder != null,
-                            Modifier.fillMaxWidth(), Icons.Rounded.Folder) {
+                            Modifier.fillMaxWidth(), signalIcon(SignalIcons.Folder)) {
                             onBrowse(state.folder ?: state.browsing?.path)
                         }
                         state.browsing?.let { FolderBrowser(it, state.folder, onPick = { onChange(state.copy(folder = it)) }, onBrowse = onBrowse) }
@@ -269,7 +267,7 @@ fun BotEditorScreen(
                 Section("More") {
                     ToggleRow("Pin to the top", "Keeps it first in the list", state.pinned, true) { onChange(state.copy(pinned = it)) }
                     AnimatedVisibility(!state.confirmDelete) {
-                        SoftButton(if (state.group) "Delete group" else "Delete bot", Modifier.fillMaxWidth(), icon = Icons.Rounded.Delete, tint = c.danger) {
+                        SoftButton(if (state.group) "Delete group" else "Delete bot", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Close), tint = c.needsText) {
                             onChange(state.copy(confirmDelete = true))
                         }
                     }
@@ -278,36 +276,44 @@ fun BotEditorScreen(
                             Text(if (state.group) "The group and its chat go away. Its bots stay." else "The bot and its chat go away. Its folder stays on the computer.",
                                 color = c.secondary, style = MaterialTheme.typography.bodyMedium)
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                SoftButton("Delete", Modifier.weight(1f), tint = c.danger, onClick = onDelete)
+                                SoftButton("Delete", Modifier.weight(1f), tint = c.needsText, onClick = onDelete)
                                 SoftButton("Keep", Modifier.weight(1f), tint = c.secondary) { onChange(state.copy(confirmDelete = false)) }
                             }
                         }
                     }
                 }
             }
-            state.error?.let { Text(it, color = c.danger, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 12.dp, start = 8.dp)) }
+            state.error?.let { Text(it, color = c.needsText, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 12.dp, start = 8.dp)) }
         }
-        FlowButton(when {
+        if (state.isNew && !state.group && state.busy) {
+            Box(
+                Modifier.align(Alignment.Center).clip(RoundedCornerShape(20.dp)).background(c.surface)
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+            ) {
+                CatAssemble(playing = true, size = 64.dp, name = state.name.ifBlank { "New bot" })
+            }
+        }
+        PrimaryButton(when {
             state.busy -> "Saving…"
             state.isNew && state.group -> "Create group"
             state.isNew -> "Create bot"
             else -> "Save"
         }, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(20.dp).fillMaxWidth(), enabled = state.canSave,
-            icon = Icons.Rounded.Check, onClick = onSave)
+            icon = signalIcon(SignalIcons.Check), onClick = onSave)
     }
 }
 
 @Composable
 private fun Choice(label: String, on: Boolean, modifier: Modifier = Modifier, icon: androidx.compose.ui.graphics.vector.ImageVector? = null, badge: String? = null, onClick: () -> Unit) {
     val c = Hypurr.colors
-    Row(modifier.clip(RoundedCornerShape(16.dp)).background(if (on) c.accent.copy(alpha = 0.14f) else c.bg.copy(alpha = 0.6f))
+    Row(modifier.clip(RoundedCornerShape(16.dp)).background(if (on) c.accent else c.surface2)
         .pressable(label, role = Role.RadioButton, onClick = onClick).padding(horizontal = 14.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically) {
         if (icon != null) {
-            Icon(icon, null, tint = if (on) c.accent else c.secondary, modifier = Modifier.size(18.dp))
+            Icon(icon, null, tint = if (on) c.onAccent else c.secondary, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
         }
-        Text(label, color = if (on) c.accent else c.text, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
+        Text(label, color = if (on) c.onAccent else c.text, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false))
         if (badge != null) {
             Spacer(Modifier.width(8.dp))
@@ -320,21 +326,21 @@ private fun Choice(label: String, on: Boolean, modifier: Modifier = Modifier, ic
 @Composable
 private fun FolderBrowser(listing: DirListing, picked: String?, onPick: (String) -> Unit, onBrowse: (String?) -> Unit) {
     val c = Hypurr.colors
-    Column(Modifier.fillMaxWidth().glass(RoundedCornerShape(18.dp), c.bg.copy(alpha = 0.5f)).padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(Modifier.fillMaxWidth().panel(RoundedCornerShape(18.dp), c.surface2).padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            listing.parent?.let { IconBubble(Icons.Rounded.KeyboardArrowUp, "Up one folder", size = 34.dp) { onBrowse(it) } }
+            listing.parent?.let { IconBubble(signalIcon(SignalIcons.Back), "Up one folder", size = 34.dp) { onBrowse(it) } }
             Spacer(Modifier.width(8.dp))
             Text(listing.path, color = c.text, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall, maxLines = 1,
                 overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             if (listing.isGit) Pill("git", c.success)
         }
-        SoftButton(if (picked == listing.path) "Using this folder" else "Use this folder", Modifier.fillMaxWidth(), icon = Icons.Rounded.Check,
+        SoftButton(if (picked == listing.path) "Using this folder" else "Use this folder", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Check),
             tint = if (picked == listing.path) c.success else c.accent) { onPick(listing.path) }
         Column(Modifier.heightIn(max = 280.dp).verticalScroll(rememberScrollState())) {
             listing.dirs.forEach { d ->
                 Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).pressable(d.name) { onBrowse(d.path) }.padding(horizontal = 8.dp, vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Rounded.Folder, null, tint = c.accent, modifier = Modifier.size(18.dp))
+                    Icon(signalIcon(SignalIcons.Folder), null, tint = c.accent, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(10.dp))
                     Text(d.name, color = c.text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), maxLines = 1,
                         overflow = TextOverflow.Ellipsis)

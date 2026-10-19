@@ -2,14 +2,9 @@ package com.ragul84.hypurr.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,70 +14,71 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.DesktopWindows
-import androidx.compose.material.icons.rounded.Groups
-import androidx.compose.material.icons.rounded.SmartToy
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import com.ragul84.hypurr.ui.SoftButton
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.PushPin
-import androidx.compose.material.icons.rounded.Shield
-import androidx.compose.foundation.layout.navigationBarsPadding
-import com.ragul84.hypurr.ui.FlowButton
-import com.ragul84.hypurr.ui.Pill
-import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ragul84.hypurr.model.Bot
+import com.ragul84.hypurr.model.PermissionOption
 import com.ragul84.hypurr.net.LinkState
 import com.ragul84.hypurr.ui.ApprovalActions
 import com.ragul84.hypurr.ui.BotAvatar
-import com.ragul84.hypurr.ui.CreamPlate
-import com.ragul84.hypurr.ui.FlowOrb
-import com.ragul84.hypurr.ui.WorkingPhase
-import com.ragul84.hypurr.ui.motion.RainShimmer
-import com.ragul84.hypurr.ui.motion.LaunchFlicker
+import com.ragul84.hypurr.ui.DotCat
+import com.ragul84.hypurr.ui.DotFigure
+import com.ragul84.hypurr.ui.Eyebrow
+import com.ragul84.hypurr.ui.HairlineDivider
 import com.ragul84.hypurr.ui.IconBubble
-import com.ragul84.hypurr.ui.LinkPill
+import com.ragul84.hypurr.ui.Pill
+import com.ragul84.hypurr.ui.PrimaryButton
+import com.ragul84.hypurr.ui.SectionHeader
+import com.ragul84.hypurr.ui.SignalCard
+import com.ragul84.hypurr.ui.SignalIcons
+import com.ragul84.hypurr.ui.SoftButton
+import com.ragul84.hypurr.ui.StatusLabel
+import com.ragul84.hypurr.ui.WorkingPhase
+import com.ragul84.hypurr.ui.motion.CatPeek
+import com.ragul84.hypurr.ui.motion.DotCatMark
+import com.ragul84.hypurr.ui.motion.DotShimmer
 import com.ragul84.hypurr.ui.pressable
 import com.ragul84.hypurr.ui.relativeTime
+import com.ragul84.hypurr.ui.signalIcon
+import com.ragul84.hypurr.ui.signalState
 import com.ragul84.hypurr.ui.theme.Hypurr
 import com.ragul84.hypurr.ui.theme.Motion
-import com.ragul84.hypurr.model.PermissionOption
-import androidx.compose.material.icons.rounded.GridView
-import androidx.compose.material.icons.rounded.Description
-import androidx.compose.material.icons.rounded.Schedule
-import androidx.compose.material.icons.rounded.Person
-import androidx.compose.ui.graphics.vector.ImageVector
+import com.ragul84.hypurr.ui.theme.SignalType
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /** Roster order: pinned first, then the latest activity. Hidden bots stay off the list. */
 fun rosterOrder(bots: Collection<Bot>): List<Bot> =
@@ -102,7 +98,7 @@ data class NeedsYouAsk(
 
 enum class HomeTab { Bots, Tasks, Spend, You }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun BotListScreen(
     computerName: String,
@@ -130,120 +126,186 @@ fun BotListScreen(
     asks: Map<String, NeedsYouAsk> = emptyMap(),
     onRespondAsk: (botId: String, entryId: String?, optionId: String?) -> Unit = { _, _, _ -> },
     onSpend: () -> Unit = {},
+    onTasks: () -> Unit = {},
     showTabBar: Boolean = true,
 ) {
     val c = Hypurr.colors
     var menu by remember { mutableStateOf(initialMenuOpen) }
+    var refreshing by remember { mutableStateOf(false) }
+    val pullState = rememberPullToRefreshState()
+    val scope = rememberCoroutineScope()
     val needsYou = bots.filter { it.needsInput }
     val rest = bots.filter { !it.needsInput }
     Box(Modifier.fillMaxSize().background(c.bg)) {
     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Bots", style = MaterialTheme.typography.headlineLarge, color = c.text, fontWeight = FontWeight.ExtraBold)
-                val quiet = bots.count { !it.needsInput }
-                val need = needsYou.size
-                if (need > 0) {
-                    Text(
-                        if (need == 1) "One needs you · $quiet quiet" else "$need need you · $quiet quiet",
-                        style = MaterialTheme.typography.bodyMedium, color = c.secondary, maxLines = 1,
-                        overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp),
-                    )
-                }
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
-                    Text(computerName, style = MaterialTheme.typography.labelMedium, color = c.tertiary, maxLines = 1,
-                        overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 160.dp))
-                    Spacer(Modifier.width(8.dp))
-                    LinkPill(link)
-                }
-            }
+        // Brand row: dot cat + Doto wordmark, quiet icon actions, You avatar.
+        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 14.dp, top = 10.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            DotCat(c.text, 20.dp)
+            Spacer(Modifier.width(8.dp))
+            Text("Hypurr", style = SignalType.wordmark, color = c.text, modifier = Modifier.weight(1f))
             if (link is LinkState.Failed || link is LinkState.HostOffline) {
-                IconBubble(Icons.Rounded.Refresh, "Reconnect", onClick = onRetry)
-                Spacer(Modifier.width(8.dp))
+                IconBubble(signalIcon(SignalIcons.Refresh), "Reconnect", onClick = onRetry)
             }
-            if (onScreen != null) {
-                IconBubble(Icons.Rounded.DesktopWindows, "Computer screen", onClick = onScreen)
-                Spacer(Modifier.width(8.dp))
-            }
-            if (canCreate) {
-                IconBubble(if (menu) Icons.Rounded.Close else Icons.Rounded.Add, if (menu) "Close" else "New bot or group") { menu = !menu }
-                Spacer(Modifier.width(8.dp))
-            }
-            IconBubble(Icons.Rounded.Settings, "Settings", onClick = onSettings)
-        }
-        AnimatedVisibility(menu) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SoftButton("New bot", Modifier.weight(1f), icon = Icons.Rounded.SmartToy) { menu = false; onNewBot() }
-                SoftButton("New group", Modifier.weight(1f), icon = Icons.Rounded.Groups) { menu = false; onNewGroup() }
-            }
-        }
-        AnimatedVisibility(link is LinkState.HostOffline || link is LinkState.Unauthorized) {
-            val text = when (link) {
-                is LinkState.Unauthorized -> link.message
-                else -> "Your computer is offline. Messages you send are queued in the relay and run when it's back."
-            }
-            Text(text, color = c.warning, style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp)).background(c.warning.copy(alpha = 0.1f)).padding(14.dp))
+            if (onScreen != null) IconBubble(signalIcon(SignalIcons.Host), "Computer screen", onClick = onScreen)
+            Spacer(Modifier.width(4.dp))
+            Box(
+                Modifier.size(36.dp).clip(CircleShape).background(c.surface2).border(1.dp, c.border, CircleShape)
+                    .pressable("You and settings", onClick = onSettings),
+                contentAlignment = Alignment.Center,
+            ) { Icon(signalIcon(SignalIcons.You), null, tint = c.text, modifier = Modifier.size(18.dp)) }
         }
         if (synced && bots.isEmpty()) {
+            Greeting(computerName, link, now, Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
             builtinInstall?.let { BuiltinInstallCard(it, onInstallBuiltin, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
-            EmptyRoster(onNewTask)
+            EmptyRoster(onNewTask, onPair = onSettings, onInstall = onInstallBuiltin)
             return@Column
         }
         if (!synced && bots.isEmpty()) {
-            RainShimmer(Modifier.fillMaxSize()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { FlowOrb(56.dp) }
+            DotShimmer(Modifier.fillMaxSize()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { DotCatMark(56.dp) }
             }
             return@Column
         }
-        LazyColumn(contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 120.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            builtinInstall?.let { prompt ->
-                item(key = "builtin-install") {
-                    BuiltinInstallCard(prompt, onInstallBuiltin, Modifier.padding(horizontal = 4.dp, vertical = 8.dp))
+        PullToRefreshBox(
+            isRefreshing = refreshing,
+            onRefresh = {
+                refreshing = true
+                scope.launch {
+                    delay(900)
+                    refreshing = false
+                    onRetry()
                 }
-            }
-            if (needsYou.isNotEmpty()) {
-                item(key = "needs-header") { SectionLabel("Needs you", c.accent) }
+            },
+            state = pullState,
+            modifier = Modifier.fillMaxSize(),
+            indicator = {
+                CatPeek(
+                    progress = if (refreshing) 1f else pullState.distanceFraction.coerceIn(0f, 1f),
+                    modifier = Modifier.align(Alignment.TopCenter),
+                )
+            },
+        ) {
+            LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 128.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                item(key = "hello") { Greeting(computerName, link, now, Modifier.padding(horizontal = 4.dp, vertical = 6.dp)) }
+                item(key = "summary") { Summary(bots, now, Modifier.padding(top = 6.dp)) }
+                item(key = "offline") {
+                    androidx.compose.animation.AnimatedVisibility(link is LinkState.HostOffline || link is LinkState.Unauthorized) {
+                        val text = when (link) {
+                            is LinkState.Unauthorized -> link.message
+                            else -> "Your computer is offline. Messages you send wait in the relay and run when it's back."
+                        }
+                        SignalCard(Modifier.fillMaxWidth().padding(top = 4.dp)) {
+                            Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(signalIcon(SignalIcons.NeedsYou), null, tint = c.needsText, modifier = Modifier.size(20.dp))
+                                Spacer(Modifier.width(10.dp))
+                                Text(text, color = c.text, style = MaterialTheme.typography.bodyMedium)
+                            }
+                        }
+                    }
+                }
+                item(key = "header") {
+                    Column {
+                        SectionHeader("Your bots", Modifier.padding(start = 4.dp), action = if (canCreate) (if (menu) "Close" else "New bot") else null,
+                            actionIcon = if (canCreate) signalIcon(if (menu) SignalIcons.Close else SignalIcons.Plus) else null) { menu = !menu }
+                        AnimatedVisibility(menu) {
+                            Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                SoftButton("New bot", Modifier.weight(1f), icon = signalIcon(SignalIcons.Bots)) { menu = false; onNewBot() }
+                                SoftButton("New group", Modifier.weight(1f), icon = signalIcon(SignalIcons.Team)) { menu = false; onNewGroup() }
+                            }
+                        }
+                    }
+                }
+                builtinInstall?.let { prompt ->
+                    item(key = "builtin-install") { BuiltinInstallCard(prompt, onInstallBuiltin, Modifier) }
+                }
                 items(needsYou, key = { "need-${it.id}" }) { bot ->
                     NeedsYouCard(
                         bot = bot,
-                        ask = asks[bot.id] ?: NeedsYouAsk(
-                            title = plainAsk(bot.activity),
-                            meta = "${bot.name} · $computerName",
-                        ),
-                        modifier = Modifier.animateItem().padding(horizontal = 4.dp, vertical = 6.dp),
+                        ask = asks[bot.id],
+                        byId = byId,
+                        modifier = Modifier.animateItem(),
                         onOpen = { onOpen(bot) },
                         onChoose = { optionId ->
                             val ask = asks[bot.id]
-                            if (ask?.entryId != null) onRespondAsk(bot.id, ask.entryId, optionId)
-                            else onOpen(bot)
+                            if (ask?.entryId != null) onRespondAsk(bot.id, ask.entryId, optionId) else onOpen(bot)
                         },
                     )
                 }
-                item(key = "all-header") { SectionLabel("Your bots", c.tertiary) }
+                items(rest, key = { it.id }) { bot -> BotRow(bot, now, Modifier.animateItem(), byId) { onOpen(bot) } }
             }
-            items(rest, key = { it.id }) { bot -> BotRow(bot, now, Modifier.animateItem(), byId) { onOpen(bot) } }
         }
     }
-    if (showTabBar && !(synced && bots.isEmpty())) {
+    if (showTabBar) {
         HypurrTabBar(
             selected = HomeTab.Bots,
-            modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp),
+            modifier = Modifier.align(Alignment.BottomCenter),
+            needsYou = needsYou.size,
             onSelect = { tab ->
                 when (tab) {
                     HomeTab.Bots -> Unit
-                    HomeTab.Tasks -> onNewTask()
+                    HomeTab.Tasks -> onTasks()
                     HomeTab.Spend -> onSpend()
                     HomeTab.You -> onSettings()
                 }
             },
         )
     } else if (!(synced && bots.isEmpty())) {
-        FlowButton("New task", Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(20.dp), icon = Icons.Rounded.Add,
+        PrimaryButton("New task", Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(20.dp), icon = signalIcon(SignalIcons.Plus),
             onClick = onNewTask)
     }
+    }
+}
+
+private fun greetingFor(now: Long): String {
+    val h = java.util.Calendar.getInstance().apply { timeInMillis = now }.get(java.util.Calendar.HOUR_OF_DAY)
+    return when (h) {
+        in 5..11 -> "Good morning"
+        in 12..16 -> "Good afternoon"
+        else -> "Good evening"
+    }
+}
+
+/** "● KEVIN'S MAC STUDIO IS ONLINE" + the big greeting. */
+@Composable
+private fun Greeting(computerName: String, link: LinkState, now: Long, modifier: Modifier = Modifier) {
+    val c = Hypurr.colors
+    val (line, dot) = when (link) {
+        is LinkState.Ready -> ("$computerName is online" + (if (link.route == com.ragul84.hypurr.net.Route.Relay) " · relay" else "")) to c.text
+        LinkState.Connecting -> "Connecting to $computerName" to c.tertiary
+        is LinkState.HostOffline -> "$computerName is offline" to c.needs
+        is LinkState.Unauthorized -> "Not allowed on $computerName" to c.needs
+        is LinkState.Failed -> "Can't reach $computerName" to c.needs
+    }
+    Column(modifier) {
+        Eyebrow(line, dot = dot, color = if (dot == c.needs) c.needsText else c.secondary)
+        Spacer(Modifier.height(8.dp))
+        Text(greetingFor(now), style = MaterialTheme.typography.headlineLarge, color = c.text)
+    }
+}
+
+/** Three widget cards: Needs you (red figure when > 0), Running, Done today. */
+@Composable
+private fun Summary(bots: List<Bot>, now: Long, modifier: Modifier = Modifier) {
+    val c = Hypurr.colors
+    val need = bots.count { it.needsInput }
+    val running = bots.count { it.status == "working" }
+    val done = bots.count { !it.isWorking && !it.failed && it.lastAt > 0 && now - it.lastAt < 24 * 3_600_000L }
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf(
+            Triple(need, "Needs you", need > 0),
+            Triple(running, "Running", false),
+            Triple(done, "Done today", false),
+        ).forEach { (n, label, red) ->
+            SignalCard(Modifier.weight(1f)) {
+                Column(Modifier.padding(start = 14.dp, end = 10.dp, top = 14.dp, bottom = 13.dp)) {
+                    DotFigure("$n", SignalType.counter, if (red) c.needs else c.text)
+                    Spacer(Modifier.height(8.dp))
+                    Text(label, color = if (red) c.text else c.tertiary, style = MaterialTheme.typography.labelMedium.copy(
+                        fontWeight = if (red) FontWeight.SemiBold else FontWeight.Medium), maxLines = 1)
+                }
+            }
+        }
     }
 }
 
@@ -256,142 +318,200 @@ private fun plainAsk(activity: String): String {
     return stripped.replaceFirstChar { it.uppercase() }.let { if (it.endsWith("?")) it else "$it?" }
 }
 
+/** The live card: 1.5dp ink border, red cat, red status, and (when the ask is known) Deny / Allow once. */
 @Composable
 private fun NeedsYouCard(
     bot: Bot,
-    ask: NeedsYouAsk,
+    ask: NeedsYouAsk?,
+    byId: Map<String, Bot>,
     modifier: Modifier = Modifier,
     onOpen: () -> Unit,
     onChoose: (String?) -> Unit,
 ) {
-    val c = Hypurr.colors
-    CreamPlate(modifier.fillMaxWidth().pressable(bot.name, onClick = onOpen)) {
-        Column(Modifier.fillMaxWidth().padding(16.dp)) {
-            Pill("Needs you", c.accent)
-            Text(ask.title, color = c.text, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold,
-                modifier = Modifier.padding(top = 10.dp))
-            if (ask.meta.isNotBlank()) {
-                Text(ask.meta, color = c.secondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
+    SignalCard(modifier.fillMaxWidth().pressable(bot.name, onClick = onOpen), emphasis = true) {
+        Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 14.dp)) {
+            BotCardBody(bot, byId, line = ask?.title ?: plainAsk(bot.activity))
+            if (ask?.entryId != null) {
+                val options = ask.options.filter { !it.kind.contains("always", true) && !it.name.contains("always", true) }
+                ApprovalActions(options, Modifier.padding(top = 12.dp), onChoose = onChoose)
             }
-            ApprovalActions(ask.options, Modifier.padding(top = 14.dp), onChoose = onChoose)
+        }
+    }
+}
+
+/** Tile + name + status, a line, and "Codex · folder" meta. Shared by every bot card. */
+@Composable
+private fun BotCardBody(bot: Bot, byId: Map<String, Bot>, line: String? = null, meta: String? = null, now: Long? = null) {
+    val c = Hypurr.colors
+    Row(verticalAlignment = Alignment.Top) {
+        if (bot.isGroup) GroupAvatar(bot, byId, 48.dp) else BotAvatar(bot, 48.dp)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(bot.name, style = MaterialTheme.typography.titleMedium, color = c.text, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                Spacer(Modifier.weight(1f))
+                Spacer(Modifier.width(8.dp))
+                if (bot.unread > 0 && !bot.needsInput) {
+                    Box(Modifier.clip(CircleShape).background(c.accent).padding(horizontal = 7.dp, vertical = 1.dp)) {
+                        Text("${bot.unread}", color = c.onAccent, style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+                    }
+                    Spacer(Modifier.width(8.dp))
+                }
+                StatusLabel(bot.signalState())
+            }
+            Spacer(Modifier.height(3.dp))
+            if (line != null) {
+                Text(line, color = c.secondary, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            } else {
+                StatusLine(bot)
+            }
+            val agent = agentName(bot.backend)
+            val where = if (bot.isGroup) groupMembersLine(bot, byId) else bot.folderName.ifBlank { null }
+            Row(Modifier.padding(top = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                val label = meta ?: listOfNotNull(agent, now?.let { relativeTime(bot.lastAt, it) }?.takeIf { it.isNotBlank() }).joinToString(" · ")
+                if (label.isNotBlank()) {
+                    Text(label, color = c.tertiary, style = MaterialTheme.typography.labelMedium, maxLines = 1)
+                }
+                if (where != null && meta == null) {
+                    if (label.isNotBlank()) Text("  ·  ", color = c.tertiary, style = MaterialTheme.typography.labelMedium)
+                    Icon(signalIcon(if (bot.isGroup) SignalIcons.Team else SignalIcons.Folder), null, tint = c.tertiary, modifier = Modifier.size(13.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(where, color = c.tertiary, style = if (bot.isGroup) MaterialTheme.typography.labelMedium else SignalType.mono.copy(fontSize = MaterialTheme.typography.labelMedium.fontSize),
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+    }
+}
+
+/** Backend id → the agent's product name. */
+fun agentName(backend: String): String? = when (backend.lowercase()) {
+    "" -> null
+    "claude", "claude-code" -> "Claude Code"
+    "codex" -> "Codex"
+    "gemini" -> "Gemini CLI"
+    "hypurr-agent", "opencode" -> "Hypurr Agent"
+    "cursor" -> "Cursor"
+    else -> backend.replaceFirstChar { it.uppercase() }
+}
+
+/** Bottom bar: white with a hairline; the active tab's icon sits in a black pill; red badge on Bots. */
+@Composable
+fun HypurrTabBar(selected: HomeTab, modifier: Modifier = Modifier, needsYou: Int = 0, onSelect: (HomeTab) -> Unit) {
+    val c = Hypurr.colors
+    val h = androidx.compose.ui.platform.LocalHapticFeedback.current
+    Column(modifier.fillMaxWidth().background(c.surface)) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(c.border))
+        Row(
+            Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 8.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            listOf(
+                Triple(HomeTab.Bots, "Bots", SignalIcons.Bots),
+                Triple(HomeTab.Tasks, "Tasks", SignalIcons.Tasks),
+                Triple(HomeTab.Spend, "Spend", SignalIcons.Spend),
+                Triple(HomeTab.You, "You", SignalIcons.You),
+            ).forEach { (tab, label, icon) ->
+                TabItem(label, signalIcon(icon), selected == tab, if (tab == HomeTab.Bots) needsYou else 0, Modifier.weight(1f)) {
+                    h.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                    onSelect(tab)
+                }
+            }
         }
     }
 }
 
 @Composable
-fun HypurrTabBar(selected: HomeTab, modifier: Modifier = Modifier, onSelect: (HomeTab) -> Unit) {
+private fun TabItem(label: String, icon: ImageVector, active: Boolean, badge: Int, modifier: Modifier, onClick: () -> Unit) {
     val c = Hypurr.colors
-    val fill = if (c.dark) Color(0xFF0A2E24) else Color(0xFF15130F)
-    Row(
-        modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(fill).padding(horizontal = 8.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        TabItem("Bots", Icons.Rounded.GridView, selected == HomeTab.Bots) { onSelect(HomeTab.Bots) }
-        TabItem("Tasks", Icons.Rounded.Description, selected == HomeTab.Tasks) { onSelect(HomeTab.Tasks) }
-        TabItem("Spend", Icons.Rounded.Schedule, selected == HomeTab.Spend) { onSelect(HomeTab.Spend) }
-        TabItem("You", Icons.Rounded.Person, selected == HomeTab.You) { onSelect(HomeTab.You) }
-    }
-}
-
-@Composable
-private fun TabItem(label: String, icon: ImageVector, active: Boolean, onClick: () -> Unit) {
-    val c = Hypurr.colors
-    val color = if (active) Color(0xFFFFF8E8) else Color(0x99FFF8E8)
+    val pill by androidx.compose.animation.animateColorAsState(if (active) c.accent else Color.Transparent, Motion.effects(), label = "pill")
     Column(
-        Modifier.pressable(label, onClick = onClick).padding(horizontal = 10.dp, vertical = 4.dp),
+        modifier.pressable(label, onClick = onClick).padding(vertical = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Icon(icon, null, tint = color, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.height(2.dp))
-        Text(label, color = color, style = MaterialTheme.typography.labelSmall, fontWeight = if (active) FontWeight.Bold else FontWeight.Medium)
+        Box {
+            Box(Modifier.width(52.dp).height(30.dp).clip(RoundedCornerShape(50)).background(pill), contentAlignment = Alignment.Center) {
+                Icon(icon, null, tint = if (active) c.onAccent else c.tertiary, modifier = Modifier.size(21.dp))
+            }
+            if (badge > 0) {
+                Box(
+                    Modifier.align(Alignment.TopEnd).offset(x = 2.dp, y = (-3).dp).size(17.dp).clip(CircleShape).background(c.surface).padding(1.5.dp)
+                        .clip(CircleShape).background(c.needs).semantics { contentDescription = "$badge need you" },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("$badge", color = c.onNeeds, style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp, lineHeight = 10.sp))
+                }
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(label, color = if (active) c.text else c.tertiary, style = MaterialTheme.typography.labelSmall.copy(
+            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium))
     }
 }
 
 @Composable
-private fun SectionLabel(text: String, color: androidx.compose.ui.graphics.Color) {
-    Text(text, color = color, style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.sp, fontWeight = FontWeight.Bold),
-        modifier = Modifier.padding(start = 12.dp, top = 14.dp, bottom = 6.dp))
-}
-
-@Composable
-private fun EmptyRoster(onNewTask: () -> Unit) {
+private fun EmptyRoster(onNewTask: () -> Unit, onPair: () -> Unit = {}, onInstall: () -> Unit = {}) {
     val c = Hypurr.colors
-    Box(Modifier.fillMaxSize()) {
-        FlowBackdrop()
-        Column(Modifier.align(Alignment.Center).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            LaunchFlicker(play = true) { FlowOrb(72.dp, animate = false) }
-            Spacer(Modifier.height(20.dp))
-            Text("Start your first task", style = MaterialTheme.typography.titleLarge, color = c.text)
-            Spacer(Modifier.height(6.dp))
-            Text("Say what you need in plain words, like “write tests for the login form”. Hypurr picks the agent and keeps your code safe on its own branch.",
-                color = c.secondary, textAlign = TextAlign.Center)
-            Spacer(Modifier.height(20.dp))
-            FlowButton("New task", icon = Icons.Rounded.Add, onClick = onNewTask)
+    Column(
+        Modifier.fillMaxSize().padding(horizontal = 20.dp).padding(bottom = 110.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        DotCatMark(96.dp)
+        Spacer(Modifier.height(22.dp))
+        Text("Meet Hypurr", style = MaterialTheme.typography.headlineMedium, color = c.text)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "AI coding agents, safe enough for anyone.",
+            color = c.secondary, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge,
+        )
+        Spacer(Modifier.height(20.dp))
+        SignalCard(Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                listOf(
+                    "Install Hypurr Agent on your computer",
+                    "Scan the QR, or paste the pairing link",
+                    "Run your first task",
+                ).forEachIndexed { i, line ->
+                    if (i > 0) HairlineDivider()
+                    Row(Modifier.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        DotFigure("${i + 1}", SignalType.figureSmall, c.text, Modifier.width(26.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(line, color = c.text, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(18.dp))
+        PrimaryButton("Install Hypurr Agent", Modifier.fillMaxWidth(), onClick = onInstall)
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SoftButton("Pair with QR", Modifier.weight(1f), icon = signalIcon(SignalIcons.Qr), onClick = onPair)
+            SoftButton("Start a task", Modifier.weight(1f), icon = signalIcon(SignalIcons.Plus), onClick = onNewTask)
         }
     }
 }
 
 @Composable
 fun BotRow(bot: Bot, now: Long, modifier: Modifier = Modifier, byId: Map<String, Bot> = emptyMap(), onClick: () -> Unit) {
-    val c = Hypurr.colors
-    Row(
-        modifier.fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(c.surface)
-            .pressable(bot.name, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp).animateContentSize(Motion.spatialDefault()),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (bot.isGroup) GroupAvatar(bot, byId) else BotAvatar(bot)
-        Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(bot.name, style = MaterialTheme.typography.titleMedium, color = c.text, maxLines = 1,
-                    overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                if (bot.isGroup) {
-                    Spacer(Modifier.width(6.dp))
-                    Icon(Icons.Rounded.Groups, "Group", tint = c.tertiary, modifier = Modifier.size(15.dp))
-                }
-                if (bot.pinned) {
-                    Spacer(Modifier.width(6.dp))
-                    Icon(Icons.Rounded.PushPin, "Pinned", tint = c.tertiary, modifier = Modifier.size(14.dp))
-                }
-                bot.task?.let { task ->
-                    Spacer(Modifier.width(6.dp))
-                    when {
-                        !task.isActive -> Pill("Done", c.tertiary, icon = Icons.Rounded.Check)
-                        task.hasSafetyNet -> Pill("Task", c.success, icon = Icons.Rounded.Shield)
-                        else -> Pill("Task", c.warning)
-                    }
-                }
-                Spacer(Modifier.weight(1f))
-                Text(relativeTime(bot.lastAt, now), style = MaterialTheme.typography.labelMedium, color = c.tertiary)
-            }
-            Spacer(Modifier.height(3.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.weight(1f)) { StatusLine(bot) }
-                if (bot.unread > 0) {
-                    Spacer(Modifier.width(8.dp))
-                    Box(Modifier.clip(CircleShape).background(c.accent).padding(horizontal = 7.dp, vertical = 2.dp)) {
-                        Text("${bot.unread}", color = c.onAccent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
+    SignalCard(modifier.fillMaxWidth().pressable(bot.name, onClick = onClick)) {
+        Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 14.dp).animateContentSize(Motion.spatialDefault())) {
+            BotCardBody(bot, byId, now = now)
         }
     }
 }
 
-/** Working shimmers in the colour flow; needs you and failed take their tokens. */
+/** What the bot is doing in one line; the thinking row while it works. */
 @Composable
 fun StatusLine(bot: Bot) {
     val c = Hypurr.colors
     when {
-        bot.needsInput -> Text("Waiting on you", color = c.accent,
-            style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
+        bot.needsInput -> Text(plainAsk(bot.activity), color = c.secondary,
+            style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         bot.status == "working" -> WorkingPhase(bot.activity.ifEmpty { "Working…" }, animate = !LocalInspectionMode.current)
-        bot.failed -> Text("Failed · ${bot.lastMessage.orEmpty()}", color = c.danger, style = MaterialTheme.typography.bodyMedium,
+        bot.failed -> Text(bot.lastMessage.orEmpty().ifEmpty { "Stopped with an error" }, color = c.needsText, style = MaterialTheme.typography.bodyMedium,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
         else -> Text(bot.lastMessage ?: bot.description.ifEmpty { bot.folderName }, color = c.secondary,
             style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -400,7 +520,7 @@ fun StatusLine(bot: Bot) {
 
 /** Offer to install Hypurr's built-in Hypurr Agent (free Zen models). */
 data class BuiltinInstallPrompt(
-    val title: String = "Hypurr Agent agent",
+    val title: String = "Hypurr Agent",
     val body: String = "Install Hypurr Agent into ~/.hypurr/agents/hypurr-agent and start with free models via the Hypurr gateway. No other AI account needed.",
     val consent: String = "Free models use the Hypurr gateway with a daily allowance; paid models use credits. Bring-your-own-key is also supported.",
     val busy: Boolean = false,
@@ -410,14 +530,16 @@ data class BuiltinInstallPrompt(
 @Composable
 private fun BuiltinInstallCard(prompt: BuiltinInstallPrompt, onInstall: () -> Unit, modifier: Modifier = Modifier) {
     val c = Hypurr.colors
-    Column(modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(c.surface).padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    SignalCard(modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            DotCat(c.text, 22.dp)
+            Spacer(Modifier.width(10.dp))
             Text(prompt.title, color = c.text, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-            Pill("Free", c.success)
+            Pill("Free", c.text)
         }
         Text(prompt.body, color = c.secondary, style = MaterialTheme.typography.bodyMedium)
         Text(prompt.consent, color = c.tertiary, style = MaterialTheme.typography.bodySmall)
-        prompt.error?.let { Text(it, color = c.danger, style = MaterialTheme.typography.bodySmall) }
-        FlowButton(if (prompt.busy) "Installing…" else "Install Hypurr Agent", enabled = !prompt.busy, onClick = onInstall)
-    }
+        prompt.error?.let { Text(it, color = c.needsText, style = MaterialTheme.typography.bodySmall) }
+        PrimaryButton(if (prompt.busy) "Installing…" else "Install Hypurr Agent", Modifier.fillMaxWidth(), enabled = !prompt.busy, onClick = onInstall)
+    } }
 }

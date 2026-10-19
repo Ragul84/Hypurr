@@ -24,6 +24,7 @@ import com.ragul84.hypurr.model.TaskCosts
 import com.ragul84.hypurr.model.TaskRoute
 import com.ragul84.hypurr.model.TaskSetup
 import com.ragul84.hypurr.model.TaskTemplate
+import kotlinx.serialization.encodeToString
 import com.ragul84.hypurr.net.ChannelTransport
 import com.ragul84.hypurr.net.Dialer
 import com.ragul84.hypurr.net.HostClient
@@ -43,6 +44,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.JsonObject
 import java.util.UUID
 
@@ -113,6 +119,53 @@ class HypurrStore(
     val themeMode = MutableStateFlow(persistence.read(THEME)?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.System)
     val dynamicColor = MutableStateFlow(persistence.read(DYNAMIC) == "1")
     val notifications = MutableStateFlow(persistence.read(NOTIFY) != "0")
+
+    private val _userProfile = MutableStateFlow(
+        persistence.read(USER_PROFILE)?.let {
+            runCatching { HypurrJson.decodeFromString(UserProfile.serializer(), it) }.getOrNull()
+        } ?: UserProfile(),
+    )
+    /** Local first-run profile (role / experience / stack / goals). Never holds employee ID or salary. */
+    val userProfile: StateFlow<UserProfile> = _userProfile.asStateFlow()
+
+    fun setUserProfile(profile: UserProfile) {
+        _userProfile.value = profile
+        persistence.write(
+            USER_PROFILE,
+            if (profile == UserProfile()) null
+            else HypurrJson.encodeToString(UserProfile.serializer(), profile),
+        )
+        scope.launch { syncUserProfileToHost() }
+    }
+
+    /** Default project folder for new tasks (picked after pairing or under You). */
+    val projectFolder = MutableStateFlow(persistence.read(PROJECT_FOLDER)?.takeIf { it.isNotBlank() })
+
+    fun setProjectFolder(path: String?) {
+        projectFolder.value = path?.takeIf { it.isNotBlank() }
+        persistence.write(PROJECT_FOLDER, projectFolder.value)
+    }
+
+    fun clearUserProfile() {
+        setUserProfile(UserProfile(completed = true, skipped = true))
+    }
+
+    /** Push non-sensitive preferences to the host so agent prompts adapt. */
+    suspend fun syncUserProfileToHost() {
+        val c = client ?: return
+        val p = _userProfile.value
+        if (!p.hasAnswers && !p.completed) return
+        runCatching {
+            c.setUserProfile(buildJsonObject {
+                put("completed", p.completed)
+                put("skipped", p.skipped)
+                p.role?.let { put("role", it) }
+                p.experience?.let { put("experience", it) }
+                putJsonArray("stacks") { p.stacks.forEach { add(JsonPrimitive(it)) } }
+                putJsonArray("goals") { p.goals.forEach { add(JsonPrimitive(it)) } }
+            })
+        }
+    }
 
     var transport: ChannelTransport? = null
         private set
@@ -191,6 +244,7 @@ class HypurrStore(
         _threads.value = emptyMap()
         _files.value = emptyMap()
         _hello.value = null
+        setProjectFolder(null)
     }
 
     /** Sync, then follow the event stream; a dropped channel resubscribes from the last rev. */
@@ -209,6 +263,7 @@ class HypurrStore(
                     _hello.value = h
                     h.you?.let { _you.value = it }
                 }
+                runCatching { syncUserProfileToHost() }
                 if (notifications.value) runCatching { onConnected?.invoke(c) }
                 c.events(rev).collect(::apply)
             } catch (e: CancellationException) {
@@ -534,6 +589,8 @@ class HypurrStore(
         const val THEME = "theme"
         const val DYNAMIC = "dynamicColor"
         const val NOTIFY = "notifications"
+        const val USER_PROFILE = "user.profile"
+        const val PROJECT_FOLDER = "project.folder"
         /** Pictures larger than this show as file cards instead of previews. */
         const val MAX_PREVIEW = 20L * 1024 * 1024
     }

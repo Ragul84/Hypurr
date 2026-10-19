@@ -1,82 +1,88 @@
 @import "tailwindcss";
 
-@font-face { font-family: "Cabinet Grotesk"; src: url("/fonts/CabinetGrotesk-400.ttf") format("truetype"); font-weight: 400; font-display: swap; }
-@font-face { font-family: "Cabinet Grotesk"; src: url("/fonts/CabinetGrotesk-500.ttf") format("truetype"); font-weight: 500; font-display: swap; }
-@font-face { font-family: "Cabinet Grotesk"; src: url("/fonts/CabinetGrotesk-700.ttf") format("truetype"); font-weight: 700; font-display: swap; }
-@font-face { font-family: "Cabinet Grotesk"; src: url("/fonts/CabinetGrotesk-800.ttf") format("truetype"); font-weight: 800; font-display: swap; }
-
+@font-face { font-family: "Inter"; src: url("/fonts/Inter-Regular.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "Inter"; src: url("/fonts/Inter-Medium.woff2") format("woff2"); font-weight: 500; font-display: swap; }
+@font-face { font-family: "Inter"; src: url("/fonts/Inter-SemiBold.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+@font-face { font-family: "Inter"; src: url("/fonts/Inter-Bold.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "Doto"; src: url("/fonts/Doto.ttf") format("truetype"); font-weight: 800; font-display: swap; }
 
 /*
- * Hypurr Sunfield Panel tokens (docs/design/hypurr-design-system.md).
- * Sunflower ground, cream plates, forest primary. No teal. No purple.
+ * Hypurr Signal tokens (docs/design/hypurr-design-system.md).
+ * Black and white on light grey, white rounded cards, black pills.
+ * Red is the only colour and always means "needs you".
+ * Inter for all text; Doto dot-matrix only for big figures.
  */
 :root {
   color-scheme: light;
-  --seed-h: 48; /* sunflower */
-  --surface: #F2B90D;
-  --surface-dim: #E0A80A;
-  --surface-container-low: #F5C42E;
-  --surface-container: #FFF8E8;
-  --surface-container-high: #FFF8E8;
-  --surface-container-highest: #FFE7A8;
-  --on-surface: #17140A;
-  --on-surface-variant: #5C5640;
-  --outline: #8A8168;
-  --outline-variant: rgba(23,20,10,0.12);
-  --primary: #0E4A38;
-  --on-primary: #FFF8E8;
-  --primary-container: #17140A;
-  --on-primary-container: #FFF8E8;
-  --secondary: #0E4A38;
-  --secondary-container: #FFF8E8;
-  --on-secondary-container: #17140A;
-  --tertiary: #0E4A38;
-  --tertiary-container: #FFF8E8;
-  --on-tertiary-container: #17140A;
-  --attention: #0E4A38;
-  --negative: #A1281C;
-  --flow-1: #F2B90D;
-  --flow-2: #0E4A38;
-  --flow-3: #E8C46A;
-  --glass: color-mix(in srgb, #17140A 88%, transparent);
-  --glass-strong: color-mix(in srgb, #17140A 92%, transparent);
-  --glass-edge: color-mix(in srgb, #17140A 12%, transparent);
-  --shadow: 0 4px 0 rgba(23, 20, 10, 0.12);
-  --radius-card: 20px;
-  --font-display: "Cabinet Grotesk", "Bricolage Grotesque", system-ui, sans-serif;
+  --surface: #EDEDEA;
+  --surface-dim: #E4E4E0;
+  --surface-container-low: #F2F2EF;
+  --surface-container: #FFFFFF;
+  --surface-container-high: #FFFFFF;
+  --surface-container-highest: #F2F2EF;
+  --on-surface: #0E0E0E;
+  --on-surface-variant: #5C5C63; /* 5.65:1 on ground, 6.63:1 on white */
+  --outline: #CFCFCA;
+  --outline-variant: #E0E0DC;
+  --primary: #0E0E0E;
+  --on-primary: #FFFFFF;
+  --primary-container: #0E0E0E;
+  --on-primary-container: #FFFFFF;
+  --secondary: #34343A;
+  --secondary-container: #F2F2EF;
+  --on-secondary-container: #0E0E0E;
+  --tertiary: #34343A;
+  --tertiary-container: #F2F2EF;
+  --on-tertiary-container: #0E0E0E;
+  --attention: #D21F26; /* fill red: badges, stop, today's bar */
+  --attention-text: #C41A20; /* red text, 5.09:1 on ground */
+  --negative: #C41A20;
+  --dot-off: #D6D6D1;
+  --flow-1: #0E0E0E;
+  --flow-2: #D21F26;
+  --flow-3: #5C5C63;
+  --glass: #FFFFFF;
+  --glass-strong: #FFFFFF;
+  --glass-edge: #E0E0DC;
+  --shadow: none;
+  --radius-card: 24px;
+  --font-display: "Inter", system-ui, sans-serif;
+  --font-dot: "Doto", "Inter", ui-monospace, monospace;
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --surface: #0E4A38;
-  --surface-dim: #0A3428;
-  --surface-container-low: #123D30;
-  --surface-container: #143D30;
-  --surface-container-high: #1A4A3A;
-  --surface-container-highest: #1F5542;
-  --on-surface: #FFF8E8;
-  --on-surface-variant: #C8E0D4;
-  --outline: #7A9E8E;
-  --outline-variant: rgba(255,248,232,0.12);
-  --primary: #F2B90D;
-  --on-primary: #0E4A38;
-  --primary-container: #F2B90D;
-  --on-primary-container: #0E4A38;
-  --secondary: #5DDB9A;
-  --secondary-container: #1A4A3A;
-  --on-secondary-container: #FFF8E8;
-  --tertiary: #F2B90D;
-  --tertiary-container: #143D30;
-  --on-tertiary-container: #FFF8E8;
-  --attention: #F2B90D;
-  --negative: #F5A090;
-  --flow-1: #F2B90D;
-  --flow-2: #0E4A38;
-  --flow-3: #5DDB9A;
-  --glass: color-mix(in srgb, #143D30 88%, transparent);
-  --glass-strong: color-mix(in srgb, #143D30 92%, transparent);
-  --glass-edge: color-mix(in srgb, #F2B90D 18%, transparent);
-  --shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
+  --surface: #000000;
+  --surface-dim: #000000;
+  --surface-container-low: #0A0A0A;
+  --surface-container: #111111;
+  --surface-container-high: #111111;
+  --surface-container-highest: #1C1C1E;
+  --on-surface: #F5F5F2;
+  --on-surface-variant: #9A9AA1; /* 6.75:1 on #111 */
+  --outline: #3A3A3D;
+  --outline-variant: #242426;
+  --primary: #F5F5F2;
+  --on-primary: #0E0E0E;
+  --primary-container: #F5F5F2;
+  --on-primary-container: #0E0E0E;
+  --secondary: #C9C9CE;
+  --secondary-container: #1C1C1E;
+  --on-secondary-container: #F5F5F2;
+  --tertiary: #C9C9CE;
+  --tertiary-container: #1C1C1E;
+  --on-tertiary-container: #F5F5F2;
+  --attention: #D21F26;
+  --attention-text: #FF4D4F; /* 5.78:1 on #111 */
+  --negative: #FF4D4F;
+  --dot-off: #2E2E31;
+  --flow-1: #F5F5F2;
+  --flow-2: #D21F26;
+  --flow-3: #9A9AA1;
+  --glass: #111111;
+  --glass-strong: #111111;
+  --glass-edge: #242426;
+  --shadow: none;
 }
 
 @theme inline {
@@ -103,10 +109,13 @@
   --color-flow-1: var(--flow-1);
   --color-flow-2: var(--flow-2);
   --color-flow-3: var(--flow-3);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: "Inter", system-ui, sans-serif;
   --font-mono: var(--font-geist-mono);
   --font-display: var(--font-display);
-  --radius-expressive: 0.25rem; /* sharp 4px plates */
+  --radius-expressive: 1.5rem; /* 24px Signal cards */
+  --font-dot: var(--font-dot);
+  --color-attention: var(--attention);
+  --color-dot-off: var(--dot-off);
 }
 
 html { scroll-behavior: smooth; overflow-x: clip; }
@@ -115,7 +124,7 @@ body { overflow-x: clip; }
 body {
   background: var(--surface);
   color: var(--on-surface);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   transition: background-color 0.5s ease, color 0.5s ease;
 }
 
@@ -134,7 +143,7 @@ body {
 }
 @keyframes flow { to { background-position: 300% 0; } }
 
-/* Thin teal ring (no rainbow conic). */
+/* Thin ink ring. */
 .flow-ring { position: relative; isolation: isolate; }
 .flow-ring::before {
   content: ""; position: absolute; inset: -1.5px; border-radius: inherit; z-index: -1;
@@ -144,23 +153,8 @@ body {
 @property --angle { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
 @keyframes flow-spin { to { --angle: 360deg; } }
 
-/* Subtle rain / asphalt field — no purple aurora blobs. */
-.aurora { position: fixed; inset: 0; z-index: -10; overflow: hidden; pointer-events: none;
-  background:
-    repeating-linear-gradient(
-      -28deg,
-      transparent 0,
-      transparent 14px,
-      color-mix(in srgb, var(--primary) 8%, transparent) 14px,
-      color-mix(in srgb, var(--primary) 8%, transparent) 15px
-    );
-  opacity: 0.55;
-}
-.aurora::after {
-  content: ""; position: absolute; inset: 0;
-  background: radial-gradient(ellipse at 50% 0%, transparent 0%, var(--surface) 75%);
-  opacity: 0.7;
-}
+/* Signal: a flat light-grey ground, no texture. */
+.aurora { display: none; }
 .aurora span { display: none; } /* no glow blobs */
 @keyframes drift {
   0% { transform: translate(0, 0) scale(1); }
@@ -168,27 +162,20 @@ body {
   100% { transform: translate(-6vmax, 10vmax) scale(0.95); }
 }
 
-.grain { position: fixed; inset: 0; z-index: -5; pointer-events: none; opacity: 0.04;
+.grain { display: none; position: fixed; inset: 0; z-index: -5; pointer-events: none; opacity: 0;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
 
-.glass {
+/* Signal card: flat white, hairline, 24px. (Class name kept for existing markup.) */
+.glass, .glass-strong {
   background: var(--glass);
-  backdrop-filter: blur(16px) saturate(140%);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
-  box-shadow: inset 0 1px 0 var(--glass-edge), var(--shadow);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--radius-card);
 }
-.glass-strong {
-  background: var(--glass-strong);
-  backdrop-filter: blur(20px) saturate(150%);
-  -webkit-backdrop-filter: blur(20px) saturate(150%);
-  box-shadow: inset 0 1px 0 var(--glass-edge), var(--shadow);
-}
+.dot-figure { font-family: var(--font-dot); font-weight: 800; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+.needs-you { color: var(--attention-text); }
 
-.morph { animation: none; border-radius: 4px; }
-@keyframes morph {
-  0%, 100% { border-radius: 4px; }
-}
-.cookie { clip-path: none; border-radius: 4px; }
+.morph { animation: none; border-radius: var(--radius-card); }
+.cookie { clip-path: none; border-radius: var(--radius-card); }
 
 .marquee { animation: marquee 38s linear infinite; }
 @keyframes marquee { to { transform: translateX(-50%); } }
@@ -210,14 +197,19 @@ body {
 
 
 /* ---------- Hypurr motion language (docs/design/hypurr-motion.md) ---------- */
-.hypurr-scan {
-  position: relative; height: 4px; background: var(--outline-variant); overflow: hidden; border-radius: 1px;
-}
-.hypurr-scan > i {
-  position: absolute; top: 0; bottom: 0; width: 22%; background: var(--primary);
-  animation: hypurr-scan 1.6s linear infinite;
-}
-@keyframes hypurr-scan { from { left: -22%; } to { left: 100%; } }
+/* Dot-matrix thinking pulse: five dots light left to right. */
+.hypurr-scan { display: inline-flex; gap: 4px; height: 6px; }
+.hypurr-scan > i { width: 6px; height: 6px; border-radius: 50%; background: var(--dot-off); animation: hypurr-dot 1.1s steps(1) infinite; }
+.hypurr-scan > i:nth-child(2) { animation-delay: .11s; } .hypurr-scan > i:nth-child(3) { animation-delay: .22s; }
+.hypurr-scan > i:nth-child(4) { animation-delay: .33s; } .hypurr-scan > i:nth-child(5) { animation-delay: .44s; }
+@keyframes hypurr-dot { 0% { background: var(--primary); } 20%, 100% { background: var(--dot-off); } }
+/* Needs-you: a red dot with a breathing ring. */
+.hypurr-needs { position: relative; width: 8px; height: 8px; border-radius: 50%; background: var(--attention); }
+.hypurr-needs::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 1.5px solid var(--attention); animation: hypurr-ring 1.4s cubic-bezier(0.2,0,0,1) infinite; }
+@keyframes hypurr-ring { from { transform: scale(1); opacity: .9; } to { transform: scale(2.6); opacity: 0; } }
+/* Approval card drop-in: crisp, no bounce. */
+.hypurr-drop { animation: hypurr-drop .24s cubic-bezier(0.2,0,0,1) both; }
+@keyframes hypurr-drop { from { transform: translateY(-10px); opacity: 0; } to { transform: none; opacity: 1; } }
 
 .hypurr-caret {
   display: inline-block; width: 1px; height: 1.1em; background: var(--primary); vertical-align: -2px;
@@ -232,24 +224,24 @@ body {
   position: relative; overflow: hidden;
 }
 .hypurr-rain-shimmer::after {
-  content: ""; position: absolute; inset: -20%; pointer-events: none;
-  background: repeating-linear-gradient(-28deg, transparent 0 14px, color-mix(in srgb, var(--primary) 14%, transparent) 14px 15px);
-  animation: hypurr-rain 2.4s linear infinite;
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(circle, color-mix(in srgb, var(--primary) 12%, transparent) 1px, transparent 1.5px) 0 0 / 8px 8px;
+  animation: hypurr-rain 1.1s steps(4) infinite;
 }
-@keyframes hypurr-rain { to { transform: translate(18px, 0); } }
+@keyframes hypurr-rain { to { background-position: 8px 0; } }
 
 .hypurr-done-rule { height: 2px; background: var(--outline-variant); }
 .hypurr-done-rule > i { display: block; height: 100%; width: 0; background: var(--primary); animation: hypurr-draw .42s linear forwards; }
 @keyframes hypurr-draw { to { width: 100%; } }
 
 .hypurr-deny { transition: transform .18s cubic-bezier(0.2,0,0,1), opacity .18s; }
-.hypurr-deny.is-denied { transform: translateX(4px); opacity: 0.55; box-shadow: inset 1px 0 0 var(--negative, #FF6B5A); }
+.hypurr-deny.is-denied { transform: translateX(4px); opacity: 0.55; }
 
 @media (prefers-reduced-motion: reduce) {
-  .hypurr-scan > i, .hypurr-caret, .hypurr-rain-shimmer::after, .hypurr-done-rule > i {
+  .hypurr-scan > i, .hypurr-needs::after, .hypurr-drop, .hypurr-caret, .hypurr-rain-shimmer::after, .hypurr-done-rule > i {
     animation: none !important;
   }
-  .hypurr-scan > i { left: 35%; opacity: 0.4; }
+  .hypurr-scan > i:first-child { background: var(--primary); }
   .hypurr-caret { opacity: 0.7; }
   .hypurr-done-rule > i { width: 100%; }
   .hypurr-deny.is-denied { transform: none; }

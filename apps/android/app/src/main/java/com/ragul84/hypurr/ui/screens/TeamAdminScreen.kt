@@ -1,4 +1,6 @@
 package com.ragul84.hypurr.ui.screens
+import com.ragul84.hypurr.ui.SignalIcons
+import com.ragul84.hypurr.ui.signalIcon
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
@@ -19,14 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Block
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Computer
-import androidx.compose.material.icons.rounded.ErrorOutline
-import androidx.compose.material.icons.rounded.PhoneAndroid
-import androidx.compose.material.icons.rounded.VerifiedUser
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -99,7 +93,7 @@ fun TeamAdminScreen(
     val tab = state.tab.takeIf { it in tabs } ?: tabs.first()
     Column(Modifier.fillMaxSize().background(c.bg).safeDrawingPadding().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
         Row(Modifier.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconBubble(Icons.AutoMirrored.Rounded.ArrowBack, "Back", onClick = onBack)
+            IconBubble(signalIcon(SignalIcons.Back), "Back", onClick = onBack)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text("Team admin", style = MaterialTheme.typography.headlineMedium, color = c.text)
@@ -108,7 +102,7 @@ fun TeamAdminScreen(
         }
         Segmented(tabs.map { it.name to it.label }, tab.name, true) { name -> onTab(AdminTab.valueOf(name)) }
         state.error?.let {
-            Text(it, color = c.danger, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 10.dp, start = 8.dp))
+            Text(it, color = c.needsText, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 10.dp, start = 8.dp))
         }
         when (tab) {
             AdminTab.Activity -> state.activity?.let { ActivityTab(it, state.now) } ?: Loading()
@@ -148,7 +142,7 @@ internal fun Segmented(options: List<Pair<String, String>>, selected: String, en
 @Composable
 private fun Stat(value: String, label: String, modifier: Modifier, tint: Color = Hypurr.colors.text) {
     val c = Hypurr.colors
-    Column(modifier.clip(RoundedCornerShape(16.dp)).background(c.bg.copy(alpha = 0.5f)).padding(10.dp)) {
+    Column(modifier.clip(RoundedCornerShape(16.dp)).background(c.surface2).padding(10.dp)) {
         Text(value, color = tint, style = MaterialTheme.typography.titleMedium)
         Text(label, color = c.secondary, style = MaterialTheme.typography.labelSmall, maxLines = 1)
     }
@@ -175,7 +169,7 @@ private fun ActivityTab(a: Activity, now: Long) {
     Section("People") {
         a.people.forEach { p ->
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(if (p.key == "local") Icons.Rounded.Computer else Icons.Rounded.PhoneAndroid, null, tint = c.secondary,
+                Icon(if (p.key == "local") signalIcon(SignalIcons.Host) else signalIcon(SignalIcons.You), null, tint = c.secondary,
                     modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
@@ -259,7 +253,7 @@ private fun RulesTab(info: PolicyInfo, admin: Boolean, onSave: (JsonObject) -> U
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 ids.forEach { (id, name) ->
                     val on = id in p.allowedAgents
-                    Row(Modifier.clip(RoundedCornerShape(50)).background(if (on) c.accent.copy(alpha = 0.16f) else c.bg.copy(alpha = 0.5f))
+                    Row(Modifier.clip(RoundedCornerShape(50)).background(if (on) c.surface2 else c.surface2)
                         .pressable(name, role = Role.Checkbox, enabled = admin) {
                             val next = if (on) p.allowedAgents - id else p.allowedAgents + id
                             if (next.isNotEmpty()) onSave(buildJsonObject {
@@ -267,7 +261,7 @@ private fun RulesTab(info: PolicyInfo, admin: Boolean, onSave: (JsonObject) -> U
                             })
                         }.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (on) {
-                            Icon(Icons.Rounded.Check, null, tint = c.accent, modifier = Modifier.size(16.dp))
+                            Icon(signalIcon(SignalIcons.Check), null, tint = c.accent, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
                         }
                         Text(name, color = if (on) c.accent else c.secondary, style = MaterialTheme.typography.labelLarge)
@@ -333,7 +327,7 @@ private fun LimitRow(title: String, subtitle: String, value: String, enabled: Bo
             Text(subtitle, color = c.secondary, style = MaterialTheme.typography.bodySmall)
         }
         Spacer(Modifier.width(10.dp))
-        Row(Modifier.width(112.dp).clip(RoundedCornerShape(14.dp)).background(c.bg.copy(alpha = 0.6f)).padding(horizontal = 10.dp, vertical = 10.dp),
+        Row(Modifier.width(112.dp).clip(RoundedCornerShape(14.dp)).background(c.surface2).padding(horizontal = 10.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically) {
             Text("$", color = c.secondary)
             Spacer(Modifier.width(4.dp))
@@ -365,7 +359,7 @@ private fun PeopleTab(team: TeamInfo, admin: Boolean, now: Long, onRole: (String
         team.people.forEach { p ->
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(if (p.fixed) Icons.Rounded.Computer else Icons.Rounded.PhoneAndroid, null, tint = c.secondary, modifier = Modifier.size(20.dp))
+                    Icon(if (p.fixed) signalIcon(SignalIcons.Host) else signalIcon(SignalIcons.You), null, tint = c.secondary, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
                         Text(p.name + if (p.you) " (you)" else "", color = c.text, style = MaterialTheme.typography.titleSmall)
@@ -382,7 +376,7 @@ private fun PeopleTab(team: TeamInfo, admin: Boolean, now: Long, onRole: (String
         }
     }
     Row(Modifier.padding(start = 8.dp, top = 14.dp, end = 8.dp)) {
-        Icon(Icons.Rounded.VerifiedUser, null, tint = c.tertiary, modifier = Modifier.size(16.dp))
+        Icon(signalIcon(SignalIcons.Shield), null, tint = c.tertiary, modifier = Modifier.size(16.dp))
         Spacer(Modifier.width(8.dp))
         Text("Each person pairs their own phone with the QR code on the computer. Single sign-on (SSO) with your company account is planned.",
             color = c.tertiary, style = MaterialTheme.typography.bodySmall)
@@ -394,8 +388,8 @@ private fun AuditTab(log: AuditLog, now: Long) {
     val c = Hypurr.colors
     val ok = log.intact
     Row(Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(18.dp))
-        .background((if (ok) c.success else c.danger).copy(alpha = 0.12f)).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(if (ok) Icons.Rounded.VerifiedUser else Icons.Rounded.ErrorOutline, null, tint = if (ok) c.success else c.danger)
+        .background(c.surface2).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(if (ok) signalIcon(SignalIcons.Shield) else signalIcon(SignalIcons.Deny), null, tint = if (ok) c.success else c.danger)
         Spacer(Modifier.width(10.dp))
         Column {
             Text(if (ok) "Intact: nothing edited or removed" else "Changed at record ${log.brokenAt}", color = c.text,
@@ -415,7 +409,7 @@ private fun AuditRow(e: AuditEntry, now: Long) {
     val c = Hypurr.colors
     val bad = e.action == "blocked" || e.action == "approval.blocked" || e.action == "policy.limit"
     Row(verticalAlignment = Alignment.Top) {
-        Icon(if (bad) Icons.Rounded.Block else Icons.Rounded.Check, null, tint = if (bad) c.danger else c.success,
+        Icon(if (bad) signalIcon(SignalIcons.Deny) else signalIcon(SignalIcons.Check), null, tint = if (bad) c.danger else c.success,
             modifier = Modifier.padding(top = 2.dp).size(16.dp))
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
