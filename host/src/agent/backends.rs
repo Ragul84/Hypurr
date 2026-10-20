@@ -489,6 +489,22 @@ pub fn hydrate_path() {
     *SEARCH_PATH.locked() = path;
 }
 
+/// The harness's installed CLI. Generic names (Cursor's `agent`) only count when the file is
+/// really that harness's: Grok also ships an `agent.exe`.
+fn resolve(h: &Harness) -> Option<PathBuf> {
+    h.bins.iter().find_map(|b| which(b).filter(|p| bin_is_theirs(h.id, b, p)))
+}
+
+fn bin_is_theirs(id: &str, bin: &str, path: &Path) -> bool {
+    match (id, bin) {
+        ("cursor", "agent") => {
+            let real = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+            [path, real.as_path()].iter().any(|p| p.to_string_lossy().to_ascii_lowercase().contains("cursor"))
+        }
+        _ => true,
+    }
+}
+
 pub fn which(bin: &str) -> Option<PathBuf> {
     let dirs = {
         let cached = SEARCH_PATH.locked();
@@ -554,7 +570,7 @@ pub fn list() -> Vec<Value> {
     let mut out: Vec<Value> = HARNESSES
         .iter()
         .map(|h| {
-            let path = h.bins.iter().find_map(|b| which(b));
+            let path = resolve(h);
             let reg = h.registry.and_then(|id| registry.iter().find(|a| a["id"] == id));
             let runnable =
                 (path.is_some() && h.local.is_some()) || reg.is_some_and(|a| registry::launch_kind(a).is_some());
@@ -568,6 +584,9 @@ pub fn list() -> Vec<Value> {
                 "path": path.as_ref().map(|p| p.to_string_lossy().into_owned()),
                 "description": if managed {
                     "Hypurr Agent with free models via the Hypurr gateway.".into()
+                } else if h.id == "opencode" {
+                    // Legacy CLI: never show the upstream name.
+                    "Hypurr Agent from a CLI already on your computer.".into()
                 } else {
                     reg.and_then(|a| a["description"].as_str()).unwrap_or_default().to_owned()
                 },
@@ -651,7 +670,7 @@ pub fn set_signed_in(id: &str, state: Option<bool>) {
 pub async fn refresh_sign_in() {
     let checks = HARNESSES.iter().filter_map(|h| {
         let check = h.signed_in?;
-        let bin = h.bins.iter().find_map(|b| which(b))?;
+        let bin = resolve(h)?;
         Some(async move {
             let args: Vec<&str> = check.args.split_whitespace().collect();
             let run = crate::oscmd::program_command(&bin, &args)
@@ -726,7 +745,7 @@ pub fn login_available(id: &str) -> bool {
 /// Hypurr's own sign-in command for `id`, with `{bin}` resolved.
 pub async fn login_command(id: &str) -> anyhow::Result<String> {
     let h = harness(id).ok_or_else(|| anyhow::anyhow!("no sign-in command for {id}"))?;
-    let bin = match h.bins.iter().find_map(|b| which(b)) {
+    let bin = match resolve(h) {
         Some(p) => crate::oscmd::shell_program(&p),
         None => match registry_cli(h) {
             Some(agent) => registry::command(&agent, |_| {}).await?.program,
@@ -744,7 +763,7 @@ pub fn local_candidate(id: &str) -> Option<registry::Cmd> {
     let path = if id == crate::agent::builtin::BACKEND_ID && crate::agent::builtin::is_installed() {
         Some(crate::agent::builtin::bin_path())
     } else {
-        h.bins.iter().find_map(|b| which(b))
+        resolve(h)
     }?;
     let args = template.strip_prefix("{bin}").unwrap_or(template).trim().to_owned();
     Some(registry::Cmd { program: crate::oscmd::shell_program(&path), args })
@@ -753,6 +772,42 @@ pub fn local_candidate(id: &str) -> Option<registry::Cmd> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cursor_agent_fallback_must_be_cursors() {
+        let dir = std::env::temp_dir().join(format!("hypurr-cur-{}", uuid::Uuid::new_v4()));
+        let grok = dir.join(".grok").join("bin");
+        let cursor = dir.join("cursor-agent").join("bin");
+        std::fs::create_dir_all(&grok).unwrap();
+        std::fs::create_dir_all(&cursor).unwrap();
+        let name = if cfg!(windows) { "agent.exe" } else { "agent" };
+        for d in [&grok, &cursor] {
+            std::fs::write(d.join(name), "x").unwrap();
+        }
+        assert!(!bin_is_theirs("cursor", "agent", &grok.join(name)), "Grok's agent isn't Cursor");
+        assert!(bin_is_theirs("cursor", "agent", &cursor.join(name)));
+        assert!(bin_is_theirs("cursor", "cursor-agent", &grok.join(name)), "the specific name is trusted");
+        assert!(bin_is_theirs("grok", "grok", &grok.join(name)));
+        #[cfg(unix)]
+        {
+            // ~/.local/bin/agent -> ~/.local/share/cursor-agent/... (the installer's symlink) counts.
+            let link = dir.join("agent");
+            std::os::unix::fs::symlink(cursor.join(name), &link).unwrap();
+            assert!(bin_is_theirs("cursor", "agent", &link));
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn legacy_cli_row_never_says_opencode() {
+        for row in list().into_iter().filter(|r| r["id"] == "opencode" || r["id"] == "hypurr-agent") {
+            for k in ["name", "description", "installHint"] {
+                let v = row[k].as_str().unwrap_or_default().to_lowercase();
+                assert!(!v.contains("opencode"), "{k}: {v}");
+            }
+            assert!(row["name"].as_str().unwrap().starts_with("Hypurr Agent"));
+        }
+    }
 
     /// npm's layout on Windows: an extensionless `sh` shim next to the real `.cmd`.
     #[cfg(windows)]
