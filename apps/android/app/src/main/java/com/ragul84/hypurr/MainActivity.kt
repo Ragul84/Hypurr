@@ -555,7 +555,10 @@ class MainActivity : ComponentActivity() {
                 target == "ticket" -> TicketRoute(store, projectFolder, ticketDraft, { ticketDraft = it }) { screen = it }
                 target == "newtask" -> {
                     val setup by store.setup.collectAsState()
-                    var task by remember { mutableStateOf(taskDraft ?: NewTaskUiState(project = projectFolder)) }
+                    var task by remember {
+                        mutableStateOf(taskDraft ?: NewTaskUiState(project = projectFolder, agent = store.lastTaskAgent.value, model = store.lastTaskModel.value))
+                    }
+                    val taskHello by store.hello.collectAsState()
                     SideEffect { taskDraft = task }
                     LaunchedEffect(Unit) { store.loadSetup() }
                     // Ask the host for its pick as the user types (debounced).
@@ -570,14 +573,15 @@ class MainActivity : ComponentActivity() {
                         task = task.copy(files = task.files + it, error = null)
                     }
                     NewTaskScreen(
-                        task.copy(setup = setup),
+                        task.copy(setup = setup, models = com.ragul84.hypurr.ui.screens.runnableModels(taskHello)),
                         onChange = { task = it },
                         onStart = {
                             task = task.copy(busy = true, error = null)
                             scope.launch {
                                 try {
                                     val botId = store.startTask(task.goal, task.template, task.input, task.projectPath, task.agentId,
-                                        task.files, task.issue)
+                                        task.files, task.issue, model = task.model)
+                                    store.rememberTaskPicks(task.agentId, task.model, task.projectPath)
                                     taskDraft = null
                                     screen = "chat:$botId"
                                 } catch (e: Exception) {

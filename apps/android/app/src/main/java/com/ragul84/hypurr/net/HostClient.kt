@@ -259,7 +259,7 @@ class HostClient(val transport: ChannelTransport) {
     /** Starts a task; returns its bot (with `task`). */
     suspend fun startTask(goal: String, template: String?, input: String, project: String?, backend: String?,
                           attachments: List<String> = emptyList(), command: String? = null,
-                          draftId: String? = null, issue: Issue? = null, learning: Boolean? = null): Bot {
+                          draftId: String? = null, issue: Issue? = null, learning: Boolean? = null, model: String? = null): Bot {
         val res = transport.call("startTask", buildJsonObject {
             put("goal", goal)
             learning?.let { put("learning", it) }
@@ -269,6 +269,7 @@ class HostClient(val transport: ChannelTransport) {
             if (input.isNotBlank()) put("input", input)
             project?.let { put("project", it) }
             backend?.let { put("backend", it) }
+            model?.takeIf { it.isNotBlank() }?.let { put("model", it) }
             if (attachments.isNotEmpty()) put("attachments", JsonArray(attachments.map(::JsonPrimitive)))
             command?.let { put("command", it) }
         }, timeoutMs = 60_000)

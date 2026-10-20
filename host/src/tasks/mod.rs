@@ -245,8 +245,11 @@ pub fn allowed_agents(store: &Store) -> Vec<Agent> {
 
 fn pick_agents(all: &[Value]) -> Vec<Agent> {
     let to_agent = |b: &Value| Some(Agent { id: b["id"].as_str()?.to_owned(), name: b["name"].as_str()?.to_owned() });
-    let installed: Vec<Agent> =
-        all.iter().filter(|b| b["installed"] == true && b["available"] == true).filter_map(to_agent).collect();
+    let installed: Vec<Agent> = all
+        .iter()
+        .filter(|b| b["installed"] == true && b["available"] == true && b["signedIn"] != false)
+        .filter_map(to_agent)
+        .collect();
     if !installed.is_empty() {
         return installed;
     }
@@ -472,7 +475,7 @@ pub async fn start(hub: &Arc<Hub>, b: &Value) -> Result<Value> {
         command,
         cwd,
         permission: crate::store::Permission::Ask,
-        model: None,
+        model: b["model"].as_str().map(str::trim).filter(|m| !m.is_empty()).map(str::to_owned),
         pinned: false,
         hidden: false,
         notify: None,

@@ -115,7 +115,7 @@ data class ThreadSummary(val count: Int = 0, val lastAt: Long = 0, val authors: 
 data class DirEntry(val name: String, val path: String, val isGit: Boolean = false)
 
 @Serializable
-data class DirListing(val path: String = "", val parent: String? = null, val isGit: Boolean = false, val dirs: List<DirEntry> = emptyList())
+data class DirListing(val path: String = "", val parent: String? = null, val isGit: Boolean = false, val dirs: List<DirEntry> = emptyList(), val drives: Boolean = false)
 
 /** Quick reactions under a message (the iPhone's long-press row). */
 val QuickReactions = listOf("👍", "❤️", "😂", "🎉", "👀", "✅")
@@ -295,6 +295,8 @@ data class Backend(
     val installHint: String? = null,
     /** Whether the agent looks signed in on the computer; null when the host can't tell. */
     val signedIn: Boolean? = null,
+    /** Built-in only: whether the Hypurr gateway (free models) is configured on the computer. */
+    val gatewayReady: Boolean? = null,
 )
 
 /** A model an agent can run (Hypurr free gateway models, or whatever `agentModels` returns). */

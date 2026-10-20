@@ -182,6 +182,18 @@ class HypurrStore(
     suspend fun proofFile(taskId: String, name: String): ByteArray? =
         client?.proofFile(taskId, name)?.data?.let { android.util.Base64.decode(it, android.util.Base64.DEFAULT) }
 
+    /** The New task screen's last agent and model, so the next task starts with the same picks. */
+    val lastTaskAgent = MutableStateFlow(persistence.read(LAST_TASK_AGENT)?.takeIf { it.isNotBlank() })
+    val lastTaskModel = MutableStateFlow(persistence.read(LAST_TASK_MODEL)?.takeIf { it.isNotBlank() })
+
+    fun rememberTaskPicks(agent: String?, model: String?, project: String?) {
+        lastTaskAgent.value = agent?.takeIf { it.isNotBlank() }
+        lastTaskModel.value = model?.takeIf { it.isNotBlank() }
+        persistence.write(LAST_TASK_AGENT, lastTaskAgent.value)
+        persistence.write(LAST_TASK_MODEL, lastTaskModel.value)
+        if (!project.isNullOrBlank()) setProjectFolder(project)
+    }
+
     fun setProjectFolder(path: String?) {
         projectFolder.value = path?.takeIf { it.isNotBlank() }
         persistence.write(PROJECT_FOLDER, projectFolder.value)
@@ -482,7 +494,7 @@ class HypurrStore(
      * (the bot doesn't exist yet); the host moves them into the task's chat.
      */
     suspend fun startTask(goal: String, template: String?, input: String, project: String?, backend: String?,
-                          files: List<PickedFile> = emptyList(), issue: Issue? = null): String {
+                          files: List<PickedFile> = emptyList(), issue: Issue? = null, model: String? = null): String {
         val c = client ?: throw HostException.unreachable()
         val draft = if (files.isEmpty()) null else UUID.randomUUID().toString()
         val ids = files.map { f ->
@@ -490,7 +502,7 @@ class HypurrStore(
             c.upload(id, f.name, f.bytes, draftId = draft)
             id
         }
-        val bot = c.startTask(goal, template, input, project, backend, ids, draftId = draft, issue = issue, learning = learningMode.value)
+        val bot = c.startTask(goal, template, input, project, backend, ids, draftId = draft, issue = issue, learning = learningMode.value, model = model)
         upsert(bot)
         return bot.id
     }
@@ -705,6 +717,8 @@ class HypurrStore(
         const val NOTIFY = "notifications"
         const val USER_PROFILE = "user.profile"
         const val PROJECT_FOLDER = "project.folder"
+        const val LAST_TASK_AGENT = "task.agent"
+        const val LAST_TASK_MODEL = "task.model"
         const val LEARNING = "learning.mode"
         /** Pictures larger than this show as file cards instead of previews. */
         const val MAX_PREVIEW = 20L * 1024 * 1024

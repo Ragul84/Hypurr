@@ -104,8 +104,12 @@ data class BotEditorState(
 
     companion object {
         fun newBot(backends: List<Backend>): BotEditorState {
-            val pick = backends.firstOrNull { it.builtin } ?: backends.singleOrNull() ?: backends.firstOrNull()
-            return BotEditorState(backend = pick?.id, model = pick?.defaultModel ?: pick?.freeModels?.firstOrNull()?.id)
+            // Hypurr Agent first only when its free models are live; otherwise an agent that's installed and signed in.
+            val runnable = backends.filter { it.available && it.installed && it.signedIn != false }
+            val pick = backends.firstOrNull { it.builtin && it.gatewayReady == true && it.installed }
+                ?: runnable.firstOrNull { !it.builtin } ?: runnable.firstOrNull()
+                ?: backends.singleOrNull() ?: backends.firstOrNull()
+            return BotEditorState(backend = pick?.id, model = pick?.let(::safeDefaultModel))
         }
         fun newGroup(members: List<String> = emptyList()) = BotEditorState(group = true, members = members)
         fun of(bot: Bot) = BotEditorState(
@@ -217,11 +221,11 @@ fun BotEditorScreen(
                                 label = b.name.ifEmpty { b.id },
                                 on = state.backend == b.id,
                                 badge = when {
-                                    b.free || b.builtin -> "Free"
+                                    b.free -> "Free"
                                     else -> null
                                 },
                             ) {
-                                onChange(state.copy(backend = b.id, model = b.defaultModel ?: b.freeModels.firstOrNull()?.id ?: state.model))
+                                onChange(state.copy(backend = b.id, model = safeDefaultModel(b)))
                             }
                         }
                     }
@@ -352,3 +356,7 @@ private fun FolderBrowser(listing: DirListing, picked: String?, onPick: (String)
         }
     }
 }
+
+/** A model to start with that something actually serves: never a Hypurr gateway model without the gateway. */
+fun safeDefaultModel(b: com.ragul84.hypurr.model.Backend): String? =
+    (b.defaultModel ?: b.freeModels.firstOrNull()?.id)?.takeIf { !it.startsWith("hypurr/") || b.gatewayReady == true }

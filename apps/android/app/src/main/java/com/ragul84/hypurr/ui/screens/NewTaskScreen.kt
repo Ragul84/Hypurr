@@ -1,4 +1,9 @@
 package com.ragul84.hypurr.ui.screens
+import com.ragul84.hypurr.ui.theme.SignalType
+import com.ragul84.hypurr.ui.DotFigure
+import com.ragul84.hypurr.ui.SoftButton
+import com.ragul84.hypurr.ui.Pill
+import com.ragul84.hypurr.ui.SignalCard
 import com.ragul84.hypurr.ui.SignalIcons
 import com.ragul84.hypurr.ui.signalIcon
 
@@ -78,6 +83,10 @@ data class NewTaskUiState(
     /** The user's own picks; null = Hypurr's. */
     val project: String? = null,
     val agent: String? = null,
+    /** Model for the agent; null = the agent's own default. */
+    val model: String? = null,
+    /** Models each agent offers (only runnable ones: no gateway models without the gateway). */
+    val models: Map<String, List<com.ragul84.hypurr.model.AgentModel>> = emptyMap(),
     val busy: Boolean = false,
     val error: String? = null,
     /** Screenshots and files to send with the task. */
@@ -91,12 +100,18 @@ data class NewTaskUiState(
     /** What the router reads: the goal, or the picked issue. */
     val routeText: String get() = listOf(goal, issue?.title.orEmpty(), input).filter { it.isNotBlank() }.joinToString(" ")
     val selectedTemplate: TaskTemplate? get() = setup?.templates?.firstOrNull { it.id == template }
-    val projectPath: String? get() = project ?: route?.project?.path
+    /** Required: the user's own folder pick (or the one they used last). Never a guess. */
+    val projectPath: String? get() = project
     val projectName: String? get() = setup?.projects?.firstOrNull { it.path == projectPath }?.name
         ?: route?.project?.takeIf { it.path == projectPath }?.name ?: projectPath?.substringAfterLast('/')
-    val agentId: String? get() = agent ?: route?.agent?.id
+    /** The picked agent, else the computer's suggestion (an installed, signed-in agent) when it is runnable. */
+    val agentId: String? get() = agent?.takeIf { a -> setup == null || setup.agents.any { it.id == a } }
+        ?: route?.agent?.id?.takeIf { a -> setup?.agents.orEmpty().any { it.id == a } }
+        ?: setup?.agents?.singleOrNull()?.id
     val agentName: String? get() = setup?.agents?.firstOrNull { it.id == agentId }?.name ?: route?.agent?.name ?: agentId
-    val canStart: Boolean get() = !busy && (goal.isNotBlank() || template != null || issue != null) && projectPath != null && agentId != null
+    val modelName: String? get() = models[agentId].orEmpty().firstOrNull { it.id == model }?.let { it.name.ifEmpty { it.id } }
+    val pickersDone: Boolean get() = projectPath != null && agentId != null
+    val canStart: Boolean get() = !busy && (goal.isNotBlank() || template != null || issue != null) && pickersDone
 }
 
 /** Plain-language tasks: describe the goal (or tap a template); Hypurr picks project and agent, the user can override. */
@@ -122,8 +137,9 @@ fun NewTaskScreen(
             Text("New task", style = MaterialTheme.typography.headlineMedium, color = c.text)
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+            SetupPickers(state, onChange, onPickFolder)
             Text("What do you need?", style = MaterialTheme.typography.titleLarge, color = c.text, modifier = Modifier.padding(top = 4.dp))
-            Text("Describe it in your own words. Hypurr picks the project and the agent, and keeps your code safe.",
+            Text("Describe it in your own words. The agent works only in that folder, and your code stays safe.",
                 color = c.secondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
             Field(state.goal, template?.goalHint?.takeIf { it.isNotEmpty() } ?: "e.g. Fix the login bug in ticket 142",
                 minHeight = 96.dp) { onChange(state.copy(goal = it, error = null)) }
@@ -176,7 +192,7 @@ fun NewTaskScreen(
                     Field(state.input, "Paste it here", minHeight = 88.dp, mono = true) { onChange(state.copy(input = it, error = null)) }
                 }
             }
-            Plan(state, onChange, onPickFolder)
+            Plan(state)
             AnimatedVisibility(state.error != null) {
                 Text(state.error.orEmpty(), color = c.needsText, style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(top = 12.dp, start = 6.dp))
@@ -215,48 +231,99 @@ private fun TemplateCard(t: TaskTemplate, selected: Boolean, modifier: Modifier,
     }
 }
 
-/** Hypurr's pick of project and agent, why, and the safety promise. Each pick can be changed in place. */
+/** Models per agent that can actually run: gateway (free) models only when the computer has the gateway. */
+fun runnableModels(hello: com.ragul84.hypurr.model.Hello?): Map<String, List<com.ragul84.hypurr.model.AgentModel>> =
+    hello?.backends.orEmpty().associate { b ->
+        val gateway = b.gatewayReady == true
+        b.id to b.freeModels.filter { gateway || !it.id.startsWith("hypurr/") }
+    }.filterValues { it.isNotEmpty() }
+
+/** Required picks at the top: 1 agent (+ model), 2 project folder. Start stays off until both are set. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Plan(state: NewTaskUiState, onChange: (NewTaskUiState) -> Unit, onPickFolder: () -> Unit) {
+private fun SetupPickers(state: NewTaskUiState, onChange: (NewTaskUiState) -> Unit, onPickFolder: () -> Unit) {
     val c = Hypurr.colors
-    var choosing by remember { mutableStateOf<String?>(null) }
-    Text("HYPURR'S PLAN", color = c.tertiary, style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
-        modifier = Modifier.padding(start = 6.dp, top = 20.dp, bottom = 8.dp))
-    Column(Modifier.fillMaxWidth().panel(RoundedCornerShape(20.dp), c.surface).padding(16.dp).animateContentSize(Motion.spatialDefault()),
-        verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        PlanRow(signalIcon(SignalIcons.Folder), "Project", state.projectName ?: "Pick a project") { choosing = if (choosing == "project") null else "project" }
-        AnimatedVisibility(choosing == "project") {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                state.setup?.projects.orEmpty().forEach { p ->
-                    Choice(p.name, p.path == state.projectPath) {
-                        onChange(state.copy(project = p.path))
-                        choosing = null
+    var open by remember { mutableStateOf<String?>(null) }
+    val agents = state.setup?.agents.orEmpty()
+    Column(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        PickerCard("1", "Agent", state.agentName?.let { n -> state.modelName?.let { "$n · $it" } ?: n },
+            if (agents.isEmpty()) "No agent ready. Install Claude Code or Codex and sign in." else "Choose an agent",
+            open == "agent") { open = if (open == "agent") null else "agent" }
+        AnimatedVisibility(open == "agent") {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    agents.forEach { a ->
+                        Choice(a.name, a.id == state.agentId) {
+                            onChange(state.copy(agent = a.id, model = null, error = null))
+                            if (state.models[a.id].isNullOrEmpty()) open = null
+                        }
                     }
                 }
-                state.projectPath?.takeIf { p -> state.setup?.projects.orEmpty().none { it.path == p } }?.let { p ->
-                    Choice(folderName(p), true) { choosing = null }
+                val models = state.models[state.agentId].orEmpty()
+                if (models.isNotEmpty()) {
+                    Text("Model", color = c.secondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 6.dp))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Choice("Agent's default", state.model == null) { onChange(state.copy(model = null)); open = null }
+                        models.forEach { m ->
+                            Choice(m.name.ifEmpty { m.id }, m.id == state.model) { onChange(state.copy(model = m.id)); open = null }
+                        }
+                    }
                 }
-                Choice("Browse folders…", false) {
-                    choosing = null
+            }
+        }
+        PickerCard("2", "Project folder", state.projectPath?.let { state.projectName ?: folderName(it) }, "Choose a folder on your PC",
+            open == "folder", detail = state.projectPath) { open = if (open == "folder") null else "folder" }
+        AnimatedVisibility(open == "folder") {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                val recent = state.setup?.projects.orEmpty()
+                if (recent.isNotEmpty()) {
+                    Text("Recent", color = c.secondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 6.dp))
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        recent.forEach { p ->
+                            Choice(p.name, p.path == state.projectPath) { onChange(state.copy(project = p.path, error = null)); open = null }
+                        }
+                    }
+                }
+                SoftButton("Browse folders on your PC", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Folder)) {
+                    open = null
                     onPickFolder()
                 }
             }
         }
-        PlanRow(signalIcon(SignalIcons.Bots), "Agent", state.agentName ?: "No agent installed") { choosing = if (choosing == "agent") null else "agent" }
-        AnimatedVisibility(choosing == "agent") {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                state.setup?.agents.orEmpty().forEach { a ->
-                    Choice(a.name, a.id == state.agentId) {
-                        onChange(state.copy(agent = a.id))
-                        choosing = null
-                    }
-                }
+    }
+}
+
+@Composable
+private fun PickerCard(n: String, label: String, value: String?, empty: String, open: Boolean, detail: String? = null, onClick: () -> Unit) {
+    val c = Hypurr.colors
+    SignalCard(Modifier.fillMaxWidth().pressable("$label: ${value ?: empty}", onClick = onClick), emphasis = open) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            DotFigure(n, SignalType.figureSmall, if (value != null) c.tertiary else c.text, Modifier.width(26.dp))
+            Spacer(Modifier.width(8.dp))
+            Column(Modifier.weight(1f)) {
+                Text(label.uppercase(), color = c.tertiary, style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp))
+                Text(value ?: empty, color = if (value != null) c.text else c.secondary, style = MaterialTheme.typography.titleMedium,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (detail != null) Text(detail, color = c.tertiary, style = MaterialTheme.typography.bodySmall, maxLines = 1,
+                    overflow = TextOverflow.Ellipsis)
             }
+            Spacer(Modifier.width(8.dp))
+            if (value != null) Pill("Set", c.text) else Pill("Required", c.secondary)
         }
+    }
+}
+
+/** Why these picks, and the safety promise. */
+@Composable
+private fun Plan(state: NewTaskUiState) {
+    val c = Hypurr.colors
+    Text("HYPURR'S PLAN", color = c.tertiary, style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
+        modifier = Modifier.padding(start = 6.dp, top = 20.dp, bottom = 8.dp))
+    Column(Modifier.fillMaxWidth().panel(RoundedCornerShape(20.dp), c.surface).padding(16.dp).animateContentSize(Motion.spatialDefault()),
+        verticalArrangement = Arrangement.spacedBy(10.dp)) {
         val reason = when {
-            state.project != null || state.agent != null -> "You picked this yourself."
-            else -> state.route?.reason
+            state.agent != null -> "You picked the agent yourself."
+            else -> state.route?.agent?.let { state.route.reason.substringAfter("; ").ifEmpty { null } }
         }
         if (!reason.isNullOrEmpty()) Text(reason, color = c.secondary, style = MaterialTheme.typography.bodySmall)
         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.surface2).padding(12.dp),
@@ -266,20 +333,6 @@ private fun Plan(state: NewTaskUiState, onChange: (NewTaskUiState) -> Unit, onPi
             Text("Runs on its own branch with a checkpoint after every step. You can go back with one tap, and main stays untouched.",
                 color = c.text, style = MaterialTheme.typography.bodySmall)
         }
-    }
-}
-
-@Composable
-private fun PlanRow(icon: ImageVector, label: String, value: String, onClick: () -> Unit) {
-    val c = Hypurr.colors
-    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).pressable("Change $label", onClick = onClick).padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = c.accent, modifier = Modifier.size(20.dp))
-        Spacer(Modifier.width(12.dp))
-        Text(label, color = c.secondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(68.dp))
-        Text(value, color = c.text, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f), maxLines = 1,
-            overflow = TextOverflow.Ellipsis)
-        Text("Change", color = c.accent, style = MaterialTheme.typography.labelLarge)
     }
 }
 

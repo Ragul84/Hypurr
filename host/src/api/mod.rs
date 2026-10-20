@@ -964,7 +964,8 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
             match crate::agent::auth::models(&hub.store, backend).await {
                 Ok(v) if backend == crate::agent::builtin::BACKEND_ID => {
                     // Keep ACP's live list, but always surface the curated free models first.
-                    let mut models = crate::agent::builtin::free_models_json().as_array().cloned().unwrap_or_default();
+                    let mut models =
+                        crate::agent::builtin::offered_free_models().as_array().cloned().unwrap_or_default();
                     for m in v["models"].as_array().into_iter().flatten() {
                         if !models.iter().any(|x| x["id"] == m["id"]) {
                             models.push(m.clone());
@@ -974,8 +975,11 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
                         let current = v["currentModelId"]
                             .as_str()
                             .filter(|s| !s.is_empty())
-                            .map_or_else(|| json!(crate::agent::builtin::DEFAULT_MODEL), |s| json!(s));
-                        json!({"models": models, "currentModelId": current, "free": true})
+                            .filter(|s| {
+                                !crate::agent::builtin::is_gateway_model(s) || crate::agent::builtin::gateway_ready()
+                            })
+                            .map_or_else(|| json!(crate::agent::builtin::default_model()), |s| json!(s));
+                        json!({"models": models, "currentModelId": current, "free": crate::agent::builtin::gateway_ready()})
                     }
                 }
                 Ok(v) => v,
@@ -984,7 +988,7 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
                         error = format!("{e:#}"),
                         "hypurr-agent model probe failed; using free gateway list"
                     );
-                    json!({"models": crate::agent::builtin::free_models_json(), "currentModelId": crate::agent::builtin::DEFAULT_MODEL, "free": true})
+                    json!({"models": crate::agent::builtin::offered_free_models(), "currentModelId": crate::agent::builtin::default_model(), "free": crate::agent::builtin::gateway_ready()})
                 }
                 Err(e) => return Err(e),
             }
@@ -1061,30 +1065,93 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
 
 /// Blocking (`std::fs`): call through `spawn_blocking`.
 fn list_dirs(path: Option<std::path::PathBuf>) -> Result<Value> {
+    // Read-only: names only, never file contents. Windows: "" (or "drives") lists the drives.
+    #[cfg(windows)]
+    if path.as_ref().is_some_and(|p| p.as_os_str().is_empty() || p.as_os_str() == "drives") {
+        let drives: Vec<Value> = (b'A'..=b'Z')
+            .map(|l| format!("{}:\\", char::from(l)))
+            .filter(|d| std::path::Path::new(d).is_dir())
+            .map(|d| json!({"name": d.trim_end_matches('\\'), "path": d, "isGit": false}))
+            .collect();
+        return Ok(json!({"path": "", "parent": null, "isGit": false, "dirs": drives, "drives": true}));
+    }
     let dir = match path {
-        Some(p) => p,
-        None => dirs::home_dir().ok_or_else(|| anyhow!("no home directory"))?,
+        Some(p) if !p.as_os_str().is_empty() => p,
+        _ => dirs::home_dir().ok_or_else(|| anyhow!("no home directory"))?,
     };
     let mut dirs: Vec<Value> = std::fs::read_dir(&dir)
         .with_context(|| format!("listing {}", dir.display()))?
         .filter_map(Result::ok)
         .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
-        .filter_map(|e| {
+        .filter(|e| !hidden_dir(e))
+        .map(|e| {
             let name = e.file_name().to_string_lossy().into_owned();
-            if name.starts_with('.') {
-                return None;
-            }
             let p = e.path();
-            Some(json!({"name": name, "path": p.to_string_lossy(), "isGit": p.join(".git").exists()}))
+            json!({"name": name, "path": p.to_string_lossy(), "isGit": p.join(".git").exists()})
         })
         .collect();
     dirs.sort_by_key(|d| d["name"].as_str().unwrap_or_default().to_lowercase());
+    // At a drive root on Windows, "up" goes to the drive list.
+    let parent = dir.parent().map(|p| p.to_string_lossy().into_owned());
+    #[cfg(windows)]
+    let parent = parent.or_else(|| Some(String::new()));
     Ok(json!({
         "path": dir.to_string_lossy(),
-        "parent": dir.parent().map(|p| p.to_string_lossy().into_owned()),
+        "parent": parent,
         "isGit": dir.join(".git").exists(),
         "dirs": dirs,
     }))
+}
+
+/// Hidden, system and tool folders stay out of the folder picker.
+fn hidden_dir(e: &std::fs::DirEntry) -> bool {
+    let name = e.file_name().to_string_lossy().to_lowercase();
+    if name.starts_with('.') || name.starts_with('$') {
+        return true;
+    }
+    if matches!(
+        name.as_str(),
+        "node_modules"
+            | "appdata"
+            | "application data"
+            | "local settings"
+            | "system volume information"
+            | "windows"
+            | "program files"
+            | "program files (x86)"
+            | "programdata"
+            | "recovery"
+            | "perflogs"
+            | "__pycache__"
+    ) {
+        return true;
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const HIDDEN: u32 = 0x2;
+        const SYSTEM: u32 = 0x4;
+        if e.metadata().is_ok_and(|m| m.file_attributes() & (HIDDEN | SYSTEM) != 0) {
+            return true;
+        }
+    }
+    false
+}
+
+#[cfg(test)]
+mod list_dirs_tests {
+    #[test]
+    fn hides_dot_system_and_tool_folders() {
+        let root = std::env::temp_dir().join(format!("hypurr-ls-{}", uuid::Uuid::new_v4()));
+        for d in ["shop", ".git", "node_modules", "$Recycle.Bin", "AppData", "api"] {
+            std::fs::create_dir_all(root.join(d)).unwrap();
+        }
+        std::fs::write(root.join("notes.txt"), "x").unwrap();
+        let v = super::list_dirs(Some(root.clone())).unwrap();
+        let names: Vec<&str> = v["dirs"].as_array().unwrap().iter().map(|d| d["name"].as_str().unwrap()).collect();
+        assert_eq!(names, ["api", "shop"]);
+        let _ = std::fs::remove_dir_all(root);
+    }
 }
 
 fn term_size(b: &Value) -> (u16, u16) {

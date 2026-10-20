@@ -497,6 +497,9 @@ impl Actor {
         self.complete_ask(Err(anyhow!("couldn't start recipient: {e:#}")));
         self.complete_group(Err(anyhow!("couldn't start: {e:#}")));
         let mut msg = format!("Couldn't start the agent: {e}");
+        if e.to_string().contains(crate::agent::builtin::NO_GATEWAY) {
+            crate::agent::builtin::NO_GATEWAY.clone_into(&mut msg);
+        }
         if e.to_string().to_lowercase().contains("auth")
             && let Some(h) = crate::agent::backends::harness(&self.cfg.backend)
         {
@@ -976,6 +979,9 @@ impl Actor {
         let sid = res["sessionId"].as_str().ok_or_else(|| anyhow!("agent returned no sessionId"))?.to_owned();
         conn.loaded.insert(sid.clone());
         if let Some(model) = self.cfg.model.clone().filter(|m| !m.is_empty()) {
+            if crate::agent::builtin::is_gateway_model(&model) && !crate::agent::builtin::gateway_ready() {
+                bail!(crate::agent::builtin::NO_GATEWAY);
+            }
             let config_id = crate::agent::auth::model_config(&res).and_then(|c| c["id"].as_str());
             let r = if let Some(config_id) = config_id {
                 conn.acp
@@ -989,6 +995,9 @@ impl Actor {
             };
             if let Err(e) = r {
                 tracing::warn!(model, error = format!("{e:#}"), "couldn't set model");
+                if crate::agent::builtin::is_gateway_model(&model) {
+                    bail!(crate::agent::builtin::NO_GATEWAY);
+                }
                 bail!("Couldn't select model {model}: {e:#}");
             }
         }
