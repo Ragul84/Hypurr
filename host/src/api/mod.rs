@@ -706,6 +706,11 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
         "policies" => crate::admin::policies(&hub.store),
         "setPolicies" => crate::admin::set_policies(&hub.store, &b)?,
         "auditLog" => crate::admin::audit::list(&hub.store, &b)?,
+        "projectGuide" => crate::learn::guide::generate(hub, &b, &actor.key).await?,
+        "projectAsk" => crate::learn::guide::ask(hub, &b, &actor.key).await?,
+        "projectGuideSave" => crate::learn::guide::save(hub, &b).await?,
+        "learnCards" => crate::learn::cards(hub, &b).await?,
+        "learnQuiz" => crate::learn::quiz(hub, &b).await?,
         "activity" => crate::admin::activity::activity(&hub.store, &b)?,
         "setSafetySettings" => json!({"safety": crate::tasks::set_safety(&hub.store, &b)?}),
         // Non-sensitive local user preferences from the phone (tone + defaults for the agent).

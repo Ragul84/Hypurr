@@ -6,6 +6,7 @@ mod api;
 mod chat;
 mod hub;
 mod integrations;
+mod learn;
 mod market;
 mod mcp;
 mod remote;

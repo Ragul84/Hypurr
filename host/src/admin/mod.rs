@@ -336,6 +336,10 @@ pub fn authorize(store: &Store, actor: &Actor, method: &str, b: &mut Value) -> R
             }
             b["startedBy"] = json!({"key": actor.key, "name": actor.name});
         }
+        "projectGuideSave" => {
+            check_daily(store, &policies)?;
+            b["startedBy"] = json!({"key": actor.key, "name": actor.name});
+        }
         "send" => {
             if let Some(task) = b["botId"].as_str().and_then(|id| crate::tasks::Task::for_bot(store, id)) {
                 check_daily(store, &policies)?;

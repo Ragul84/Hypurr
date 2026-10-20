@@ -301,6 +301,7 @@ fn issue_context(task: &Task) -> String {
 }
 
 fn rules(task: &Task, read_only: bool) -> String {
+    let learning = task.extra.get("learning").and_then(Value::as_bool) == Some(true);
     let mut r = String::from("\n\n---\nWorking rules from Hypurr (the user's safety net):\n");
     match (&task.branch, &task.worktree) {
         (Some(b), Some(w)) => {
@@ -317,6 +318,9 @@ fn rules(task: &Task, read_only: bool) -> String {
     r.push_str("- Don't push, publish, deploy or touch files outside this folder unless the user asks.\n");
     r.push_str("- Hypurr saves checkpoints for you; you don't need to commit.\n");
     r.push_str("- When you finish, end with a short plain-language summary of what you changed and why, for someone new to programming.");
+    if learning {
+        r.push_str(crate::learn::RULES);
+    }
     r
 }
 
@@ -418,6 +422,9 @@ pub async fn start(hub: &Arc<Hub>, b: &Value) -> Result<Value> {
     // Set by `admin::authorize`, never taken from the client.
     if b["startedBy"].is_object() {
         task.extra.insert("startedBy".into(), b["startedBy"].clone());
+    }
+    if crate::learn::wanted(store, b) {
+        task.extra.insert("learning".into(), Value::Bool(true));
     }
     // Isolate on a branch + worktree when the project is a git checkout.
     let isolated = {

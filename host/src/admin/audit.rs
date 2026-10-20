@@ -34,6 +34,7 @@ pub fn system(store: &Store, action: &str, target: &str, detail: Value) {
 /// The methods that leave a record when they succeed.
 const AUDITED: &[&str] = &[
     "startTask",
+    "projectGuideSave",
     "finishTask",
     "rollbackTask",
     "taskCheckpoint",
