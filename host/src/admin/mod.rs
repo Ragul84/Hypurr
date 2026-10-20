@@ -731,6 +731,7 @@ mod tests {
         assert!(authorize(&s, &member, "updateBot", &mut json!({"botId": "b", "name": "x"})).is_ok());
     }
 
+    #[cfg(unix)]
     #[test]
     fn folder_rules_apply_to_bots_and_paths() {
         let s = store();

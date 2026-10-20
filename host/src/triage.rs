@@ -252,7 +252,7 @@ pub fn places(log: &str, project: &str) -> Vec<Place> {
                 continue;
             }
             let Some(abs) = resolve(&root, &scope, file.as_str()) else { continue };
-            let rel = abs.strip_prefix(&root).unwrap_or(&abs).to_string_lossy().into_owned();
+            let rel = abs.strip_prefix(&root).unwrap_or(&abs).to_string_lossy().replace('\\', "/");
             if out.iter().any(|p| p.path == rel && p.line == line) {
                 continue;
             }
@@ -632,7 +632,7 @@ pub fn sources(project: &str) -> Vec<Source> {
                 || name.ends_with(".log");
             let recent = meta.modified().is_ok_and(|m| m > cutoff);
             if looks && recent && meta.len() < 5_000_000 {
-                let rel = p.strip_prefix(dir).unwrap_or(&p).to_string_lossy().into_owned();
+                let rel = p.strip_prefix(dir).unwrap_or(&p).to_string_lossy().replace('\\', "/");
                 let at = meta
                     .modified()
                     .ok()

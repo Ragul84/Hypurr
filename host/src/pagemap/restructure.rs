@@ -207,15 +207,7 @@ pub struct Applied {
 }
 
 fn run_tests(dir: &Path, cmd: &str, limit: Duration) -> (bool, String) {
-    let mut c = if cfg!(windows) {
-        let mut c = Command::new("cmd");
-        c.args(["/C", cmd]);
-        c
-    } else {
-        let mut c = Command::new("sh");
-        c.args(["-c", cmd]);
-        c
-    };
+    let mut c = crate::oscmd::std_shell(cmd);
     c.current_dir(dir).stdin(std::process::Stdio::null()).env("CI", "1");
     let Ok(mut child) = c.stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped()).spawn() else {
         return (false, format!("Couldn't run {cmd}"));
@@ -428,7 +420,11 @@ mod tests {
         let repo = Repo::scan(&dir);
         let mut p = plan(&repo, &super::super::scan::build(&repo));
         // Stand-in for the project's tests: every moved file must exist and App must import it.
-        p.test_command = "test -f client/src/pages/Home.jsx && grep -q \"./pages/Home'\" client/src/App.jsx".into();
+        p.test_command = if cfg!(windows) {
+            r#"if exist client\src\pages\Home.jsx (findstr /C:"./pages/Home'" client\src\App.jsx) else (exit 1)"#.into()
+        } else {
+            "test -f client/src/pages/Home.jsx && grep -q \"./pages/Home'\" client/src/App.jsx".into()
+        };
         let a = apply(&dir, &p, "hypurr/restructure-test", Duration::from_secs(60)).expect("apply");
         assert_eq!(a.status, "ready", "{}", a.test_output);
         assert_eq!((a.moved, a.rewritten, a.base.as_str()), (3, 3, "main"));

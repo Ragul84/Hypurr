@@ -1,6 +1,8 @@
 //! End to end: a real `hypurr-host serve` driving a scripted ACP agent
 //! (`fake_agent.py`) through a full turn with an approval in the middle.
 
+// The fake agents are Python and POSIX shell scripts.
+#![cfg(unix)]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // test code: failing loudly is the point
 
 mod common;

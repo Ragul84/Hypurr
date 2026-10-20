@@ -73,6 +73,19 @@ pub struct Acp {
     child: tokio::sync::Mutex<Child>,
 }
 
+/// `sh -c "exec …"` on Unix; `cmd /D /S /C …` on Windows (no `exec`, so cmd stays the parent).
+fn shell(command: &str) -> Command {
+    if cfg!(windows) {
+        let mut c = Command::new("cmd.exe");
+        c.args(["/D", "/S", "/C", command]);
+        c
+    } else {
+        let mut c = Command::new("/bin/sh");
+        c.arg("-c").arg(format!("exec {command}"));
+        c
+    }
+}
+
 impl Acp {
     /// Spawns `command` through `sh -c` so user-provided commands (npx, env vars) just work.
     /// `env` stays out of the command line (it can hold API keys).
@@ -81,18 +94,16 @@ impl Acp {
         cwd: &str,
         env: &[(String, String)],
     ) -> Result<(Arc<Self>, mpsc::UnboundedReceiver<Incoming>)> {
-        let mut child = Command::new("/bin/sh")
-            .arg("-c")
-            .arg(format!("exec {command}"))
-            .envs(env.iter().map(|(k, v)| (k, v)))
+        let mut cmd = shell(command);
+        cmd.envs(env.iter().map(|(k, v)| (k, v)))
             .current_dir(cwd)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .kill_on_drop(true)
-            .process_group(0)
-            .spawn()
-            .with_context(|| format!("starting `{command}`"))?;
+            .kill_on_drop(true);
+        #[cfg(unix)]
+        cmd.process_group(0);
+        let mut child = cmd.spawn().with_context(|| format!("starting `{command}`"))?;
         let stdin = child.stdin.take().expect("stdin is piped");
         let stdout = child.stdout.take().expect("stdout is piped");
         let stderr = child.stderr.take().expect("stderr is piped");
@@ -249,7 +260,9 @@ pub fn truncate(s: &str, max: usize) -> String {
     format!("{}…", &s[..end])
 }
 
+// The fixtures are POSIX shell scripts.
 #[cfg(test)]
+#[cfg(unix)]
 mod tests {
     use super::*;
 

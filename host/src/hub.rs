@@ -350,6 +350,7 @@ impl Hub {
     }
 
     #[cfg(test)]
+    #[cfg(unix)]
     pub fn bot_value_for_test(&self, id: &str) -> Value {
         self.bot_value(id).unwrap_or(Value::Null)
     }

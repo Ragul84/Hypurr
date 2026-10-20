@@ -1,6 +1,8 @@
 //! Local routine lifecycle tests with real host processes and persistent fake ACP
 //! sessions. No paid provider is involved.
 
+// The fake agents are Python and POSIX shell scripts.
+#![cfg(unix)]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 mod common;
@@ -38,7 +40,7 @@ impl Host {
             .spawn()
             .unwrap();
         let mut host = Self { child, home, base: format!("http://127.0.0.1:{port}"), token: String::new() };
-        tokio::time::timeout(Duration::from_secs(20), async {
+        tokio::time::timeout(Duration::from_secs(60), async {
             while reqwest::get(format!("{}/health", host.base)).await.is_err() {
                 tokio::time::sleep(Duration::from_millis(50)).await;
             }

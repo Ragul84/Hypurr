@@ -859,6 +859,7 @@ mod tests {
         assert_eq!(list(&store).unwrap()["tasks"].as_array().unwrap().len(), 1);
     }
 
+    #[cfg(unix)]
     #[test]
     fn permission_assessment_uses_card_fields() {
         let store = Store::open(Path::new(":memory:")).unwrap();

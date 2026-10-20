@@ -740,6 +740,7 @@ mod tests {
         assert!(!h.setup.to_lowercase().contains("opencode"), "{}", h.setup);
     }
 
+    #[cfg(unix)]
     #[test]
     fn detects_executables_on_search_path() {
         let dir = std::env::temp_dir().join(format!("hypurr-bin-{}", uuid::Uuid::new_v4()));

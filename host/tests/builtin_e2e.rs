@@ -1,6 +1,8 @@
 //! Built-in Hypurr Agent: status, managed install (local archive), free models, and a
 //! turn through a fake Hypurr Agent ACP agent.
 
+// The fake agents are Python and POSIX shell scripts.
+#![cfg(unix)]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 mod common;

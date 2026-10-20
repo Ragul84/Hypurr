@@ -2,6 +2,8 @@
 //! on its own branch and worktree, explains and risk-labels approvals, refuses a push
 //! to main by itself, checkpoints after the step, and rolls back (and forward) on request.
 
+// The fake agents are Python and POSIX shell scripts.
+#![cfg(unix)]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // test code: failing loudly is the point
 
 mod common;

@@ -367,6 +367,7 @@ fn extract(archive: &Path, dir: &Path, cmd: &Path) -> Result<()> {
     Ok(())
 }
 
+#[cfg_attr(not(unix), allow(clippy::unnecessary_wraps, unused_variables))]
 fn chmod_x(path: &Path) -> Result<()> {
     #[cfg(unix)]
     {
@@ -406,6 +407,7 @@ mod tests {
         assert!(root.join("1.1.0").exists());
     }
 
+    #[cfg(unix)]
     #[test]
     fn raw_binary_extract_marks_executable() {
         let dir = std::env::temp_dir().join(format!("hypurr-reg-{}", uuid::Uuid::new_v4()));
