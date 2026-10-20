@@ -1,5 +1,7 @@
 package com.ragul84.hypurr.ui.screens
 
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onNodeWithText
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -140,6 +142,19 @@ class ProofScreenshotTest {
                 summary = "Changed 1 file (4 lines added, 1 removed). Most work in app/page.tsx (+4 −1).",
                 log = "after: the dev server didn't start within 90 seconds."))
         }
+    }
+
+    @Test fun fixItLongNote() {
+        shoot("proof-fix-long") { chat { ProofCard(web, images, initialFixing = true, initialFeedback = List(12) { "Line ${it + 1}: the trial button is too wide and the price wraps." }.joinToString("\n")) } }
+        compose.onNodeWithText("Send to agent").assertIsDisplayed()
+    }
+
+    @Test fun testsPassed() = shoot("proof-tests-passed") { ProofCardAlone { ProofCard(tests.copy(tests = tests.tests!!.copy(ok = true, failed = 0))) } }
+
+    @Test fun failedTestsOfferOnlyFixIt() {
+        assertEquals(listOf("Not right, fix it"), verdictActions(tests))
+        assertEquals(listOf("Not right, fix it", "Looks right"), verdictActions(tests.copy(tests = tests.tests!!.copy(failed = 0))))
+        assertEquals(listOf("Not right, fix it", "Looks right"), verdictActions(web))
     }
 
     @Test fun wording() {

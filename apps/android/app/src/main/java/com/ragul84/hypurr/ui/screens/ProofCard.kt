@@ -5,6 +5,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -69,6 +76,10 @@ fun testLine(passed: Int, failed: Int, seconds: Int): String =
         if (failed > 0) append(" · $failed failed")
         if (seconds > 0) append(" in ${if (seconds >= 60) "${seconds / 60}m ${seconds % 60}s" else "${seconds}s"}")
     }
+
+/** Which verdict buttons a ready proof offers: no "Looks right" when tests failed. */
+fun verdictActions(p: Proof): List<String> =
+    if (p.tests?.let { it.failed > 0 } == true) listOf("Not right, fix it") else listOf("Not right, fix it", "Looks right")
 
 /** The card's title for each kind of proof. */
 fun proofTitle(p: Proof): String = when {
@@ -284,6 +295,7 @@ private fun Tag(text: String, modifier: Modifier) {
         modifier = modifier.padding(8.dp).clip(RoundedCornerShape(50)).background(Overlay).padding(horizontal = 8.dp, vertical = 3.dp))
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun Verdict(proof: Proof, onVerdict: (Boolean, String) -> Unit, initialFixing: Boolean, initialFeedback: String) {
     val c = Hypurr.colors
@@ -298,15 +310,24 @@ private fun Verdict(proof: Proof, onVerdict: (Boolean, String) -> Unit, initialF
         return
     }
     if (fixing) {
+        // The note box stays short and scrolls inside; the buttons are kept in view above the keyboard.
+        val keep = remember { BringIntoViewRequester() }
+        LaunchedEffect(text, fixing) { keep.bringIntoView() }
         val style = MaterialTheme.typography.bodyMedium.copy(color = c.text)
-        Box(Modifier.fillMaxWidth().heightIn(min = 72.dp).clip(RoundedCornerShape(14.dp)).background(c.surface2).padding(12.dp)) {
-            if (text.isEmpty()) Text("What's wrong? (optional) e.g. the button is cut off on small phones", color = c.tertiary, style = style)
-            BasicTextField(text, { text = it }, Modifier.fillMaxWidth(), textStyle = style, cursorBrush = SolidColor(c.text))
+        Column(Modifier.fillMaxWidth().imePadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.fillMaxWidth().heightIn(min = 72.dp, max = 140.dp).clip(RoundedCornerShape(14.dp)).background(c.surface2)
+                .verticalScroll(rememberScrollState()).padding(12.dp)) {
+                if (text.isEmpty()) Text("What's wrong? (optional) e.g. the button is cut off on small phones", color = c.tertiary, style = style)
+                BasicTextField(text, { text = it }, Modifier.fillMaxWidth().testTag("proof-note"), textStyle = style, cursorBrush = SolidColor(c.text))
+            }
+            Row(Modifier.bringIntoViewRequester(keep), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SoftButton("Cancel", Modifier.weight(1f)) { fixing = false }
+                PrimaryButton("Send to agent", Modifier.weight(1f), icon = signalIcon(SignalIcons.Send)) { onVerdict(false, text.trim()) }
+            }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SoftButton("Cancel", Modifier.weight(1f)) { fixing = false }
-            PrimaryButton("Send to agent", Modifier.weight(1f), icon = signalIcon(SignalIcons.Send)) { onVerdict(false, text.trim()) }
-        }
+    } else if (verdictActions(proof).size == 1) {
+        // Tests failed: the only honest choice is to send it back.
+        PrimaryButton("Not right, fix it", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Send)) { fixing = true }
     } else {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SoftButton("Not right, fix it", Modifier.weight(1f)) { fixing = true }
@@ -314,7 +335,6 @@ private fun Verdict(proof: Proof, onVerdict: (Boolean, String) -> Unit, initialF
         }
     }
 }
-
 
 /** Labels and the slider handle sit on screenshots, so they keep one look in light and dark. */
 private val Overlay = Color(0xCC111111)
