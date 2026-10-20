@@ -277,7 +277,9 @@ pub fn is_pass(text: &str) -> bool {
     t.is_empty() || t == PASS || t == "pass"
 }
 
+// The fixtures are POSIX shell scripts.
 #[cfg(test)]
+#[cfg(unix)]
 mod tests {
     use super::*;
     use serde_json::json;

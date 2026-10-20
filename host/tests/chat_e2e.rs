@@ -3,6 +3,8 @@
 //! renamed and removed from a client. Uses a deterministic ACP agent (`fixtures/chat_agent.py`).
 //! With `HYPURR_WIRE_OUT=path` it writes `docs/reference/fixtures/chat-wire.json`.
 
+// The fake agents are Python and POSIX shell scripts.
+#![cfg(unix)]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // test code: failing loudly is the point
 
 mod common;

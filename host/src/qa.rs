@@ -402,8 +402,8 @@ pub async fn run(hub: &Arc<Hub>, b: &Value) -> Result<Value> {
     );
     let dir = task.worktree_path().unwrap_or_else(|| PathBuf::from(&task.project));
     let started = std::time::Instant::now();
-    let mut cmd = tokio::process::Command::new("sh");
-    cmd.arg("-c").arg(&f.command).current_dir(&dir).kill_on_drop(true).env("CI", "1");
+    let mut cmd = crate::oscmd::tokio_shell(&f.command);
+    cmd.current_dir(&dir).kill_on_drop(true).env("CI", "1");
     let out = tokio::time::timeout(Duration::from_secs(900), cmd.output()).await;
     let (ok, output, timed_out) = match out {
         Ok(Ok(o)) => (

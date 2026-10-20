@@ -61,6 +61,8 @@ object SignalIcons {
     val Lock get() = R.drawable.ic_sg_lock
     val Sun get() = R.drawable.ic_sg_sun
     val Moon get() = R.drawable.ic_sg_moon
+    val Trace get() = R.drawable.ic_sg_trace
+    val Map get() = R.drawable.ic_sg_map
 }
 
 @Composable

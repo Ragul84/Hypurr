@@ -265,7 +265,9 @@ async fn ask(hub: &Arc<Hub>, source: &BotConfig, to: &str, message: &str, timeou
     }
 }
 
+// The fixtures are POSIX shell scripts.
 #[cfg(test)]
+#[cfg(unix)]
 mod tests {
     use super::*;
     use crate::store::Store;

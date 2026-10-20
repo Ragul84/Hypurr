@@ -288,6 +288,7 @@ class MainActivity : ComponentActivity() {
         var proofLoading by remember { mutableStateOf(setOf<String>()) }
         var proofBusy by remember { mutableStateOf(setOf<String>()) }
         var qaDraft by remember { mutableStateOf<com.ragul84.hypurr.ui.screens.QaUiState?>(null) }
+        var traceDraft by remember { mutableStateOf<com.ragul84.hypurr.ui.screens.TraceMapUiState?>(null) }
         var ticketDraft by remember { mutableStateOf<com.ragul84.hypurr.ui.screens.TicketUiState?>(null) }
         val projectFolder by store.projectFolder.collectAsState()
         // Right after pairing, ask once which folder the agent may work in (can wait).
@@ -523,6 +524,7 @@ class MainActivity : ComponentActivity() {
                 }
                 target == "screen" -> ScreenRoute(store, current.name) { screen = "list" }
                 target == "qa" -> QaRoute(store, projectFolder, qaDraft, { qaDraft = it }) { screen = it }
+                target == "trace" -> TraceMapRoute(store, projectFolder, traceDraft, { traceDraft = it }) { screen = it }
                 target == "ticket" -> TicketRoute(store, projectFolder, ticketDraft, { ticketDraft = it }) { screen = it }
                 target == "newtask" -> {
                     val setup by store.setup.collectAsState()
@@ -770,6 +772,7 @@ class MainActivity : ComponentActivity() {
                         onStandup = { screen = "standup" },
                         onTicket = { screen = "ticket" },
                         onQa = { screen = "qa" },
+                        onTrace = { screen = "trace" },
                         onOpenTemplate = { screen = "newtask" },
                         onOpenBot = { screen = "chat:${it.id}" },
                         onTab = ::go,
@@ -1089,7 +1092,7 @@ class MainActivity : ComponentActivity() {
         screen == "guide" -> "tasks"
         screen.startsWith("folderpick:chat:") -> screen.removePrefix("folderpick:")
         screen == "spend" || screen == "tasks" -> "list"
-        screen == "ticket" || screen == "qa" -> "tasks"
+        screen == "ticket" || screen == "qa" || screen == "trace" -> "tasks"
         else -> "list"
     }
 
@@ -1203,6 +1206,113 @@ class MainActivity : ComponentActivity() {
             },
             onOpenTask = { st.botId?.let { go("chat:$it") } },
             onRun = ::run,
+        )
+    }
+
+    /** Trace a click and the page map: approvals, live recording, Playwright export, restructure on a branch. */
+    @Composable
+    private fun TraceMapRoute(
+        store: HypurrStore,
+        projectFolder: String?,
+        draft: com.ragul84.hypurr.ui.screens.TraceMapUiState?,
+        saveDraft: (com.ragul84.hypurr.ui.screens.TraceMapUiState?) -> Unit,
+        go: (String) -> Unit,
+    ) {
+        val scope = rememberCoroutineScope()
+        val setup by store.setup.collectAsState()
+        var st by remember { mutableStateOf(draft ?: com.ragul84.hypurr.ui.screens.TraceMapUiState()) }
+        SideEffect { saveDraft(st) }
+        LaunchedEffect(Unit) { store.loadSetup() }
+        LaunchedEffect(setup) {
+            val projects = setup?.projects.orEmpty()
+            val pick = projects.firstOrNull { it.path == st.project }
+                ?: projects.firstOrNull { projectFolder != null && projectFolder.startsWith(it.path) } ?: projects.firstOrNull()
+            st = st.copy(project = pick?.path, projectName = pick?.name)
+        }
+        LaunchedEffect(st.project) {
+            val p = st.project ?: return@LaunchedEffect
+            if (st.map == null) runCatching { store.mapGet(p) }.getOrNull()?.let { r ->
+                st = st.copy(map = r.map, plan = r.plan, applied = r.applied?.takeIf { it.status.isNotEmpty() })
+            }
+        }
+        // While recording or applying, follow the laptop.
+        LaunchedEffect(st.trace?.id, st.recording) {
+            val p = st.project ?: return@LaunchedEffect
+            while (st.recording) {
+                delay(2000)
+                val id = st.trace?.id ?: break
+                runCatching { store.traceGet(p, id) }.getOrNull()?.trace?.let { st = st.copy(trace = it) }
+            }
+        }
+        LaunchedEffect(st.applied?.status) {
+            val p = st.project ?: return@LaunchedEffect
+            while (st.applied?.status == "running") {
+                delay(3000)
+                runCatching { store.mapGet(p) }.getOrNull()?.applied?.let { st = st.copy(applied = it) }
+            }
+        }
+        fun fail(e: Throwable, what: String) { st = st.copy(busy = false, error = e.message ?: what) }
+        fun started(r: com.ragul84.hypurr.model.TraceReply) {
+            st = if (r.status == "needsApproval") st.copy(busy = false, approval = r)
+            else st.copy(busy = false, approval = null, trace = r.trace, open = null, exported = null)
+        }
+        fun back() {
+            st = when {
+                st.tab == 1 && st.mapStep != com.ragul84.hypurr.ui.screens.MapStep.Pages ->
+                    st.copy(mapStep = com.ragul84.hypurr.ui.screens.MapStep.Pages, page = null, confirmApply = false)
+                st.approval != null -> st.copy(approval = null)
+                else -> { saveDraft(null); go("tasks"); st }
+            }
+        }
+        BackHandler { back() }
+        com.ragul84.hypurr.ui.screens.TraceMapScreen(
+            st,
+            onBack = ::back,
+            onChange = { st = it },
+            onStart = {
+                val p = st.project ?: return@TraceMapScreen
+                st = st.copy(busy = true, busyLabel = "Opening the page", error = null)
+                scope.launch { runCatching { store.traceStart(p, st.url, st.stepList) }.onSuccess(::started).onFailure { fail(it, "Couldn't start the trace.") } }
+            },
+            onAllow = {
+                val p = st.project ?: return@TraceMapScreen
+                st = st.copy(busy = true, busyLabel = "Opening the page", error = null)
+                scope.launch { runCatching { store.traceAllow(p, st.url, st.stepList) }.onSuccess(::started).onFailure { fail(it, "Couldn't start the trace.") } }
+            },
+            onStop = {
+                val id = st.trace?.id ?: return@TraceMapScreen
+                scope.launch { runCatching { store.traceStop(id) } }
+            },
+            onExport = {
+                val p = st.project ?: return@TraceMapScreen
+                val id = st.trace?.id ?: return@TraceMapScreen
+                scope.launch { runCatching { store.traceExport(p, id) }.onSuccess { st = st.copy(exported = it, copied = false) }.onFailure { fail(it, "Couldn't make the test.") } }
+            },
+            onCopy = { st.exported?.let { copyText("Playwright test", it.code); st = st.copy(copied = true) } },
+            onShare = {
+                val code = st.exported?.code ?: return@TraceMapScreen
+                val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, code).putExtra(Intent.EXTRA_SUBJECT, "flow.spec.js")
+                runCatching { startActivity(Intent.createChooser(send, null)) }
+            },
+            onScan = {
+                val p = st.project ?: return@TraceMapScreen
+                st = st.copy(busy = true, busyLabel = "Reading the project", error = null)
+                scope.launch { runCatching { store.mapScan(p) }.onSuccess { st = st.copy(busy = false, map = it.map, plan = it.plan) }.onFailure { fail(it, "Couldn't map the project.") } }
+            },
+            onApply = {
+                val p = st.project ?: return@TraceMapScreen
+                st = st.copy(confirmApply = false, busy = true, busyLabel = "Starting", error = null)
+                scope.launch { runCatching { store.restructureApply(p) }.onSuccess { st = st.copy(busy = false, applied = it.applied) }.onFailure { fail(it, "Couldn't start.") } }
+            },
+            onPublish = {
+                val p = st.project ?: return@TraceMapScreen
+                st = st.copy(busy = true, busyLabel = "Uploading the branch", error = null)
+                scope.launch { runCatching { store.restructurePublish(p) }.onSuccess { st = st.copy(busy = false, applied = it.applied) }.onFailure { fail(it, "Couldn't open the pull request.") } }
+            },
+            onDiscard = {
+                val p = st.project ?: return@TraceMapScreen
+                scope.launch { runCatching { store.restructureDiscard(p) }.onSuccess { st = st.copy(applied = null) }.onFailure { fail(it, "Couldn't delete the branch.") } }
+            },
         )
     }
 

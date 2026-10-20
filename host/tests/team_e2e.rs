@@ -1,6 +1,8 @@
 //! A real host and built-in MCP process, with deterministic ACP agents instead
 //! of paid providers. Exercises discovery, delegation, approval and reply sync.
 
+// The fake agents are Python and POSIX shell scripts.
+#![cfg(unix)]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 mod common;

@@ -10,6 +10,8 @@ mod itkit;
 mod learn;
 mod market;
 mod mcp;
+mod oscmd;
+mod pagemap;
 mod pricing;
 mod proof;
 mod qa;
@@ -21,6 +23,7 @@ mod standup;
 mod store;
 mod tasks;
 mod ticket;
+mod trace;
 mod triage;
 mod tui;
 mod update;
@@ -680,9 +683,7 @@ async fn statusline(port: u16, wrapped: String) {
     if !wrapped.trim().is_empty() {
         // The user's own status line gets the same JSON on stdin.
         use std::io::Write;
-        if let Ok(mut child) =
-            std::process::Command::new("/bin/sh").arg("-c").arg(&wrapped).stdin(std::process::Stdio::piped()).spawn()
-        {
+        if let Ok(mut child) = oscmd::std_shell(&wrapped).stdin(std::process::Stdio::piped()).spawn() {
             if let Some(mut stdin) = child.stdin.take() {
                 let _ = stdin.write_all(input.as_bytes());
             }
