@@ -10,6 +10,7 @@ pub mod risk;
 pub mod router;
 pub mod safety;
 pub mod scope;
+pub mod shell;
 pub mod templates;
 
 use crate::hub::Hub;
