@@ -498,7 +498,24 @@ pub fn which(bin: &str) -> Option<PathBuf> {
             cached.clone()
         }
     };
-    dirs.into_iter().map(|d| d.join(bin)).find(|p| is_executable(p))
+    dirs.into_iter().find_map(|d| exe_in(&d, bin))
+}
+
+/// `dir/bin`, or on Windows `dir/bin.exe` / `.cmd` / `.bat` (no PATHEXT lookup without this).
+fn exe_in(dir: &Path, bin: &str) -> Option<PathBuf> {
+    let p = dir.join(bin);
+    if is_executable(&p) {
+        return Some(p);
+    }
+    if cfg!(windows) && Path::new(bin).extension().is_none() {
+        for ext in ["exe", "cmd", "bat"] {
+            let p = dir.join(format!("{bin}.{ext}"));
+            if p.is_file() {
+                return Some(p);
+            }
+        }
+    }
+    None
 }
 
 fn is_executable(p: &Path) -> bool {
@@ -722,6 +739,14 @@ pub fn local_candidate(id: &str) -> Option<registry::Cmd> {
 }
 
 fn shell_quote(s: &str) -> String {
+    if cfg!(windows) {
+        // Commands run via `cmd /S /C`, which only understands double quotes.
+        return if s.chars().all(|c| c.is_ascii_alphanumeric() || "-_./\\:".contains(c)) {
+            s.to_owned()
+        } else {
+            format!("\"{}\"", s.replace('"', ""))
+        };
+    }
     if s.chars().all(|c| c.is_ascii_alphanumeric() || "-_./".contains(c)) {
         s.to_owned()
     } else {

@@ -122,7 +122,7 @@ fun BotListScreen(
     /** When set, show the built-in agent install card (Hypurr Agent free models). */
     builtinInstall: BuiltinInstallPrompt? = null,
     onInstallBuiltin: () -> Unit = {},
-    /** The paired computer's OS ("windows", "linux", "macos"); Windows has no Hypurr Agent build yet. */
+    /** The paired computer's OS ("windows", "linux", "macos"). */
     hostOs: String = "",
     /** Pending asks keyed by bot id — powers one-tap approve on Needs-you cards. */
     asks: Map<String, NeedsYouAsk> = emptyMap(),
@@ -159,7 +159,7 @@ fun BotListScreen(
         if (synced && bots.isEmpty()) {
             Greeting(computerName, link, now, Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
             builtinInstall?.let { BuiltinInstallCard(it, onInstallBuiltin, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
-            EmptyRoster(onNewTask, onPair = onSettings, onInstall = onInstallBuiltin, windows = isWindows(hostOs))
+            EmptyRoster(onNewTask, onPair = onSettings, onInstall = onInstallBuiltin, windows = isWindows(hostOs) && builtinInstall == null)
             return@Column
         }
         if (!synced && bots.isEmpty()) {
