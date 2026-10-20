@@ -363,6 +363,8 @@ data class Checkpoint(val id: String, val label: String = "", val at: Long = 0, 
 @Serializable
 data class TaskInfo(
     val id: String,
+    /** Set when the task came from Ticket to PR: the approved plan and, later, the pull request. */
+    val ticket: TicketExtra? = null,
     val botId: String = "",
     val goal: String = "",
     val title: String = "",
@@ -690,3 +692,69 @@ data class Activity(
 
 /** "$4.20" for a limit; "No limit" for 0. */
 fun limitLabel(x: Double): String = if (x <= 0.0) "No limit" else "$" + String.format(java.util.Locale.US, "%.2f", x)
+
+// MARK: Ticket to PR (host `ticket.rs`)
+
+@Serializable
+data class PlanFile(val path: String = "", val why: String = "", val exists: Boolean = true)
+
+@Serializable
+data class TicketPlan(
+    val understood: String = "",
+    val files: List<PlanFile> = emptyList(),
+    val checks: List<String> = emptyList(),
+    val tests: List<String> = emptyList(),
+    val testCommand: String = "",
+)
+
+@Serializable
+data class TicketResolve(val ticket: Issue? = null, val needsSetup: String? = null, val key: String = "")
+
+@Serializable
+data class TicketPlanResult(val plan: TicketPlan = TicketPlan(), val by: String = "ticket")
+
+@Serializable
+data class TicketPublishInfo(
+    /** github | gitlab | azure | other | none */
+    val provider: String = "none",
+    /** How the PR would be opened; empty: copy the description instead. */
+    val via: String = "",
+    val branch: String = "",
+    val base: String = "",
+    val protected: Boolean = false,
+)
+
+@Serializable
+data class TicketPr(
+    val pushed: Boolean = false,
+    val branch: String = "",
+    val provider: String = "",
+    val url: String? = null,
+    val number: Long? = null,
+    /** No PR tool signed in: the user copies the description. */
+    val copy: Boolean = false,
+    val error: String? = null,
+)
+
+@Serializable
+data class TicketExtra(val plan: TicketPlan? = null, val pr: TicketPr? = null)
+
+@Serializable
+data class TicketReview(
+    val ticket: Issue = Issue("text", ""),
+    val files: List<FileChange> = emptyList(),
+    val summary: String = "",
+    val by: String = "files",
+    val prTitle: String = "",
+    val prBody: String = "",
+    val comment: String = "",
+    val publish: TicketPublishInfo = TicketPublishInfo(),
+    val pr: TicketPr? = null,
+    val testCommand: String = "",
+)
+
+@Serializable
+data class TicketCli(val gh: Boolean = false, val glab: Boolean = false, val az: Boolean = false)
+
+@Serializable
+data class TicketSetup(val integrations: Integrations = Integrations(), val cli: TicketCli = TicketCli())

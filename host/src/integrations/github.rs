@@ -52,7 +52,7 @@ pub fn parse_remote(url: &str) -> Option<String> {
     (parts.next().is_none()).then(|| format!("{owner}/{repo}"))
 }
 
-fn remote_url(dir: &Path) -> Option<String> {
+pub fn remote_url(dir: &Path) -> Option<String> {
     let out =
         std::process::Command::new("git").arg("-C").arg(dir).args(["remote", "get-url", "origin"]).output().ok()?;
     out.status.success().then(|| String::from_utf8_lossy(&out.stdout).trim().to_owned())
@@ -146,6 +146,19 @@ impl Client {
                 project: None,
             })
             .collect())
+    }
+
+    /// One issue by number.
+    pub async fn issue(&self, repo: &str, number: u64) -> Result<Issue> {
+        let i = self.request("GET", &format!("/repos/{repo}/issues/{number}"), None).await?;
+        Ok(Issue {
+            source: "github".into(),
+            key: format!("#{number}"),
+            title: i["title"].as_str().unwrap_or_default().to_owned(),
+            url: i["html_url"].as_str().unwrap_or_default().to_owned(),
+            body: crate::agent::acp::truncate(i["body"].as_str().unwrap_or_default(), 6000),
+            project: None,
+        })
     }
 
     /// Opens a pull request (or returns the one already open for this branch).

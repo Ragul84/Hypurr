@@ -353,6 +353,7 @@ const VIEWER_OK: &[&str] = &[
     "taskSetup",
     "routeTask",
     "taskCosts",
+    "ticketSetup",
     "taskTemplates",
     "issues",
     "integrations",

@@ -5,6 +5,12 @@ import com.ragul84.hypurr.model.Actor
 import com.ragul84.hypurr.model.AuditLog
 import com.ragul84.hypurr.model.Backend
 import com.ragul84.hypurr.model.Bot
+import com.ragul84.hypurr.model.TicketSetup
+import com.ragul84.hypurr.model.TicketResolve
+import com.ragul84.hypurr.model.TicketPlanResult
+import com.ragul84.hypurr.model.TicketPlan
+import com.ragul84.hypurr.model.TicketReview
+import com.ragul84.hypurr.model.TicketPr
 import com.ragul84.hypurr.model.PolicyInfo
 import com.ragul84.hypurr.model.TeamInfo
 import com.ragul84.hypurr.model.Computer
@@ -453,6 +459,20 @@ class HypurrStore(
         upsert(bot)
         return bot.id
     }
+
+    // MARK: Ticket to PR
+
+    private fun cl() = client ?: throw HostException.unreachable()
+    suspend fun ticketSetup(): TicketSetup = cl().ticketSetup()
+    suspend fun ticketResolve(input: String, project: String?): TicketResolve = cl().ticketResolve(input, project)
+    suspend fun ticketPlan(ticket: Issue, project: String): TicketPlanResult = cl().ticketPlan(ticket, project)
+    suspend fun ticketStart(ticket: Issue, plan: TicketPlan, project: String): String {
+        val bot = cl().ticketStart(ticket, plan, project)
+        upsert(bot)
+        return bot.id
+    }
+    suspend fun ticketReview(taskId: String): TicketReview = cl().ticketReview(taskId)
+    suspend fun ticketPublish(taskId: String, title: String, body: String): TicketPr = cl().ticketPublish(taskId, title, body)
 
     /** Open GitHub issues and Jira tickets to start a task from. */
     suspend fun issues(): IssueList = client?.issues() ?: IssueList()
