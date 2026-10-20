@@ -126,7 +126,8 @@ fun IconTile(icon: ImageVector, label: String, modifier: Modifier = Modifier, si
 @Composable
 fun PrimaryButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, icon: ImageVector? = null, onClick: () -> Unit) {
     val c = Hypurr.colors
-    val alpha by animateFloatAsState(if (enabled) 1f else 0.4f, Motion.effects(), label = "enabled")
+    // No fade: the primary action must read as ready the instant it is (onboarding Continue).
+    val alpha = if (enabled) 1f else 0.4f
     Row(
         modifier
             .heightIn(min = 48.dp)
