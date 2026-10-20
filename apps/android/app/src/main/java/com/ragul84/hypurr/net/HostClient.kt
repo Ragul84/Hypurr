@@ -286,6 +286,22 @@ class HostClient(val transport: ChannelTransport) {
     suspend fun learnCards(taskId: String): com.ragul84.hypurr.model.LearnCards =
         call("learnCards", buildJsonObject { put("taskId", taskId) })
 
+    suspend fun proof(taskId: String): com.ragul84.hypurr.model.ProofReply =
+        call("proofGet", buildJsonObject { put("taskId", taskId) })
+
+    suspend fun proofStart(taskId: String): com.ragul84.hypurr.model.ProofReply =
+        call("proofStart", buildJsonObject { put("taskId", taskId) })
+
+    suspend fun proofAllow(taskId: String): com.ragul84.hypurr.model.ProofReply =
+        call("proofAllow", buildJsonObject { put("taskId", taskId) })
+
+    suspend fun proofFile(taskId: String, name: String): com.ragul84.hypurr.model.ProofFileData =
+        call("proofFile", buildJsonObject { put("taskId", taskId); put("name", name) }, timeoutMs = 120_000)
+
+    suspend fun proofVerdict(taskId: String, ok: Boolean, text: String) {
+        transport.call("proofVerdict", buildJsonObject { put("taskId", taskId); put("ok", ok); put("text", text) })
+    }
+
     suspend fun learnQuiz(taskId: String): com.ragul84.hypurr.model.Quiz =
         call("learnQuiz", buildJsonObject { put("taskId", taskId) }, timeoutMs = 240_000)
 

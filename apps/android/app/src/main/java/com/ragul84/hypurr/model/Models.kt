@@ -951,3 +951,51 @@ data class QaRunResult(
     val manual: List<String> = emptyList(),
     val needsDevice: Boolean = false,
 )
+
+// ---------- Show me it works (Stage 8) ----------
+
+@Serializable
+data class ProofPlan(val kind: String = "", val what: String = "", val command: String? = null)
+
+@Serializable
+data class ProofShot(val label: String = "", val before: String? = null, val after: String? = null)
+
+@Serializable
+data class ProofTests(
+    val ok: Boolean = false,
+    val passed: Int = 0,
+    val failed: Int = 0,
+    val command: String = "",
+    val seconds: Int = 0,
+    val output: String = "",
+)
+
+@Serializable
+data class ProofChange(val path: String = "", val added: Int = 0, val removed: Int = 0)
+
+@Serializable
+data class ProofVerdict(val ok: Boolean = true, val text: String = "")
+
+/** Visual proof of a task's result: before/after shots, a clip, test counts, the diff in words. */
+@Serializable
+data class Proof(
+    /** needsApproval | running | ready | failed */
+    val status: String = "",
+    val plan: ProofPlan? = null,
+    val kind: String = "",
+    val shots: List<ProofShot> = emptyList(),
+    val clip: String? = null,
+    val tests: ProofTests? = null,
+    val summary: String = "",
+    val files: List<ProofChange> = emptyList(),
+    val note: String = "",
+    val log: String = "",
+    val verdict: ProofVerdict? = null,
+    val seconds: Int = 0,
+)
+
+@Serializable
+data class ProofReply(val proof: Proof? = null)
+
+@Serializable
+data class ProofFileData(val name: String = "", val data: String = "")
