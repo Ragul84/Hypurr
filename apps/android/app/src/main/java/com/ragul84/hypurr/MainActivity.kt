@@ -57,6 +57,7 @@ import com.ragul84.hypurr.net.LinkState
 import com.ragul84.hypurr.ui.screens.BotListScreen
 import com.ragul84.hypurr.ui.screens.HomeTab
 import com.ragul84.hypurr.ui.screens.TasksScreen
+import com.ragul84.hypurr.ui.screens.StandupScreen
 import com.ragul84.hypurr.ui.screens.TicketScreen
 import com.ragul84.hypurr.ui.screens.QaScreen
 import com.ragul84.hypurr.ui.screens.QaStep
@@ -485,6 +486,45 @@ class MainActivity : ComponentActivity() {
                     LaunchedEffect(Unit) { store.loadPricing() }
                     SpendScreen(current.name, linkState, costs, bots, onTab = ::go, pricing = pricing)
                 }
+                target == "standup" -> {
+                    var st by remember { mutableStateOf(com.ragul84.hypurr.ui.screens.StandupUiState(loading = true,
+                        projectName = projectFolder?.let { com.ragul84.hypurr.ui.screens.folderName(it) })) }
+                    fun write(useAgent: Boolean = true) {
+                        st = st.copy(loading = true, error = null)
+                        scope.launch {
+                            runCatching { store.standup(listOfNotNull(projectFolder), useAgent) }
+                                .onSuccess { st = com.ragul84.hypurr.ui.screens.StandupUiState.from(it, st) }
+                                .onFailure { st = st.copy(loading = false, error = it.message ?: "Couldn't reach your computer.") }
+                        }
+                    }
+                    LaunchedEffect(Unit) {
+                        write()
+                        st = st.copy(reminder = store.standupReminder(), team = store.teamStandup())
+                    }
+                    StandupScreen(
+                        st,
+                        onBack = { screen = "tasks" },
+                        onChange = { st = it },
+                        onRewrite = { write() },
+                        onCopy = {
+                            getSystemService(ClipboardManager::class.java)
+                                .setPrimaryClip(android.content.ClipData.newPlainText("Standup", st.shareText()))
+                            st = st.copy(copied = true)
+                        },
+                        onShare = {
+                            // The person picks Teams, Slack, WhatsApp…; nothing is sent automatically.
+                            val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, st.shareText())
+                            startActivity(Intent.createChooser(send, "Share standup"))
+                        },
+                        onReminder = { on ->
+                            scope.launch {
+                                runCatching { store.setStandupReminder(on, st.reminder?.time ?: "09:30", "Asia/Kolkata") }
+                                    .onSuccess { st = st.copy(reminder = it) }
+                                    .onFailure { st = st.copy(error = it.message) }
+                            }
+                        },
+                    )
+                }
                 target == "tasks" -> {
                     val setup by store.setup.collectAsState()
                     LaunchedEffect(Unit) { store.loadSetup() }
@@ -506,6 +546,7 @@ class MainActivity : ComponentActivity() {
                         templates = templates,
                         recent = rosterOrder(bots.values),
                         onNewTask = { screen = "newtask" },
+                        onStandup = { screen = "standup" },
                         onTicket = { screen = "ticket" },
                         onQa = { screen = "qa" },
                         onOpenTemplate = { screen = "newtask" },

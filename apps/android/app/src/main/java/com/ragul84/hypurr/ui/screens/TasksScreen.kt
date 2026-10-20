@@ -54,6 +54,7 @@ fun TasksScreen(
     recent: List<Bot>,
     now: Long = System.currentTimeMillis(),
     onNewTask: () -> Unit = {},
+    onStandup: () -> Unit = {},
     onTicket: () -> Unit = {},
     onQa: () -> Unit = {},
     onOpenTemplate: (TaskTemplate) -> Unit = {},
@@ -74,6 +75,21 @@ fun TasksScreen(
             ) {
                 item {
                     PrimaryButton("New task", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Plus), onClick = onNewTask)
+                }
+                item {
+                    SignalCard(Modifier.fillMaxWidth().pressable("Daily standup", onClick = onStandup)) {
+                        Row(Modifier.padding(horizontal = 14.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(c.surface2), contentAlignment = Alignment.Center) {
+                                Icon(signalIcon(SignalIcons.Clock), null, tint = c.text, modifier = Modifier.size(20.dp))
+                            }
+                            Spacer(Modifier.width(14.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("Daily standup", color = c.text, style = MaterialTheme.typography.titleSmall)
+                                Text("Yesterday, today and blockers, written for you", color = c.tertiary, style = MaterialTheme.typography.bodySmall)
+                            }
+                            Icon(signalIcon(SignalIcons.Chevron), null, tint = c.tertiary, modifier = Modifier.size(16.dp))
+                        }
+                    }
                 }
                 item {
                     SignalCard(Modifier.fillMaxWidth().pressable("Write tests", onClick = onQa)) {

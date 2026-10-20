@@ -314,6 +314,7 @@ const ADMIN_ONLY: &[&str] = &[
     "auditExport",
     "spendByPerson",
     "activity",
+    "teamStandup",
     "setIntegrations",
     "testIntegration",
     "saveProject",

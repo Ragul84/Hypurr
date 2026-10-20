@@ -489,6 +489,17 @@ class HypurrStore(
     /** Open GitHub issues and Jira tickets to start a task from. */
     suspend fun issues(): IssueList = client?.issues() ?: IssueList()
 
+    suspend fun standup(projects: List<String>, useAgent: Boolean = true) =
+        (client ?: throw HostException.unreachable()).standup(projects, useAgent)
+
+    /** `null` when this phone isn't an admin (the host refuses) or the computer is unreachable. */
+    suspend fun teamStandup() = runCatching { client?.teamStandup() }.getOrNull()
+
+    suspend fun standupReminder() = runCatching { client?.standupReminder()?.reminder }.getOrNull()
+
+    suspend fun setStandupReminder(enabled: Boolean, time: String, timeZone: String) =
+        (client ?: throw HostException.unreachable()).setStandupReminder(enabled, time, timeZone).reminder
+
     // MARK: work tools and costs
 
     private val _integrations = MutableStateFlow<Integrations?>(null)
