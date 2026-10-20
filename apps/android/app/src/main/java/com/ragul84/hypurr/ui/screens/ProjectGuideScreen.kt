@@ -115,15 +115,11 @@ fun ProjectGuideScreen(
             if (state.tab != GuideTab.Ask && state.docs[state.tab.kind] != null) {
                 val kind = state.tab.kind
                 Column(Modifier.fillMaxWidth().background(c.bg).padding(horizontal = 16.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SoftButton(if (state.editing) "Done" else "Edit", Modifier.weight(1f),
-                            icon = signalIcon(if (state.editing) SignalIcons.Check else SignalIcons.Review), onClick = onToggleEdit)
-                        SoftButton(if (state.copied) "Copied" else "Copy", Modifier.weight(1f),
-                            icon = signalIcon(if (state.copied) SignalIcons.Check else SignalIcons.Paste)) { onCopy(kind) }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SoftButton("Markdown", Modifier.weight(1f), icon = signalIcon(SignalIcons.Send)) { onShareMarkdown(kind) }
-                        SoftButton("PDF", Modifier.weight(1f), icon = signalIcon(SignalIcons.File)) { onSharePdf(kind) }
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SoftButton(if (state.editing) "Done" else "Edit", Modifier.weight(1f)) { onToggleEdit() }
+                        SoftButton(if (state.copied) "Copied" else "Copy", Modifier.weight(1f)) { onCopy(kind) }
+                        SoftButton(".md", Modifier.weight(1f), icon = signalIcon(SignalIcons.Send)) { onShareMarkdown(kind) }
+                        SoftButton("PDF", Modifier.weight(1f), icon = signalIcon(SignalIcons.Send)) { onSharePdf(kind) }
                     }
                     if (kind == "guide") PrimaryButton("Save to project…", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Branch), onClick = onAskSave)
                 }
@@ -146,7 +142,9 @@ private fun DocPane(state: GuideUiState, kind: String, onGenerate: (String) -> U
                     color = c.secondary, style = MaterialTheme.typography.bodyMedium)
                 PrimaryButton(if (busy) "Reading the folder…" else if (kind == "guide") "Write the project guide" else "Write the handover doc",
                     Modifier.fillMaxWidth(), enabled = !busy && state.folder != null, icon = signalIcon(SignalIcons.Docs)) { onGenerate(kind) }
-                if (state.folder == null) Text("Pick a project folder first.", color = c.tertiary, style = MaterialTheme.typography.bodySmall)
+                Text(if (state.folder == null) "Pick a project folder first."
+                    else "Hypurr reads the folder and its git history, then writes it for your role and experience. Nothing in the folder changes.",
+                    color = c.tertiary, style = MaterialTheme.typography.bodySmall)
             }
         }
         return

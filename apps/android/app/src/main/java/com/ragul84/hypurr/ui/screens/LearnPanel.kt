@@ -142,7 +142,7 @@ private fun TeachCard(card: LearnCard) {
     val c = Hypurr.colors
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.surface2).padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(card.concept, color = c.text, style = MaterialTheme.typography.titleSmall)
-        Text(card.explain, color = c.secondary, style = MaterialTheme.typography.bodySmall)
+        Text(card.explain.replace("`", ""), color = c.secondary, style = MaterialTheme.typography.bodySmall)
         if (card.example.isNotBlank()) {
             Text("In your code", color = c.tertiary, style = MaterialTheme.typography.labelSmall)
             Text(card.example, color = c.text, fontFamily = FontFamily.Monospace, fontSize = 12.sp,
