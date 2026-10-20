@@ -548,6 +548,7 @@ mod tests {
         assert_eq!(names, ["a", "b", "c", "d", "e", "f", "g"]);
     }
 
+    #[cfg(unix)]
     #[test]
     fn tracks_cd() {
         let p = parse("cd src && ls; cd ..; cd ..; rm x", Some("/r".into()));

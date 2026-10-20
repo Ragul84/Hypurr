@@ -334,13 +334,13 @@ mod tests {
         let terms = Arc::new(Terms::default());
         let id = terms.spawn(("test".into(), Step::Login), "echo got-hi", 80, 24).unwrap();
         let term = terms.get(&id).unwrap();
-        let (_, mut rx) = term.attach();
+        // It can finish before anyone attaches, so poll instead of waiting for the event.
         let code = tokio::time::timeout(Duration::from_secs(20), async {
             loop {
-                let v = rx.recv().await.unwrap();
-                if v["type"] == "exit" {
-                    return v["code"].as_i64().unwrap();
+                if let Some(c) = term.output.locked().exit {
+                    return i64::from(c);
                 }
+                tokio::time::sleep(Duration::from_millis(100)).await;
             }
         })
         .await

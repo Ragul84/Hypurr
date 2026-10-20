@@ -192,6 +192,11 @@ pub fn resolve(t: &mut Trace, repo: &Repo, maps: &HashMap<String, SourceMap>) {
             call.handled_by = locate::route_for(&routes, &call.method, &call.url).cloned();
             call.initiator.clear();
         }
+        // A framework's own click plumbing (React Native Web, …) hides the handler; the code that
+        // sent the click's first API call is the handler as far as the person is concerned.
+        if c.handler.is_none() {
+            c.handler = c.calls.iter().find_map(|call| call.sent_from.clone().filter(|r| r.name.is_some()));
+        }
     }
     t.chain = t.clicks.iter().map(super::chain::words).collect();
 }

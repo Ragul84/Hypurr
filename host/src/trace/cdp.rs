@@ -580,6 +580,9 @@ pub async fn record(exe: &Path, profile: &Path, opts: Options, mut stop: watch::
                 if r["result"]["value"] != true {
                     s.rec.missing_steps.push(label);
                     next_step = Some(Instant::now() + Duration::from_millis(300));
+                } else if label.starts_with("type:") {
+                    // Typing isn't a click, so no settle follows it: move straight on.
+                    next_step = Some(Instant::now() + Duration::from_millis(300));
                 }
             }
             _ = stop.changed() => break,

@@ -334,6 +334,7 @@ const NETWORK: &[&str] = &["curl", "wget", "ssh", "scp", "rsync", "nc", "ftp", "
 const DANGEROUS: &[&str] =
     &["dd", "mkfs", "shutdown", "reboot", "halt", "kill", "killall", "pkill", "crontab", "chown"];
 
+const UNKNOWN_CMD: &str = "run a command: ";
 const UNSURE: &str = "Hypurr can't tell for sure what this does or where, so it asks to be safe.";
 const OUTSIDE_RUN: &str = "It runs outside the project folder, where the safety net can't undo changes.";
 /// Programs where an unknown (`$X`, `$(…)`) argument can't change anything.
@@ -470,9 +471,12 @@ impl Ctx<'_> {
         // ways and keep every finding, so a dialect trick can't hide a change.
         if cfg!(windows) {
             let mut seen = Vec::new();
-            for win in [false, true] {
-                self.segments(&shell::parse_as(cmd, start.clone(), win), depth, &mut seen);
-            }
+            self.segments(&shell::parse_as(cmd, start.clone(), true), depth, &mut seen);
+            let mut posix = Vec::new();
+            self.segments(&shell::parse_as(cmd, start.clone(), false), depth, &mut posix);
+            // Read as POSIX, a Windows command (`dir`, `type`) is just "unknown"; that reading only
+            // adds what it actually recognises.
+            seen.extend(posix.into_iter().filter(|f| !f.action.starts_with(UNKNOWN_CMD)));
             for f in seen {
                 if !out.iter().any(|o: &Finding| o.action == f.action) {
                     out.push(f);
@@ -880,7 +884,7 @@ fn classify(prog: &str, args: &[&str], w: &[String], at: &At, moved: bool, displ
                     .because("It connects to a database.")
             }
         }
-        _ => Finding::new(Risk::Medium, format!("run a command: {display}"))
+        _ => Finding::new(Risk::Medium, format!("{UNKNOWN_CMD}{display}"))
             .because("Hypurr doesn't recognise this command, so it asks to be safe."),
     }
 }
@@ -913,7 +917,8 @@ fn tool_finding(prog: &str, args: &[&str], display: &str) -> Finding {
     }
 }
 
-#[cfg(all(test, unix))]
+#[cfg(test)]
+#[cfg(unix)]
 mod tests {
     use super::*;
 
@@ -1335,7 +1340,8 @@ mod tests {
     }
 }
 
-#[cfg(all(test, windows))]
+#[cfg(test)]
+#[cfg(windows)]
 mod win_tests {
     use super::*;
 

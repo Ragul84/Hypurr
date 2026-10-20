@@ -80,6 +80,9 @@ pub fn markdown(t: &Trace) -> String {
         t.clicks.len(),
         if t.clicks.len() == 1 { "" } else { "s" }
     );
+    if let Some(e) = &t.error {
+        let _ = writeln!(m, "Note: {e}\n");
+    }
     if !t.blocked_hosts.is_empty() {
         let _ = writeln!(m, "Blocked (not allowed for this project): {}\n", t.blocked_hosts.join(", "));
     }

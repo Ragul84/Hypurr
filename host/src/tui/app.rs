@@ -2480,8 +2480,36 @@ pub fn fuzzy(query: &str, fields: &[&str]) -> bool {
 }
 
 /// Paths a terminal pastes for dropped files (shell-escaped, quoted or `file://`), when every one is a file.
+/// Splits a pasted/dropped list of paths. Windows terminals quote with `"` and use `\`
+/// as the separator, so shell escaping doesn't apply there.
+fn split_dropped(s: &str) -> Option<Vec<String>> {
+    if !cfg!(windows) {
+        return shlex::split(s);
+    }
+    if std::path::Path::new(s).is_file() {
+        return Some(vec![s.to_owned()]);
+    }
+    let (mut out, mut cur, mut quote) = (Vec::new(), String::new(), None);
+    for c in s.chars() {
+        match (quote, c) {
+            (None, '"' | '\'') => quote = Some(c),
+            (Some(q), c) if c == q => quote = None,
+            (None, c) if c.is_whitespace() => {
+                if !cur.is_empty() {
+                    out.push(std::mem::take(&mut cur));
+                }
+            }
+            _ => cur.push(c),
+        }
+    }
+    if !cur.is_empty() {
+        out.push(cur);
+    }
+    quote.is_none().then_some(out)
+}
+
 fn dropped_files(s: &str) -> Option<Vec<std::path::PathBuf>> {
-    let paths: Vec<std::path::PathBuf> = shlex::split(s.trim())?
+    let paths: Vec<std::path::PathBuf> = split_dropped(s.trim())?
         .into_iter()
         .map(|p| match p.strip_prefix("file://") {
             Some(url) => url.replace("%20", " "),
@@ -2555,8 +2583,12 @@ mod tests {
         std::fs::create_dir_all(&dir).expect("temp dir");
         let a = dir.join("a b.txt");
         std::fs::write(&a, "x").expect("write");
-        let esc = a.to_string_lossy().replace(' ', "\\ ");
-        assert_eq!(dropped_files(&esc), Some(vec![a.clone()]));
+        if cfg!(unix) {
+            let esc = a.to_string_lossy().replace(' ', "\\ ");
+            assert_eq!(dropped_files(&esc), Some(vec![a.clone()]));
+        } else {
+            assert_eq!(dropped_files(&format!("\"{}\"", a.display())), Some(vec![a.clone()]));
+        }
         assert_eq!(dropped_files(&format!("'{}'", a.display())), Some(vec![a.clone()]));
         assert_eq!(dropped_files(&format!("file://{}", a.to_string_lossy().replace(' ', "%20"))), Some(vec![a]));
         assert_eq!(dropped_files(&dir.to_string_lossy()), None);

@@ -260,7 +260,9 @@ pub fn truncate(s: &str, max: usize) -> String {
     format!("{}…", &s[..end])
 }
 
+// The fixtures are POSIX shell scripts.
 #[cfg(test)]
+#[cfg(unix)]
 mod tests {
     use super::*;
 

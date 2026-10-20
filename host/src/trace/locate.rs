@@ -571,10 +571,52 @@ fn spring(repo: &Repo, out: &mut Vec<Route>) {
     }
 }
 
+static NEST_CLASS: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"@Controller\(\s*(?:['"`]([^'"`]*)['"`])?"#).expect("nest class re"));
+static NEST: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"@(Get|Post|Put|Patch|Delete|All)\(\s*(?:['"`]([^'"`]*)['"`])?\s*\)"#).expect("nest re")
+});
+static NEST_FN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^\s*(?:public\s+|private\s+)?(?:async\s+)?([A-Za-z_$][\w$]*)\s*\(").expect("nest fn re")
+});
+
+/// `NestJS`: `@Controller('claude')` + `@Post('chat')` → `POST /claude/chat`.
+fn nestjs(repo: &Repo, out: &mut Vec<Route>) {
+    for f in repo.files.iter().filter(|f| matches!(ext(f), "ts" | "js")) {
+        let src = repo.read(f);
+        if !src.contains("@Controller(") {
+            continue;
+        }
+        let mut pre = String::new();
+        let lines: Vec<&str> = src.lines().collect();
+        for (i, l) in lines.iter().enumerate() {
+            if let Some(c) = NEST_CLASS.captures(l) {
+                c.get(1).map_or("", |m| m.as_str()).clone_into(&mut pre);
+                continue;
+            }
+            let Some(c) = NEST.captures(l) else { continue };
+            let method = if &c[1] == "All" { "ANY".to_owned() } else { c[1].to_ascii_uppercase() };
+            let handler = lines[i + 1..lines.len().min(i + 6)]
+                .iter()
+                .filter(|l| !l.trim_start().starts_with('@'))
+                .find_map(|l| NEST_FN.captures(l).map(|c| c[1].to_owned()));
+            out.push(Route {
+                framework: "NestJS".into(),
+                method,
+                path: join(&pre, c.get(2).map_or("", |m| m.as_str())),
+                file: f.clone(),
+                line: line_no(i),
+                handler,
+            });
+        }
+    }
+}
+
 /// Every backend route found in the repo.
 pub fn routes(repo: &Repo) -> Vec<Route> {
     let mut out = Vec::new();
     express(repo, &mut out);
+    nestjs(repo, &mut out);
     nextjs(repo, &mut out);
     python(repo, &mut out);
     spring(repo, &mut out);
@@ -607,6 +649,19 @@ pub(crate) mod tests {
             std::fs::write(path, body).expect("write");
         }
         dir
+    }
+
+    #[test]
+    fn nestjs_routes() {
+        let dir = temp_repo(&[(
+            "backend/src/claude/claude.controller.ts",
+            "import { Controller, Post, Get, Body } from '@nestjs/common';\n@Controller('claude')\nexport class ClaudeController {\n  @Post('chat')\n  async chat(@Body('prompt') prompt: string) {\n    return {};\n  }\n  @Get()\n  list() { return []; }\n}\n",
+        )]);
+        let r = routes(&Repo::scan(&dir));
+        let chat = route_for(&r, "POST", "http://localhost:3000/claude/chat").expect("chat route");
+        assert_eq!((chat.framework.as_str(), chat.line, chat.handler.as_deref()), ("NestJS", 4, Some("chat")));
+        assert!(route_for(&r, "GET", "/claude").is_some());
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
