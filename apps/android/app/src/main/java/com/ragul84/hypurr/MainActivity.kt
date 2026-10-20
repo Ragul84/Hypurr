@@ -277,6 +277,11 @@ class MainActivity : ComponentActivity() {
         var screen by rememberSaveable { mutableStateOf("list") }
         // The new-task draft survives a trip to the folder picker.
         var taskDraft by remember { mutableStateOf<NewTaskUiState?>(null) }
+        var guide by remember { mutableStateOf(com.ragul84.hypurr.ui.screens.GuideUiState()) }
+        // Learning mode per task: cards, quiz, and tasks where the panel was hidden.
+        var learnCards by remember { mutableStateOf(mapOf<String, List<com.ragul84.hypurr.model.LearnCard>>()) }
+        var quizzes by remember { mutableStateOf(mapOf<String, com.ragul84.hypurr.model.Quiz>()) }
+        var learnHidden by remember { mutableStateOf(setOf<String>()) }
         var qaDraft by remember { mutableStateOf<com.ragul84.hypurr.ui.screens.QaUiState?>(null) }
         var ticketDraft by remember { mutableStateOf<com.ragul84.hypurr.ui.screens.TicketUiState?>(null) }
         val projectFolder by store.projectFolder.collectAsState()
@@ -335,6 +340,10 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     LaunchedEffect(bot.task != null) { if (bot.task != null) store.loadIntegrations() }
+                    val learnTask = bot.task?.takeIf { it.learning && it.id !in learnHidden }
+                    LaunchedEffect(learnTask?.id, learnTask?.status, entries[id]?.size) {
+                        learnTask?.let { t -> runCatching { store.learnCards(t.id) }.getOrNull()?.let { learnCards = learnCards + (t.id to it.cards) } }
+                    }
                     LaunchedEffect(target, synced) { if (rootId != null) store.openThread(id, rootId) else store.openChat(id) }
                     ChatScreen(
                         bot, if (rootId != null) threads[rootId].orEmpty() else entries[id].orEmpty(), draft, { draft = it },
@@ -376,6 +385,17 @@ class MainActivity : ComponentActivity() {
                         onReact = { e, emoji -> scope.launch { runCatching { store.react(e.id, emoji) } } },
                         onEdit = if (you?.canAct != false) ({ screen = "edit:$id" }) else null,
                         onChangeFolder = if (you?.canAct != false && !bot.isGroup) ({ screen = "folderpick:chat:$id" }) else null,
+                        learn = learnTask?.let { t ->
+                            {
+                                com.ragul84.hypurr.ui.screens.LearnPanel(
+                                    t,
+                                    (learnCards[t.id].orEmpty() + com.ragul84.hypurr.ui.screens.teachLines(entries[id].orEmpty())).distinctBy { it.concept.lowercase() },
+                                    quizzes[t.id],
+                                    onLoadQuiz = { scope.launch { runCatching { store.learnQuiz(t.id) }.getOrNull()?.let { quizzes = quizzes + (t.id to it) } } },
+                                    onHide = { learnHidden = learnHidden + t.id },
+                                )
+                            }
+                        },
                     )
                 }
                 target == "bot:new" || target == "group:new" || target.startsWith("edit:") -> {
@@ -678,6 +698,7 @@ class MainActivity : ComponentActivity() {
                         templates = templates,
                         recent = rosterOrder(bots.values),
                         onNewTask = { screen = "newtask" },
+                        onLearnProject = { screen = "guide" },
                         onTriage = { screen = "triage" },
                         onStandup = { screen = "standup" },
                         onTicket = { screen = "ticket" },
@@ -703,6 +724,7 @@ class MainActivity : ComponentActivity() {
                     // folderpick:newtask | folderpick:settings | folderpick:pair | folderpick:chat:<botId>
                     val mode = target.removePrefix("folderpick:")
                     val back = when {
+                        mode == "guide" -> "guide"
                         mode == "newtask" -> "newtask"
                         mode == "settings" -> "settings"
                         mode.startsWith("chat:") -> mode
@@ -745,6 +767,10 @@ class MainActivity : ComponentActivity() {
                                     taskDraft = NewTaskUiState(project = path)
                                     screen = "newtask"
                                 }
+                                mode == "guide" -> {
+                                    if (path != guide.folder) guide = com.ragul84.hypurr.ui.screens.GuideUiState(folder = path, tab = guide.tab)
+                                    screen = "guide"
+                                }
                                 else -> {
                                     store.setProjectFolder(path)
                                     screen = back
@@ -752,6 +778,60 @@ class MainActivity : ComponentActivity() {
                             }
                         },
                         onLater = if (mode == "pair") ({ screen = "list" }) else null,
+                    )
+                }
+                target == "guide" -> {
+                    BackHandler { screen = "tasks" }
+                    LaunchedEffect(Unit) { if (guide.folder == null) guide = guide.copy(folder = projectFolder) }
+                    fun text(kind: String) = guide.text(kind)
+                    fun title(kind: String) = guide.docs[kind]?.title ?: "Project guide"
+                    fun fileBase(kind: String) = (if (kind == "handover") "HANDOVER" else "HYPURR_GUIDE") + "-" +
+                        com.ragul84.hypurr.ui.screens.folderName(guide.folder ?: "project")
+                    com.ragul84.hypurr.ui.screens.ProjectGuideScreen(
+                        guide,
+                        onBack = { screen = "tasks" },
+                        onPickFolder = { screen = "folderpick:guide" },
+                        onTab = { guide = guide.copy(tab = it, editing = false, error = null) },
+                        onGenerate = { kind ->
+                            val folder = guide.folder ?: return@ProjectGuideScreen
+                            guide = guide.copy(loading = kind, error = null)
+                            scope.launch {
+                                runCatching { store.projectGuide(folder, kind) }
+                                    .onSuccess { d -> guide = guide.copy(loading = null, docs = guide.docs + (kind to d), edits = guide.edits - kind) }
+                                    .onFailure { guide = guide.copy(loading = null, error = it.message ?: "Couldn't read the folder.") }
+                            }
+                        },
+                        onEdit = { kind, t -> guide = guide.copy(edits = guide.edits + (kind to t)) },
+                        onToggleEdit = { guide = guide.copy(editing = !guide.editing) },
+                        onShareMarkdown = { kind -> com.ragul84.hypurr.ui.ShareSheet.file(this@MainActivity, fileBase(kind) + ".md", "text/markdown", text(kind)) },
+                        onSharePdf = { kind ->
+                            runCatching { com.ragul84.hypurr.ui.PdfExport.write(this@MainActivity, fileBase(kind) + ".pdf", text(kind)) }
+                                .onSuccess { com.ragul84.hypurr.ui.ShareSheet.existing(this@MainActivity, it, "application/pdf") }
+                                .onFailure { guide = guide.copy(error = "Couldn't make the PDF.") }
+                        },
+                        onCopy = { kind -> com.ragul84.hypurr.ui.ShareSheet.copy(this@MainActivity, title(kind), text(kind)); guide = guide.copy(copied = true) },
+                        onAskSave = { guide = guide.copy(confirmSave = true) },
+                        onCancelSave = { guide = guide.copy(confirmSave = false) },
+                        onConfirmSave = {
+                            val folder = guide.folder ?: return@ProjectGuideScreen
+                            guide = guide.copy(confirmSave = false)
+                            scope.launch {
+                                runCatching { store.projectGuideSave(folder, text("guide")) }
+                                    .onSuccess { botId -> screen = "chat:$botId" }
+                                    .onFailure { guide = guide.copy(error = it.message ?: "Couldn't start the task.") }
+                            }
+                        },
+                        onQuestion = { guide = guide.copy(question = it) },
+                        onAsk = {
+                            val folder = guide.folder ?: return@ProjectGuideScreen
+                            val q = guide.question.trim()
+                            guide = guide.copy(loading = "ask", error = null)
+                            scope.launch {
+                                runCatching { store.projectAsk(folder, q) }
+                                    .onSuccess { a -> guide = guide.copy(loading = null, answer = a, asked = q, question = "") }
+                                    .onFailure { guide = guide.copy(loading = null, error = it.message ?: "Couldn't search the folder.") }
+                            }
+                        },
                     )
                 }
                 target == "settings" -> {
@@ -768,17 +848,19 @@ class MainActivity : ComponentActivity() {
                         store.loadCosts()
                     }
                     val userProfile by store.userProfile.collectAsState()
+                    val learningMode by store.learningMode.collectAsState()
                     val pricing by store.pricing.collectAsState()
                     LaunchedEffect(Unit) { store.loadPricing() }
                     SettingsScreen(
                         SettingsUiState(current, linkState, theme, dynamic, notify, app.pushAvailable, BuildConfig.VERSION_NAME,
                             safety = setup?.safety, customTemplates = setup?.templates.orEmpty().filter { !it.builtin },
                             integrations = integrations, costs = costs, testResults = tests, you = you, profile = userProfile,
-                            projectFolder = projectFolder, pricing = pricing),
+                            projectFolder = projectFolder, learningMode = learningMode, pricing = pricing),
                         onEditProfile = { screen = "profile" },
                         onPickFolder = { screen = "folderpick:settings" },
                         onClearProfile = { store.clearUserProfile() },
                         onTeamAdmin = { screen = "team" },
+                        onLearningMode = { store.setLearningMode(it) },
                         onItKit = { screen = "itkit" },
                         onBack = { screen = "list" },
                         showHomeTabs = true,
@@ -936,6 +1018,8 @@ class MainActivity : ComponentActivity() {
         screen == "team" || screen == "profile" -> "settings"
         screen == "folderpick:settings" -> "settings"
         screen == "folderpick:newtask" -> "newtask"
+        screen == "folderpick:guide" -> "guide"
+        screen == "guide" -> "tasks"
         screen.startsWith("folderpick:chat:") -> screen.removePrefix("folderpick:")
         screen == "spend" || screen == "tasks" -> "list"
         screen == "ticket" || screen == "qa" -> "tasks"

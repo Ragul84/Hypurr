@@ -255,9 +255,10 @@ class HostClient(val transport: ChannelTransport) {
     /** Starts a task; returns its bot (with `task`). */
     suspend fun startTask(goal: String, template: String?, input: String, project: String?, backend: String?,
                           attachments: List<String> = emptyList(), command: String? = null,
-                          draftId: String? = null, issue: Issue? = null): Bot {
+                          draftId: String? = null, issue: Issue? = null, learning: Boolean? = null): Bot {
         val res = transport.call("startTask", buildJsonObject {
             put("goal", goal)
+            learning?.let { put("learning", it) }
             draftId?.let { put("draftId", it) }
             issue?.let { put("issue", HypurrJson.encodeToJsonElement(Issue.serializer(), it)) }
             template?.let { put("template", it) }
@@ -269,6 +270,24 @@ class HostClient(val transport: ChannelTransport) {
         }, timeoutMs = 60_000)
         return HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("bot"))
     }
+
+    suspend fun projectGuide(project: String, kind: String): com.ragul84.hypurr.model.GuideDoc =
+        call("projectGuide", buildJsonObject { put("project", project); put("kind", kind) }, timeoutMs = 240_000)
+
+    suspend fun projectAsk(project: String, question: String): com.ragul84.hypurr.model.AskAnswer =
+        call("projectAsk", buildJsonObject { put("project", project); put("question", question) }, timeoutMs = 240_000)
+
+    /** Saves the guide as docs/HYPURR_GUIDE.md through a normal safe-branch task. */
+    suspend fun projectGuideSave(project: String, markdown: String): Bot {
+        val res = transport.call("projectGuideSave", buildJsonObject { put("project", project); put("markdown", markdown) }, timeoutMs = 60_000)
+        return HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("bot"))
+    }
+
+    suspend fun learnCards(taskId: String): com.ragul84.hypurr.model.LearnCards =
+        call("learnCards", buildJsonObject { put("taskId", taskId) })
+
+    suspend fun learnQuiz(taskId: String): com.ragul84.hypurr.model.Quiz =
+        call("learnQuiz", buildJsonObject { put("taskId", taskId) }, timeoutMs = 240_000)
 
     suspend fun rollbackTask(taskId: String, checkpointId: String): TaskInfo {
         val res = transport.call("rollbackTask", buildJsonObject {

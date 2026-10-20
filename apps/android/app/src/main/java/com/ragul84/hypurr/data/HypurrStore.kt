@@ -139,6 +139,7 @@ class HypurrStore(
 
     fun setUserProfile(profile: UserProfile) {
         _userProfile.value = profile
+        if (persistence.read(LEARNING) == null) learningMode.value = profile.experience == "New" || profile.role == "Student"
         persistence.write(
             USER_PROFILE,
             if (profile == UserProfile()) null
@@ -149,6 +150,29 @@ class HypurrStore(
 
     /** Default project folder for new tasks (picked after pairing or under You). */
     val projectFolder = MutableStateFlow(persistence.read(PROJECT_FOLDER)?.takeIf { it.isNotBlank() })
+
+    /** Learning mode: on by default for New experience or Student (from the profile), until changed here. */
+    val learningMode = MutableStateFlow(
+        persistence.read(LEARNING)?.toBooleanStrictOrNull() ?: userProfileDefaultLearning(),
+    )
+
+    private fun userProfileDefaultLearning(): Boolean =
+        runCatching { userProfile.value.let { it.experience == "New" || it.role == "Student" } }.getOrDefault(false)
+
+    fun setLearningMode(on: Boolean) {
+        learningMode.value = on
+        persistence.write(LEARNING, on.toString())
+    }
+
+    suspend fun projectGuide(project: String, kind: String) = client?.projectGuide(project, kind) ?: throw HostException.unreachable()
+    suspend fun projectAsk(project: String, q: String) = client?.projectAsk(project, q) ?: throw HostException.unreachable()
+    suspend fun projectGuideSave(project: String, md: String): String {
+        val bot = client?.projectGuideSave(project, md) ?: throw HostException.unreachable()
+        upsert(bot)
+        return bot.id
+    }
+    suspend fun learnCards(taskId: String) = client?.learnCards(taskId)
+    suspend fun learnQuiz(taskId: String) = client?.learnQuiz(taskId)
 
     fun setProjectFolder(path: String?) {
         projectFolder.value = path?.takeIf { it.isNotBlank() }
@@ -458,7 +482,7 @@ class HypurrStore(
             c.upload(id, f.name, f.bytes, draftId = draft)
             id
         }
-        val bot = c.startTask(goal, template, input, project, backend, ids, draftId = draft, issue = issue)
+        val bot = c.startTask(goal, template, input, project, backend, ids, draftId = draft, issue = issue, learning = learningMode.value)
         upsert(bot)
         return bot.id
     }
@@ -663,6 +687,7 @@ class HypurrStore(
         const val NOTIFY = "notifications"
         const val USER_PROFILE = "user.profile"
         const val PROJECT_FOLDER = "project.folder"
+        const val LEARNING = "learning.mode"
         /** Pictures larger than this show as file cards instead of previews. */
         const val MAX_PREVIEW = 20L * 1024 * 1024
     }

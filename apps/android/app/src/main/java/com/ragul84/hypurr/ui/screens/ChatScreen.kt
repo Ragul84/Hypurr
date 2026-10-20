@@ -165,6 +165,8 @@ fun ChatScreen(
     initialActionsFor: String? = null,
     /** Opens the folder picker (a new task in another folder); null hides "Change". */
     onChangeFolder: (() -> Unit)? = null,
+    /** Learning mode panel for a task (Teach me cards, quiz); null hides it. */
+    learn: (@Composable () -> Unit)? = null,
 ) {
     val c = Hypurr.colors
     val inThread = threadRoot != null
@@ -185,6 +187,7 @@ fun ChatScreen(
                 bottom = if (composer.files.isEmpty()) 104.dp else 172.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (learn != null && !inThread) item(key = "learn") { Box(Modifier.animateItem()) { learn() } }
             if (bot.status == "working" && (if (inThread) bot.workingThread == threadRoot?.id else bot.workingThread == null)) {
                 item(key = "working") { WorkingRow(bot, bots, Modifier.animateItem()) }
             }

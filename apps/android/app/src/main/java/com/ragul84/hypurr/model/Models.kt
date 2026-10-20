@@ -387,6 +387,8 @@ data class TaskInfo(
     /** The learning-mode summary, once finished. */
     val summary: String? = null,
     val pr: PullRequest? = null,
+    /** Learning mode: the agent explains each step; the phone offers Teach me cards and a quiz. */
+    val learning: Boolean = false,
 ) {
     val hasSafetyNet: Boolean get() = safety == "worktree" && branch != null && worktree != null
     val isActive: Boolean get() = status == "active"
@@ -693,6 +695,51 @@ data class Activity(
 /** "$4.20" for a limit; "No limit" for 0. */
 fun limitLabel(x: Double): String = if (x <= 0.0) "No limit" else "$" + String.format(java.util.Locale.US, "%.2f", x)
 
+/** `projectGuide`: a Project guide or Handover doc, every file path checked against the folder. */
+@Serializable
+data class GuideDoc(
+    val markdown: String = "",
+    val title: String = "",
+    val kind: String = "guide",
+    /** "agent" or "facts" (built from the folder and git history only). */
+    val by: String = "facts",
+    val cited: List<String> = emptyList(),
+    /** Paths the agent named that aren't in the folder; removed from the text. */
+    val dropped: List<String> = emptyList(),
+)
+
+@Serializable
+data class AskSource(val path: String = "", val line: Int? = null, val text: String = "")
+
+/** `projectAsk`: an answer that cites files. */
+@Serializable
+data class AskAnswer(
+    val answer: String = "",
+    val sources: List<AskSource> = emptyList(),
+    val by: String = "search",
+    val cited: List<String> = emptyList(),
+    val dropped: List<String> = emptyList(),
+)
+
+/** A "Teach me this" card: an idea, in simple words, with a real line from the user's code. */
+@Serializable
+data class LearnCard(
+    val id: String = "",
+    val concept: String = "",
+    val explain: String = "",
+    val example: String = "",
+    val file: String = "",
+    val line: Int = 0,
+)
+
+@Serializable
+data class LearnCards(val cards: List<LearnCard> = emptyList())
+
+@Serializable
+data class QuizQuestion(val q: String = "", val options: List<String> = emptyList(), val answer: Int = 0, val why: String = "")
+
+@Serializable
+data class Quiz(val questions: List<QuizQuestion> = emptyList(), val by: String = "task")
 // Fix from a log (host `triage`, `triageRedact`, `triageSources`, `triageSource`).
 
 @Serializable

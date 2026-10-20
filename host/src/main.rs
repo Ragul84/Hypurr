@@ -7,6 +7,7 @@ mod chat;
 mod hub;
 mod integrations;
 mod itkit;
+mod learn;
 mod market;
 mod mcp;
 mod pricing;
