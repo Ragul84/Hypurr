@@ -163,6 +163,8 @@ pub mod tests {
         let dir = std::env::temp_dir().join(format!("hypurr-safety-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         git(&dir, &["init", "-q", "-b", "main"]).unwrap();
+        // Git for Windows checks files out with CRLF by default; the test compares bytes.
+        git(&dir, &["config", "core.autocrlf", "false"]).unwrap();
         std::fs::write(dir.join("a.txt"), "one\n").unwrap();
         git(&dir, &["add", "."]).unwrap();
         git(&dir, &["commit", "-q", "-m", "init"]).unwrap();

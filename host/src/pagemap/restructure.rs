@@ -207,15 +207,7 @@ pub struct Applied {
 }
 
 fn run_tests(dir: &Path, cmd: &str, limit: Duration) -> (bool, String) {
-    let mut c = if cfg!(windows) {
-        let mut c = Command::new("cmd");
-        c.args(["/C", cmd]);
-        c
-    } else {
-        let mut c = Command::new("sh");
-        c.args(["-c", cmd]);
-        c
-    };
+    let mut c = crate::oscmd::std_shell(cmd);
     c.current_dir(dir).stdin(std::process::Stdio::null()).env("CI", "1");
     let Ok(mut child) = c.stdout(std::process::Stdio::piped()).stderr(std::process::Stdio::piped()).spawn() else {
         return (false, format!("Couldn't run {cmd}"));

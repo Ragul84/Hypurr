@@ -4,11 +4,17 @@ use std::path::Path;
 
 /// The platform shell running `cmd` (blocking).
 pub fn std_shell(cmd: &str) -> std::process::Command {
-    if cfg!(windows) {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt as _;
+        // cmd doesn't understand the `\"` quoting Rust would add, so hand it the line as is:
+        // `/S` strips the outer quotes and runs exactly what's inside.
         let mut c = std::process::Command::new("cmd.exe");
-        c.args(["/D", "/S", "/C", cmd]);
+        c.args(["/D", "/S", "/C"]).raw_arg(format!("\"{cmd}\""));
         c
-    } else {
+    }
+    #[cfg(not(windows))]
+    {
         let mut c = std::process::Command::new("sh");
         c.args(["-c", cmd]);
         c
@@ -60,6 +66,10 @@ mod tests {
         let out = std_shell("echo hi").output().unwrap();
         assert!(out.status.success());
         assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "hi");
+        // Quotes reach the shell untouched.
+        let out = std_shell(r#"echo "a b" && echo 'c'"#).output().unwrap();
+        let text = String::from_utf8_lossy(&out.stdout).replace('\r', "");
+        assert!(text.contains("a b"), "{text}");
         let dir = std::env::temp_dir().join(format!("oscmd-{}", uuid::Uuid::new_v4().simple()));
         std::fs::create_dir_all(dir.join("src/inner")).unwrap();
         assert!(link_dir(&dir.join("src"), &dir.join("dst")));
