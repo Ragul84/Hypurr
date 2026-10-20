@@ -44,6 +44,7 @@ class AgentSetupTest {
         Backend("codex", "Codex", installed = true, signedIn = false),
         Backend("gemini", "Gemini CLI", installed = false, available = false),
     ), builtinAgent = Backend("hypurr-agent", available = false, installed = false))
+    private val winNew = win.copy(builtinAgent = Backend("hypurr-agent", installed = false, available = true, needsInstall = true))
     private val linux = Hello(hostId = "h", name = "devbox", os = "linux", builtinAgent = Backend("hypurr-agent", installed = false, available = true))
 
     private fun shoot(name: String, content: @androidx.compose.runtime.Composable () -> Unit) {
@@ -60,6 +61,8 @@ class AgentSetupTest {
     @Test fun modes() {
         assertEquals(AgentSetupMode.NotPaired, agentSetupMode(null))
         assertEquals(AgentSetupMode.Windows, agentSetupMode(win))
+        assertEquals(AgentSetupMode.OneTap, agentSetupMode(winNew))
+        assertEquals(AgentSetupMode.Windows, agentSetupMode(win.copy(builtinAgent = null)))
         assertEquals(AgentSetupMode.OneTap, agentSetupMode(linux))
         assertEquals(AgentSetupMode.OneTap, agentSetupMode(linux.copy(os = "macos")))
     }
@@ -76,7 +79,7 @@ class AgentSetupTest {
     @Test fun windowsListsAgents() {
         var checked = false
         compose.setContent { HypurrTheme(ThemeMode.Light) { AgentSetupPanel(win, onCheckAgain = { checked = true }) } }
-        compose.onNodeWithText("coming soon", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Update Hypurr on", substring = true).assertIsDisplayed()
         compose.onNodeWithText("Sign in needed").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("npm install -g @google/gemini-cli").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Check again").performClick()
@@ -97,6 +100,16 @@ class AgentSetupTest {
         compose.onNodeWithText("Installed. Hypurr Agent is ready.").assertIsDisplayed()
     }
 
+    @Test fun windowsOneTapInstallsAndKeepsAgentList() {
+        var tapped = false
+        compose.setContent { HypurrTheme(ThemeMode.Light) { AgentSetupPanel(winNew, onInstall = { tapped = true }) } }
+        compose.onNodeWithText("No admin rights needed", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("npm install -g @google/gemini-cli").performScrollTo().assertIsDisplayed()
+        compose.onAllNodesWithText("Install Hypurr Agent").onLast().performClick()
+        assertTrue(tapped)
+    }
+
+    @Test fun shotWindowsOneTap() = shoot("agent-setup-windows-one-tap") { AgentSetupPanel(winNew) }
     @Test fun shotNotPaired() = shoot("agent-setup-not-paired") { AgentSetupPanel(null) }
     @Test fun shotWindows() = shoot("agent-setup-windows") { AgentSetupPanel(win) }
     @Test fun shotOneTapFailed() = shoot("agent-setup-install-failed") { AgentSetupPanel(linux, AgentInstallState(error = "download blocked by the network")) }

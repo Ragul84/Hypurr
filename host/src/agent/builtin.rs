@@ -1,4 +1,5 @@
-//! Hypurr's built-in agent: pinned Hypurr Agent binaries in `~/.hypurr/agents/hypurr-agent`.
+//! Hypurr's built-in agent: pinned Hypurr Agent binaries in `~/.hypurr/agents/hypurr-agent`
+//! (Windows: `%LOCALAPPDATA%\\Hypurr\\agent`, no admin, PATH or registry changes).
 //!
 //! Hypurr Agent is a rebranded fork of OpenCode (MIT). Attribution lives in the
 //! agent's LICENSE/NOTICE. User-facing UI never says "OpenCode".
@@ -10,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 /// Pinned Hypurr Agent release. Bump with matching digests from the GitHub release.
-pub const VERSION: &str = "0.1.0";
+pub const VERSION: &str = "0.1.1";
 pub const BACKEND_ID: &str = "hypurr-agent";
 pub const DISPLAY_NAME: &str = "Hypurr Agent";
 pub const DEFAULT_MODEL: &str = "hypurr/hypurr-free";
@@ -43,22 +44,32 @@ fn release() -> Result<&'static Release> {
     const LINUX_X64: Release = Release {
         archive: "hypurr-agent-linux-x64.tar.gz",
         cmd: "hypurr-agent",
-        sha256: "578bc0b9db6591d26f3108d106d028dce7b0b55c8bb6be98c8c7ca166c64e0a3",
+        sha256: "80e13a65edc205032f7421a0c6ee9fd07b4aef68227ea4f2b2d6b34eac4a5d1e",
     };
     const LINUX_ARM64: Release = Release {
         archive: "hypurr-agent-linux-arm64.tar.gz",
         cmd: "hypurr-agent",
-        sha256: "d93e2c8cfcd9041ae44726a06e5d3ac68bb6261c16788efd9055a34f7d9fb6b2",
+        sha256: "d854f5950d3c73301fa2441525907585a3e8717a9a10a04d11a4cef1e0c51900",
     };
     const MAC_X64: Release = Release {
         archive: "hypurr-agent-darwin-x64.zip",
         cmd: "hypurr-agent",
-        sha256: "d48f9fb425a6c56fd02648ae9605a599ec3d5f397835b9dc9217bf0884ad92e6",
+        sha256: "443e8912402c2603aea301f582a36da47f1364c76a10ce8b1aa7a487cbfd1c25",
     };
     const MAC_ARM64: Release = Release {
         archive: "hypurr-agent-darwin-arm64.zip",
         cmd: "hypurr-agent",
-        sha256: "28ddb235dcbd81dc870a0181d0e28647906345ec0444b6ceab0f1bdf4906e706",
+        sha256: "eb733a52907d1495fc7f8cb2789a867954a49abc959e70a739133f0c4bdf6e00",
+    };
+    const WIN_X64: Release = Release {
+        archive: "hypurr-agent-windows-x64.zip",
+        cmd: "hypurr-agent.exe",
+        sha256: "8950a06f6154ceada288ed4d4bf69c16734b53dab631fff669add4a7cae15931",
+    };
+    const WIN_ARM64: Release = Release {
+        archive: "hypurr-agent-windows-arm64.zip",
+        cmd: "hypurr-agent.exe",
+        sha256: "6d731c333127e6f1ac601e9f44b28b9e27ceae99cfddda09a62f6d6d3ac9151f",
     };
     let (os, arch) = (std::env::consts::OS, std::env::consts::ARCH);
     Ok(match (os, arch) {
@@ -66,12 +77,24 @@ fn release() -> Result<&'static Release> {
         ("linux", "aarch64") => &LINUX_ARM64,
         ("macos", "x86_64") => &MAC_X64,
         ("macos", "aarch64") => &MAC_ARM64,
+        ("windows", "x86_64") => &WIN_X64,
+        ("windows", "aarch64") => &WIN_ARM64,
         _ => bail!("Hypurr Agent isn't available for {os}/{arch} yet"),
     })
 }
 
 fn root() -> PathBuf {
+    #[cfg(windows)]
+    if let Some(local) = std::env::var_os("LOCALAPPDATA").filter(|v| !v.is_empty()) {
+        // User-writable, per-user, no admin rights needed.
+        return PathBuf::from(local).join("Hypurr").join("agent");
+    }
     crate::service::data_dir().join("agents").join(BACKEND_ID)
+}
+
+/// File name of the agent executable on this OS.
+pub const fn exe_name() -> &'static str {
+    if cfg!(windows) { "hypurr-agent.exe" } else { "hypurr-agent" }
 }
 
 pub fn install_dir() -> PathBuf {
@@ -79,7 +102,7 @@ pub fn install_dir() -> PathBuf {
 }
 
 pub fn bin_path() -> PathBuf {
-    install_dir().join("hypurr-agent")
+    install_dir().join(exe_name())
 }
 
 pub fn is_installed() -> bool {
@@ -118,7 +141,7 @@ pub fn status() -> Value {
         "needsInstall": !installed,
         "license": "MIT",
         "source": format!("https://github.com/{RELEASE_REPO}"),
-        "consent": "Hypurr downloads Hypurr Agent into ~/.hypurr/agents/hypurr-agent. Free models use the Hypurr gateway with a daily allowance; paid models use credits. Bring-your-own-key providers are also supported.",
+        "consent": format!("Hypurr downloads Hypurr Agent into {} (no admin rights needed). Free models use the Hypurr gateway with a daily allowance; paid models use credits. Bring-your-own-key providers are also supported.", root().display()),
     })
 }
 
@@ -217,7 +240,10 @@ fn extract(archive: &Path, dir: &Path, cmd: &Path) -> Result<()> {
     let name = archive.file_name().map(|n| n.to_string_lossy().to_lowercase()).unwrap_or_default();
     #[allow(clippy::case_sensitive_file_extension_comparisons)]
     let status = if name.ends_with(".zip") {
-        std::process::Command::new("unzip").arg("-q").arg("-o").arg(archive).arg("-d").arg(dir).status()
+        // In-process: Windows has no `unzip`.
+        let f = std::fs::File::open(archive)?;
+        zip::ZipArchive::new(f).context("reading Hypurr Agent zip")?.extract(dir).context("extracting Hypurr Agent")?;
+        Ok(std::process::ExitStatus::default())
     } else if name.ends_with(".tar.gz") || name.ends_with(".tgz") {
         std::process::Command::new("tar").arg("-xzf").arg(archive).arg("-C").arg(dir).status()
     } else {
@@ -298,7 +324,7 @@ mod tests {
     fn install_from_tiny_archive() {
         let dir = std::env::temp_dir().join(format!("hypurr-ha-src-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
-        let bin = dir.join("hypurr-agent");
+        let bin = dir.join(exe_name());
         std::fs::write(&bin, "#!/bin/sh\necho fake\n").unwrap();
         #[cfg(unix)]
         {
@@ -311,7 +337,7 @@ mod tests {
             .arg(&tar)
             .arg("-C")
             .arg(&dir)
-            .arg("hypurr-agent")
+            .arg(exe_name())
             .status()
             .unwrap();
         assert!(status.success());
@@ -321,12 +347,54 @@ mod tests {
         let home = std::env::temp_dir().join(format!("hypurr-ha-home-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&home).unwrap();
         // SAFETY: test-only, single-threaded here.
-        unsafe { std::env::set_var("HYPURR_HOME", &home) };
+        unsafe {
+            std::env::set_var("HYPURR_HOME", &home);
+            std::env::set_var("LOCALAPPDATA", &home);
+        }
 
-        let path = install_from_bytes_for_test(&bytes, "hypurr-agent-linux-x64.tar.gz", &sum, "hypurr-agent").unwrap();
+        let path = install_from_bytes_for_test(&bytes, "hypurr-agent-linux-x64.tar.gz", &sum, exe_name()).unwrap();
         assert!(path.is_file(), "{path:?}");
         assert!(is_installed());
         let _ = std::fs::remove_dir_all(&home);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn extracts_windows_style_zip() {
+        use std::io::Write as _;
+        let dir = std::env::temp_dir().join(format!("hypurr-ha-zip-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let archive = dir.join("hypurr-agent-windows-x64.zip");
+        {
+            let mut w = zip::ZipWriter::new(std::fs::File::create(&archive).unwrap());
+            w.start_file("hypurr-agent.exe", zip::write::SimpleFileOptions::default()).unwrap();
+            w.write_all(b"MZfake").unwrap();
+            w.finish().unwrap();
+        }
+        extract(&archive, &dir, Path::new("hypurr-agent.exe")).unwrap();
+        assert_eq!(std::fs::read(dir.join("hypurr-agent.exe")).unwrap(), b"MZfake");
+        assert!(!archive.exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn every_desktop_target_has_a_release() {
+        assert!(release_ok(), "this host OS/arch must have a pinned Hypurr Agent build");
+    }
+
+    /// Real install path against a downloaded release archive (pinned digest is enforced):
+    /// `HYPURR_AGENT_ARCHIVE=…zip cargo test real_release_install -- --ignored`.
+    #[tokio::test]
+    #[ignore = "needs HYPURR_AGENT_ARCHIVE pointing at a real release archive"]
+    async fn real_release_install() {
+        let st = install(|l| println!("{l}")).await.expect("install");
+        assert_eq!(st["installed"], true);
+        let bin = bin_path();
+        println!("installed at {}", bin.display());
+        let out = std::process::Command::new(&bin).arg("--version").output().expect("run agent");
+        let v = String::from_utf8_lossy(&out.stdout);
+        println!("hypurr-agent --version: {}", v.trim());
+        assert!(out.status.success());
+        assert_eq!(v.trim(), VERSION);
     }
 }

@@ -34,19 +34,27 @@ import com.ragul84.hypurr.ui.SoftButton
 import com.ragul84.hypurr.ui.theme.Hypurr
 import com.ragul84.hypurr.ui.theme.SignalType
 
-/** What the "set up an agent" panel shows, from what the paired computer told us. */
+/**
+ * What the "set up an agent" panel shows, from what the paired computer told us.
+ * [Windows] is the fallback for a computer whose Hypurr can't install Hypurr Agent
+ * (an older Windows Hypurr, or an unsupported CPU): it lists agents the user may already have.
+ */
 enum class AgentSetupMode { NotPaired, Windows, OneTap }
 
-fun agentSetupMode(hello: Hello?): AgentSetupMode = when {
-    hello == null || hello.hostId.isEmpty() && hello.os.isEmpty() -> AgentSetupMode.NotPaired
-    isWindows(hello.os) -> AgentSetupMode.Windows
-    hello.builtinAgent?.let { it.available || it.installed || it.needsInstall } == false -> AgentSetupMode.Windows
-    else -> AgentSetupMode.OneTap
+fun agentSetupMode(hello: Hello?): AgentSetupMode {
+    if (hello == null || hello.hostId.isEmpty() && hello.os.isEmpty()) return AgentSetupMode.NotPaired
+    val b = hello.builtinAgent
+    return when {
+        b != null && (b.available || b.installed) -> AgentSetupMode.OneTap
+        b != null && !b.needsInstall -> AgentSetupMode.Windows
+        isWindows(hello.os) -> AgentSetupMode.Windows
+        else -> AgentSetupMode.OneTap
+    }
 }
 
 fun isWindows(os: String) = os.lowercase().startsWith("win")
 
-/** Progress of the one-tap Hypurr Agent install (Linux and Mac). */
+/** Progress of the one-tap Hypurr Agent install (Windows, Linux and Mac). */
 data class AgentInstallState(val busy: Boolean = false, val done: Boolean = false, val error: String? = null)
 
 /** An agent the user may already have, with plain install and sign-in steps (Windows commands). */
@@ -83,13 +91,15 @@ fun AgentSetupPanel(
                     ))
                 }
                 AgentSetupMode.Windows -> {
-                    Title("Use an agent you already have", "Hypurr Agent for Windows is coming soon. Hypurr can drive one of these on ${hello?.name?.ifEmpty { null } ?: "your PC"}.")
+                    Title("Use an agent you already have", "Update Hypurr on ${hello?.name?.ifEmpty { null } ?: "your PC"} to install Hypurr Agent with one tap. Until then, Hypurr can drive one of these.")
                     AgentList(hello?.backends.orEmpty())
                     Spacer(Modifier.height(12.dp))
                     Text("After installing, tap Check again.", color = c.tertiary, style = MaterialTheme.typography.bodySmall)
                 }
                 AgentSetupMode.OneTap -> {
-                    Title("Install Hypurr Agent", "One tap installs it on ${hello?.name?.ifEmpty { null } ?: "your computer"} with free models. No other AI account needed.")
+                    val win = isWindows(hello?.os.orEmpty())
+                    Title("Install Hypurr Agent", "One tap installs it on ${hello?.name?.ifEmpty { null } ?: "your computer"} with free models. No other AI account needed." +
+                        if (win) " No admin rights needed; it goes in your own AppData folder." else "")
                     SignalCard(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp).semantics { contentDescription = "Install status" }) {
                             val (label, color) = when {
@@ -104,7 +114,7 @@ fun AgentSetupPanel(
                     Spacer(Modifier.height(16.dp))
                     Eyebrow("Or use one you have")
                     Spacer(Modifier.height(8.dp))
-                    AgentList(hello?.backends.orEmpty(), windows = false)
+                    AgentList(hello?.backends.orEmpty(), windows = win)
                 }
             }
             Spacer(Modifier.height(16.dp))
