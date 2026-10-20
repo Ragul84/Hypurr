@@ -16,9 +16,10 @@ Every proof comes with a plain-words summary of what changed.
 
 ## Looks right / Not right, fix it
 
-- **Looks right**: Hypurr notes it on the task.
+- **Looks right**: Hypurr notes it on the task. It isn't offered when tests failed.
 - **Not right, fix it**: you can say what's wrong (this is optional). That goes to the agent as a new
-  turn, along with what the proof showed (the pages captured and any failing tests).
+  turn, along with what the proof showed (the pages captured and any failing tests). A finished
+  task is reopened with your note, so the agent keeps working in the same safe copy.
 
 ## Safety
 
@@ -28,7 +29,9 @@ Every proof comes with a plain-words summary of what changed.
 - Everything runs inside the task's safe copy. Pictures and clips are saved in
   `.hypurr/proof/`, which ignores itself in git, so nothing gets committed. The "before" copy is a
   temporary git worktree in that same folder, and it's removed afterwards. Dependencies are shared
-  by linking `node_modules`; nothing is installed.
+  by linking `node_modules`. If a web project has none, Hypurr installs them in the task's copy
+  only (`pnpm`, `yarn` or `npm`, chosen from the lockfile, with install scripts turned off). The
+  install counts toward the 8-minute limit, and its log is cleaned of secrets.
 - Every step has a time limit: about 90 s for a server to start, a few minutes per capture or
   test run, and 8 minutes in total. Servers are killed (the whole process group) as soon as
   capture ends.
