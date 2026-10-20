@@ -89,6 +89,8 @@ data class SettingsUiState(
     val profile: com.ragul84.hypurr.data.UserProfile? = null,
     /** Default project folder for new tasks; null = none picked. */
     val projectFolder: String? = null,
+    /** Learning mode for new tasks (on by default for New experience or Student). */
+    val learningMode: Boolean = false,
 )
 
 @Composable
@@ -105,6 +107,7 @@ fun SettingsScreen(
     onIntegrations: (JsonObject) -> Unit = {},
     onTestIntegration: (String) -> Unit = {},
     onTeamAdmin: () -> Unit = {},
+    onLearningMode: (Boolean) -> Unit = {},
     onEditProfile: () -> Unit = {},
     onClearProfile: () -> Unit = {},
     onPickFolder: () -> Unit = {},
@@ -151,6 +154,10 @@ fun SettingsScreen(
             } else {
                 SoftButton("Pick a folder", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Folder), onClick = onPickFolder)
             }
+        }
+        Section("Learning") {
+            ToggleRow("Learning mode", "New tasks explain each step simply, offer Teach me cards from your code and a 3-question check at the end. Never slows work or changes approvals.",
+                state.learningMode, true, onLearningMode)
         }
         Section("Team") {
             Row(Modifier.fillMaxWidth().pressable("Team admin", onClick = onTeamAdmin), verticalAlignment = Alignment.CenterVertically) {

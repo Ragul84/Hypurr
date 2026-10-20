@@ -54,6 +54,7 @@ fun TasksScreen(
     recent: List<Bot>,
     now: Long = System.currentTimeMillis(),
     onNewTask: () -> Unit = {},
+    onLearnProject: () -> Unit = {},
     onOpenTemplate: (TaskTemplate) -> Unit = {},
     onOpenBot: (Bot) -> Unit = {},
     onTab: (HomeTab) -> Unit = {},
@@ -72,6 +73,19 @@ fun TasksScreen(
             ) {
                 item {
                     PrimaryButton("New task", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Plus), onClick = onNewTask)
+                }
+                item {
+                    SignalCard(Modifier.fillMaxWidth().pressable("Learn this project", onClick = onLearnProject)) {
+                        Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(signalIcon(SignalIcons.Docs), null, tint = c.text, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("Learn this project", color = c.text, style = MaterialTheme.typography.titleSmall)
+                                Text("Project guide, handover doc, or ask a question", color = c.secondary, style = MaterialTheme.typography.bodySmall)
+                            }
+                            Icon(signalIcon(SignalIcons.Chevron), null, tint = c.tertiary, modifier = Modifier.size(18.dp))
+                        }
+                    }
                 }
                 if (templates.isNotEmpty()) {
                     item { SectionHeader("Start from a template", Modifier.padding(start = 4.dp)) }
