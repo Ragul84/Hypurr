@@ -136,4 +136,16 @@ mod tests {
         }
         let _ = std::fs::remove_dir_all(dir);
     }
+
+    /// Map a real checkout: `HYPURR_LIVE_REPO`. Writes `.hypurr/map/` there and prints it.
+    #[test]
+    #[ignore = "needs a real project"]
+    fn live_map() {
+        let Ok(repo) = std::env::var("HYPURR_LIVE_REPO") else {
+            return;
+        };
+        let v = scan_and_save(std::path::Path::new(&repo)).expect("scan");
+        let md = std::fs::read_to_string(std::path::Path::new(&repo).join(".hypurr/map/map.md")).unwrap_or_default();
+        println!("{md}\n\nPLAN:\n{:#}", v["plan"]);
+    }
 }
