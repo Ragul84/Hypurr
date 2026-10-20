@@ -370,4 +370,28 @@ document.getElementById('place').addEventListener('click', handlePlaceOrder);\n"
         println!("{}", chain::markdown(&t));
         let _ = std::fs::remove_dir_all(dir);
     }
+
+    /// Trace any running app: `HYPURR_LIVE_URL`, `HYPURR_LIVE_REPO`, `HYPURR_LIVE_STEPS` (a|b).
+    #[tokio::test]
+    #[ignore = "needs a running app and Chrome or Edge"]
+    async fn live_trace_url() {
+        let (Ok(url), Ok(repo), Some(exe)) =
+            (std::env::var("HYPURR_LIVE_URL"), std::env::var("HYPURR_LIVE_REPO"), cdp::find_browser())
+        else {
+            return;
+        };
+        let steps = std::env::var("HYPURR_LIVE_STEPS")
+            .unwrap_or_default()
+            .split('|')
+            .filter(|s| !s.is_empty())
+            .map(str::to_owned)
+            .collect();
+        let id = format!("live{}", uuid::Uuid::new_v4().simple());
+        let t = Trace { id, url: url.clone(), status: "recording".into(), ..Trace::default() };
+        let opts = cdp::Options { url, approved: vec![], headless: true, steps, max: Duration::from_secs(90) };
+        let (_tx, rx) = watch::channel(false);
+        let t = run(PathBuf::from(repo), t, exe, opts, rx).await;
+        println!("{}\n\n{}", chain::markdown(&t), chain::playwright(&t));
+        assert_eq!(t.status, "done", "{:?}", t.error);
+    }
 }

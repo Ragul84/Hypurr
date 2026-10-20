@@ -27,7 +27,7 @@ if(typeof n.onclick==='function')return n.onclick;}return null}";
 
 const APPEARED_JS: &str = "(()=>{const b=new Set((window.__hypurrBefore||'').split('\\n').map(s=>s.trim()));\
 return {url:location.href,text:(document.body?document.body.innerText:'').split('\\n').map(s=>s.trim())\
-.filter(s=>s&&s.length<=80&&!b.has(s)).slice(0,5)}})()";
+.filter(s=>s&&s.length<=80&&/[A-Za-z]{3}/.test(s)&&!b.has(s)).slice(0,5)}})()";
 
 const CLICK_BY_TEXT: &str = "(label)=>{const w=label.trim().toLowerCase();\
 const els=[...document.querySelectorAll('button,a,[role=button],input[type=submit],input[type=button],summary,label')];\
@@ -273,6 +273,18 @@ impl Session {
             && let Some(fid) = f["result"]["objectId"].as_str()
         {
             name = f["result"]["description"].as_str().and_then(fn_name);
+            // Arrow functions keep their variable's name (`const handleRefresh = () => …`).
+            if name.is_none()
+                && let Ok(n) = self
+                    .cdp
+                    .call(
+                        "Runtime.callFunctionOn",
+                        json!({"objectId": fid, "functionDeclaration": "function(){return this.name}", "returnByValue": true}),
+                    )
+                    .await
+            {
+                name = n["result"]["value"].as_str().filter(|s| !s.is_empty()).map(str::to_owned);
+            }
             if let Ok(props) =
                 self.cdp.call("Runtime.getProperties", json!({"objectId": fid, "ownProperties": true})).await
             {

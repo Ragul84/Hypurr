@@ -446,4 +446,20 @@ mod tests {
         assert!(discard(&dir, "main").is_err());
         let _ = std::fs::remove_dir_all(dir);
     }
+
+    /// Restructure a real checkout: `HYPURR_LIVE_REPO`, `HYPURR_LIVE_TESTCMD` (e.g. a production build).
+    #[test]
+    #[ignore = "needs a real project with its packages installed"]
+    fn live_restructure() {
+        let (Ok(repo_dir), Ok(cmd)) = (std::env::var("HYPURR_LIVE_REPO"), std::env::var("HYPURR_LIVE_TESTCMD")) else {
+            return;
+        };
+        let dir = std::path::PathBuf::from(repo_dir);
+        let repo = Repo::scan(&dir);
+        let mut p = plan(&repo, &super::super::scan::build(&repo));
+        p.test_command = cmd;
+        let a = apply(&dir, &p, "hypurr/restructure-live", Duration::from_secs(300)).expect("apply");
+        println!("{a:#?}");
+        assert_eq!(a.status, "ready", "{}", a.test_output);
+    }
 }
