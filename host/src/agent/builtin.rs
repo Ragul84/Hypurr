@@ -378,4 +378,20 @@ mod tests {
     fn every_desktop_target_has_a_release() {
         assert!(release_ok(), "this host OS/arch must have a pinned Hypurr Agent build");
     }
+
+    /// Real install path against a downloaded release archive (pinned digest is enforced):
+    /// `HYPURR_AGENT_ARCHIVE=…zip cargo test real_release_install -- --ignored`.
+    #[tokio::test]
+    #[ignore = "needs HYPURR_AGENT_ARCHIVE pointing at a real release archive"]
+    async fn real_release_install() {
+        let st = install(|l| println!("{l}")).await.expect("install");
+        assert_eq!(st["installed"], true);
+        let bin = bin_path();
+        println!("installed at {}", bin.display());
+        let out = std::process::Command::new(&bin).arg("--version").output().expect("run agent");
+        let v = String::from_utf8_lossy(&out.stdout);
+        println!("hypurr-agent --version: {}", v.trim());
+        assert!(out.status.success());
+        assert_eq!(v.trim(), VERSION);
+    }
 }
