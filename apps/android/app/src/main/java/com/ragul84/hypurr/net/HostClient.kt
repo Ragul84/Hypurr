@@ -435,6 +435,15 @@ class HostClient(val transport: ChannelTransport) {
 
     suspend fun policies(): PolicyInfo = call("policies")
 
+    suspend fun spendByPerson(): com.ragul84.hypurr.model.SpendByPerson = call("spendByPerson")
+
+    suspend fun auditExport(format: String = "csv"): com.ragul84.hypurr.model.AuditExport =
+        call("auditExport", buildJsonObject { put("format", format) })
+
+    suspend fun itKit(): com.ragul84.hypurr.model.ItKit = call("itKit")
+
+    suspend fun pricing(): com.ragul84.hypurr.model.Pricing = call("pricing")
+
     /** Partial update of the team rules and the safety net settings. */
     suspend fun setPolicies(patch: JsonObject): PolicyInfo = call("setPolicies", patch)
 

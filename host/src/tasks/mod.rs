@@ -10,6 +10,7 @@ pub mod risk;
 pub mod router;
 pub mod safety;
 pub mod scope;
+pub mod shell;
 pub mod templates;
 
 use crate::hub::Hub;
@@ -393,6 +394,7 @@ pub async fn start(hub: &Arc<Hub>, b: &Value) -> Result<Value> {
     if !Path::new(&project.path).is_dir() {
         bail!("project folder not found: {}", project.path);
     }
+    crate::admin::check_folder(&crate::admin::Policies::load(store), &project.path)?;
     let settings = SafetySettings::load(store);
     let id = uuid::Uuid::new_v4().to_string();
     let title = title_for(&goal, template.as_ref());

@@ -79,6 +79,8 @@ import com.ragul84.hypurr.ui.screens.PairingUiState
 import com.ragul84.hypurr.ui.screens.SettingsScreen
 import com.ragul84.hypurr.ui.screens.AdminTab
 import com.ragul84.hypurr.ui.screens.TeamAdminScreen
+import com.ragul84.hypurr.ui.screens.ItKitScreen
+import com.ragul84.hypurr.ui.Share
 import com.ragul84.hypurr.ui.screens.TeamAdminUiState
 import com.ragul84.hypurr.ui.screens.SettingsUiState
 import com.ragul84.hypurr.ui.screens.rosterOrder
@@ -479,7 +481,9 @@ class MainActivity : ComponentActivity() {
                             HomeTab.You -> "settings"
                         }
                     }
-                    SpendScreen(current.name, linkState, costs, bots, onTab = ::go)
+                    val pricing by store.pricing.collectAsState()
+                    LaunchedEffect(Unit) { store.loadPricing() }
+                    SpendScreen(current.name, linkState, costs, bots, onTab = ::go, pricing = pricing)
                 }
                 target == "tasks" -> {
                     val setup by store.setup.collectAsState()
@@ -590,15 +594,18 @@ class MainActivity : ComponentActivity() {
                         store.loadCosts()
                     }
                     val userProfile by store.userProfile.collectAsState()
+                    val pricing by store.pricing.collectAsState()
+                    LaunchedEffect(Unit) { store.loadPricing() }
                     SettingsScreen(
                         SettingsUiState(current, linkState, theme, dynamic, notify, app.pushAvailable, BuildConfig.VERSION_NAME,
                             safety = setup?.safety, customTemplates = setup?.templates.orEmpty().filter { !it.builtin },
                             integrations = integrations, costs = costs, testResults = tests, you = you, profile = userProfile,
-                            projectFolder = projectFolder),
+                            projectFolder = projectFolder, pricing = pricing),
                         onEditProfile = { screen = "profile" },
                         onPickFolder = { screen = "folderpick:settings" },
                         onClearProfile = { store.clearUserProfile() },
                         onTeamAdmin = { screen = "team" },
+                        onItKit = { screen = "itkit" },
                         onBack = { screen = "list" },
                         showHomeTabs = true,
                         onTab = { tab ->
@@ -637,11 +644,26 @@ class MainActivity : ComponentActivity() {
                         },
                     )
                 }
+                target == "itkit" -> {
+                    val kit by store.itKit.collectAsState()
+                    var copied by remember { mutableStateOf(false) }
+                    LaunchedEffect(Unit) { store.loadItKit() }
+                    BackHandler { screen = "settings" }
+                    ItKitScreen(
+                        kit,
+                        onBack = { screen = "settings" },
+                        onShare = { k -> Share.text(this@MainActivity, "Hypurr: IT approval kit", k.text) },
+                        onCopy = { k -> Share.copy(this@MainActivity, "Hypurr IT kit", k.text); copied = true },
+                        copied = copied,
+                    )
+                }
                 target == "team" -> {
                     val team by store.team.collectAsState()
                     val policies by store.policies.collectAsState()
                     val activity by store.activity.collectAsState()
                     val audit by store.audit.collectAsState()
+                    val spend by store.spendByPerson.collectAsState()
+                    var exportNote by remember { mutableStateOf<String?>(null) }
                     var tab by rememberSaveable { mutableStateOf(AdminTab.Activity) }
                     var error by remember { mutableStateOf<String?>(null) }
                     LaunchedEffect(Unit) { store.loadAdmin() }
@@ -651,7 +673,7 @@ class MainActivity : ComponentActivity() {
                     }
                     BackHandler { screen = "settings" }
                     TeamAdminScreen(
-                        TeamAdminUiState(you, team, policies, activity, audit, tab, error),
+                        TeamAdminUiState(you, team, policies, activity, audit, spend, tab, exportNote = exportNote, error = error),
                         onBack = { screen = "settings" },
                         onTab = {
                             tab = it
@@ -660,6 +682,16 @@ class MainActivity : ComponentActivity() {
                         onPolicies = { patch -> save { store.setPolicies(patch) } },
                         onRole = { key, role -> save { store.setRole(key, role) } },
                         onDefaultRole = { role -> save { store.setDefaultRole(role) } },
+                        onExportAudit = {
+                            scope.launch {
+                                runCatching { store.auditExport() }
+                                    .onSuccess { x ->
+                                        Share.file(this@MainActivity, x.fileName, x.mime, x.text)
+                                        exportNote = "${x.rows} records" + if (x.intact) ", chain intact." else ", changed at record ${x.brokenAt}."
+                                    }
+                                    .onFailure { exportNote = it.message ?: "Couldn't export." }
+                            }
+                        },
                     )
                 }
                 else -> {

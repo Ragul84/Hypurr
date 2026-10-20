@@ -3,6 +3,7 @@
 //! the safety net refuses a request outright (pushes to protected branches, force pushes).
 //! Rules are deliberately simple and conservative: anything unrecognised is medium.
 
+use super::shell::{self, Simple, Word};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -72,25 +73,10 @@ impl Finding {
 pub fn assess(req: &Request) -> Assessment {
     let mut findings: Vec<Finding> = Vec::new();
     if let Some(cmd) = req.command.map(str::trim).filter(|c| !c.is_empty()) {
-        let parts = split_commands(cmd);
-        let prog =
-            |w: &Vec<String>| w.first().map(|p| p.rsplit('/').next().unwrap_or(p).to_owned()).unwrap_or_default();
-        let fetch_at = parts.iter().position(|w| NETWORK.contains(&prog(w).as_str()));
-        let shell_after = fetch_at.is_some_and(|i| {
-            parts
-                .iter()
-                .skip(i + 1)
-                .any(|w| matches!(prog(w).as_str(), "sh" | "bash" | "zsh" | "python" | "python3" | "node" | "perl"))
-        });
-        if shell_after {
-            findings.push(
-                Finding::new(Risk::High, "download a script from the internet and run it")
-                    .because("It runs code nobody has checked, with access to your whole computer."),
-            );
-        }
-        for part in parts {
-            findings.push(command_finding(&part, req));
-        }
+        let scoped = !req.cwd.trim().is_empty();
+        let root = if scoped { super::scope::real_path(Path::new("/"), req.cwd.trim()) } else { None };
+        let ctx = Ctx { scope: super::scope::Scope::new(req.cwd), scoped, root: root.clone(), req };
+        ctx.command(cmd, root, 0, &mut findings);
     }
     if !req.paths.is_empty() {
         findings.push(paths_finding(req.paths, req.cwd));
@@ -130,40 +116,6 @@ fn join_and(items: &[&str]) -> String {
         [] => String::new(),
         [one] => (*one).to_owned(),
         [init @ .., last] => format!("{}, then {last}", init.join(", ")),
-    }
-}
-
-/// `a && b; c | d` → its simple commands, each as words (quotes resolved).
-fn split_commands(cmd: &str) -> Vec<Vec<String>> {
-    let mut out = Vec::new();
-    let mut cur = String::new();
-    let mut chars = cmd.chars().peekable();
-    let (mut single, mut double) = (false, false);
-    while let Some(c) = chars.next() {
-        match c {
-            '\'' if !double => single = !single,
-            '"' if !single => double = !double,
-            ';' | '|' | '&' | '\n' if !single && !double => {
-                if matches!(chars.peek(), Some('|' | '&')) {
-                    chars.next();
-                }
-                push_words(&mut out, &cur);
-                cur.clear();
-                continue;
-            }
-            _ => {}
-        }
-        cur.push(c);
-    }
-    push_words(&mut out, &cur);
-    out
-}
-
-fn push_words(out: &mut Vec<Vec<String>>, part: &str) {
-    let words = shlex::split(part).unwrap_or_else(|| part.split_whitespace().map(str::to_owned).collect());
-    // `sudo`, `env X=1`, `bash -c` wrappers are looked through (sudo itself is a finding).
-    if !words.is_empty() {
-        out.push(words);
     }
 }
 
@@ -382,48 +334,423 @@ const NETWORK: &[&str] = &["curl", "wget", "ssh", "scp", "rsync", "nc", "ftp", "
 const DANGEROUS: &[&str] =
     &["dd", "mkfs", "shutdown", "reboot", "halt", "kill", "killall", "pkill", "crontab", "chown"];
 
-fn command_finding(words: &[String], req: &Request) -> Finding {
-    let mut w: Vec<String> = words.to_vec();
+const UNSURE: &str = "Hypurr can't tell for sure what this does or where, so it asks to be safe.";
+const OUTSIDE_RUN: &str = "It runs outside the project folder, where the safety net can't undo changes.";
+/// Programs where an unknown (`$X`, `$(…)`) argument can't change anything.
+const SAFE_DYNAMIC: &[&str] = &[
+    "echo", "printf", "true", "false", "test", "[", "pwd", "date", "which", "basename", "dirname", "expr", "seq",
+    "sleep",
+];
+const SHELLS: &[&str] = &["sh", "bash", "zsh", "dash", "ksh", "fish"];
+const CHANGERS: &[&str] = &[
+    "rm", "rmdir", "unlink", "shred", "trash", "mv", "cp", "ln", "touch", "mkdir", "tee", "sed", "perl", "chmod",
+    "chown", "truncate", "install", "rsync", "dd",
+];
+
+fn unsure(action: impl Into<String>) -> Finding {
+    Finding::new(Risk::Medium, action).because(UNSURE).ask()
+}
+
+fn base_name(p: &str) -> String {
+    Path::new(p).file_name().map_or_else(|| p.to_owned(), |n| n.to_string_lossy().into_owned())
+}
+
+/// Strips `sudo`, `env X=1`, `nohup`, `time`, `nice`, `timeout N`, `command`, `exec` wrappers.
+fn unwrap(words: &[Word]) -> (Vec<Word>, bool) {
+    let mut w: Vec<Word> = words.to_vec();
     let mut sudo = false;
-    // Look through wrappers: sudo, env VAR=1, timeout N, nohup.
     while let Some(first) = w.first().cloned() {
-        if first == "sudo" || first == "doas" {
+        if first.dynamic {
+            break;
+        }
+        let t = first.text.as_str();
+        if t == "sudo" || t == "doas" {
             sudo = true;
             w.remove(0);
-        } else if first == "env"
-            || first == "nohup"
-            || first == "time"
-            || first.contains('=') && !first.starts_with('-')
+            while w.first().is_some_and(|a| a.text.starts_with('-')) {
+                let takes = matches!(w[0].text.as_str(), "-u" | "-g" | "-U" | "-C" | "-h" | "-p");
+                w.remove(0);
+                if takes && !w.is_empty() {
+                    w.remove(0);
+                }
+            }
+        } else if matches!(t, "env" | "nohup" | "time" | "command" | "builtin" | "exec" | "stdbuf")
+            || shell::is_assignment(t)
         {
             w.remove(0);
-        } else if first == "timeout" && w.len() > 2 {
-            w.drain(..2);
+            while w.first().is_some_and(|a| !a.dynamic && (a.text.starts_with('-') || shell::is_assignment(&a.text))) {
+                w.remove(0);
+            }
+        } else if t == "nice" {
+            w.remove(0);
+            if w.first().is_some_and(|a| a.text == "-n") {
+                w.drain(..w.len().min(2));
+            } else if w.first().is_some_and(|a| a.text.starts_with('-')) {
+                w.remove(0);
+            }
+        } else if t == "timeout" && w.len() > 2 {
+            w.remove(0);
+            while w.first().is_some_and(|a| a.text.starts_with('-')) {
+                w.remove(0);
+            }
+            if !w.is_empty() {
+                w.remove(0);
+            }
         } else {
             break;
         }
     }
-    let Some(prog) =
-        w.first().map(|p| Path::new(p).file_name().map_or_else(|| p.clone(), |n| n.to_string_lossy().into_owned()))
-    else {
-        return Finding::new(Risk::Low, "run an empty command");
-    };
-    let args: Vec<&str> = w.iter().skip(1).map(String::as_str).collect();
-    let display = crate::agent::acp::truncate(&w.join(" "), 80);
-    let mut f = classify(&prog, &args, &w, req, &display);
-    if sudo {
-        f = Finding::new(Risk::High, format!("run a command as administrator ({display})"))
-            .because("Administrator (sudo) commands can change the whole computer.");
-    }
-    let secret: Vec<String> =
-        args.iter().filter(|a| !a.starts_with('-') && looks_secret(a)).map(|a| (*a).to_owned()).collect();
-    if !secret.is_empty() && f.risk < Risk::High {
-        f = Finding::new(Risk::High, format!("open {} ({display})", short_list(&secret)))
-            .because("That file may hold passwords or keys.");
-    }
-    f
+    (w, sudo)
 }
 
-fn classify(prog: &str, args: &[&str], w: &[String], req: &Request, display: &str) -> Finding {
+struct Ctx<'a> {
+    scope: super::scope::Scope,
+    scoped: bool,
+    root: Option<std::path::PathBuf>,
+    req: &'a Request<'a>,
+}
+
+/// One simple command's view: the task's folder plus where this command runs.
+struct At<'a, 'b> {
+    ctx: &'b Ctx<'a>,
+    here: Option<std::path::PathBuf>,
+}
+
+impl At<'_, '_> {
+    /// Whether `p`, as this command sees it, is outside the project folder.
+    fn outside(&self, p: &str) -> bool {
+        if !self.ctx.scoped {
+            return false;
+        }
+        if p.starts_with('/') || p.starts_with('~') {
+            return !self.ctx.scope.contains(p);
+        }
+        match &self.here {
+            Some(h) => !self.ctx.scope.contains(&h.join(p).to_string_lossy()),
+            None => true,
+        }
+    }
+    /// The command runs somewhere other than the project folder itself.
+    fn moved(&self) -> bool {
+        self.ctx.scoped && self.here != self.ctx.root
+    }
+    fn here_outside(&self) -> bool {
+        self.ctx.scoped && self.here.as_ref().is_none_or(|h| !self.ctx.scope.contains(&h.to_string_lossy()))
+    }
+
+    fn write_finding(&self, w: &Word) -> Finding {
+        let name = base_name(&w.text);
+        if !w.dynamic && matches!(w.text.as_str(), "/dev/null" | "/dev/stdout" | "/dev/stderr") {
+            return Finding::new(Risk::Low, "hide some output");
+        }
+        if w.dynamic {
+            return unsure("write to a file Hypurr can't work out");
+        }
+        if self.outside(&w.text) {
+            return Finding::new(Risk::High, format!("write to {name} outside this project"))
+                .because("It changes files outside the project folder, where the safety net can't undo it.")
+                .ask();
+        }
+        if looks_secret(&w.text) {
+            return Finding::new(Risk::High, format!("write to {name}"))
+                .because("That file may hold passwords or keys.");
+        }
+        Finding::new(Risk::Low, format!("write to {name}"))
+            .because("Edits inside the project can be undone from a checkpoint.")
+    }
+}
+
+impl Ctx<'_> {
+    fn command(&self, cmd: &str, start: Option<std::path::PathBuf>, depth: usize, out: &mut Vec<Finding>) {
+        if depth > 4 {
+            out.push(unsure("run commands nested too deeply to check"));
+            return;
+        }
+        let segs = shell::parse(cmd, start);
+        let prog = |s: &Simple| unwrap(&s.words).0.first().map(|w| base_name(&w.text)).unwrap_or_default();
+        let fetch_at = segs.iter().position(|s| NETWORK.contains(&prog(s).as_str()));
+        let shell_after = fetch_at.is_some_and(|i| {
+            segs.iter().skip(i + 1).any(|s| {
+                let p = prog(s);
+                SHELLS.contains(&p.as_str()) || matches!(p.as_str(), "python" | "python3" | "node" | "perl" | "eval")
+            })
+        });
+        if shell_after {
+            out.push(
+                Finding::new(Risk::High, "download a script from the internet and run it")
+                    .because("It runs code nobody has checked, with access to your whole computer."),
+            );
+        }
+        for s in &segs {
+            self.simple(s, depth, out);
+        }
+    }
+
+    fn simple(&self, s: &Simple, depth: usize, out: &mut Vec<Finding>) {
+        let at = At { ctx: self, here: s.cwd.clone() };
+        if s.unsure {
+            out.push(unsure("run a command Hypurr can't fully read"));
+        }
+        for w in &s.writes {
+            out.push(at.write_finding(w));
+        }
+        let (w, sudo) = unwrap(&s.words);
+        if w.is_empty() {
+            return;
+        }
+        let prog = base_name(&w[0].text);
+        let mut f = self.simple_finding(&at, &w, depth, out);
+        let display = crate::agent::acp::truncate(&texts(&w).join(" "), 80);
+        let harmless = matches!(prog.as_str(), "cd" | "pushd" | "popd" | "echo" | "printf" | "true" | ":" | "pwd");
+        if at.here_outside() && !harmless {
+            let place = at.here.as_ref().map_or_else(
+                || "a folder Hypurr can't work out".to_owned(),
+                |h| format!("{} (outside this project)", h.display()),
+            );
+            out.push(Finding::new(Risk::Medium, format!("run {display} in {place}")).because(OUTSIDE_RUN).ask());
+        }
+        if sudo {
+            f = Finding::new(Risk::High, format!("run a command as administrator ({display})"))
+                .because("Administrator (sudo) commands can change the whole computer.");
+        }
+        let secret: Vec<String> = w[1..]
+            .iter()
+            .filter(|a| !a.dynamic && !a.text.starts_with('-') && looks_secret(&a.text))
+            .map(|a| a.text.clone())
+            .collect();
+        if !secret.is_empty() && f.risk < Risk::High {
+            f = Finding::new(Risk::High, format!("open {} ({display})", short_list(&secret)))
+                .because("That file may hold passwords or keys.");
+        }
+        out.push(f);
+    }
+
+    fn simple_finding(&self, at: &At, w: &[Word], depth: usize, out: &mut Vec<Finding>) -> Finding {
+        let display = crate::agent::acp::truncate(&texts(w).join(" "), 80);
+        if w[0].dynamic {
+            return unsure(format!("run a command Hypurr can't work out ({display})"));
+        }
+        let first = w[0].text.as_str();
+        let prog = base_name(first);
+        let args = &w[1..];
+        match prog.as_str() {
+            "cd" | "pushd" | "popd" => return Finding::new(Risk::Low, "move to another folder"),
+            "set" | "export" | "unset" | "shopt" | "local" | "readonly" | "exit" | "return" | ":" | "[[" | "wait" => {
+                return Finding::new(Risk::Low, format!("set up the shell ({display})"));
+            }
+            p if SHELLS.contains(&p) => {
+                let c = args.iter().position(|a| {
+                    !a.dynamic && a.text.starts_with('-') && !a.text.starts_with("--") && a.text.contains('c')
+                });
+                if let Some(i) = c {
+                    return match args.get(i + 1) {
+                        Some(script) if !script.dynamic => {
+                            self.command(&script.text, at.here.clone(), depth + 1, out);
+                            Finding::new(Risk::Low, format!("run a shell ({p} -c)"))
+                        }
+                        _ => unsure(format!("run a shell command Hypurr can't read ({display})")),
+                    };
+                }
+                if let Some(script) = args.iter().find(|a| a.dynamic || !a.text.starts_with('-')) {
+                    return self.script_finding(at, script, depth, out);
+                }
+                return Finding::new(Risk::Medium, format!("run a shell ({display})"))
+                    .because("It runs whatever is sent to it, which Hypurr can't check.")
+                    .ask();
+            }
+            "eval" => {
+                if args.iter().any(|a| a.dynamic) {
+                    return unsure(format!("run commands Hypurr can't read ({display})"));
+                }
+                self.command(&texts(args).join(" "), at.here.clone(), depth + 1, out);
+                return Finding::new(Risk::Low, "run commands (eval)");
+            }
+            "source" | "." => {
+                return match args.first() {
+                    Some(s) => self.script_finding(at, s, depth, out),
+                    None => unsure("run a script"),
+                };
+            }
+            "xargs" => {
+                let mut i = 0;
+                while i < args.len() && args[i].text.starts_with('-') && !args[i].dynamic {
+                    let takes = matches!(args[i].text.as_str(), "-I" | "-n" | "-P" | "-d" | "-L" | "-s" | "-E" | "-a");
+                    i += if takes { 2 } else { 1 };
+                }
+                let mut inner: Vec<Word> = args.get(i..).unwrap_or_default().to_vec();
+                if inner.is_empty() {
+                    inner.push(Word::lit("echo"));
+                }
+                inner.push(Word { text: "<input>".into(), dynamic: true });
+                return self.simple_finding(at, &inner, depth + 1, out);
+            }
+            "find" => return self.find_finding(at, w, depth, out, &display),
+            "git" => {
+                if let Some(i) = args.iter().position(|a| a.text == "-C") {
+                    match args.get(i + 1) {
+                        Some(d) if !d.dynamic && !at.outside(&d.text) => {}
+                        _ => out.push(
+                            Finding::new(Risk::Medium, format!("run git in another folder ({display})"))
+                                .because(OUTSIDE_RUN)
+                                .ask(),
+                        ),
+                    }
+                }
+            }
+            _ => {}
+        }
+        // `./run.sh`, `scripts/x.sh`, or a path into the project: running a file from here.
+        if first.contains('/') && (!first.starts_with('/') || !at.outside(first)) {
+            return self.script_finding(at, &w[0], depth, out);
+        }
+        let strings = texts(w);
+        let arg_strs: Vec<&str> = strings.iter().skip(1).copied().collect();
+        let owned: Vec<String> = strings.iter().map(|s| (*s).to_owned()).collect();
+        let f = classify(&prog, &arg_strs, &owned, at, at.moved(), &display);
+        // `… | xargs grep x`: the piped-in names only feed a reader.
+        let piped_reader = READ_ONLY.contains(&prog.as_str())
+            && prog != "find"
+            && args.iter().filter(|a| a.dynamic).all(|a| a.text == "<input>");
+        if args.iter().any(|a| a.dynamic) && !SAFE_DYNAMIC.contains(&prog.as_str()) && !piped_reader {
+            let changes = CHANGERS.contains(&prog.as_str());
+            out.push(
+                Finding::new(
+                    if changes { Risk::High } else { Risk::Medium },
+                    format!(
+                        "{} files Hypurr can't work out ({display})",
+                        if changes { "change or delete" } else { "use" }
+                    ),
+                )
+                .because(
+                    "Part of the command is only known when it runs, so Hypurr can't check it stays in the project.",
+                )
+                .ask(),
+            );
+        }
+        f
+    }
+
+    fn find_finding(&self, at: &At, words: &[Word], depth: usize, out: &mut Vec<Finding>, display: &str) -> Finding {
+        let args = &words[1..];
+        let starts: Vec<&Word> = args
+            .iter()
+            .take_while(|a| a.dynamic || !(a.text.starts_with('-') || a.text == "(" || a.text == "!"))
+            .collect();
+        let outside: Vec<String> =
+            starts.iter().filter(|a| a.dynamic || at.outside(&a.text)).map(|a| a.text.clone()).collect();
+        let mut i = 0;
+        while i < args.len() {
+            let a = args[i].text.as_str();
+            match a {
+                "-delete" => out.push(
+                    Finding::new(
+                        Risk::High,
+                        if outside.is_empty() {
+                            format!("delete every file find matches ({display})")
+                        } else {
+                            format!("delete files outside this project ({display})")
+                        },
+                    )
+                    .because("It deletes every file it finds; the safety net can't bring back new or ignored ones.")
+                    .ask(),
+                ),
+                "-exec" | "-execdir" | "-ok" | "-okdir" => {
+                    let mut inner = Vec::new();
+                    i += 1;
+                    while i < args.len() && (args[i].dynamic || !matches!(args[i].text.as_str(), ";" | "+")) {
+                        let x = &args[i];
+                        inner.push(match x.text.as_str() {
+                            "{}" => Word { text: "<input>".into(), dynamic: true },
+                            t if t.contains("{}") => Word { text: x.text.clone(), dynamic: true },
+                            _ => x.clone(),
+                        });
+                        i += 1;
+                    }
+                    if inner.is_empty() {
+                        out.push(unsure(format!("run a command on every file found ({display})")));
+                    } else {
+                        let f = self.simple_finding(at, &inner, depth + 1, out);
+                        out.push(f);
+                    }
+                }
+                "-fprint" | "-fprint0" | "-fprintf" | "-fls" => {
+                    if let Some(t) = args.get(i + 1) {
+                        out.push(at.write_finding(t));
+                    }
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+        if outside.is_empty() {
+            Finding::new(Risk::Low, format!("look at files ({display})")).because("It only reads; nothing changes.")
+        } else {
+            Finding::new(Risk::Medium, format!("look at files outside this project ({})", short_list(&outside)))
+                .because("It reads files outside the project folder.")
+                .ask()
+        }
+    }
+
+    /// Running a script file: allowed quietly only when it's inside the folder and
+    /// reading it shows nothing but low-risk commands.
+    fn script_finding(&self, at: &At, script: &Word, depth: usize, out: &mut Vec<Finding>) -> Finding {
+        let name = base_name(&script.text);
+        if script.dynamic {
+            return unsure("run a script Hypurr can't work out");
+        }
+        if at.outside(&script.text) {
+            return Finding::new(Risk::High, format!("run the script {name} from outside this project"))
+                .because("It runs code from outside the project folder that Hypurr hasn't checked.")
+                .ask();
+        }
+        let path = if script.text.starts_with('/') || script.text.starts_with('~') {
+            super::scope::real_path(Path::new("/"), &script.text)
+        } else {
+            at.here.as_ref().and_then(|h| super::scope::real_path(h, &script.text))
+        };
+        let text = path
+            .and_then(|p| std::fs::File::open(p).ok())
+            .and_then(|f| {
+                use std::io::Read;
+                let mut s = String::new();
+                f.take(64 * 1024 + 1).read_to_string(&mut s).ok().map(|_| s)
+            })
+            .filter(|s| s.len() <= 64 * 1024);
+        let Some(text) = text else {
+            return Finding::new(Risk::Medium, format!("run the script {name}"))
+                .because("Hypurr couldn't read the script to check it, so it asks.")
+                .ask();
+        };
+        let shebang = text.lines().next().unwrap_or("");
+        if shebang.starts_with("#!")
+            && !SHELLS.iter().any(|s| shebang.ends_with(&format!("/{s}")) || shebang.contains(&format!(" {s}")))
+        {
+            return Finding::new(Risk::Medium, format!("run the script {name}"))
+                .because("Hypurr can only read shell scripts; this one runs other code it can't check.")
+                .ask();
+        }
+        let mut inner = Vec::new();
+        self.command(&text, at.here.clone(), depth + 1, &mut inner);
+        if inner.iter().all(|f| f.risk == Risk::Low && !f.ask && f.blocked.is_none()) {
+            return Finding::new(Risk::Low, format!("run the script {name}"))
+                .because("Hypurr read the script: it only reads, builds or tests.");
+        }
+        for mut f in inner.into_iter().filter(|f| f.risk >= Risk::Medium) {
+            f.ask = true;
+            out.push(f);
+        }
+        Finding::new(Risk::Medium, format!("run the script {name}"))
+            .because("The script does more than read, build or test.")
+            .ask()
+    }
+}
+
+fn texts(w: &[Word]) -> Vec<&str> {
+    w.iter().map(|x| x.text.as_str()).collect()
+}
+
+fn classify(prog: &str, args: &[&str], w: &[String], at: &At, moved: bool, display: &str) -> Finding {
+    let req = at.ctx.req;
     let targets: Vec<String> = args.iter().filter(|a| !a.starts_with('-')).map(|a| (*a).to_owned()).collect();
     match prog {
         "git" => git_finding(&git_args(w), req),
@@ -433,7 +760,7 @@ fn classify(prog: &str, args: &[&str], w: &[String], req: &Request, display: &st
                     || args.contains(&"--recursive");
             let out: Vec<String> = targets
                 .iter()
-                .filter(|t| outside(req.cwd, t) || t.as_str() == "/" || t.contains('*') && t.starts_with('/'))
+                .filter(|t| at.outside(t) || t.as_str() == "/" || t.contains('*') && t.starts_with('/'))
                 .cloned()
                 .collect();
             if !out.is_empty() {
@@ -454,7 +781,7 @@ fn classify(prog: &str, args: &[&str], w: &[String], req: &Request, display: &st
             }
         }
         "mv" | "cp" | "ln" | "touch" | "mkdir" | "tee" | "sed" | "perl" => {
-            let out: Vec<String> = targets.iter().filter(|t| outside(req.cwd, t)).cloned().collect();
+            let out: Vec<String> = targets.iter().filter(|t| at.outside(t)).cloned().collect();
             if !out.is_empty() {
                 Finding::new(Risk::High, format!("change {} outside this project", short_list(&out)))
                     .because("It changes files outside the project folder, where the safety net can't undo it.")
@@ -472,7 +799,7 @@ fn classify(prog: &str, args: &[&str], w: &[String], req: &Request, display: &st
         p if READ_ONLY.contains(&p) => {
             let out: Vec<String> = targets
                 .iter()
-                .filter(|t| (t.contains('/') || t.starts_with("..") || t.starts_with('~')) && outside(req.cwd, t))
+                .filter(|t| (moved || t.contains('/') || t.starts_with("..") || t.starts_with('~')) && at.outside(t))
                 .cloned()
                 .collect();
             if out.is_empty() {
@@ -809,6 +1136,184 @@ mod tests {
             block_protected: true,
         });
         assert!(a.reasons.iter().any(|r| r.contains("outside")), "{:?}", a.reasons);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    fn asks(c: &str) -> Assessment {
+        let a = cmd(c);
+        assert!(a.must_ask || a.blocked.is_some(), "{c} should ask: {a:?}");
+        a
+    }
+
+    #[test]
+    fn chained_cd_escapes_must_ask() {
+        for c in [
+            "cd ..; rm x",
+            "cd .. && rm x",
+            "cd /tmp && rm -rf y",
+            "cd src; cd ../..; rm -rf z",
+            "cd src && cd .. && cd .. && cat secret.txt",
+            "pushd /etc; cat hosts",
+            "cd -; rm x",
+            "cd $OLDPWD && rm x",
+            "cd ..; npm test",
+            "cd ~ && ls",
+        ] {
+            asks(c);
+        }
+        let a = cmd("cd /tmp && rm -rf y");
+        assert_eq!(a.risk, Risk::High);
+        assert!(a.reasons.iter().any(|r| r.contains("outside")), "{:?}", a.reasons);
+    }
+
+    #[test]
+    fn cd_inside_the_folder_stays_free() {
+        for c in ["cd src && ls", "cd src && cat main.rs", "cd src/a && cd .. && cargo test", "(cd web && npm test)"] {
+            let a = cmd(c);
+            assert!(!a.must_ask, "{c}: {a:?}");
+            assert_eq!(a.risk, Risk::Low, "{c}");
+        }
+        // A subshell's cd doesn't leak out.
+        assert!(!cmd("(cd /tmp && ls) ; ls src").must_ask || cmd("(cd /tmp && ls)").must_ask);
+        assert!(!cmd("(cd src) ; cat main.rs").must_ask);
+        assert_eq!(cmd("(cd /tmp); rm -rf x").risk, Risk::High);
+        assert!(!cmd("(cd /tmp; true); cat src/main.rs").must_ask);
+    }
+
+    #[test]
+    fn shell_wrappers_are_read_through() {
+        for c in [
+            "sh -c 'rm -rf ../z'",
+            "bash -c \"cd .. && rm x\"",
+            "bash -lc 'rm -rf /tmp/q'",
+            "eval 'rm ../a'",
+            "eval $CMD",
+            "bash -c \"$CMD\"",
+            "env FOO=1 sh -c 'cat ../../etc/passwd'",
+            "timeout 10 bash -c 'rm -rf ../z'",
+            "sudo -u bob sh -c 'ls'",
+        ] {
+            asks(c);
+        }
+        assert_eq!(cmd("sh -c 'rm -rf ../z'").risk, Risk::High);
+        assert_eq!(cmd("bash -c 'cargo test && ls'").risk, Risk::Low);
+        assert!(!cmd("bash -c 'cargo test && ls'").must_ask);
+    }
+
+    #[test]
+    fn substitutions_and_variables_fail_safe() {
+        for c in [
+            "rm $(echo ..)/x",
+            "rm `echo ..`/x",
+            "rm -rf \"$DIR\"",
+            "cp a.txt $(dirname $PWD)/b",
+            "cat $(echo /etc/passwd)",
+            "ls $(cd .. && rm -rf z)",
+        ] {
+            asks(c);
+        }
+        assert_eq!(cmd("rm $(echo ..)/x").risk, Risk::High);
+        assert!(!cmd("echo $(git rev-parse HEAD)").must_ask);
+        assert!(!cmd("echo \"build $(date)\"").must_ask);
+    }
+
+    #[test]
+    fn pipes_xargs_and_find_deletes_ask() {
+        for c in [
+            "ls | xargs rm",
+            "find . -name '*.tmp' | xargs -n1 rm -f",
+            "find . -name '*.log' -delete",
+            "find . -type f -exec rm {} \\;",
+            "find build -execdir rm -rf {} +",
+            "find .. -name x",
+            "find /etc -name hosts",
+            "git ls-files | xargs sed -i s/a/b/",
+        ] {
+            asks(c);
+        }
+        assert_eq!(cmd("find . -name '*.log' -delete").risk, Risk::High);
+        assert_eq!(cmd("find . -exec rm {} ;").risk, Risk::High);
+        assert!(!cmd("find src -name '*.rs' | xargs grep TODO").must_ask);
+        assert!(!cmd("find . -name '*.rs' -exec wc -l {} +").must_ask);
+        assert!(!cmd("cat src/a.rs | grep foo | sort | uniq").must_ask);
+    }
+
+    #[test]
+    fn redirects_outside_ask() {
+        for c in ["echo hi > ../x.txt", "cat a >> /etc/hosts", "ls &> ~/out.log", "echo x | tee ../y", "echo > $F"] {
+            asks(c);
+        }
+        assert!(!cmd("cargo test 2>&1 > target/log.txt").must_ask);
+        assert!(!cmd("ls 2>/dev/null").must_ask);
+        assert_eq!(cmd("echo hi > ../x.txt").risk, Risk::High);
+    }
+
+    #[test]
+    fn unreadable_syntax_and_git_c_ask() {
+        asks("echo 'unterminated; rm -rf ..");
+        asks("git -C ../other status");
+        asks("git -C /tmp/x log");
+        assert!(!cmd("git -C src status").must_ask);
+    }
+
+    #[test]
+    fn no_folder_chosen_keeps_old_behaviour() {
+        let p = protected();
+        let a = assess(&Request {
+            tool_kind: "execute",
+            title: "",
+            command: Some("cd /tmp && ls"),
+            paths: &[],
+            cwd: "",
+            protected: &p,
+            block_protected: true,
+        });
+        assert_eq!(a.risk, Risk::Low);
+        assert!(!a.must_ask);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn scripts_are_read_before_running() {
+        let base = std::env::temp_dir().join(format!("hypurr-script-{}", uuid::Uuid::new_v4()));
+        let repo = base.join("repo");
+        std::fs::create_dir_all(repo.join("scripts")).unwrap();
+        std::fs::write(repo.join("scripts/check.sh"), "#!/bin/sh\nset -e\ncargo test\nls src | grep rs\n").unwrap();
+        std::fs::write(repo.join("scripts/clean.sh"), "#!/bin/bash\ncd ..\nrm -rf build\n").unwrap();
+        std::fs::write(repo.join("scripts/tool.py"), "#!/usr/bin/env python3\nprint(1)\n").unwrap();
+        std::fs::write(base.join("evil.sh"), "ls\n").unwrap();
+        let cwd = repo.to_string_lossy().into_owned();
+        let run = |c: &str| {
+            assess(&Request {
+                tool_kind: "execute",
+                title: "",
+                command: Some(c),
+                paths: &[],
+                cwd: &cwd,
+                protected: &[],
+                block_protected: true,
+            })
+        };
+        for c in ["bash scripts/check.sh", "./scripts/check.sh", "sh ./scripts/check.sh", ". scripts/check.sh"] {
+            let a = run(c);
+            assert_eq!(a.risk, Risk::Low, "{c}: {a:?}");
+            assert!(!a.must_ask, "{c}");
+        }
+        for c in [
+            "bash scripts/clean.sh",
+            "./scripts/clean.sh",
+            "./scripts/tool.py",
+            "bash ../evil.sh",
+            "../evil.sh",
+            "./scripts/missing.sh",
+            "cd scripts && ./clean.sh",
+            "source $X",
+        ] {
+            let a = run(c);
+            assert!(a.must_ask, "{c}: {a:?}");
+        }
+        assert_eq!(run("bash ../evil.sh").risk, Risk::High);
+        assert_eq!(run("bash scripts/clean.sh").risk, Risk::High, "the script's rm outside shows through");
         let _ = std::fs::remove_dir_all(&base);
     }
 }

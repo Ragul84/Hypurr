@@ -47,6 +47,10 @@ pub fn agent(id: &str) -> Option<Value> {
 
 pub async fn refresh_loop() {
     loop {
+        if crate::admin::local_only::active() {
+            tokio::time::sleep(Duration::from_secs(600)).await;
+            continue;
+        }
         match fetch().await {
             Ok(v) => {
                 if let Err(error) = tokio::fs::write(cache_file(), v.to_string()).await {
