@@ -4,6 +4,10 @@ import com.ragul84.hypurr.data.DeviceIdentity
 import com.ragul84.hypurr.model.Backend
 import com.ragul84.hypurr.model.Bot
 import com.ragul84.hypurr.model.TicketSetup
+import com.ragul84.hypurr.model.TraceReply
+import com.ragul84.hypurr.model.TraceGetReply
+import com.ragul84.hypurr.model.TraceExport
+import com.ragul84.hypurr.model.MapReply
 import com.ragul84.hypurr.model.QaCase
 import com.ragul84.hypurr.model.QaCasesResult
 import com.ragul84.hypurr.model.QaRunResult
@@ -379,6 +383,25 @@ class HostClient(val transport: ChannelTransport) {
         call("issues", buildJsonObject { project?.let { put("project", it) } }, timeoutMs = 45_000)
 
     suspend fun taskCosts(): TaskCosts = call("taskCosts")
+
+    // Trace a click & Page map
+    suspend fun traceStart(project: String, url: String, steps: List<String>): TraceReply = call("traceStart", buildJsonObject {
+        put("project", project); put("url", url)
+        put("steps", kotlinx.serialization.json.JsonArray(steps.map { kotlinx.serialization.json.JsonPrimitive(it) }))
+    }, timeoutMs = 30_000)
+    suspend fun traceAllow(project: String, url: String, steps: List<String>): TraceReply = call("traceAllow", buildJsonObject {
+        put("project", project); put("url", url)
+        put("steps", kotlinx.serialization.json.JsonArray(steps.map { kotlinx.serialization.json.JsonPrimitive(it) }))
+    }, timeoutMs = 30_000)
+    suspend fun traceStop(id: String) { transport.call("traceStop", buildJsonObject { put("id", id) }) }
+    suspend fun traceGet(project: String, id: String): TraceGetReply = call("traceGet", buildJsonObject { put("project", project); put("id", id) })
+    suspend fun traceExport(project: String, id: String): TraceExport = call("traceExport", buildJsonObject { put("project", project); put("id", id) })
+    suspend fun mapScan(project: String): MapReply = call("mapScan", buildJsonObject { put("project", project) }, timeoutMs = 120_000)
+    suspend fun mapGet(project: String): MapReply = call("mapGet", buildJsonObject { put("project", project) })
+    suspend fun restructureApply(project: String): MapReply = call("restructureApply", buildJsonObject { put("project", project); put("approved", true) })
+    suspend fun restructureDiscard(project: String) { transport.call("restructureDiscard", buildJsonObject { put("project", project) }) }
+    suspend fun restructurePublish(project: String): MapReply =
+        call("restructurePublish", buildJsonObject { put("project", project); put("approved", true) }, timeoutMs = 90_000)
 
     // QA test writer
     suspend fun qaCases(source: String, input: String, project: String?): QaCasesResult = call("qaCases", buildJsonObject {

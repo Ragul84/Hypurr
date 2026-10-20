@@ -999,3 +999,143 @@ data class ProofReply(val proof: Proof? = null)
 
 @Serializable
 data class ProofFileData(val name: String = "", val data: String = "")
+
+// ---------- Trace a click & Page map ----------
+
+/** A place in the repo (`client/src/api.js:9`) and how Hypurr knows: source map, browser or code search. */
+@Serializable
+data class TraceCodeRef(val name: String? = null, val file: String? = null, val line: Int? = null, val how: String = "") {
+    val place: String? get() = file?.let { f -> line?.let { "$f:$it" } ?: f }
+}
+
+/** The backend route that answers a call (Express, Next.js, FastAPI, Flask, Spring, Django). */
+@Serializable
+data class TraceRoute(
+    val framework: String = "",
+    val method: String = "",
+    val path: String = "",
+    val file: String = "",
+    val line: Int = 0,
+    val handler: String? = null,
+)
+
+@Serializable
+data class TraceCall(
+    val method: String = "",
+    val url: String = "",
+    val status: Int? = null,
+    val statusText: String = "",
+    val ms: Long? = null,
+    val requestBody: String = "",
+    val responseBody: String = "",
+    val requestHeaders: List<List<String>> = emptyList(),
+    val failed: String? = null,
+    val blocked: Boolean = false,
+    val sentFrom: TraceCodeRef? = null,
+    val handledBy: TraceRoute? = null,
+)
+
+@Serializable
+data class TraceClick(
+    val label: String = "",
+    val tag: String = "",
+    val page: String = "",
+    val handlerName: String? = null,
+    val handler: TraceCodeRef? = null,
+    val calls: List<TraceCall> = emptyList(),
+    val appeared: List<String> = emptyList(),
+)
+
+@Serializable
+data class Trace(
+    val id: String = "",
+    val url: String = "",
+    val at: Long = 0,
+    /** recording | done | failed */
+    val status: String = "",
+    val error: String? = null,
+    val browser: String = "",
+    val clicks: List<TraceClick> = emptyList(),
+    val blockedHosts: List<String> = emptyList(),
+    val chain: List<List<String>> = emptyList(),
+)
+
+/** `traceStart` / `traceAllow`: either the trace, or what needs the user's OK first. */
+@Serializable
+data class TraceReply(
+    val status: String = "",
+    val trace: Trace? = null,
+    val host: String? = null,
+    /** local | staging | other */
+    val hostKind: String? = null,
+    val why: String? = null,
+)
+
+@Serializable
+data class TraceGetReply(val trace: Trace? = null)
+
+@Serializable
+data class TraceExport(val code: String = "", val path: String = "")
+
+@Serializable
+data class MapElement(val kind: String = "", val label: String = "", val handler: String? = null, val file: String = "", val line: Int = 0)
+
+@Serializable
+data class MapCall(
+    val method: String = "",
+    val path: String = "",
+    val file: String = "",
+    val line: Int = 0,
+    val via: String? = null,
+    val handledBy: TraceRoute? = null,
+)
+
+@Serializable
+data class MapPage(
+    val path: String = "",
+    val file: String = "",
+    val component: String? = null,
+    val files: List<String> = emptyList(),
+    val elements: List<MapElement> = emptyList(),
+    val calls: List<MapCall> = emptyList(),
+)
+
+@Serializable
+data class PageMapData(
+    val at: Long = 0,
+    val router: String = "",
+    val pages: List<MapPage> = emptyList(),
+    val routes: List<TraceRoute> = emptyList(),
+    val unusedRoutes: List<TraceRoute> = emptyList(),
+)
+
+@Serializable
+data class RestructureMove(val from: String = "", val to: String = "", val why: String = "")
+
+@Serializable
+data class RestructurePlan(
+    val root: String = "",
+    val moves: List<RestructureMove> = emptyList(),
+    val notes: List<String> = emptyList(),
+    val testCommand: String = "",
+)
+
+/** The applied restructure: running | ready (tests passed) | testsFailed | noTests | failed. */
+@Serializable
+data class RestructureApplied(
+    val status: String = "",
+    val branch: String = "",
+    val base: String = "",
+    val moved: Int = 0,
+    val rewritten: Int = 0,
+    val testCommand: String = "",
+    val testOutput: String = "",
+    val prTitle: String = "",
+    val prBody: String = "",
+    val error: String? = null,
+    val pushed: Boolean = false,
+    val prUrl: String? = null,
+)
+
+@Serializable
+data class MapReply(val map: PageMapData? = null, val plan: RestructurePlan? = null, val applied: RestructureApplied? = null)

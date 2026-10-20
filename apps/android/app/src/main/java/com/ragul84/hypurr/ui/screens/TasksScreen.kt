@@ -59,6 +59,7 @@ fun TasksScreen(
     onStandup: () -> Unit = {},
     onTicket: () -> Unit = {},
     onQa: () -> Unit = {},
+    onTrace: () -> Unit = {},
     onOpenTemplate: (TaskTemplate) -> Unit = {},
     onOpenBot: (Bot) -> Unit = {},
     onTab: (HomeTab) -> Unit = {},
@@ -134,6 +135,22 @@ fun TasksScreen(
                             Column(Modifier.weight(1f)) {
                                 Text("Write tests", color = c.text, style = MaterialTheme.typography.titleSmall)
                                 Text("Test cases from a ticket or requirements; export or automate them", color = c.tertiary,
+                                    style = MaterialTheme.typography.bodySmall)
+                            }
+                            Icon(signalIcon(SignalIcons.Chevron), null, tint = c.tertiary, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+                item {
+                    SignalCard(Modifier.fillMaxWidth().pressable("Trace and map", onClick = onTrace)) {
+                        Row(Modifier.padding(horizontal = 14.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(c.surface2), contentAlignment = Alignment.Center) {
+                                Icon(signalIcon(SignalIcons.Trace), null, tint = c.text, modifier = Modifier.size(20.dp))
+                            }
+                            Spacer(Modifier.width(14.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("Trace and map", color = c.text, style = MaterialTheme.typography.titleSmall)
+                                Text("What a button calls, down to the file and line; every page's APIs", color = c.tertiary,
                                     style = MaterialTheme.typography.bodySmall)
                             }
                             Icon(signalIcon(SignalIcons.Chevron), null, tint = c.tertiary, modifier = Modifier.size(16.dp))
