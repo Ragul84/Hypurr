@@ -669,6 +669,21 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
         }
         "rollbackTask" => crate::tasks::rollback(hub, str_arg(&b, "taskId")?, str_arg(&b, "checkpointId")?).await?,
         "finishTask" => crate::tasks::finish::finish(hub, str_arg(&b, "taskId")?, &b).await?,
+        "qaCases" => crate::qa::cases(hub, &b, &actor.key).await?,
+        "qaFrameworks" => crate::qa::detect(&b).await?,
+        "qaAutomate" => crate::qa::automate(hub, &b).await?,
+        "qaSaveCases" => crate::qa::save_cases(&hub.store, &b)?,
+        "qaSavedCases" => crate::qa::saved_cases(&hub.store, &b),
+        "qaRun" => crate::qa::run(hub, &b).await?,
+        "ticketSetup" => {
+            let hub = hub.clone();
+            tokio::task::spawn_blocking(move || crate::ticket::setup(&hub.store)).await?
+        }
+        "ticketResolve" => crate::ticket::resolve(&hub.store, &b).await?,
+        "ticketPlan" => crate::ticket::plan(hub, &b, &actor.key).await?,
+        "ticketStart" => crate::ticket::start(hub, &b).await?,
+        "ticketReview" => crate::ticket::review(hub, &b).await?,
+        "ticketPublish" => crate::ticket::publish(hub, &b).await?,
         "taskCosts" => crate::tasks::costs(&hub.store)?,
         "integrations" => json!({"integrations": crate::integrations::Integrations::load(&hub.store).public()}),
         "setIntegrations" => json!({"integrations": crate::integrations::update(&hub.store, &b)?.public()}),
@@ -705,6 +720,10 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
         "setTeam" => crate::admin::set_team(&hub.store, actor, &b)?,
         "policies" => crate::admin::policies(&hub.store),
         "setPolicies" => crate::admin::set_policies(&hub.store, &b)?,
+        "auditExport" => crate::admin::export::export(&hub.store, &b)?,
+        "spendByPerson" => crate::admin::budget::by_person(&hub.store),
+        "pricing" => crate::pricing::public(),
+        "itKit" => crate::itkit::kit(hub),
         "auditLog" => crate::admin::audit::list(&hub.store, &b)?,
         "activity" => crate::admin::activity::activity(&hub.store, &b)?,
         "standup" => crate::standup::write(hub, &b, &actor.key).await?,

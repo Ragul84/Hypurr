@@ -28,7 +28,8 @@ class HypurrApp : Application() {
 
     /** Firebase is set up with a real project (not the placeholder google-services.json). */
     val pushAvailable: Boolean by lazy {
-        FirebaseApp.getApps(this).firstOrNull()?.options?.projectId?.let { it != PLACEHOLDER_PROJECT } ?: false
+        BuildConfig.PUSH_CONFIGURED &&
+            (FirebaseApp.getApps(this).firstOrNull()?.options?.projectId?.let { it != PLACEHOLDER_PROJECT } ?: false)
     }
 
     val deviceName: String by lazy {

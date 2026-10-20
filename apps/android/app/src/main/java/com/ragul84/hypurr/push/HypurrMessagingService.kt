@@ -55,7 +55,14 @@ class HypurrMessagingService : FirebaseMessagingService() {
                 .setContentIntent(pending)
                 .setColor(0xFF0E0E0E.toInt())
                 .build()
-            runCatching { NotificationManagerCompat.from(context).notify(alert.threadId.hashCode(), notification) }
+            val compat = NotificationManagerCompat.from(context)
+            // Android 13+ asks for POST_NOTIFICATIONS; if it was refused, skip quietly.
+            if (!compat.areNotificationsEnabled()) return
+            try {
+                compat.notify(alert.threadId.hashCode(), notification)
+            } catch (_: SecurityException) {
+                // Permission revoked between the check and the call.
+            }
         }
     }
 }

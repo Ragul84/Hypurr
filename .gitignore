@@ -21,3 +21,6 @@ brag-output*/
 
 # Launch video projects
 videos/
+
+# Firebase config for push (docs/setup/push.md); per-deployment, never committed
+apps/android/app/google-services.json

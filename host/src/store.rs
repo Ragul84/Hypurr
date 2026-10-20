@@ -514,7 +514,7 @@ impl Store {
     pub fn audit_list(&self, before: i64, limit: i64, since: i64) -> Result<Vec<Value>> {
         let c = self.db.locked();
         let mut st = c.prepare(
-            "SELECT seq, at, actor, actor_name, role, action, target, detail, hash FROM audit
+            "SELECT seq, at, actor, actor_name, role, action, target, detail, hash, prev FROM audit
              WHERE seq < ?1 AND at >= ?3 ORDER BY seq DESC LIMIT ?2",
         )?;
         let rows = st.query_map(params![before, limit, since], |r| {
@@ -524,7 +524,7 @@ impl Store {
                 "actorName": r.get::<_, String>(3)?, "role": r.get::<_, String>(4)?,
                 "action": r.get::<_, String>(5)?, "target": r.get::<_, String>(6)?,
                 "detail": serde_json::from_str::<Value>(&detail).unwrap_or(Value::Null),
-                "hash": r.get::<_, String>(8)?,
+                "hash": r.get::<_, String>(8)?, "prev": r.get::<_, String>(9)?,
             }))
         })?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)

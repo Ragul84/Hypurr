@@ -55,6 +55,8 @@ fun TasksScreen(
     now: Long = System.currentTimeMillis(),
     onNewTask: () -> Unit = {},
     onStandup: () -> Unit = {},
+    onTicket: () -> Unit = {},
+    onQa: () -> Unit = {},
     onOpenTemplate: (TaskTemplate) -> Unit = {},
     onOpenBot: (Bot) -> Unit = {},
     onTab: (HomeTab) -> Unit = {},
@@ -84,6 +86,38 @@ fun TasksScreen(
                             Column(Modifier.weight(1f)) {
                                 Text("Daily standup", color = c.text, style = MaterialTheme.typography.titleSmall)
                                 Text("Yesterday, today and blockers, written for you", color = c.tertiary, style = MaterialTheme.typography.bodySmall)
+                            }
+                            Icon(signalIcon(SignalIcons.Chevron), null, tint = c.tertiary, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+                item {
+                    SignalCard(Modifier.fillMaxWidth().pressable("Write tests", onClick = onQa)) {
+                        Row(Modifier.padding(horizontal = 14.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(c.surface2), contentAlignment = Alignment.Center) {
+                                Icon(signalIcon(SignalIcons.Tests), null, tint = c.text, modifier = Modifier.size(20.dp))
+                            }
+                            Spacer(Modifier.width(14.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("Write tests", color = c.text, style = MaterialTheme.typography.titleSmall)
+                                Text("Test cases from a ticket or requirements; export or automate them", color = c.tertiary,
+                                    style = MaterialTheme.typography.bodySmall)
+                            }
+                            Icon(signalIcon(SignalIcons.Chevron), null, tint = c.tertiary, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+                item {
+                    SignalCard(Modifier.fillMaxWidth().pressable("Ticket to PR", onClick = onTicket)) {
+                        Row(Modifier.padding(horizontal = 14.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(c.surface2), contentAlignment = Alignment.Center) {
+                                Icon(signalIcon(SignalIcons.Branch), null, tint = c.text, modifier = Modifier.size(20.dp))
+                            }
+                            Spacer(Modifier.width(14.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("Ticket to PR", color = c.text, style = MaterialTheme.typography.titleSmall)
+                                Text("Paste a Jira or GitHub ticket; approve a plan; get a pull request", color = c.tertiary,
+                                    style = MaterialTheme.typography.bodySmall)
                             }
                             Icon(signalIcon(SignalIcons.Chevron), null, tint = c.tertiary, modifier = Modifier.size(16.dp))
                         }
