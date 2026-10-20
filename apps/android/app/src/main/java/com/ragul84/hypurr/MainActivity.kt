@@ -1090,6 +1090,7 @@ class MainActivity : ComponentActivity() {
                         builtinInstall = prompt,
                         onInstallBuiltin = { setupOpen = true },
                         hostOs = hello?.os.orEmpty(),
+                        setupProgress = com.ragul84.hypurr.ui.screens.setupProgress(hello),
                         asks = asks,
                         onRespondAsk = { _, entryId, optionId ->
                             if (entryId != null) scope.launch { runCatching { store.respond(entryId, optionId) } }

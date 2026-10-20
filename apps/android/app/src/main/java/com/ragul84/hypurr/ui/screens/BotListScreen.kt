@@ -124,6 +124,8 @@ fun BotListScreen(
     onInstallBuiltin: () -> Unit = {},
     /** The paired computer's OS ("windows", "linux", "macos"). */
     hostOs: String = "",
+    /** What's already set up (paired, agent ready), so the empty-state checklist never asks twice. */
+    setupProgress: SetupProgress = SetupProgress(),
     /** Pending asks keyed by bot id — powers one-tap approve on Needs-you cards. */
     asks: Map<String, NeedsYouAsk> = emptyMap(),
     onRespondAsk: (botId: String, entryId: String?, optionId: String?) -> Unit = { _, _, _ -> },
@@ -454,7 +456,10 @@ private fun TabItem(label: String, icon: ImageVector, active: Boolean, badge: In
 }
 
 @Composable
-private fun EmptyRoster(onNewTask: () -> Unit, onPair: () -> Unit = {}, onInstall: () -> Unit = {}, windows: Boolean = false) {
+private fun EmptyRoster(
+    onNewTask: () -> Unit, onPair: () -> Unit = {}, onInstall: () -> Unit = {}, windows: Boolean = false,
+    progress: SetupProgress = SetupProgress(), computerName: String = "",
+) {
     val c = Hypurr.colors
     Column(
         Modifier.fillMaxSize().padding(horizontal = 20.dp).padding(bottom = 110.dp),
@@ -463,38 +468,58 @@ private fun EmptyRoster(onNewTask: () -> Unit, onPair: () -> Unit = {}, onInstal
     ) {
         DotCatMark(96.dp)
         Spacer(Modifier.height(22.dp))
-        Text("Meet Hypurr", style = MaterialTheme.typography.headlineMedium, color = c.text)
+        Text(if (progress.ready) "You're set up" else "Meet Hypurr", style = MaterialTheme.typography.headlineMedium, color = c.text)
         Spacer(Modifier.height(6.dp))
         Text(
-            "AI coding agents, safe enough for anyone.",
+            if (progress.ready) "Start your first task." else "AI coding agents, safe enough for anyone.",
             color = c.secondary, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge,
         )
         Spacer(Modifier.height(20.dp))
         SignalCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
-                listOf(
-                    if (windows) "Pick an agent you already have on your PC" else "Install Hypurr Agent on your computer",
-                    "Scan the QR, or paste the pairing link",
-                    "Run your first task",
-                ).forEachIndexed { i, line ->
+                setupChecklist(progress, windows, computerName).forEachIndexed { i, (line, done) ->
                     if (i > 0) HairlineDivider()
-                    Row(Modifier.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        DotFigure("${i + 1}", SignalType.figureSmall, c.text, Modifier.width(26.dp))
+                    Row(Modifier.padding(vertical = 12.dp).semantics { contentDescription = if (done) "$line, done" else line },
+                        verticalAlignment = Alignment.CenterVertically) {
+                        DotFigure("${i + 1}", SignalType.figureSmall, if (done) c.tertiary else c.text, Modifier.width(26.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text(line, color = c.text, style = MaterialTheme.typography.bodyMedium)
+                        Text(line, color = if (done) c.secondary else c.text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                        if (done) Pill("Done", c.text)
                     }
                 }
             }
         }
         Spacer(Modifier.height(18.dp))
-        PrimaryButton(if (windows) "Use an agent you have" else "Install Hypurr Agent", Modifier.fillMaxWidth(), onClick = onInstall)
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SoftButton("Pair with QR", Modifier.weight(1f), icon = signalIcon(SignalIcons.Qr), onClick = onPair)
-            SoftButton("Start a task", Modifier.weight(1f), icon = signalIcon(SignalIcons.Plus), onClick = onNewTask)
+        when {
+            progress.ready -> PrimaryButton("Start a task", Modifier.fillMaxWidth(), onClick = onNewTask)
+            !progress.paired -> PrimaryButton("Pair with QR", Modifier.fillMaxWidth(), onClick = onPair)
+            else -> PrimaryButton(if (windows) "Use an agent you have" else "Install Hypurr Agent", Modifier.fillMaxWidth(), onClick = onInstall)
+        }
+        if (!progress.ready) {
+            Spacer(Modifier.height(10.dp))
+            SoftButton("Start a task", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Plus), onClick = onNewTask)
         }
     }
 }
+
+/** What's already done on the first-run checklist, read from the paired computer's hello. */
+data class SetupProgress(val paired: Boolean = false, val agentReady: Boolean = false) {
+    val ready get() = paired && agentReady
+}
+
+fun setupProgress(hello: com.ragul84.hypurr.model.Hello?): SetupProgress {
+    val paired = agentSetupMode(hello) != AgentSetupMode.NotPaired
+    val agentReady = paired && (hello?.builtinAgent?.installed == true ||
+        hello?.backends.orEmpty().any { it.available && it.installed && !it.needsInstall })
+    return SetupProgress(paired, agentReady)
+}
+
+/** Checklist lines (pair first: you can't install on a PC you haven't paired) with done flags. */
+fun setupChecklist(p: SetupProgress, windows: Boolean = false, computerName: String = ""): List<Pair<String, Boolean>> = listOf(
+    (if (p.paired) "Paired with ${computerName.ifEmpty { "your computer" }}" else "Scan the QR, or paste the pairing link") to p.paired,
+    (if (p.agentReady) "Agent ready on your computer" else if (windows) "Pick an agent you already have on your PC" else "Install Hypurr Agent on your computer") to p.agentReady,
+    "Run your first task" to false,
+)
 
 @Composable
 fun BotRow(bot: Bot, now: Long, modifier: Modifier = Modifier, byId: Map<String, Bot> = emptyMap(), onClick: () -> Unit) {
