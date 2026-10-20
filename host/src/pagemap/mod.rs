@@ -144,8 +144,8 @@ mod tests {
         let Ok(repo) = std::env::var("HYPURR_LIVE_REPO") else {
             return;
         };
-        let v = scan_and_save(std::path::Path::new(&repo)).expect("scan");
-        let md = std::fs::read_to_string(std::path::Path::new(&repo).join(".hypurr/map/map.md")).unwrap_or_default();
+        let v = scan_and_save(Path::new(&repo)).expect("scan");
+        let md = std::fs::read_to_string(Path::new(&repo).join(".hypurr/map/map.md")).unwrap_or_default();
         println!("{md}\n\nPLAN:\n{:#}", v["plan"]);
     }
 }
