@@ -3,9 +3,14 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.google.services)
     alias(libs.plugins.roborazzi)
 }
+
+// Firebase is optional: with no app/google-services.json (or the old placeholder) the app builds
+// and runs without push. Drop the real file in and the google-services plugin turns on.
+val googleServicesFile = file("google-services.json")
+val pushConfigured = googleServicesFile.exists() && !googleServicesFile.readText().contains("hypurr-placeholder")
+if (pushConfigured) apply(plugin = "com.google.gms.google-services")
 
 android {
     namespace = "com.ragul84.hypurr"
@@ -19,7 +24,11 @@ android {
         versionName = "2.4.0"
         versionCode = 20400
         // The push relay (relay/). Placeholder until it is deployed; matches SharedStore.relayURL on iOS.
-        buildConfigField("String", "RELAY_URL", "\"https://hypurr-relay.example.workers.dev\"")
+        // Override without editing: ./gradlew assembleRelease -Phypurr.relayUrl=https://relay.example.com
+        val relayUrl = providers.gradleProperty("hypurr.relayUrl").getOrElse("https://hypurr-relay.example.workers.dev")
+        buildConfigField("String", "RELAY_URL", "\"$relayUrl\"")
+        // Push is on only when a real Firebase config is present (see docs/setup/push.md).
+        buildConfigField("boolean", "PUSH_CONFIGURED", pushConfigured.toString())
     }
 
     buildTypes {
@@ -82,6 +91,8 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.messaging)
     implementation(libs.zxing.embedded)
+    // On-device OCR for shared screenshots in Fix from a log (Play services model, nothing leaves the phone).
+    implementation(libs.mlkit.text)
     // Remote screen: WebRTC (Google's libwebrtc, packaged by Stream), receive-only video + data channels.
     implementation(libs.webrtc)
     debugImplementation(libs.compose.ui.tooling)

@@ -10,6 +10,7 @@ pub mod risk;
 pub mod router;
 pub mod safety;
 pub mod scope;
+pub mod shell;
 pub mod templates;
 
 use crate::hub::Hub;
@@ -155,7 +156,7 @@ impl Task {
         self.extra.insert("usage".into(), serde_json::to_value(u).unwrap_or(Value::Null));
     }
 
-    fn worktree_path(&self) -> Option<PathBuf> {
+    pub fn worktree_path(&self) -> Option<PathBuf> {
         self.worktree.as_deref().map(PathBuf::from).filter(|p| p.is_dir())
     }
 
@@ -292,7 +293,11 @@ fn title_for(goal: &str, template: Option<&templates::Template>) -> String {
 /// The ticket's own words, for the agent.
 fn issue_context(task: &Task) -> String {
     let Some(i) = task.issue() else { return String::new() };
-    let source = if i.source == "jira" { "Jira ticket" } else { "GitHub issue" };
+    let source = match i.source.as_str() {
+        "jira" => "Jira ticket",
+        "github" => "GitHub issue",
+        _ => "Ticket",
+    };
     let mut s = format!("\n\n[{source} {}: {}]({})", i.key, i.title, i.url);
     if !i.body.trim().is_empty() {
         let _ = write!(s, "\n{}", i.body.trim());
@@ -393,6 +398,7 @@ pub async fn start(hub: &Arc<Hub>, b: &Value) -> Result<Value> {
     if !Path::new(&project.path).is_dir() {
         bail!("project folder not found: {}", project.path);
     }
+    crate::admin::check_folder(&crate::admin::Policies::load(store), &project.path)?;
     let settings = SafetySettings::load(store);
     let id = uuid::Uuid::new_v4().to_string();
     let title = title_for(&goal, template.as_ref());

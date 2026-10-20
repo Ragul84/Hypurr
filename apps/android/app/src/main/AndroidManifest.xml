@@ -36,6 +36,16 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="hypurr" android:host="pair" />
             </intent-filter>
+            <!-- Share a log, stack trace, screenshot or text file into "Fix from a log". -->
+            <intent-filter android:label="@string/share_to_triage">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/*" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="application/json" />
+                <data android:mimeType="application/xml" />
+                <data android:mimeType="application/octet-stream" />
+            </intent-filter>
         </activity>
 
         <!-- zxing-android-embedded's scanner, following the device orientation. -->

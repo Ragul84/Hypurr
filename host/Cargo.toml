@@ -12,6 +12,7 @@ repository = "https://github.com/Ragul84/Hypurr"
 anyhow = "1.0.104"
 axum = { version = "0.8.9", features = ["ws"] }
 base64 = "0.23.1"
+regex = "1"
 chacha20poly1305 = "0.11.0"
 chrono = "0.4.45"
 chrono-tz = "0.10.4"
