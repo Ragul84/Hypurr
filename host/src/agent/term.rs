@@ -347,7 +347,10 @@ mod tests {
             }
         })
         .await
-        .unwrap();
+        .unwrap_or_else(|_| {
+            let out = String::from_utf8_lossy(&term.output.locked().scrollback).into_owned();
+            panic!("no exit after 20s; output so far: {out:?}")
+        });
         assert_eq!(code, 0);
         let (head, _) = term.attach();
         let text: String = head
