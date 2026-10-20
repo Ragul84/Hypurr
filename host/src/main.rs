@@ -11,6 +11,7 @@ mod learn;
 mod market;
 mod mcp;
 mod pricing;
+mod proof;
 mod qa;
 mod remote;
 mod routines;

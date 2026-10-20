@@ -675,6 +675,11 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
         "qaSaveCases" => crate::qa::save_cases(&hub.store, &b)?,
         "qaSavedCases" => crate::qa::saved_cases(&hub.store, &b),
         "qaRun" => crate::qa::run(hub, &b).await?,
+        "proofGet" => crate::proof::get(&hub.store, &b)?,
+        "proofStart" => crate::proof::start(hub, &b).await?,
+        "proofAllow" => crate::proof::allow(hub, &b).await?,
+        "proofFile" => crate::proof::file(&hub.store, &b)?,
+        "proofVerdict" => crate::proof::verdict(hub, &b)?,
         "ticketSetup" => {
             let hub = hub.clone();
             tokio::task::spawn_blocking(move || crate::ticket::setup(&hub.store)).await?
