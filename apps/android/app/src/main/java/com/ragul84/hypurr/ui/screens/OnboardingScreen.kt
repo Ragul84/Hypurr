@@ -190,21 +190,21 @@ fun OnboardingScreen(
             }
             Spacer(Modifier.height(16.dp))
         }
-        PrimaryButton(
-            when {
-                last && editing -> "Save"
-                last -> "Done"
-                answered -> "Next"
-                else -> "Skip this one"
-            },
-            Modifier.fillMaxWidth(),
-        ) { if (last) onFinished(answers(skipped = false)) else step++ }
-        Spacer(Modifier.height(10.dp))
-        SoftButton(
-            if (editing) "Cancel" else "Skip for now",
-            Modifier.fillMaxWidth().padding(bottom = 16.dp),
-            tint = c.text,
-        ) { if (editing) onSkipAll() else onFinished(answers(skipped = true)) }
+        // Pinned action bar: always on screen above the nav bar / gesture area, whatever the text size.
+        Column(Modifier.fillMaxWidth().background(c.bg).padding(top = 12.dp, bottom = 16.dp)) {
+            PrimaryButton(
+                if (last && editing) "Save" else "Continue",
+                Modifier.fillMaxWidth(),
+                // The stack is optional; the other steps need a pick (Skip for now covers "not now").
+                enabled = answered || current == OnboardingStep.Stack,
+            ) { if (last) onFinished(answers(skipped = false)) else step++ }
+            Spacer(Modifier.height(10.dp))
+            SoftButton(
+                if (editing) "Cancel" else "Skip for now",
+                Modifier.fillMaxWidth(),
+                tint = c.text,
+            ) { if (editing) onSkipAll() else onFinished(answers(skipped = true)) }
+        }
     }
 }
 
