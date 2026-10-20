@@ -37,6 +37,8 @@ const AUDITED: &[&str] = &[
     "finishTask",
     "ticketStart",
     "ticketPublish",
+    "qaAutomate",
+    "qaRun",
     "rollbackTask",
     "taskCheckpoint",
     "respondPermission",

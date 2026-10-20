@@ -4,6 +4,9 @@ import com.ragul84.hypurr.data.DeviceIdentity
 import com.ragul84.hypurr.model.Backend
 import com.ragul84.hypurr.model.Bot
 import com.ragul84.hypurr.model.TicketSetup
+import com.ragul84.hypurr.model.QaCase
+import com.ragul84.hypurr.model.QaCasesResult
+import com.ragul84.hypurr.model.QaRunResult
 import com.ragul84.hypurr.model.TicketResolve
 import com.ragul84.hypurr.model.TicketPlanResult
 import com.ragul84.hypurr.model.TicketPlan
@@ -341,6 +344,34 @@ class HostClient(val transport: ChannelTransport) {
         call("issues", buildJsonObject { project?.let { put("project", it) } }, timeoutMs = 45_000)
 
     suspend fun taskCosts(): TaskCosts = call("taskCosts")
+
+    // QA test writer
+    suspend fun qaCases(source: String, input: String, project: String?): QaCasesResult = call("qaCases", buildJsonObject {
+        put("source", source); put("input", input); project?.let { put("project", it) }
+    }, timeoutMs = 180_000)
+
+    suspend fun qaAutomate(cases: List<QaCase>, framework: String, project: String): Bot {
+        val res = transport.call("qaAutomate", buildJsonObject {
+            put("cases", HypurrJson.encodeToJsonElement(kotlinx.serialization.builtins.ListSerializer(QaCase.serializer()), cases))
+            put("framework", framework); put("project", project)
+        }, timeoutMs = 120_000)
+        return HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("bot"))
+    }
+
+    suspend fun qaSaveCases(project: String, cases: List<QaCase>, input: String, source: String) {
+        transport.call("qaSaveCases", buildJsonObject {
+            put("project", project); put("input", input); put("source", source)
+            put("cases", HypurrJson.encodeToJsonElement(kotlinx.serialization.builtins.ListSerializer(QaCase.serializer()), cases))
+        })
+    }
+
+    suspend fun qaSavedCases(project: String): com.ragul84.hypurr.model.QaSaved =
+        call("qaSavedCases", buildJsonObject { put("project", project) })
+
+    suspend fun qaRun(taskId: String): QaRunResult {
+        val res = transport.call("qaRun", buildJsonObject { put("taskId", taskId) }, timeoutMs = 960_000)
+        return HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("result"))
+    }
 
     // Ticket to PR
     suspend fun ticketSetup(): TicketSetup = call("ticketSetup", timeoutMs = 30_000)

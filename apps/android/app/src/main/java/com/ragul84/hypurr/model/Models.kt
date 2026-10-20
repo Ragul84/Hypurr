@@ -758,3 +758,49 @@ data class TicketCli(val gh: Boolean = false, val glab: Boolean = false, val az:
 
 @Serializable
 data class TicketSetup(val integrations: Integrations = Integrations(), val cli: TicketCli = TicketCli())
+
+// MARK: QA test writer (host `qa.rs`)
+
+@Serializable
+data class QaCase(
+    val id: String = "",
+    val title: String = "",
+    val steps: List<String> = emptyList(),
+    val expected: String = "",
+    /** high | medium | low */
+    val priority: String = "medium",
+    /** positive | negative | edge */
+    val kind: String = "positive",
+    val why: String = "",
+    val automatable: Boolean = false,
+)
+
+@Serializable
+data class QaFramework(val id: String = "", val name: String = "", val command: String = "", val needsDevice: Boolean = false)
+
+@Serializable
+data class QaCasesResult(
+    val cases: List<QaCase> = emptyList(),
+    val by: String = "template",
+    val frameworks: List<QaFramework> = emptyList(),
+    val ticket: Issue? = null,
+    val needsSetup: String? = null,
+    val explain: Boolean = false,
+)
+
+@Serializable
+data class QaSaved(val cases: List<QaCase> = emptyList(), val input: String = "", val source: String = "text", val savedAt: Long = 0)
+
+@Serializable
+data class QaRunResult(
+    val ok: Boolean = false,
+    val passed: Long = 0,
+    val failed: Long = 0,
+    val timedOut: Boolean = false,
+    val command: String = "",
+    val seconds: Long = 0,
+    val output: String = "",
+    val automated: List<String> = emptyList(),
+    val manual: List<String> = emptyList(),
+    val needsDevice: Boolean = false,
+)

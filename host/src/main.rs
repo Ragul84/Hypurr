@@ -10,6 +10,7 @@ mod itkit;
 mod market;
 mod mcp;
 mod pricing;
+mod qa;
 mod remote;
 mod routines;
 mod screen;
