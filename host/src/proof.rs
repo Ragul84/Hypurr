@@ -27,6 +27,8 @@ use std::time::{Duration, Instant};
 
 /// The whole proof run, start to finish.
 const TOTAL: Duration = Duration::from_secs(8 * 60);
+/// Packages must be installed by then, leaving time to capture inside the 8-minute cap.
+const INSTALL_BY: Duration = Duration::from_secs(5 * 60);
 /// How long a dev server gets to start listening.
 const SERVER_START: Duration = Duration::from_secs(90);
 /// Pages captured at most.
@@ -816,7 +818,7 @@ async fn produce(hub: &Arc<Hub>, id: &str, p: &Plan) -> Result<Value> {
         (Kind::Web, Some(cmd)) => {
             let pg = pages(&ch);
             let project = PathBuf::from(&task.project);
-            let deadline = Instant::now() + (TOTAL - Duration::from_secs(3 * 60));
+            let deadline = Instant::now() + INSTALL_BY;
             link_deps(&[&project], &work);
             ensure_deps(&work, deadline, &mut log).await;
             let after = capture_web(&work, cmd, &out, "after", &pg, true, &mut log).await?;
