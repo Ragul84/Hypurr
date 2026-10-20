@@ -91,6 +91,8 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.messaging)
     implementation(libs.zxing.embedded)
+    // On-device OCR for shared screenshots in Fix from a log (Play services model, nothing leaves the phone).
+    implementation(libs.mlkit.text)
     // Remote screen: WebRTC (Google's libwebrtc, packaged by Stream), receive-only video + data channels.
     implementation(libs.webrtc)
     debugImplementation(libs.compose.ui.tooling)

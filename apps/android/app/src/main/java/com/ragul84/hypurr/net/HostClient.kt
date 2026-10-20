@@ -454,6 +454,26 @@ class HostClient(val transport: ChannelTransport) {
 
     suspend fun activity(days: Int = 7): Activity = call("activity", buildJsonObject { put("days", days) })
 
+    suspend fun triageRedact(text: String): com.ragul84.hypurr.model.RedactPreview = call("triageRedact", buildJsonObject { put("text", text) })
+
+    /** `mode`: explain | more (with `previous`). Secrets are removed on the computer before any agent sees the text. */
+    suspend fun triage(text: String, project: String?, mode: String = "explain", previous: com.ragul84.hypurr.model.Triage? = null):
+        com.ragul84.hypurr.model.TriageResult = call("triage", buildJsonObject {
+            put("text", text)
+            project?.let { put("project", it) }
+            put("mode", mode)
+            previous?.let { put("previous", com.ragul84.hypurr.model.HypurrJson.encodeToJsonElement(com.ragul84.hypurr.model.Triage.serializer(), it)) }
+        }, timeoutMs = 180_000)
+
+    suspend fun triageSources(project: String): com.ragul84.hypurr.model.TriageSources =
+        call("triageSources", buildJsonObject { put("project", project) }, timeoutMs = 40_000)
+
+    suspend fun triageSource(project: String, kind: String, id: String): com.ragul84.hypurr.model.TriageSourceText =
+        call("triageSource", buildJsonObject {
+            put("project", project)
+            put("kind", kind)
+            put("id", id)
+        }, timeoutMs = 60_000)
     /** The agent may take a minute to write it; the host falls back to a plain draft. */
     suspend fun standup(projects: List<String>, useAgent: Boolean = true): com.ragul84.hypurr.model.StandupResult =
         call("standup", buildJsonObject {

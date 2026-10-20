@@ -726,6 +726,18 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
         "itKit" => crate::itkit::kit(hub),
         "auditLog" => crate::admin::audit::list(&hub.store, &b)?,
         "activity" => crate::admin::activity::activity(&hub.store, &b)?,
+        "triageRedact" => crate::triage::preview(&b),
+        "triage" => crate::triage::explain(hub, &b, &actor.key).await?,
+        "triageSources" => {
+            let project = b["project"].as_str().unwrap_or_default().to_owned();
+            json!({"sources": tokio::task::spawn_blocking(move || crate::triage::sources(&project)).await?})
+        }
+        "triageSource" => {
+            let (project, kind, id) =
+                (str_arg(&b, "project")?.to_owned(), str_arg(&b, "kind")?.to_owned(), str_arg(&b, "id")?.to_owned());
+            let text = tokio::task::spawn_blocking(move || crate::triage::source_text(&project, &kind, &id)).await??;
+            json!({"text": text})
+        }
         "standup" => crate::standup::write(hub, &b, &actor.key).await?,
         "teamStandup" => crate::standup::team(&hub.store)?,
         "standupReminder" => crate::standup::reminder(&hub.store),

@@ -3,4 +3,5 @@
     <string name="app_name">Hypurr</string>
     <string name="notification_channel">Bot alerts</string>
     <string name="scan_prompt">Scan the pairing code on your computer</string>
+    <string name="share_to_triage">Fix with Hypurr</string>
 </resources>

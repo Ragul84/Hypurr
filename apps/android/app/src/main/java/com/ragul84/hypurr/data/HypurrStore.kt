@@ -489,6 +489,12 @@ class HypurrStore(
     /** Open GitHub issues and Jira tickets to start a task from. */
     suspend fun issues(): IssueList = client?.issues() ?: IssueList()
 
+    private fun need() = client ?: throw HostException.unreachable()
+    suspend fun triageRedact(text: String) = need().triageRedact(text)
+    suspend fun triage(text: String, project: String?, mode: String = "explain", previous: com.ragul84.hypurr.model.Triage? = null) =
+        need().triage(text, project, mode, previous)
+    suspend fun triageSources(project: String) = need().triageSources(project).sources
+    suspend fun triageSource(project: String, kind: String, id: String) = need().triageSource(project, kind, id).text
     suspend fun standup(projects: List<String>, useAgent: Boolean = true) =
         (client ?: throw HostException.unreachable()).standup(projects, useAgent)
 

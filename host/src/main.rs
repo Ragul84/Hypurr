@@ -19,6 +19,7 @@ mod standup;
 mod store;
 mod tasks;
 mod ticket;
+mod triage;
 mod tui;
 mod update;
 mod usage;
