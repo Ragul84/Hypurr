@@ -680,6 +680,18 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
         "proofAllow" => crate::proof::allow(hub, &b).await?,
         "proofFile" => crate::proof::file(&hub.store, &b)?,
         "proofVerdict" => crate::proof::verdict(hub, &b)?,
+        // Trace a click and the page map (`trace`, `pagemap`).
+        "traceStart" => crate::trace::start(hub, &b)?,
+        "traceAllow" => crate::trace::allow(hub, &b)?,
+        "traceStop" => crate::trace::stop(&b)?,
+        "traceGet" => crate::trace::get(&hub.store, &b)?,
+        "traceList" => crate::trace::list(&hub.store, &b)?,
+        "traceExport" => crate::trace::export(&hub.store, &b)?,
+        "mapScan" => crate::pagemap::scan(hub, &b).await?,
+        "mapGet" => crate::pagemap::get(&hub.store, &b)?,
+        "restructureApply" => crate::pagemap::apply(hub, &b)?,
+        "restructureDiscard" => crate::pagemap::discard(&hub.store, &b)?,
+        "restructurePublish" => crate::pagemap::publish(hub, &b).await?,
         "ticketSetup" => {
             let hub = hub.clone();
             tokio::task::spawn_blocking(move || crate::ticket::setup(&hub.store)).await?
