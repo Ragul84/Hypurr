@@ -58,12 +58,12 @@ as the `hypurr-debug-apk` artifact. Nothing is published.
 
 ## Push notifications (FCM)
 
-The repository ships a **placeholder** `app/google-services.json` (project `hypurr-placeholder`). With
-it the app builds and runs, but it never asks Firebase for a token and Settings says push isn't
-configured. To turn push on:
+`app/google-services.json` is not in the repository (it's git-ignored). Without it the app builds
+and runs, never asks Firebase for a token, and Settings says push isn't configured. Exactly what to
+provide is in [docs/setup/push.md](../setup/push.md). In short:
 
-1. Create a Firebase project, add the Android app `com.ragul84.hypurr`, and replace
-   `apps/android/app/google-services.json` with the downloaded file.
+1. Create a Firebase project, add the Android app `com.ragul84.hypurr`, and put the downloaded
+   file at `apps/android/app/google-services.json`.
 2. Give `relay/` an FCM sender: create a service account with the *Firebase Cloud Messaging API Admin*
    role and set its fields as Worker secrets (see [relay/README.md](../../relay/README.md)):
    `FCM_PROJECT_ID`, `FCM_CLIENT_EMAIL`, `FCM_PRIVATE_KEY`.
