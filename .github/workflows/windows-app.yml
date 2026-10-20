@@ -1,0 +1,96 @@
+name: windows-app
+
+on:
+  push:
+    branches: [main]
+    paths: ["apps/windows/**", "host/**", "packaging/windows/**", ".github/workflows/windows-app.yml"]
+  pull_request:
+    paths: ["apps/windows/**", "host/**", "packaging/windows/**", ".github/workflows/windows-app.yml"]
+  workflow_dispatch:
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: apps/windows
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y xvfb libxkbcommon-x11-0 libgl1-mesa-dri libegl1
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/windows
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+      - run: cargo build
+      - name: Screenshots (QR + status, light + dark)
+        run: |
+          mkdir -p shots
+          for s in qr status public; do for t in light dark; do
+            LIBGL_ALWAYS_SOFTWARE=1 timeout 60 xvfb-run -a -s "-screen 0 1280x1024x24" target/debug/hypurr --demo $s --theme $t --screenshot shots/$s-$t.png
+            test -s shots/$s-$t.png
+          done; done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-app-screenshots
+          path: apps/windows/shots
+
+  installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            apps/windows
+            host
+      - name: Lint + test the app
+        working-directory: apps/windows
+        run: |
+          cargo clippy --all-targets -- -D warnings
+          cargo test
+      - name: Build app + host (release)
+        run: |
+          cargo build --release --manifest-path apps/windows/Cargo.toml
+          cargo build --release --manifest-path host/Cargo.toml
+      - name: Stage files
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/windows | Out-Null
+          Copy-Item apps/windows/target/release/hypurr.exe dist/windows/
+          Copy-Item host/target/release/hypurr-host.exe dist/windows/
+          Copy-Item LICENSE dist/windows/LICENSE.txt
+          Copy-Item NOTICE dist/windows/NOTICE.txt
+      - name: Check the app has no console window (GUI subsystem)
+        shell: pwsh
+        run: |
+          $b = [IO.File]::ReadAllBytes("dist/windows/hypurr.exe")
+          $pe = [BitConverter]::ToInt32($b, 0x3C)
+          $sub = [BitConverter]::ToUInt16($b, $pe + 24 + 68)
+          if ($sub -ne 2) { throw "expected IMAGE_SUBSYSTEM_WINDOWS_GUI (2), got $sub" }
+      - name: Build installer (Inno Setup, per-user)
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
+          & $iscc /DAppVersion=0.1.0 "/DSrcDir=$PWD\dist\windows" "/O$PWD\dist" packaging\windows\hypurr.iss
+          if ($LASTEXITCODE -ne 0) { throw "iscc failed" }
+      - name: Silent per-user install + uninstall (no admin)
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem dist\HypurrSetup-*.exe | Select -First 1
+          Start-Process $setup.FullName -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/CURRENTUSER' -Wait
+          $dir = "$env:LOCALAPPDATA\Programs\Hypurr"
+          foreach ($f in 'hypurr.exe','hypurr-host.exe','unins000.exe') { if (-not (Test-Path "$dir\$f")) { throw "missing $f" } }
+          if (-not (Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Hypurr.lnk")) { throw "no Start menu shortcut" }
+          if (Get-ItemProperty HKCU:\Software\Microsoft\Windows\CurrentVersion\Run -Name Hypurr -ErrorAction SilentlyContinue) { throw "installer must not enable Start with Windows" }
+          Start-Process "$dir\unins000.exe" -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES' -Wait
+          Start-Sleep 3
+          if (Test-Path "$dir\hypurr.exe") { throw "uninstall left files" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hypurr-windows-installer
+          path: dist/HypurrSetup-*.exe
