@@ -288,9 +288,12 @@ async fn run(
             },
         }
     };
-    // ConPTY keeps the reader open until the master goes; a background grandchild can too.
-    drop(writer);
-    drop(pty);
+    // ConPTY keeps the reader open until the pseudo console is closed, and closing it can
+    // block while output is pending, so close it off this task and give the reader a moment.
+    let _close = tokio::task::spawn_blocking(move || {
+        drop(writer);
+        drop(pty);
+    });
     let _ = tokio::time::timeout(Duration::from_secs(1), pump).await;
     let code = status.map_or(-1, |s| i32::try_from(s.exit_code()).unwrap_or(-1));
     tracing::info!(term = %id, code, "setup terminal finished");
