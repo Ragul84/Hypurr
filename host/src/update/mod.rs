@@ -215,7 +215,7 @@ pub async fn automatic_loop(hub: Arc<Hub>) {
     loop {
         tokio::time::sleep(Duration::from_secs(60)).await;
         let enabled = read::<Config>("update-config.json").is_ok_and(|c| c.automatic);
-        if !enabled || hub.busy() {
+        if !enabled || hub.busy() || crate::admin::local_only::active() {
             continue;
         }
         if last_check.is_some_and(|at: tokio::time::Instant| at.elapsed() < Duration::from_secs(24 * 60 * 60)) {
