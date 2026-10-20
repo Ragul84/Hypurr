@@ -21,7 +21,7 @@
   };
   document.addEventListener('click', (e) => {
     const t = e.target;
-    const el = (t.closest && t.closest('button,a,[role=button],input,select,textarea,summary,label,[onclick]')) || t;
+    const el = (t.closest && t.closest('button,a,[role=button],input,select,textarea,summary,label,[onclick],[role=tab],[role=link],[tabindex]:not([tabindex="-1"])')) || t;
     window.__hypurrLast = el;
     window.__hypurrBefore = document.body ? document.body.innerText : '';
     const label = (el.getAttribute('aria-label') || el.innerText || el.value || el.title || '').trim().replace(/\s+/g, ' ').slice(0, 80);

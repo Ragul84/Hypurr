@@ -29,10 +29,22 @@ const APPEARED_JS: &str = "(()=>{const b=new Set((window.__hypurrBefore||'').spl
 return {url:location.href,text:(document.body?document.body.innerText:'').split('\\n').map(s=>s.trim())\
 .filter(s=>s&&s.length<=80&&/[A-Za-z]{3}/.test(s)&&!b.has(s)).slice(0,5)}})()";
 
-const CLICK_BY_TEXT: &str = "(label)=>{const w=label.trim().toLowerCase();\
-const els=[...document.querySelectorAll('button,a,[role=button],input[type=submit],input[type=button],summary,label')];\
+/// One scripted step: `type:<placeholder>=<text>` fills a field, `css:<selector>` clicks it,
+/// anything else clicks the control with that text. Includes React Native Web controls
+/// (focusable divs) and fires a full pointer sequence, which those listen for.
+const CLICK_BY_TEXT: &str = "(label)=>{const fire=el=>{el.scrollIntoView({block:'center'});\
+for(const k of ['pointerdown','mousedown','pointerup','mouseup']){const E=k.startsWith('pointer')?PointerEvent:MouseEvent;\
+el.dispatchEvent(new E(k,{bubbles:true,cancelable:true,composed:true,button:0,isPrimary:true,pointerType:'mouse'}))}\
+el.click();return true};\
+if(label.startsWith('type:')){const i=label.indexOf('=');if(i<0)return false;const w=label.slice(5,i).trim().toLowerCase(),v=label.slice(i+1);\
+const f=[...document.querySelectorAll('input,textarea')].find(e=>(e.placeholder||e.getAttribute('aria-label')||e.name||'').trim().toLowerCase()===w);if(!f)return false;\
+f.focus();const d=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(f),'value');d.set.call(f,v);\
+f.dispatchEvent(new Event('input',{bubbles:true}));f.dispatchEvent(new Event('change',{bubbles:true}));return true}\
+if(label.startsWith('css:')){const el=document.querySelector(label.slice(4));return el?fire(el):false}\
+const w=label.trim().toLowerCase();\
+const els=[...document.querySelectorAll('button,a,[role=button],[role=tab],[role=link],input[type=submit],input[type=button],summary,label,[tabindex]:not([tabindex=\"-1\"])')];\
 const t=e=>(e.innerText||e.value||e.getAttribute('aria-label')||'').trim().toLowerCase();\
-const el=els.find(e=>t(e)===w)||els.find(e=>t(e).includes(w));if(!el)return false;el.scrollIntoView({block:'center'});el.click();return true}";
+const ex=els.filter(e=>t(e)===w);const el=ex[ex.length-1]||els.filter(e=>t(e).includes(w)).pop();return el?fire(el):false}";
 
 /// How long after a click its API calls still count as part of it.
 const CLICK_WINDOW: Duration = Duration::from_secs(8);
