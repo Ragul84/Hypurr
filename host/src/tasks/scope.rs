@@ -13,7 +13,7 @@ const MAX_LINKS: usize = 40;
 
 /// `~` and `~/x` → the home folder.
 fn expand_home(p: &str) -> PathBuf {
-    if let Some(rest) = p.strip_prefix("~/") {
+    if let Some(rest) = p.strip_prefix("~/").or_else(|| p.strip_prefix("~\\").filter(|_| cfg!(windows))) {
         dirs::home_dir().unwrap_or_default().join(rest)
     } else if p == "~" {
         dirs::home_dir().unwrap_or_default()
@@ -34,6 +34,7 @@ pub fn real_path(base: &Path, p: &str) -> Option<PathBuf> {
         return None;
     };
     let mut pending: Vec<std::ffi::OsString> = Vec::new();
+    let mut cur = root_of(&start);
     // Reverse stack of components still to walk.
     for c in start.components().rev() {
         match c {
@@ -42,7 +43,6 @@ pub fn real_path(base: &Path, p: &str) -> Option<PathBuf> {
             Component::CurDir | Component::RootDir | Component::Prefix(_) => {}
         }
     }
-    let mut cur = PathBuf::from("/");
     let mut links = 0usize;
     while let Some(part) = pending.pop() {
         if part == ".." {
@@ -59,7 +59,7 @@ pub fn real_path(base: &Path, p: &str) -> Option<PathBuf> {
                 let target = std::fs::read_link(&next).ok()?;
                 // Walk the link's target in place of this component.
                 if target.is_absolute() {
-                    cur = PathBuf::from("/");
+                    cur = root_of(&target);
                 }
                 for c in target.components().rev() {
                     match c {
@@ -74,6 +74,34 @@ pub fn real_path(base: &Path, p: &str) -> Option<PathBuf> {
         }
     }
     Some(cur)
+}
+/// `/` on Unix; the drive or share root (`C:\`, `\\server\share\`) on Windows.
+/// `/` on Unix; the drive or share root (`C:\\`, `\\\\?\\C:\\`, `\\\\server\\share\\`) on Windows.
+fn root_of(p: &Path) -> PathBuf {
+    let mut root = PathBuf::new();
+    for c in p.components() {
+        match c {
+            Component::Prefix(_) | Component::RootDir => root.push(c.as_os_str()),
+            _ => break,
+        }
+    }
+    if root.as_os_str().is_empty() { PathBuf::from("/") } else { root }
+}
+
+/// Windows paths ignore case and may come back with a `\\?\` prefix; compare them plainly.
+fn same_tree(real: &Path, root: &Path) -> bool {
+    if cfg!(windows) {
+        let norm = |p: &Path| {
+            let s = p.to_string_lossy().replace('/', "\\").to_lowercase();
+            let s = s.strip_prefix(r"\\?\unc\").map_or(s.clone(), |r| format!(r"\\{r}"));
+            let s = s.strip_prefix(r"\\?\").map_or(s.clone(), str::to_owned);
+            s.trim_end_matches('\\').to_owned()
+        };
+        let (r, base) = (norm(real), norm(root));
+        r == base || r.starts_with(&format!("{base}\\"))
+    } else {
+        real.starts_with(root)
+    }
 }
 
 /// The folder a task may work in.
@@ -99,7 +127,7 @@ impl Scope {
         if p.trim().is_empty() {
             return true;
         }
-        real_path(root, p).is_some_and(|real| real.starts_with(root))
+        real_path(root, p).is_some_and(|real| same_tree(&real, root))
     }
 }
 
@@ -203,5 +231,24 @@ mod tests {
     #[test]
     fn no_folder_means_no_scope() {
         assert!(Scope::new("").contains("/etc/passwd"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_paths() {
+        let (_d, project) = tmp();
+        let s = Scope::new(project.to_str().unwrap());
+        assert!(s.contains(r"src\main.rs"));
+        assert!(s.contains(&project.to_string_lossy().to_uppercase()));
+        assert!(!s.contains(r"..\other\secret.txt"));
+        assert!(!s.contains(r"C:\Windows\System32"));
+        assert!(!s.contains(r"D:\anything"));
+        assert!(!s.contains(r"\\server\share\x"));
+        assert!(!s.contains(r"~\.ssh\id_rsa"));
+        // A junction out of the project is followed, like a symlink.
+        let link = project.join("escape");
+        let ok = crate::oscmd::link_dir(&project.parent().unwrap().join("other"), &link);
+        assert!(ok);
+        assert!(!s.contains(r"escape\secret.txt"));
     }
 }

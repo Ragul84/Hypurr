@@ -117,7 +117,6 @@ pub async fn archive(release: &Release) -> Result<Vec<u8>> {
 /// Extract just the expected regular executable. Never unpack archive paths,
 /// symlinks, permissions or other files into the user's installation.
 pub fn extract(bytes: &[u8], platform: &str, destination: &Path) -> Result<()> {
-    use std::os::unix::fs::PermissionsExt as _;
     let decoder = flate2::read::GzDecoder::new(bytes).take(MAX_UNPACKED);
     let mut archive = tar::Archive::new(decoder);
     let expected = format!("hypurr-host-{platform}/hypurr-host");
@@ -131,7 +130,11 @@ pub fn extract(bytes: &[u8], platform: &str, destination: &Path) -> Result<()> {
         ensure!(entry.size() > 0 && entry.size() < MAX_UNPACKED, "invalid update executable size");
         let mut file = std::fs::OpenOptions::new().write(true).create_new(true).open(destination)?;
         std::io::copy(&mut entry, &mut file)?;
-        file.set_permissions(std::fs::Permissions::from_mode(0o755))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            file.set_permissions(std::fs::Permissions::from_mode(0o755))?;
+        }
         file.sync_all()?;
         found = true;
     }

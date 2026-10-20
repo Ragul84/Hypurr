@@ -39,7 +39,9 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
+#[cfg(unix)]
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+#[cfg(unix)]
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::{broadcast, mpsc, oneshot};
 
@@ -313,6 +315,7 @@ type Pending = Mutex<HashMap<i64, oneshot::Sender<Result<Value, String>>>>;
 
 /// One connected screen helper.
 struct Link {
+    #[cfg_attr(not(unix), allow(dead_code))]
     id: u64,
     tx: mpsc::UnboundedSender<String>,
     pending: Pending,
@@ -392,6 +395,7 @@ pub struct Screen {
     status: Mutex<HelperStatus>,
     control: Mutex<Control>,
     sessions: Mutex<HashMap<String, Viewer>>,
+    #[cfg_attr(not(unix), allow(dead_code))]
     next_link: AtomicU64,
 }
 
@@ -771,7 +775,15 @@ fn scale_frames(node: &mut Value, s: f64) {
 
 // MARK: helper socket
 
+/// Remote screen has no Windows helper yet, so there is nothing to accept.
+#[cfg(not(unix))]
+#[allow(clippy::unused_async)]
+pub async fn serve_helpers(_screen: Arc<Screen>) {
+    tracing::info!("remote screen isn't available on Windows yet");
+}
+
 /// Accepts screen helpers on `~/.hypurr/screen.sock`. The newest connection wins.
+#[cfg(unix)]
 pub async fn serve_helpers(screen: Arc<Screen>) {
     let path = crate::service::data_dir().join("screen.sock");
     let _ = std::fs::remove_file(&path);
@@ -832,6 +844,7 @@ pub async fn supervise_linux_helper(screen: Arc<Screen>) {
     }
 }
 
+#[cfg(unix)]
 async fn run_link(screen: Arc<Screen>, stream: UnixStream) {
     let (rd, mut wr) = stream.into_split();
     let (tx, mut rx) = mpsc::unbounded_channel::<String>();
@@ -1007,6 +1020,7 @@ mod tests {
         assert!(screen.prepare("phone", IceConfig::default()).is_err());
     }
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn helper_roundtrip_over_the_socket() {
         let (tx, _) = broadcast::channel(8);

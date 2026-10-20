@@ -7,13 +7,14 @@ on:
     # Tag releases disabled until Hypurr has its own signing keys and tap:
     # tags: ["v*"]  # one version tag ships the Mac app, the host and the Linux app
   pull_request:
-    paths: ["host/**", "apps/linux/**", "packaging/updates/**", "docs/reference/fixtures/remote-relay-vectors.json"]
+    paths: ["host/**", "apps/linux/**", "packaging/updates/**", "docs/reference/fixtures/remote-relay-vectors.json", ".github/workflows/host.yml"]
 
 jobs:
   test:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
+      fail-fast: false
     runs-on: ${{ matrix.os }}
     defaults:
       run:

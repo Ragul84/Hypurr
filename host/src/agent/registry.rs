@@ -367,6 +367,7 @@ fn extract(archive: &Path, dir: &Path, cmd: &Path) -> Result<()> {
     Ok(())
 }
 
+#[cfg_attr(not(unix), allow(clippy::unnecessary_wraps, unused_variables))]
 fn chmod_x(path: &Path) -> Result<()> {
     #[cfg(unix)]
     {

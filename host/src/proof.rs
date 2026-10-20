@@ -328,8 +328,7 @@ struct Running {
 impl Drop for Running {
     fn drop(&mut self) {
         if let Some(pid) = self.child.id() {
-            #[cfg(unix)]
-            let _ = std::process::Command::new("kill").args(["-9", "--", &format!("-{pid}")]).status();
+            crate::oscmd::kill_tree(pid);
         }
         let _ = self.child.start_kill();
     }
@@ -337,10 +336,8 @@ impl Drop for Running {
 
 fn spawn(dir: &Path, cmd: &str, envs: &[(&str, String)], log: &Path) -> Result<Running> {
     let file = std::fs::File::create(log)?;
-    let mut c = tokio::process::Command::new("sh");
-    c.arg("-c")
-        .arg(cmd)
-        .current_dir(dir)
+    let mut c = crate::oscmd::tokio_shell(cmd);
+    c.current_dir(dir)
         .env("CI", "1")
         .env("BROWSER", "none")
         .stdin(Stdio::null())
@@ -357,8 +354,8 @@ fn spawn(dir: &Path, cmd: &str, envs: &[(&str, String)], log: &Path) -> Result<R
 
 /// Runs a command to the end (or the limit). Returns (ok, output).
 async fn run(dir: &Path, cmd: &str, limit: Duration) -> (bool, String) {
-    let mut c = tokio::process::Command::new("sh");
-    c.arg("-c").arg(cmd).current_dir(dir).env("CI", "1").stdin(Stdio::null()).kill_on_drop(true);
+    let mut c = crate::oscmd::tokio_shell(cmd);
+    c.current_dir(dir).env("CI", "1").stdin(Stdio::null()).kill_on_drop(true);
     #[cfg(unix)]
     c.process_group(0);
     match tokio::time::timeout(limit, c.output()).await {
@@ -471,13 +468,12 @@ async fn ensure_deps(dir: &Path, deadline: Instant, log: &mut String) {
 
 /// Dependencies are shared from the task copy or the project when they exist.
 fn link_deps(from: &[&Path], to: &Path) {
-    #[cfg(unix)]
     for name in ["node_modules"] {
         if to.join(name).exists() {
             continue;
         }
         if let Some(src) = from.iter().map(|d| d.join(name)).find(|p| p.is_dir()) {
-            let _ = std::os::unix::fs::symlink(src, to.join(name));
+            let _ = crate::oscmd::link_dir(&src, &to.join(name));
         }
     }
 }

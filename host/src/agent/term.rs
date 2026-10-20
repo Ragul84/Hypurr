@@ -7,12 +7,13 @@ use crate::agent::backends;
 use anyhow::{Result, anyhow, bail};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as B64;
+use portable_pty::{Child, CommandBuilder, MasterPty, PtySize, native_pty_system};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::collections::HashMap;
+use std::io::{Read as _, Write as _};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::{broadcast, mpsc};
 
 /// Output kept for a client that (re)attaches mid-run.
@@ -178,16 +179,15 @@ impl Terms {
         if let Some((id, _)) = map.iter().find(|(_, t)| t.key == key && t.output.locked().exit.is_none()) {
             return Ok(id.clone());
         }
-        let (pty, pts) = pty_process::open()?;
-        pty.resize(pty_process::Size::new(rows.max(4), cols.max(20)))?;
-        let child = pty_process::Command::new("/bin/sh")
-            .arg("-c")
-            .arg(command)
-            .env("TERM", "xterm-256color")
-            .env("COLORTERM", "truecolor")
-            .current_dir(dirs::home_dir().unwrap_or_else(|| "/".into()))
-            .kill_on_drop(true)
-            .spawn(pts)?;
+        let pair = native_pty_system().openpty(size(cols, rows))?;
+        let mut cmd = shell_command(command);
+        cmd.env("TERM", "xterm-256color");
+        cmd.env("COLORTERM", "truecolor");
+        cmd.cwd(dirs::home_dir().unwrap_or_else(|| "/".into()));
+        let child = pair.slave.spawn_command(cmd)?;
+        // The child holds its own copy; keeping ours would keep the reader open after exit.
+        drop(pair.slave);
+        let pty = pair.master;
         let (tx, rx) = mpsc::unbounded_channel();
         let term = Arc::new(Term {
             key,
@@ -226,46 +226,73 @@ impl Terms {
     }
 }
 
+fn size(cols: u16, rows: u16) -> PtySize {
+    PtySize { rows: rows.max(4), cols: cols.max(20), pixel_width: 0, pixel_height: 0 }
+}
+
+/// The platform shell running a host-chosen setup command.
+fn shell_command(command: &str) -> CommandBuilder {
+    if cfg!(windows) {
+        let mut c = CommandBuilder::new("cmd.exe");
+        c.args(["/D", "/S", "/C", command]);
+        c
+    } else {
+        let mut c = CommandBuilder::new("/bin/sh");
+        c.args(["-c", command]);
+        c
+    }
+}
+
 async fn run(
     terms: Arc<Terms>,
     id: String,
     term: Arc<Term>,
-    pty: pty_process::Pty,
-    mut child: tokio::process::Child,
+    pty: Box<dyn MasterPty + Send>,
+    mut child: Box<dyn Child + Send + Sync>,
     mut rx: mpsc::UnboundedReceiver<Input>,
 ) {
-    let (mut reader, mut writer) = pty.into_split();
+    let (reader, writer) = (pty.try_clone_reader(), pty.take_writer());
+    let (Ok(mut reader), Ok(mut writer)) = (reader, writer) else {
+        let _ = child.kill();
+        term.finish(-1);
+        terms.0.locked().remove(&id);
+        return;
+    };
     let pump = {
         let term = term.clone();
-        tokio::spawn(async move {
+        tokio::task::spawn_blocking(move || {
             let mut buf = vec![0u8; 16 * 1024];
             // EOF or EIO once the child and its children are gone.
-            while let Ok(n @ 1..) = reader.read(&mut buf).await {
+            while let Ok(n @ 1..) = reader.read(&mut buf) {
                 term.push(&buf[..n]);
             }
         })
     };
+    let mut killer = child.clone_killer();
+    let mut wait = tokio::task::spawn_blocking(move || child.wait());
     let status = loop {
         tokio::select! {
-            status = child.wait() => break status,
+            status = &mut wait => break status.ok().and_then(Result::ok),
             input = rx.recv() => match input {
                 Some(Input::Data(bytes)) => {
-                    if let Err(error) = writer.write_all(&bytes).await {
+                    if let Err(error) = writer.write_all(&bytes).and_then(|()| writer.flush()) {
                         tracing::info!(%error, "setup terminal write failed");
                     }
                 }
                 Some(Input::Resize(cols, rows)) => {
-                    let _ = writer.resize(pty_process::Size::new(rows.max(4), cols.max(20)));
+                    let _ = pty.resize(size(cols, rows));
                 }
                 Some(Input::Kill) | None => {
-                    let _ = child.start_kill();
+                    let _ = killer.kill();
                 }
             },
         }
     };
-    // Let the last output drain; a background grandchild can hold the PTY open forever.
+    // ConPTY keeps the reader open until the master goes; a background grandchild can too.
+    drop(writer);
+    drop(pty);
     let _ = tokio::time::timeout(Duration::from_secs(1), pump).await;
-    let code = status.ok().and_then(|s| s.code()).unwrap_or(-1);
+    let code = status.map_or(-1, |s| i32::try_from(s.exit_code()).unwrap_or(-1));
     tracing::info!(term = %id, code, "setup terminal finished");
     term.finish(code);
     tokio::time::sleep(LINGER).await;
@@ -276,6 +303,7 @@ async fn run(
 mod tests {
     use super::*;
 
+    #[cfg(unix)]
     #[tokio::test]
     async fn runs_in_a_pty_and_takes_input() {
         let terms = Arc::new(Terms::default());
@@ -298,5 +326,32 @@ mod tests {
         let (head, _) = term.attach();
         let text = String::from_utf8(B64.decode(head[0]["data"].as_str().unwrap()).unwrap()).unwrap();
         assert!(text.contains("tty") && text.contains("got-hi"), "{text}");
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn runs_in_conpty() {
+        let terms = Arc::new(Terms::default());
+        let id = terms.spawn(("test".into(), Step::Login), "echo got-hi", 80, 24).unwrap();
+        let term = terms.get(&id).unwrap();
+        let (_, mut rx) = term.attach();
+        let code = tokio::time::timeout(Duration::from_secs(20), async {
+            loop {
+                let v = rx.recv().await.unwrap();
+                if v["type"] == "exit" {
+                    return v["code"].as_i64().unwrap();
+                }
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(code, 0);
+        let (head, _) = term.attach();
+        let text: String = head
+            .iter()
+            .filter_map(|v| v["data"].as_str())
+            .map(|d| String::from_utf8_lossy(&B64.decode(d).unwrap()).into_owned())
+            .collect();
+        assert!(text.contains("got-hi"), "{text}");
     }
 }
