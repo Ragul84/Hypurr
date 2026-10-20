@@ -110,3 +110,20 @@ role from the grant instead of `team`. That's planned after launch and not built
   `host/tests/tasks_e2e.rs` (task and daily spending limits stop and refuse, audit actions).
 - Android: `AdminWireTest` (fixture), `AdminStoreTest`, screenshots `android-admin-*`, `android-needs-admin-*`.
 - Swift: `kit/Tests/HypurrKitTests/AdminWireTests.swift`.
+
+## Manager console (Stage 6)
+
+- **₹ Spend** tab: this month's spend per person and for the team, with limits per person per
+  day / month and for the whole team per month (`personDailyInr`, `personMonthlyInr`,
+  `teamMonthlyInr`, overrides in `personLimits` by device key). Checked by the host before a
+  task starts, on each message and while it runs. USD agent costs are converted with
+  `usdToInr` from `pricing/plans.json`.
+- **Folder rules** (`allowedFolders`): tasks and bots only inside these folders.
+- **Local-only mode** (`localOnly`, `modelEndpoints`): see `docs/it-kit/local-only.md`.
+- **Audit → Export CSV** (`auditExport`, admin only): see `docs/it-kit/audit-export.md`.
+
+**What needs cloud sync.** Everything here is stored and enforced on one computer, and the
+console runs in the phone app paired with it. A team with several laptops sets the rules on
+each laptop, and spend is per laptop. One web console for many laptops, shared limits across
+them, and SSO need the Hypurr cloud to sync policies and spend; they are not built.
+Per-person overrides are supported by the host API but the app does not edit them yet.

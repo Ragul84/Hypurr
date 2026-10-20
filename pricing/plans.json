@@ -1,0 +1,41 @@
+{
+  "_comment": "The one place Hypurr's plans are configured. The host serves this to the apps (method `pricing`) and the website copies it at build time. Prices are in rupees; null means not decided yet. Change numbers here only.",
+  "currency": "INR",
+  "symbol": "₹",
+  "usdToInr": 84.0,
+  "gstNote": "Prices exclude GST. GST rate and GSTIN: to be confirmed before launch.",
+  "plans": [
+    {
+      "id": "free",
+      "name": "Free",
+      "priceInr": 0,
+      "per": "forever",
+      "tasksPerDay": 5,
+      "summary": "For trying Hypurr on your own laptop.",
+      "features": ["Up to 5 tasks a day", "Safe branches, approvals and undo", "Your own model keys"]
+    },
+    {
+      "id": "pro",
+      "name": "Pro",
+      "priceInr": 199,
+      "per": "person / month",
+      "tasksPerDay": null,
+      "summary": "For one person who works from their phone every day.",
+      "features": ["Unlimited tasks", "Ticket to PR, Fix from a log, Write tests", "Daily standup"]
+    },
+    {
+      "id": "team",
+      "name": "Team",
+      "priceInr": null,
+      "per": "seat / month",
+      "tasksPerDay": null,
+      "summary": "For teams that need IT sign-off and a manager console.",
+      "features": ["Everything in Pro", "Manager console: roles, rules, ₹ limits", "Audit log export", "Local-only mode"]
+    }
+  ],
+  "payments": {
+    "provider": "razorpay",
+    "razorpay": { "keyId": "", "planIds": { "pro": "", "team": "" } },
+    "stripe": { "publishableKey": "", "priceIds": { "pro": "", "team": "" } }
+  }
+}

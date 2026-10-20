@@ -6,8 +6,10 @@ mod api;
 mod chat;
 mod hub;
 mod integrations;
+mod itkit;
 mod market;
 mod mcp;
+mod pricing;
 mod remote;
 mod routines;
 mod screen;
@@ -480,6 +482,7 @@ async fn serve(bind: &str, port: u16) -> Result<()> {
     tokio::task::spawn_blocking(backends::hydrate_path).await?;
     let hub = hub::Hub::new(store, host_id, identity, token, port);
     hub.start()?;
+    admin::local_only::sync(&hub.store);
     tokio::spawn(registry::refresh_loop());
     tokio::spawn(backends::refresh_sign_in());
     tokio::spawn(usage::poll(hub.clone()));

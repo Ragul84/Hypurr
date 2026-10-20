@@ -5,6 +5,9 @@
 
 pub mod activity;
 pub mod audit;
+pub mod budget;
+pub mod export;
+pub mod local_only;
 
 use crate::api::devices::Caller;
 use crate::hub::Hub;
@@ -14,6 +17,7 @@ use anyhow::{Result, bail};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
+use std::path::Path;
 
 /// What a person may do. Ordered: viewer < member < admin.
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
@@ -110,6 +114,18 @@ pub struct Policies {
     pub ask_from: String,
     /// Requests at or above this risk need an admin to approve: `medium` | `high` | `off` / empty.
     pub admin_approves_from: String,
+    /// ₹ per person per day / month (0: no limit), with per-person overrides by device key.
+    pub person_daily_inr: f64,
+    pub person_monthly_inr: f64,
+    pub person_limits: BTreeMap<String, budget::PersonLimit>,
+    /// ₹ for the whole team per month. 0: no limit.
+    pub team_monthly_inr: f64,
+    /// Local-only mode: no Hypurr cloud, relay or marketplaces; agents only on approved endpoints.
+    pub local_only: bool,
+    /// Approved model endpoints (company gateway or local model server base URLs).
+    pub model_endpoints: Vec<String>,
+    /// Folder rules: tasks and bots may only work inside these folders. Empty: any folder.
+    pub allowed_folders: Vec<String>,
 }
 
 fn parse_risk(s: &str) -> Option<Risk> {
@@ -126,7 +142,7 @@ impl Policies {
         store.kv_get("policies").and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default()
     }
 
-    fn save(&self, store: &Store) -> Result<()> {
+    pub(crate) fn save(&self, store: &Store) -> Result<()> {
         store.kv_set("policies", &serde_json::to_string(self)?)
     }
 
@@ -160,6 +176,14 @@ impl Policies {
             "taskLimit": self.task_limit,
             "askFrom": ask,
             "adminApprovesFrom": admin,
+            "personDailyInr": self.person_daily_inr,
+            "personMonthlyInr": self.person_monthly_inr,
+            "personLimits": self.person_limits,
+            "teamMonthlyInr": self.team_monthly_inr,
+            "localOnly": self.local_only || local_only::active(),
+            "modelEndpoints": self.model_endpoints,
+            "allowedFolders": self.allowed_folders,
+            "usdToInr": crate::pricing::usd_to_inr(),
         })
     }
 }
@@ -188,6 +212,63 @@ pub fn set_policies(store: &Store, b: &Value) -> Result<Value> {
             *slot = (n * 100.0).round() / 100.0;
         }
     }
+    for (key, slot) in [
+        ("personDailyInr", &mut p.person_daily_inr),
+        ("personMonthlyInr", &mut p.person_monthly_inr),
+        ("teamMonthlyInr", &mut p.team_monthly_inr),
+    ] {
+        if let Some(v) = b.get(key).filter(|v| !v.is_null()) {
+            let Some(n) = v.as_f64().filter(|n| n.is_finite() && *n >= 0.0) else {
+                bail!("{key} must be rupees, 0 or more")
+            };
+            *slot = n.round();
+        }
+    }
+    if let Some(map) = b["personLimits"].as_object() {
+        for (k, v) in map {
+            if v.is_null() {
+                p.person_limits.remove(k);
+                continue;
+            }
+            let l: budget::PersonLimit = serde_json::from_value(v.clone())
+                .map_err(|_| anyhow::anyhow!("personLimits.{k} must be {{dailyInr, monthlyInr}}"))?;
+            if [l.daily_inr, l.monthly_inr].iter().any(|n| !n.is_finite() || *n < 0.0) {
+                bail!("person limits must be rupees, 0 or more");
+            }
+            if l == budget::PersonLimit::default() {
+                p.person_limits.remove(k);
+            } else {
+                p.person_limits.insert(k.clone(), l);
+            }
+        }
+    }
+    if let Some(v) = b["localOnly"].as_bool() {
+        p.local_only = v;
+    }
+    if let Some(list) = b["modelEndpoints"].as_array() {
+        let mut eps = vec![];
+        for e in list.iter().filter_map(Value::as_str).map(str::trim).filter(|s| !s.is_empty()) {
+            if !(e.starts_with("https://")
+                || e.starts_with("http://localhost")
+                || e.starts_with("http://127.0.0.1")
+                || e.starts_with("http://[::1]"))
+            {
+                bail!("{e}: an approved endpoint must be https://, or http:// on this computer (a local model)");
+            }
+            eps.push(e.trim_end_matches('/').to_owned());
+        }
+        p.model_endpoints = eps;
+    }
+    if let Some(list) = b["allowedFolders"].as_array() {
+        let mut dirs = vec![];
+        for d in list.iter().filter_map(Value::as_str).map(str::trim).filter(|s| !s.is_empty()) {
+            if !Path::new(d).is_absolute() {
+                bail!("{d}: a folder rule must be a full path, like /Users/asha/work");
+            }
+            dirs.push(d.trim_end_matches('/').to_owned());
+        }
+        p.allowed_folders = dirs;
+    }
     let mut safety = b.clone();
     if let Some(s) = b["askFrom"].as_str() {
         if !matches!(s, "low" | "medium" | "high" | "never") {
@@ -206,6 +287,7 @@ pub fn set_policies(store: &Store, b: &Value) -> Result<Value> {
         p.admin_approves_from = if s == "off" { String::new() } else { s.to_owned() };
     }
     p.save(store)?;
+    local_only::sync(store);
     crate::tasks::set_safety(store, &safety)?;
     Ok(policies(store))
 }
@@ -229,6 +311,8 @@ const ADMIN_ONLY: &[&str] = &[
     "setRole",
     "setTeam",
     "auditLog",
+    "auditExport",
+    "spendByPerson",
     "activity",
     "setIntegrations",
     "testIntegration",
@@ -258,6 +342,8 @@ const ADMIN_ONLY: &[&str] = &[
 /// What a viewer may call: reading, plus its own device registration.
 const VIEWER_OK: &[&str] = &[
     "hello",
+    "pricing",
+    "itKit",
     "sync",
     "history",
     "thread",
@@ -312,6 +398,7 @@ pub fn authorize(store: &Store, actor: &Actor, method: &str, b: &mut Value) -> R
             actor.role.as_str()
         )));
     }
+    local_only::check_method(store, method)?;
     let policies = Policies::load(store);
     match method {
         "respondPermission" => {
@@ -331,6 +418,7 @@ pub fn authorize(store: &Store, actor: &Actor, method: &str, b: &mut Value) -> R
         }
         "startTask" => {
             check_daily(store, &policies)?;
+            budget::check(store, &policies, &actor.key)?;
             if let Some(backend) = b["backend"].as_str().filter(|s| !s.is_empty()) {
                 check_agent(&policies, backend)?;
             }
@@ -340,16 +428,24 @@ pub fn authorize(store: &Store, actor: &Actor, method: &str, b: &mut Value) -> R
             if let Some(task) = b["botId"].as_str().and_then(|id| crate::tasks::Task::for_bot(store, id)) {
                 check_daily(store, &policies)?;
                 check_task(&policies, &task)?;
+                let who = task.extra.get("startedBy").and_then(|v| v["key"].as_str()).unwrap_or("local").to_owned();
+                budget::check(store, &policies, &who)?;
             }
         }
         "createBot" if b["kind"] != "group" => {
             if let Some(backend) = b["backend"].as_str().filter(|s| !s.is_empty()) {
                 check_agent(&policies, backend)?;
             }
+            if let Some(cwd) = b["cwd"].as_str().filter(|s| !s.is_empty()) {
+                check_folder(&policies, cwd)?;
+            }
         }
         "updateBot" => {
             if let Some(backend) = b["backend"].as_str().filter(|s| !s.is_empty()) {
                 check_agent(&policies, backend)?;
+            }
+            if let Some(cwd) = b["cwd"].as_str().filter(|s| !s.is_empty()) {
+                check_folder(&policies, cwd)?;
             }
         }
         _ => {}
@@ -367,6 +463,25 @@ fn risk_word(r: Risk) -> &'static str {
 
 fn money(x: f64) -> String {
     format!("${x:.2}")
+}
+
+/// Folder rules: `path` must be one of the allowed folders or inside one (whole path parts).
+pub fn check_folder(p: &Policies, path: &str) -> Result<(), NotAllowed> {
+    if p.allowed_folders.is_empty() {
+        return Ok(());
+    }
+    let path = Path::new(path);
+    if p.allowed_folders.iter().any(|d| path.starts_with(d))
+        && !path.components().any(|c| c == std::path::Component::ParentDir)
+    {
+        Ok(())
+    } else {
+        Err(NotAllowed(format!(
+            "Your team's folder rules don't include {}. Allowed: {}.",
+            path.display(),
+            p.allowed_folders.join(", ")
+        )))
+    }
 }
 
 fn check_agent(p: &Policies, backend: &str) -> Result<(), NotAllowed> {
@@ -404,7 +519,11 @@ pub fn after_usage(hub: &Hub, task: &mut crate::tasks::Task) {
     if task.extra.get("limitHit").is_some_and(|v| v == true) {
         return;
     }
-    let over = check_task(&p, task).err().or_else(|| check_daily(store, &p).err());
+    let who = task.extra.get("startedBy").and_then(|v| v["key"].as_str()).unwrap_or("local").to_owned();
+    let over = check_task(&p, task)
+        .err()
+        .or_else(|| check_daily(store, &p).err())
+        .or_else(|| budget::check(store, &p, &who).err());
     let Some(NotAllowed(reason)) = over else { return };
     task.extra.insert("limitHit".into(), true.into());
     let _ = task.save(store);
@@ -485,7 +604,7 @@ mod tests {
     use super::*;
 
     fn store() -> Store {
-        Store::open(std::path::Path::new(":memory:")).unwrap()
+        Store::open(Path::new(":memory:")).unwrap()
     }
 
     fn device(store: &Store, key: &str) -> Actor {
@@ -590,5 +709,22 @@ mod tests {
         assert!(authorize(&s, &member, "createBot", &mut json!({"kind": "group", "backend": "codex"})).is_ok());
         assert!(authorize(&s, &member, "updateBot", &mut json!({"botId": "b", "backend": "codex"})).is_err());
         assert!(authorize(&s, &member, "updateBot", &mut json!({"botId": "b", "name": "x"})).is_ok());
+    }
+
+    #[test]
+    fn folder_rules_apply_to_bots_and_paths() {
+        let s = store();
+        assert!(set_policies(&s, &json!({"allowedFolders": ["work"]})).is_err(), "relative");
+        set_policies(&s, &json!({"allowedFolders": ["/home/asha/work/"]})).unwrap();
+        let p = Policies::load(&s);
+        assert!(check_folder(&p, "/home/asha/work").is_ok());
+        assert!(check_folder(&p, "/home/asha/work/api").is_ok());
+        assert!(check_folder(&p, "/home/asha/workshop").is_err(), "whole path parts only");
+        assert!(check_folder(&p, "/home/asha/work/../secrets").is_err());
+        let member = Actor { key: "m".into(), name: "M".into(), role: Role::Member };
+        assert!(authorize(&s, &member, "createBot", &mut json!({"cwd": "/tmp"})).is_err());
+        assert!(authorize(&s, &member, "createBot", &mut json!({"cwd": "/home/asha/work/api"})).is_ok());
+        set_policies(&s, &json!({"allowedFolders": []})).unwrap();
+        assert!(check_folder(&Policies::load(&s), "/tmp").is_ok());
     }
 }
