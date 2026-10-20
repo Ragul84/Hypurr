@@ -283,6 +283,7 @@ async fn complete_inner(hub: &Arc<Hub>, task_id: &str, summary: Option<String>) 
         &json!({"text": text, "style": if errors.is_empty() { "info" } else { "error" }, "learning": learning}),
     );
     hub.emit_bot(&task.bot_id);
+    crate::proof::after_finish(hub, &task.id);
     Ok(())
 }
 

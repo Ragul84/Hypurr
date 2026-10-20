@@ -526,7 +526,7 @@ pub async fn start(hub: &Arc<Hub>, b: &Value) -> Result<Value> {
 }
 
 /// The task's first message: the chat shows `shown`, the agent gets `prompt`.
-fn send_first(hub: &Arc<Hub>, bot_id: &str, shown: &str, prompt: &str, uploads: &[String]) -> Result<()> {
+pub(crate) fn send_first(hub: &Arc<Hub>, bot_id: &str, shown: &str, prompt: &str, uploads: &[String]) -> Result<()> {
     let row = hub.store.bot(bot_id)?.ok_or_else(|| anyhow!("unknown bot"))?;
     let (mut paths, mut attachments) = (Vec::new(), Vec::new());
     if !uploads.is_empty() {

@@ -343,6 +343,8 @@ const ADMIN_ONLY: &[&str] = &[
 /// What a viewer may call: reading, plus its own device registration.
 const VIEWER_OK: &[&str] = &[
     "hello",
+    "proofGet",
+    "proofFile",
     "pricing",
     "itKit",
     "sync",
@@ -425,6 +427,18 @@ pub fn authorize(store: &Store, actor: &Actor, method: &str, b: &mut Value) -> R
                 check_agent(&policies, backend)?;
             }
             b["startedBy"] = json!({"key": actor.key, "name": actor.name});
+        }
+        "proofAllow" => {
+            // Starting servers and browsers runs project code: a medium-risk approval.
+            if policies.admin_from().is_some_and(|from| Risk::Medium >= from) && !actor.is_admin() {
+                return Err(NotAllowed("Your team's rules say an admin allows running project code.".into()));
+            }
+        }
+        "proofVerdict" if b["ok"] == false => {
+            if let Some(task) = b["taskId"].as_str().and_then(|id| crate::tasks::Task::load(store, id)) {
+                check_daily(store, &policies)?;
+                check_task(&policies, &task)?;
+            }
         }
         "projectGuideSave" => {
             check_daily(store, &policies)?;

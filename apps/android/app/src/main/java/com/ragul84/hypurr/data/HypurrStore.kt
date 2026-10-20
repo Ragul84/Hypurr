@@ -173,6 +173,14 @@ class HypurrStore(
     }
     suspend fun learnCards(taskId: String) = client?.learnCards(taskId)
     suspend fun learnQuiz(taskId: String) = client?.learnQuiz(taskId)
+    suspend fun proof(taskId: String) = client?.proof(taskId)?.proof
+    suspend fun proofStart(taskId: String) = client?.proofStart(taskId)?.proof
+    suspend fun proofAllow(taskId: String) = client?.proofAllow(taskId)?.proof
+    suspend fun proofVerdict(taskId: String, ok: Boolean, text: String) = client?.proofVerdict(taskId, ok, text)
+
+    /** One proof picture or clip, as bytes. */
+    suspend fun proofFile(taskId: String, name: String): ByteArray? =
+        client?.proofFile(taskId, name)?.data?.let { android.util.Base64.decode(it, android.util.Base64.DEFAULT) }
 
     fun setProjectFolder(path: String?) {
         projectFolder.value = path?.takeIf { it.isNotBlank() }
