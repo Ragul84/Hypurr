@@ -434,7 +434,40 @@ impl Drop for BaseCopy {
     }
 }
 
-/// Dependencies are shared from the task copy or the project (never installed here).
+/// The install command for a web project, from its lockfile.
+pub fn install_command(dir: &Path) -> Option<&'static str> {
+    if !dir.join("package.json").is_file() {
+        return None;
+    }
+    Some(if dir.join("pnpm-lock.yaml").is_file() {
+        "pnpm install --frozen-lockfile --ignore-scripts"
+    } else if dir.join("yarn.lock").is_file() {
+        "yarn install --frozen-lockfile --ignore-scripts"
+    } else if dir.join("package-lock.json").is_file() {
+        "npm ci --ignore-scripts --no-audit --no-fund"
+    } else {
+        "npm install --ignore-scripts --no-audit --no-fund"
+    })
+}
+
+/// Packages missing: install them inside this folder only, within what's left of the cap.
+async fn ensure_deps(dir: &Path, deadline: Instant, log: &mut String) {
+    if dir.join("node_modules").exists() {
+        return;
+    }
+    let Some(cmd) = install_command(dir) else { return };
+    let left = deadline.saturating_duration_since(Instant::now()).min(Duration::from_secs(4 * 60));
+    if left < Duration::from_secs(20) {
+        let _ = writeln!(log, "Skipped installing packages: not enough time left.");
+        return;
+    }
+    let (ok, text) = run(dir, cmd, left).await;
+    if !ok {
+        let _ = writeln!(log, "Installing packages ({cmd}): {}", clean_log(&text));
+    }
+}
+
+/// Dependencies are shared from the task copy or the project when they exist.
 fn link_deps(from: &[&Path], to: &Path) {
     #[cfg(unix)]
     for name in ["node_modules"] {
@@ -783,7 +816,9 @@ async fn produce(hub: &Arc<Hub>, id: &str, p: &Plan) -> Result<Value> {
         (Kind::Web, Some(cmd)) => {
             let pg = pages(&ch);
             let project = PathBuf::from(&task.project);
+            let deadline = Instant::now() + (TOTAL - Duration::from_secs(3 * 60));
             link_deps(&[&project], &work);
+            ensure_deps(&work, deadline, &mut log).await;
             let after = capture_web(&work, cmd, &out, "after", &pg, true, &mut log).await?;
             let copy = BaseCopy::new(&work, &out, &base)?;
             link_deps(&[&work, &project], &copy.path);
@@ -878,7 +913,11 @@ pub fn verdict(hub: &Arc<Hub>, b: &Value) -> Result<Value> {
         let shown = if text.is_empty() { "Not right, fix it".to_owned() } else { format!("Not right: {text}") };
         let proof = task.extra.get("proof").cloned().unwrap_or_default();
         let prompt = feedback_prompt(&text, &proof);
+        if task.status == crate::tasks::TaskStatus::Finished {
+            ensure!(work_dir(&task).is_dir(), "The task's folder is gone, so it can't be reopened.");
+        }
         crate::tasks::send_first(hub, &task.bot_id, &shown, &prompt, &[])?;
+        reopen(&mut task, &text, now());
     }
     if let Some(p) = task.extra.get_mut("proof") {
         p["verdict"] = json!({"ok": ok, "text": text, "at": now()});
@@ -886,6 +925,20 @@ pub fn verdict(hub: &Arc<Hub>, b: &Value) -> Result<Value> {
     task.save(&hub.store)?;
     hub.emit_bot(&task.bot_id);
     Ok(json!({"ok": true}))
+}
+
+/// "Not right" on a finished task opens it again, keeping the user's note.
+pub fn reopen(task: &mut Task, text: &str, at: i64) -> bool {
+    if task.status != crate::tasks::TaskStatus::Finished {
+        return false;
+    }
+    task.status = crate::tasks::TaskStatus::Active;
+    let note = if text.is_empty() { "Not right, fix it" } else { text };
+    let list = task.extra.entry("reopened").or_insert_with(|| json!([]));
+    if let Some(a) = list.as_array_mut() {
+        a.push(json!({"at": at, "note": note}));
+    }
+    true
 }
 
 /// What the agent gets when the user says the result isn't right.
@@ -1025,6 +1078,32 @@ mod tests {
         assert_eq!(shots[1]["label"], "settings dark");
         assert_eq!(std::fs::read_to_string(o.join("before-1.png")).unwrap(), "old");
         assert_eq!(std::fs::read_to_string(o.join("after-1.png")).unwrap(), "new");
+    }
+
+    #[test]
+    fn install_follows_the_lockfile() {
+        let d = tmp("install");
+        assert_eq!(install_command(&d), None);
+        std::fs::write(d.join("package.json"), "{}").unwrap();
+        assert!(install_command(&d).unwrap().starts_with("npm install"));
+        std::fs::write(d.join("package-lock.json"), "").unwrap();
+        assert!(install_command(&d).unwrap().starts_with("npm ci"));
+        std::fs::write(d.join("yarn.lock"), "").unwrap();
+        assert!(install_command(&d).unwrap().starts_with("yarn install"));
+        std::fs::write(d.join("pnpm-lock.yaml"), "").unwrap();
+        assert!(install_command(&d).unwrap().starts_with("pnpm install"));
+        assert!(install_command(&d).unwrap().contains("--ignore-scripts"));
+    }
+
+    #[test]
+    fn not_right_reopens_a_finished_task() {
+        let mut t: Task = serde_json::from_value(json!({"id":"t","botId":"b","goal":"g","title":"t","project":"/p",
+            "projectName":"p","backend":"x","status":"finished","createdAt":0,"updatedAt":0}))
+        .unwrap();
+        assert!(reopen(&mut t, "button is cut off", 5));
+        assert_eq!(t.status, crate::tasks::TaskStatus::Active);
+        assert_eq!(t.extra["reopened"][0]["note"], "button is cut off");
+        assert!(!reopen(&mut t, "again", 6));
     }
 
     #[test]
