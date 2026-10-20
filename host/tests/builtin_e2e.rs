@@ -170,5 +170,5 @@ async fn builtin_status_install_models_and_fake_turn() {
 }
 
 fn hypurr_host_version_dir() -> &'static str {
-    "0.1.0"
+    "0.1.1"
 }
