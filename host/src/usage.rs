@@ -91,8 +91,7 @@ async fn claude_cli_usage() -> Option<Vec<Window>> {
     let bin = crate::agent::backends::which("claude")?;
     let out = tokio::time::timeout(
         Duration::from_secs(60),
-        tokio::process::Command::new(bin)
-            .args(["-p", "/usage", "--output-format", "json", "--no-session-persistence"])
+        crate::oscmd::program_command(&bin, &["-p", "/usage", "--output-format", "json", "--no-session-persistence"])
             .current_dir(dirs::home_dir()?)
             .stdin(std::process::Stdio::null())
             .kill_on_drop(true)

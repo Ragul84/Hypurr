@@ -107,20 +107,52 @@ impl Backoff {
     }
 }
 
+/// The one line users see when the cloud can't be reached; details stay at DEBUG.
+pub const UNREACHABLE: &str = "Hypurr cloud not reachable; phone pairing over Wi-Fi still works";
+
+/// Logs the first failure once at INFO, repeats at DEBUG, and one INFO when it recovers.
+#[derive(Default)]
+pub struct Quiet {
+    failing: bool,
+}
+
+impl Quiet {
+    /// Returns true when this failure was logged at INFO (first after OK).
+    pub fn failed(&mut self, what: &str, e: &anyhow::Error) -> bool {
+        tracing::debug!(error = format!("{e:#}"), "{what}");
+        if self.failing {
+            return false;
+        }
+        self.failing = true;
+        tracing::info!("{UNREACHABLE}");
+        true
+    }
+
+    pub fn ok(&mut self) {
+        if std::mem::take(&mut self.failing) {
+            tracing::info!("Hypurr cloud reachable again");
+        }
+    }
+}
+
+const REGISTER_MAX_WAIT: Duration = Duration::from_secs(10 * 60);
+
 async fn supervise(hub: &Arc<Hub>, url: &str) {
-    let mut register_wait = Backoff::new(Duration::from_secs(30 * 60));
+    let mut quiet = Quiet::default();
+    let mut register_wait = Backoff::new(REGISTER_MAX_WAIT);
     let mut wait = Backoff::new(Duration::from_secs(60));
     let mut registered = false;
     loop {
         if !registered {
             if let Err(e) = cloud::register(hub, url).await {
-                tracing::warn!(error = format!("{e:#}"), "couldn't register with the Hypurr cloud");
+                quiet.failed("couldn't register with the Hypurr cloud", &e);
                 cloud::update_status(hub, |s| s.last_error = Some(format!("{e:#}")));
                 sleep(register_wait.wait()).await;
                 continue;
             }
             registered = true;
             register_wait.reset();
+            quiet.ok();
         }
         let started = Instant::now();
         let outcome = session(hub, url).await;
@@ -141,7 +173,7 @@ async fn supervise(hub: &Arc<Hub>, url: &str) {
                 if let Some(tungstenite::Error::Http(res)) = e.downcast_ref::<tungstenite::Error>() {
                     registered = !res.status().is_client_error();
                 }
-                tracing::warn!(error = format!("{e:#}"), "relay connection failed");
+                quiet.failed("relay connection failed", &e);
                 cloud::update_status(hub, |s| s.last_error = Some(format!("{e:#}")));
             }
         }
@@ -523,8 +555,19 @@ async fn deliver(hub: &Arc<Hub>, item: &Value) -> Result<(), MailboxFailure> {
 
 #[cfg(test)]
 mod tests {
+
     #![allow(clippy::unwrap_used, clippy::expect_used)]
     use super::*;
+    #[test]
+    fn unreachable_cloud_logs_once_until_it_recovers() {
+        let mut q = Quiet::default();
+        let e = anyhow::anyhow!("dns error: No such host is known");
+        assert!(q.failed("register", &e));
+        assert!(!q.failed("register", &e));
+        assert!(!q.failed("relay", &e));
+        q.ok();
+        assert!(q.failed("register", &e), "logged again after recovering");
+    }
     use crate::remote::identity::Identity;
     use crate::store::{BotConfig, Device, DeviceSource, Scope, Store, now_ms};
     use axum::extract::ws::{Message as AxMessage, WebSocket, WebSocketUpgrade};

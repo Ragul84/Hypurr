@@ -75,11 +75,14 @@ pub struct Acp {
 
 /// `sh -c "exec …"` on Unix; `cmd /D /S /C …` on Windows (no `exec`, so cmd stays the parent).
 fn shell(command: &str) -> Command {
-    if cfg!(windows) {
-        let mut c = Command::new("cmd.exe");
-        c.args(["/D", "/S", "/C", command]);
-        c
-    } else {
+    #[cfg(windows)]
+    {
+        // Rust would quote `command` with `\"`, which cmd doesn't understand; `/S` + raw outer quotes
+        // runs the line exactly, so `"C:\path with spaces\codex.cmd" acp` works.
+        Command::from(crate::oscmd::std_shell(command))
+    }
+    #[cfg(not(windows))]
+    {
         let mut c = Command::new("/bin/sh");
         c.arg("-c").arg(format!("exec {command}"));
         c

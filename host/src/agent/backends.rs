@@ -501,21 +501,33 @@ pub fn which(bin: &str) -> Option<PathBuf> {
     dirs.into_iter().find_map(|d| exe_in(&d, bin))
 }
 
-/// `dir/bin`, or on Windows `dir/bin.exe` / `.cmd` / `.bat` (no PATHEXT lookup without this).
+/// `dir/bin` on Unix. On Windows, `bin` + PATHEXT (.exe, .cmd, .bat, then .ps1) and never the
+/// extensionless file: npm puts a `sh` script there, and spawning it fails with os error 193.
 fn exe_in(dir: &Path, bin: &str) -> Option<PathBuf> {
-    let p = dir.join(bin);
-    if is_executable(&p) {
-        return Some(p);
+    if !cfg!(windows) {
+        let p = dir.join(bin);
+        return is_executable(&p).then_some(p);
     }
-    if cfg!(windows) && Path::new(bin).extension().is_none() {
-        for ext in ["exe", "cmd", "bat"] {
-            let p = dir.join(format!("{bin}.{ext}"));
-            if p.is_file() {
-                return Some(p);
-            }
+    if Path::new(bin).extension().is_some() {
+        let p = dir.join(bin);
+        return p.is_file().then_some(p);
+    }
+    windows_exts().iter().map(|ext| dir.join(format!("{bin}{ext}"))).find(|p| p.is_file())
+}
+
+/// PATHEXT order limited to what Hypurr can launch, plus `.ps1` last.
+fn windows_exts() -> Vec<String> {
+    const RUNNABLE: [&str; 3] = [".exe", ".cmd", ".bat"];
+    let from_env = std::env::var("PATHEXT").unwrap_or_default();
+    let mut out: Vec<String> =
+        from_env.split(';').map(|e| e.trim().to_ascii_lowercase()).filter(|e| RUNNABLE.contains(&e.as_str())).collect();
+    for e in RUNNABLE {
+        if !out.iter().any(|o| o == e) {
+            out.push(e.to_owned());
         }
     }
-    None
+    out.push(".ps1".into());
+    out
 }
 
 fn is_executable(p: &Path) -> bool {
@@ -641,8 +653,8 @@ pub async fn refresh_sign_in() {
         let check = h.signed_in?;
         let bin = h.bins.iter().find_map(|b| which(b))?;
         Some(async move {
-            let run = tokio::process::Command::new(bin)
-                .args(check.args.split_whitespace())
+            let args: Vec<&str> = check.args.split_whitespace().collect();
+            let run = crate::oscmd::program_command(&bin, &args)
                 .stdin(std::process::Stdio::null())
                 .stderr(std::process::Stdio::null())
                 .kill_on_drop(true)
@@ -715,7 +727,7 @@ pub fn login_available(id: &str) -> bool {
 pub async fn login_command(id: &str) -> anyhow::Result<String> {
     let h = harness(id).ok_or_else(|| anyhow::anyhow!("no sign-in command for {id}"))?;
     let bin = match h.bins.iter().find_map(|b| which(b)) {
-        Some(p) => shell_quote(&p.to_string_lossy()),
+        Some(p) => crate::oscmd::shell_program(&p),
         None => match registry_cli(h) {
             Some(agent) => registry::command(&agent, |_| {}).await?.program,
             None if !h.login.contains("{bin}") => String::new(),
@@ -735,28 +747,57 @@ pub fn local_candidate(id: &str) -> Option<registry::Cmd> {
         h.bins.iter().find_map(|b| which(b))
     }?;
     let args = template.strip_prefix("{bin}").unwrap_or(template).trim().to_owned();
-    Some(registry::Cmd { program: shell_quote(&path.to_string_lossy()), args })
-}
-
-fn shell_quote(s: &str) -> String {
-    if cfg!(windows) {
-        // Commands run via `cmd /S /C`, which only understands double quotes.
-        return if s.chars().all(|c| c.is_ascii_alphanumeric() || "-_./\\:".contains(c)) {
-            s.to_owned()
-        } else {
-            format!("\"{}\"", s.replace('"', ""))
-        };
-    }
-    if s.chars().all(|c| c.is_ascii_alphanumeric() || "-_./".contains(c)) {
-        s.to_owned()
-    } else {
-        format!("'{}'", s.replace('\'', "'\\''"))
-    }
+    Some(registry::Cmd { program: crate::oscmd::shell_program(&path), args })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// npm's layout on Windows: an extensionless `sh` shim next to the real `.cmd`.
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn windows_prefers_cmd_shim_over_extensionless_file() {
+        let dir = std::env::temp_dir().join(format!("hypurr shim {}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("codex"), "#!/bin/sh\nexec node codex.js \"$@\"\n").unwrap();
+        std::fs::write(dir.join("codex.cmd"), "@echo off\r\necho logged in as %1 %2\r\n").unwrap();
+        let found = exe_in(&dir, "codex").expect("finds the .cmd");
+        assert_eq!(found.extension().unwrap(), "cmd");
+        assert!(exe_in(&dir, "claude").is_none(), "nothing installed");
+        // Spawning the .cmd (path has spaces) works; the extensionless file would give os error 193.
+        let out = crate::oscmd::program_command(&found, &["login", "status"]).output().await.unwrap();
+        assert!(out.status.success());
+        assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "logged in as login status");
+        // Same line through the session shell.
+        let line = format!("{} login status", crate::oscmd::shell_program(&found));
+        let out = crate::oscmd::tokio_shell(&line).output().await.unwrap();
+        assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "logged in as login status");
+        // .exe beats .cmd; only an extensionless file means "not installed".
+        std::fs::copy(std::env::var_os("ComSpec").unwrap(), dir.join("codex.exe")).unwrap();
+        assert_eq!(exe_in(&dir, "codex").unwrap().extension().unwrap(), "exe");
+        std::fs::remove_file(dir.join("codex.exe")).unwrap();
+        std::fs::remove_file(dir.join("codex.cmd")).unwrap();
+        assert!(exe_in(&dir, "codex").is_none(), "never the extensionless shim");
+        std::fs::write(dir.join("codex.ps1"), "Write-Output ps-ok").unwrap();
+        let ps = exe_in(&dir, "codex").unwrap();
+        assert!(crate::oscmd::shell_program(&ps).starts_with("powershell.exe "));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn every_backend_resolves_through_pathext() {
+        let dir = std::env::temp_dir().join(format!("hypurr-shims-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        for b in ["claude", "codex", "gemini", "cursor-agent", "hypurr-agent"] {
+            std::fs::write(dir.join(b), "#!/bin/sh").unwrap();
+            assert!(exe_in(&dir, b).is_none(), "{b}: extensionless only");
+            std::fs::write(dir.join(format!("{b}.cmd")), "@echo off").unwrap();
+            assert_eq!(exe_in(&dir, b).unwrap(), dir.join(format!("{b}.cmd")), "{b}");
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     #[test]
     fn legacy_opencode_id_is_accepted_but_shown_as_hypurr_agent() {

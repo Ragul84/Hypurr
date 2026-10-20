@@ -16,15 +16,17 @@ use std::sync::Mutex;
 use std::time::Duration;
 use tokio::sync::watch;
 
-/// The cloud a fresh host uses, matching the app's environment: debug builds (Xcode Debug)
-/// use dev, release builds use main. Unit tests have none, so they never reach a real cloud.
-pub const DEFAULT_CLOUD_URL: Option<&str> = if cfg!(test) {
-    None
-} else if cfg!(debug_assertions) {
-    Some("https://dev-api.hypurr.dev")
-} else {
-    Some("https://api.hypurr.dev")
-};
+/// The cloud a fresh host uses: none unless the build sets `HYPURR_DEFAULT_CLOUD_URL`.
+/// The cloud isn't deployed yet (`api.hypurr.dev` doesn't resolve), so defaulting to it only
+/// produced retry noise; Wi-Fi pairing never needed it. Unit tests have none either.
+pub const DEFAULT_CLOUD_URL: Option<&str> = if cfg!(test) { None } else { option_env!("HYPURR_DEFAULT_CLOUD_URL") };
+
+/// Built-in placeholder URLs from older builds; a saved one counts as "no cloud".
+const PLACEHOLDER_URLS: [&str; 2] = ["https://api.hypurr.dev", "https://dev-api.hypurr.dev"];
+
+fn is_placeholder(u: &str) -> bool {
+    PLACEHOLDER_URLS.contains(&u.trim_end_matches('/')) && option_env!("HYPURR_DEFAULT_CLOUD_URL").is_none()
+}
 
 /// How long one successful state pull keeps an account device allowed.
 pub const LEASE_MS: i64 = 15 * 60 * 1000;
@@ -59,7 +61,7 @@ pub fn url(store: &Store) -> Option<String> {
         .or_else(|| store.kv_get("cloud_url"))
         .or_else(|| DEFAULT_CLOUD_URL.map(str::to_owned))
         .map(|u| u.trim_end_matches('/').to_owned())
-        .filter(|u| !u.is_empty())
+        .filter(|u| !u.is_empty() && !is_placeholder(u))
 }
 
 /// A cloud URL this host may be pointed at: https, or plain http to this computer (local dev).
@@ -637,6 +639,16 @@ mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
     use super::*;
     use crate::remote::identity::Identity;
+
+    #[test]
+    fn placeholder_cloud_counts_as_off() {
+        let hub = temp_hub();
+        assert_eq!(url(&hub.store), None, "no default cloud");
+        hub.store.kv_set("cloud_url", "https://api.hypurr.dev/").unwrap();
+        assert_eq!(url(&hub.store), None, "the old placeholder is off");
+        hub.store.kv_set("cloud_url", "https://cloud.example.com").unwrap();
+        assert_eq!(url(&hub.store).as_deref(), Some("https://cloud.example.com"));
+    }
 
     fn temp_hub() -> Arc<Hub> {
         let dir = std::env::temp_dir().join(format!("hypurr-cloud-{}", uuid::Uuid::new_v4()));

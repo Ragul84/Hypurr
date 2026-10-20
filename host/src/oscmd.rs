@@ -21,6 +21,66 @@ pub fn std_shell(cmd: &str) -> std::process::Command {
     }
 }
 
+/// How a resolved program file runs on Windows, by extension.
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Launch {
+    Direct,
+    /// `.cmd` / `.bat`: only `cmd.exe` can run these (`CreateProcess` gives os error 193).
+    Cmd,
+    /// `.ps1`: through `powershell -File`.
+    PowerShell,
+}
+
+pub fn launch_kind(path: &Path) -> Launch {
+    match path.extension().and_then(|e| e.to_str()).map(str::to_ascii_lowercase).as_deref() {
+        Some("cmd" | "bat") if cfg!(windows) => Launch::Cmd,
+        Some("ps1") if cfg!(windows) => Launch::PowerShell,
+        _ => Launch::Direct,
+    }
+}
+
+/// `"path"` quoted for the platform shell (double quotes for cmd, single for sh).
+pub fn quote(s: &str) -> String {
+    if cfg!(windows) {
+        if s.chars().all(|c| c.is_ascii_alphanumeric() || "-_./\\:".contains(c)) {
+            s.to_owned()
+        } else {
+            format!("\"{}\"", s.replace('"', ""))
+        }
+    } else if s.chars().all(|c| c.is_ascii_alphanumeric() || "-_./".contains(c)) {
+        s.to_owned()
+    } else {
+        format!("'{}'", s.replace('\'', "'\\''"))
+    }
+}
+
+/// The program part of a shell line for `path` (already run through cmd on Windows).
+pub fn shell_program(path: &Path) -> String {
+    let q = quote(&path.to_string_lossy());
+    match launch_kind(path) {
+        Launch::PowerShell => format!("powershell.exe -NoProfile -ExecutionPolicy Bypass -File {q}"),
+        // cmd already runs .cmd/.bat by name; `call` keeps the line's exit code.
+        Launch::Cmd | Launch::Direct => q,
+    }
+}
+
+/// Runs a resolved program with simple `args`: directly for .exe/unix, via cmd for .cmd/.bat,
+/// via powershell for .ps1.
+pub fn program_command(path: &Path, args: &[&str]) -> tokio::process::Command {
+    match launch_kind(path) {
+        Launch::Direct => {
+            let mut c = tokio::process::Command::new(path);
+            c.args(args);
+            c
+        }
+        Launch::Cmd | Launch::PowerShell => {
+            let line =
+                std::iter::once(shell_program(path)).chain(args.iter().map(|a| quote(a))).collect::<Vec<_>>().join(" ");
+            tokio_shell(&line)
+        }
+    }
+}
+
 /// The platform shell running `cmd` (async).
 pub fn tokio_shell(cmd: &str) -> tokio::process::Command {
     tokio::process::Command::from(std_shell(cmd))
