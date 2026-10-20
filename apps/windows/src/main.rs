@@ -65,6 +65,7 @@ struct App {
     show_qr_override: Option<bool>,
     autostart: bool,
     frames: u32,
+    shot_requested: bool,
     #[cfg(windows)]
     _tray: Option<tray::Tray>,
 }
@@ -107,6 +108,7 @@ impl App {
             host,
             show_qr_override: None,
             frames: 0,
+            shot_requested: false,
             #[cfg(windows)]
             _tray: tray,
         }
@@ -168,7 +170,11 @@ impl eframe::App for App {
         }
         if let Some(path) = &self.args.screenshot {
             self.frames += 1;
-            if self.frames == 4 {
+            // Live runs wait for the first pairing code (or ~30 s) so the shot shows the real QR.
+            let ready =
+                self.args.demo.is_some() || snap.pairing_url.is_some() || self.frames > 1800;
+            if self.frames >= 4 && ready && !self.shot_requested {
+                self.shot_requested = true;
                 ctx.send_viewport_cmd(egui::ViewportCommand::Screenshot(egui::UserData::default()));
             }
             let shot = ctx.input(|i| {
