@@ -112,15 +112,15 @@ fun PairingScreen(
                     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                         SignalCard(Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                                Step(1, "Install Hypurr Agent on your computer")
+                                Step(1, "Start Hypurr on your PC (hypurr-host or the start script)")
                                 Step(2, "Scan the QR it shows, or paste the pairing link")
                                 Step(3, "Run your first task from this phone")
                             }
                         }
                         Spacer(Modifier.height(20.dp))
-                        PrimaryButton("Pair with QR", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Qr), onClick = onScan)
+                        PrimaryButton("Pair with your PC", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Qr), onClick = onScan)
                         Spacer(Modifier.height(12.dp))
-                        SoftButton("Install Hypurr Agent", Modifier.fillMaxWidth(), tint = c.text, onClick = onInstallAgent)
+                        SoftButton("How to set up your PC", Modifier.fillMaxWidth(), tint = c.text, onClick = onInstallAgent)
                         Spacer(Modifier.height(16.dp))
                         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(50)).background(c.surface).border(1.dp, c.border, RoundedCornerShape(50))
                             .padding(start = 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
