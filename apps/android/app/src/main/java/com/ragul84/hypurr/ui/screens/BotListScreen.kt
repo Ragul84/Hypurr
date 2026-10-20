@@ -122,6 +122,8 @@ fun BotListScreen(
     /** When set, show the built-in agent install card (Hypurr Agent free models). */
     builtinInstall: BuiltinInstallPrompt? = null,
     onInstallBuiltin: () -> Unit = {},
+    /** The paired computer's OS ("windows", "linux", "macos"); Windows has no Hypurr Agent build yet. */
+    hostOs: String = "",
     /** Pending asks keyed by bot id — powers one-tap approve on Needs-you cards. */
     asks: Map<String, NeedsYouAsk> = emptyMap(),
     onRespondAsk: (botId: String, entryId: String?, optionId: String?) -> Unit = { _, _, _ -> },
@@ -157,7 +159,7 @@ fun BotListScreen(
         if (synced && bots.isEmpty()) {
             Greeting(computerName, link, now, Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
             builtinInstall?.let { BuiltinInstallCard(it, onInstallBuiltin, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
-            EmptyRoster(onNewTask, onPair = onSettings, onInstall = onInstallBuiltin)
+            EmptyRoster(onNewTask, onPair = onSettings, onInstall = onInstallBuiltin, windows = isWindows(hostOs))
             return@Column
         }
         if (!synced && bots.isEmpty()) {
@@ -452,7 +454,7 @@ private fun TabItem(label: String, icon: ImageVector, active: Boolean, badge: In
 }
 
 @Composable
-private fun EmptyRoster(onNewTask: () -> Unit, onPair: () -> Unit = {}, onInstall: () -> Unit = {}) {
+private fun EmptyRoster(onNewTask: () -> Unit, onPair: () -> Unit = {}, onInstall: () -> Unit = {}, windows: Boolean = false) {
     val c = Hypurr.colors
     Column(
         Modifier.fillMaxSize().padding(horizontal = 20.dp).padding(bottom = 110.dp),
@@ -471,7 +473,7 @@ private fun EmptyRoster(onNewTask: () -> Unit, onPair: () -> Unit = {}, onInstal
         SignalCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
                 listOf(
-                    "Install Hypurr Agent on your computer",
+                    if (windows) "Pick an agent you already have on your PC" else "Install Hypurr Agent on your computer",
                     "Scan the QR, or paste the pairing link",
                     "Run your first task",
                 ).forEachIndexed { i, line ->
@@ -485,7 +487,7 @@ private fun EmptyRoster(onNewTask: () -> Unit, onPair: () -> Unit = {}, onInstal
             }
         }
         Spacer(Modifier.height(18.dp))
-        PrimaryButton("Install Hypurr Agent", Modifier.fillMaxWidth(), onClick = onInstall)
+        PrimaryButton(if (windows) "Use an agent you have" else "Install Hypurr Agent", Modifier.fillMaxWidth(), onClick = onInstall)
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             SoftButton("Pair with QR", Modifier.weight(1f), icon = signalIcon(SignalIcons.Qr), onClick = onPair)

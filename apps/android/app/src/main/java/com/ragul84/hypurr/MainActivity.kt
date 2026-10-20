@@ -215,6 +215,36 @@ class MainActivity : ComponentActivity() {
         var justPaired by remember { mutableStateOf(false) }
         val link by pendingLink.collectAsState()
         val scan by scanned.collectAsState()
+        var setupOpen by remember { mutableStateOf(false) }
+        var setupInstall by remember { mutableStateOf(com.ragul84.hypurr.ui.screens.AgentInstallState()) }
+        fun startScan() {
+            this.scan.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setBeepEnabled(false)
+                .setOrientationLocked(false).setPrompt(getString(R.string.scan_prompt)))
+        }
+        @Composable
+        fun SetupDialog(hello: com.ragul84.hypurr.model.Hello?) {
+            if (!setupOpen) return
+            androidx.compose.ui.window.Dialog(
+                onDismissRequest = { setupOpen = false },
+                properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+            ) {
+                com.ragul84.hypurr.ui.screens.AgentSetupPanel(
+                    hello, setupInstall,
+                    onInstall = {
+                        setupInstall = com.ragul84.hypurr.ui.screens.AgentInstallState(busy = true)
+                        lifecycleScope.launch {
+                            setupInstall = runCatching { store.installBuiltinAgent() }.fold(
+                                { com.ragul84.hypurr.ui.screens.AgentInstallState(done = true) },
+                                { com.ragul84.hypurr.ui.screens.AgentInstallState(error = it.message ?: "the computer didn't say why") },
+                            )
+                        }
+                    },
+                    onPair = { setupOpen = false; startScan() },
+                    onCheckAgain = { store.reconnect() },
+                    onClose = { setupOpen = false },
+                )
+            }
+        }
 
         fun pair(text: String) {
             val parsed = runCatching { Pairing.parse(text) }
@@ -256,16 +286,15 @@ class MainActivity : ComponentActivity() {
             PairingScreen(
                 pairing,
                 onLinkChange = { pairing = pairing.copy(link = it, error = null) },
-                onScan = {
-                    this.scan.launch(ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setBeepEnabled(false)
-                        .setOrientationLocked(false).setPrompt(getString(R.string.scan_prompt)))
-                },
+                onScan = { startScan() },
+                onInstallAgent = { setupOpen = true },
                 onPaste = {
                     val clip = getSystemService(ClipboardManager::class.java).primaryClip
                     clip?.getItemAt(0)?.coerceToText(this)?.toString()?.let { pairing = pairing.copy(link = it.trim(), error = null) }
                 },
                 onPair = { pair(pairing.link) },
             )
+            SetupDialog(null)
             return
         }
 
@@ -298,8 +327,6 @@ class MainActivity : ComponentActivity() {
                 if (projectFolder == null) screen = "folderpick:pair"
             }
         }
-        var builtinBusy by remember { mutableStateOf(false) }
-        var builtinError by remember { mutableStateOf<String?>(null) }
         val incoming by sharedLog.collectAsState()
         LaunchedEffect(incoming) { if (incoming != null) screen = "triage" }
         requested?.let {
@@ -1024,7 +1051,7 @@ class MainActivity : ComponentActivity() {
                     val hello by store.hello.collectAsState()
                     val builtin = hello?.builtinAgent
                     val prompt = if (you?.canAct != false && builtin != null && (builtin.needsInstall || (!builtin.installed && builtin.available))) {
-                        BuiltinInstallPrompt(busy = builtinBusy, error = builtinError, consent = builtin.consent ?: BuiltinInstallPrompt().consent)
+                        BuiltinInstallPrompt(busy = setupInstall.busy, error = setupInstall.error, consent = builtin.consent ?: BuiltinInstallPrompt().consent)
                     } else null
                     val asks = bots.values.filter { it.needsInput }.associate { bot ->
                         val pending = entries[bot.id].orEmpty().asReversed().firstOrNull {
@@ -1061,14 +1088,8 @@ class MainActivity : ComponentActivity() {
                         canCreate = you?.canAct != false,
                         onScreen = if (hello?.screen?.enabled == true && you?.canAct != false) ({ screen = "screen" }) else null,
                         builtinInstall = prompt,
-                        onInstallBuiltin = {
-                            builtinBusy = true; builtinError = null
-                            lifecycleScope.launch {
-                                runCatching { store.installBuiltinAgent() }
-                                    .onFailure { builtinError = it.message ?: "Couldn't install Hypurr Agent" }
-                                builtinBusy = false
-                            }
-                        },
+                        onInstallBuiltin = { setupOpen = true },
+                        hostOs = hello?.os.orEmpty(),
                         asks = asks,
                         onRespondAsk = { _, entryId, optionId ->
                             if (entryId != null) scope.launch { runCatching { store.respond(entryId, optionId) } }
@@ -1076,6 +1097,7 @@ class MainActivity : ComponentActivity() {
                         onSpend = { screen = "spend" },
                         onTasks = { screen = "tasks" },
                     )
+                    SetupDialog(hello)
                 }
             }
         }

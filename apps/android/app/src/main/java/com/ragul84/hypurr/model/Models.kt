@@ -291,6 +291,10 @@ data class Backend(
     val needsInstall: Boolean = false,
     val version: String? = null,
     val consent: String? = null,
+    /** Host's own setup line for this agent (how to install it there). */
+    val installHint: String? = null,
+    /** Whether the agent looks signed in on the computer; null when the host can't tell. */
+    val signedIn: Boolean? = null,
 )
 
 /** A model an agent can run (Hypurr free gateway models, or whatever `agentModels` returns). */
