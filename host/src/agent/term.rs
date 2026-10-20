@@ -262,8 +262,15 @@ async fn run(
         let term = term.clone();
         tokio::task::spawn_blocking(move || {
             let mut buf = vec![0u8; 16 * 1024];
+            let mut answered = !cfg!(windows);
             // EOF or EIO once the child and its children are gone.
             while let Ok(n @ 1..) = reader.read(&mut buf) {
+                // ConPTY asks where the cursor is (`ESC[6n`) and starts nothing until it hears
+                // back. Answer once ourselves so a command runs even before a client attaches.
+                if !answered && buf[..n].windows(4).any(|w| w == b"\x1b[6n") {
+                    answered = true;
+                    let _ = term.input.send(Input::Data(b"\x1b[1;1R".to_vec()));
+                }
                 term.push(&buf[..n]);
             }
         })
