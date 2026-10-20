@@ -324,7 +324,7 @@ mod tests {
     fn install_from_tiny_archive() {
         let dir = std::env::temp_dir().join(format!("hypurr-ha-src-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
-        let bin = dir.join("hypurr-agent");
+        let bin = dir.join(exe_name());
         std::fs::write(&bin, "#!/bin/sh\necho fake\n").unwrap();
         #[cfg(unix)]
         {
@@ -337,7 +337,7 @@ mod tests {
             .arg(&tar)
             .arg("-C")
             .arg(&dir)
-            .arg("hypurr-agent")
+            .arg(exe_name())
             .status()
             .unwrap();
         assert!(status.success());
@@ -347,9 +347,12 @@ mod tests {
         let home = std::env::temp_dir().join(format!("hypurr-ha-home-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&home).unwrap();
         // SAFETY: test-only, single-threaded here.
-        unsafe { std::env::set_var("HYPURR_HOME", &home) };
+        unsafe {
+            std::env::set_var("HYPURR_HOME", &home);
+            std::env::set_var("LOCALAPPDATA", &home);
+        }
 
-        let path = install_from_bytes_for_test(&bytes, "hypurr-agent-linux-x64.tar.gz", &sum, "hypurr-agent").unwrap();
+        let path = install_from_bytes_for_test(&bytes, "hypurr-agent-linux-x64.tar.gz", &sum, exe_name()).unwrap();
         assert!(path.is_file(), "{path:?}");
         assert!(is_installed());
         let _ = std::fs::remove_dir_all(&home);
