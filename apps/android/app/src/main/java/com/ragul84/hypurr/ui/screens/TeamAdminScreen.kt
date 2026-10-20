@@ -42,9 +42,9 @@ import com.ragul84.hypurr.model.Actor
 import com.ragul84.hypurr.model.AuditEntry
 import com.ragul84.hypurr.model.AuditLog
 import com.ragul84.hypurr.model.PolicyInfo
+import com.ragul84.hypurr.model.SpendByPerson
+import com.ragul84.hypurr.model.rupees
 import com.ragul84.hypurr.model.TeamInfo
-import com.ragul84.hypurr.model.costLabel
-import com.ragul84.hypurr.model.limitLabel
 import com.ragul84.hypurr.ui.IconBubble
 import com.ragul84.hypurr.ui.Pill
 import com.ragul84.hypurr.ui.SoftButton
@@ -59,7 +59,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 
-enum class AdminTab(val label: String) { Activity("Activity"), Rules("Rules"), People("People"), Audit("Audit log") }
+enum class AdminTab(val label: String) { Activity("Activity"), People("People"), Rules("Rules"), Spend("₹ Spend"), Audit("Audit") }
 
 data class TeamAdminUiState(
     val you: Actor? = null,
@@ -67,7 +67,10 @@ data class TeamAdminUiState(
     val policies: PolicyInfo? = null,
     val activity: Activity? = null,
     val audit: AuditLog? = null,
+    val spend: SpendByPerson? = null,
     val tab: AdminTab = AdminTab.Activity,
+    /** After an export: "Shared 42 records" or why it failed. */
+    val exportNote: String? = null,
     /** The last save error, in plain words. */
     val error: String? = null,
     val now: Long = System.currentTimeMillis(),
@@ -87,6 +90,7 @@ fun TeamAdminScreen(
     onPolicies: (JsonObject) -> Unit = {},
     onRole: (key: String, role: String?) -> Unit = { _, _ -> },
     onDefaultRole: (String) -> Unit = {},
+    onExportAudit: () -> Unit = {},
 ) {
     val c = Hypurr.colors
     val tabs = if (state.isAdmin) AdminTab.entries else listOf(AdminTab.Rules, AdminTab.People)
@@ -105,10 +109,11 @@ fun TeamAdminScreen(
             Text(it, color = c.needsText, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 10.dp, start = 8.dp))
         }
         when (tab) {
-            AdminTab.Activity -> state.activity?.let { ActivityTab(it, state.now) } ?: Loading()
+            AdminTab.Activity -> state.activity?.let { ActivityTab(it, state.now, state.policies?.policies?.usdToInr ?: 84.0) } ?: Loading()
             AdminTab.Rules -> state.policies?.let { RulesTab(it, state.isAdmin, onPolicies) } ?: Loading()
             AdminTab.People -> state.team?.let { PeopleTab(it, state.isAdmin, state.now, onRole, onDefaultRole) } ?: Loading()
-            AdminTab.Audit -> state.audit?.let { AuditTab(it, state.now) } ?: Loading()
+            AdminTab.Spend -> state.spend?.let { s -> SpendTab(s, state.policies?.policies ?: com.ragul84.hypurr.model.Policies(), state.isAdmin, onPolicies) } ?: Loading()
+            AdminTab.Audit -> state.audit?.let { AuditTab(it, state.now, state.exportNote, onExportAudit) } ?: Loading()
         }
         Spacer(Modifier.height(24.dp))
     }
@@ -156,11 +161,11 @@ private fun roleColor(role: String, c: com.ragul84.hypurr.ui.theme.HypurrColors)
 }
 
 @Composable
-private fun ActivityTab(a: Activity, now: Long) {
+private fun ActivityTab(a: Activity, now: Long, rate: Double) {
     val c = Hypurr.colors
     Section("Last ${a.days} days") {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Stat(costLabel(a.totals.todaySpend, false), "Spent today", Modifier.weight(1f))
+            Stat(rupees(a.totals.todaySpend * rate), "Spent today", Modifier.weight(1f))
             Stat("${a.totals.todayTasks}", "Tasks today", Modifier.weight(1f))
             Stat("${a.totals.approvals}", "Approvals", Modifier.weight(1f))
             Stat("${a.totals.blocked}", "Blocked", Modifier.weight(1f), if (a.totals.blocked > 0) c.danger else c.text)
@@ -176,7 +181,7 @@ private fun ActivityTab(a: Activity, now: Long) {
                     Text(p.name, color = c.text, style = MaterialTheme.typography.titleSmall)
                     val parts = buildList {
                         add("${p.tasks} task${if (p.tasks == 1) "" else "s"}")
-                        if (p.spend > 0) add(costLabel(p.spend, false))
+                        if (p.spend > 0) add(rupees(p.spend * rate))
                         if (p.approvals > 0) add("${p.approvals} approved")
                         if (p.blocked > 0) add("${p.blocked} blocked")
                     }
@@ -220,25 +225,49 @@ private fun RulesTab(info: PolicyInfo, admin: Boolean, onSave: (JsonObject) -> U
         Text("Only admins can change these. They apply to everyone, on every device.", color = c.secondary,
             style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 8.dp, top = 12.dp))
     }
-    Section("Spending limits") {
-        var daily by remember(p.dailyLimit) { mutableStateOf(if (p.dailyLimit > 0) money(p.dailyLimit) else "") }
-        var perTask by remember(p.taskLimit) { mutableStateOf(if (p.taskLimit > 0) money(p.taskLimit) else "") }
-        val dailyText = if (p.dailyLimit > 0) "${costLabel(info.spentToday, false)} of ${limitLabel(p.dailyLimit)} spent today"
-            else "${costLabel(info.spentToday, false)} spent today · no daily limit"
+    val rate = p.usdToInr.takeIf { it > 0 } ?: 84.0
+    Section("Team spending limits") {
+        var daily by remember(p.dailyLimit) { mutableStateOf(if (p.dailyLimit > 0) whole(p.dailyLimit * rate) else "") }
+        var perTask by remember(p.taskLimit) { mutableStateOf(if (p.taskLimit > 0) whole(p.taskLimit * rate) else "") }
+        val spent = rupees(info.spentToday * rate)
+        val dailyText = if (p.dailyLimit > 0) "$spent of ${rupees(p.dailyLimit * rate)} spent today" else "$spent spent today · no daily limit"
         Text(dailyText, color = c.text, style = MaterialTheme.typography.bodyMedium)
-        if (p.dailyLimit > 0) {
-            val f = (info.spentToday / p.dailyLimit).toFloat().coerceIn(0f, 1f)
-            Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)).background(c.border)) {
-                Box(Modifier.fillMaxWidth(f).height(8.dp).clip(RoundedCornerShape(50)).background(if (f >= 0.9f) c.danger else c.accent))
-            }
-        }
+        if (p.dailyLimit > 0) Meter((info.spentToday / p.dailyLimit).toFloat())
         LimitRow("Per day", "Across all tasks. New tasks are refused once it's reached.", daily, admin) { daily = it }
         LimitRow("Per task", "A task over its limit is stopped.", perTask, admin) { perTask = it }
         if (admin) SoftButton("Save limits", Modifier.fillMaxWidth()) {
             onSave(buildJsonObject {
-                put("dailyLimit", daily.toDoubleOrNull() ?: 0.0)
-                put("taskLimit", perTask.toDoubleOrNull() ?: 0.0)
+                put("dailyLimit", (daily.toDoubleOrNull() ?: 0.0) / rate)
+                put("taskLimit", (perTask.toDoubleOrNull() ?: 0.0) / rate)
             })
+        }
+        Text("Agents bill in dollars; shown at ₹${whole(rate)} per \$1 from the pricing config. Per-person limits are under ₹ Spend.",
+            color = c.tertiary, style = MaterialTheme.typography.labelSmall)
+    }
+    Section("Folder rules") {
+        var folders by remember(p.allowedFolders) { mutableStateOf(p.allowedFolders.joinToString("\n")) }
+        Text(if (p.allowedFolders.isEmpty()) "Tasks and bots may work in any folder on this computer."
+            else "Tasks and bots may only work inside these folders.", color = c.secondary, style = MaterialTheme.typography.bodySmall)
+        if (admin) {
+            SmallField(folders, "/Users/asha/work (one per line; empty: any folder)", minLines = 2) { folders = it }
+            SoftButton("Save folders", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Folder)) {
+                onSave(buildJsonObject { putJsonArray("allowedFolders") { lines(folders).forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) } } })
+            }
+        } else p.allowedFolders.forEach { Detail("Folder", it) }
+    }
+    Section("Local-only mode") {
+        ToggleRow("Local-only", "No Hypurr cloud or relay: phones pair on this network only. Agents start only with approved model endpoints.",
+            p.localOnly, admin) { onSave(buildJsonObject { put("localOnly", it) }) }
+        var eps by remember(p.modelEndpoints) { mutableStateOf(p.modelEndpoints.joinToString("\n")) }
+        Text("Approved model endpoints", color = c.text, style = MaterialTheme.typography.titleSmall)
+        if (admin) {
+            SmallField(eps, "https://llm.yourcompany.in/v1 or http://localhost:11434", minLines = 2) { eps = it }
+            SoftButton("Save endpoints", Modifier.fillMaxWidth()) {
+                onSave(buildJsonObject { putJsonArray("modelEndpoints") { lines(eps).forEach { add(kotlinx.serialization.json.JsonPrimitive(it)) } } })
+            }
+        } else if (p.modelEndpoints.isEmpty()) Detail("Endpoints", "None") else p.modelEndpoints.forEach { Detail("Endpoint", it) }
+        if (p.localOnly && p.modelEndpoints.isEmpty()) {
+            Text("No endpoint approved yet, so agents won't start.", color = c.needsText, style = MaterialTheme.typography.bodySmall)
         }
     }
     Section("Allowed agents") {
@@ -316,7 +345,70 @@ private fun platformName(p: String) = when (p) {
     else -> p.replaceFirstChar(Char::uppercase)
 }
 
-private fun money(x: Double) = String.format(java.util.Locale.US, "%.2f", x)
+private fun whole(x: Double) = Math.round(x).toString()
+
+private fun lines(s: String) = s.split('\n', ',').map { it.trim() }.filter { it.isNotEmpty() }
+
+@Composable
+private fun Meter(fraction: Float) {
+    val c = Hypurr.colors
+    val f = fraction.coerceIn(0f, 1f)
+    Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)).background(c.border)) {
+        Box(Modifier.fillMaxWidth(f).height(8.dp).clip(RoundedCornerShape(50)).background(if (f >= 0.9f) c.danger else c.text))
+    }
+}
+
+@Composable
+private fun SpendTab(s: SpendByPerson, p: com.ragul84.hypurr.model.Policies, admin: Boolean, onSave: (JsonObject) -> Unit) {
+    val c = Hypurr.colors
+    Row(Modifier.padding(top = 16.dp).fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+        Column(Modifier.weight(1f)) {
+            com.ragul84.hypurr.ui.DotFigure(rupees(s.teamMonthInr), com.ragul84.hypurr.ui.theme.SignalType.figure, c.text)
+            Text(if (s.teamMonthlyInr > 0) "this month, of ${rupees(s.teamMonthlyInr)} for the team" else "this month · no team limit",
+                color = c.tertiary, style = MaterialTheme.typography.labelMedium)
+        }
+    }
+    if (s.teamMonthlyInr > 0) Box(Modifier.padding(top = 10.dp)) { Meter((s.teamMonthInr / s.teamMonthlyInr).toFloat()) }
+    Section("Limits for each person") {
+        var day by remember(p.personDailyInr) { mutableStateOf(if (p.personDailyInr > 0) whole(p.personDailyInr) else "") }
+        var month by remember(p.personMonthlyInr) { mutableStateOf(if (p.personMonthlyInr > 0) whole(p.personMonthlyInr) else "") }
+        var team by remember(p.teamMonthlyInr) { mutableStateOf(if (p.teamMonthlyInr > 0) whole(p.teamMonthlyInr) else "") }
+        LimitRow("Per person, per day", "Their new tasks wait until tomorrow.", day, admin) { day = it }
+        LimitRow("Per person, per month", "Counts from the 1st.", month, admin) { month = it }
+        LimitRow("Whole team, per month", "Everyone's tasks together.", team, admin) { team = it }
+        if (admin) SoftButton("Save limits", Modifier.fillMaxWidth()) {
+            onSave(buildJsonObject {
+                put("personDailyInr", day.toDoubleOrNull() ?: 0.0)
+                put("personMonthlyInr", month.toDoubleOrNull() ?: 0.0)
+                put("teamMonthlyInr", team.toDoubleOrNull() ?: 0.0)
+            })
+        }
+    }
+    Section("People") {
+        if (s.people.isEmpty()) Text("No spend yet this month.", color = c.secondary, style = MaterialTheme.typography.bodySmall)
+        s.people.forEach { person ->
+            val over = (person.dailyInr > 0 && person.todayInr >= person.dailyInr) || (person.monthlyInr > 0 && person.monthInr >= person.monthlyInr)
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(person.name, color = c.text, style = MaterialTheme.typography.titleSmall)
+                        Text(buildString {
+                            append("${rupees(person.todayInr)} today")
+                            if (person.dailyInr > 0) append(" of ${rupees(person.dailyInr)}")
+                            if (person.custom) append(" · own limit")
+                        }, color = if (over) c.needsText else c.secondary, style = MaterialTheme.typography.bodySmall)
+                    }
+                    com.ragul84.hypurr.ui.DotFigure(rupees(person.monthInr), com.ragul84.hypurr.ui.theme.SignalType.figureSmall, if (over) c.danger else c.text)
+                }
+                if (person.monthlyInr > 0) Meter((person.monthInr / person.monthlyInr).toFloat())
+                Text(if (person.monthlyInr > 0) "this month, of ${rupees(person.monthlyInr)}" else "this month · no monthly limit",
+                    color = c.tertiary, style = MaterialTheme.typography.labelSmall)
+            }
+        }
+    }
+    Text("Limits are checked on the computer before each task and while it runs. Spend is converted at ₹${whole(s.usdToInr)} per \$1.",
+        color = c.tertiary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 8.dp, top = 14.dp, end = 8.dp))
+}
 
 @Composable
 private fun LimitRow(title: String, subtitle: String, value: String, enabled: Boolean, onChange: (String) -> Unit) {
@@ -329,7 +421,7 @@ private fun LimitRow(title: String, subtitle: String, value: String, enabled: Bo
         Spacer(Modifier.width(10.dp))
         Row(Modifier.width(112.dp).clip(RoundedCornerShape(14.dp)).background(c.surface2).padding(horizontal = 10.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically) {
-            Text("$", color = c.secondary)
+            Text("₹", color = c.secondary)
             Spacer(Modifier.width(4.dp))
             Box {
                 if (value.isEmpty()) Text("No limit", color = c.tertiary, style = MaterialTheme.typography.bodyMedium)
@@ -384,7 +476,7 @@ private fun PeopleTab(team: TeamInfo, admin: Boolean, now: Long, onRole: (String
 }
 
 @Composable
-private fun AuditTab(log: AuditLog, now: Long) {
+private fun AuditTab(log: AuditLog, now: Long, note: String?, onExport: () -> Unit) {
     val c = Hypurr.colors
     val ok = log.intact
     Row(Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(18.dp))
@@ -398,6 +490,11 @@ private fun AuditTab(log: AuditLog, now: Long) {
                 style = MaterialTheme.typography.bodySmall)
         }
     }
+    Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        SoftButton("Export CSV", Modifier.weight(1f), icon = signalIcon(SignalIcons.File), onClick = onExport)
+    }
+    Text(note ?: "Opens the share sheet with every record, oldest first. Nothing is sent until you pick an app.",
+        color = c.tertiary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 8.dp, top = 6.dp))
     Section("Newest first") {
         if (log.entries.isEmpty()) Text("Nothing yet.", color = c.secondary, style = MaterialTheme.typography.bodySmall)
         log.entries.forEach { AuditRow(it, now) }

@@ -31,6 +31,8 @@ export default function Home() {
             <a href={GITHUB} className="font-medium text-on-surface underline underline-offset-4 hover:text-primary">Code on GitHub</a>
           </p>
           <div className="flex gap-6">
+            <Link href="/pricing" className="transition hover:text-on-surface">Pricing</Link>
+            <Link href="/it" className="transition hover:text-on-surface">For IT</Link>
             <Link href="/terms" className="transition hover:text-on-surface">Terms</Link>
             <Link href="/privacy" className="transition hover:text-on-surface">Privacy</Link>
             <a href={`${GITHUB}/issues`} className="transition hover:text-on-surface">Contact</a>

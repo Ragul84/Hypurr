@@ -5,6 +5,15 @@ import com.ragul84.hypurr.model.Actor
 import com.ragul84.hypurr.model.AuditLog
 import com.ragul84.hypurr.model.Backend
 import com.ragul84.hypurr.model.Bot
+import com.ragul84.hypurr.model.TicketSetup
+import com.ragul84.hypurr.model.QaCase
+import com.ragul84.hypurr.model.QaCasesResult
+import com.ragul84.hypurr.model.QaRunResult
+import com.ragul84.hypurr.model.TicketResolve
+import com.ragul84.hypurr.model.TicketPlanResult
+import com.ragul84.hypurr.model.TicketPlan
+import com.ragul84.hypurr.model.TicketReview
+import com.ragul84.hypurr.model.TicketPr
 import com.ragul84.hypurr.model.PolicyInfo
 import com.ragul84.hypurr.model.TeamInfo
 import com.ragul84.hypurr.model.Computer
@@ -454,6 +463,29 @@ class HypurrStore(
         return bot.id
     }
 
+    // MARK: Ticket to PR
+    suspend fun qaCases(source: String, input: String, project: String?): QaCasesResult = cl().qaCases(source, input, project)
+    suspend fun qaAutomate(cases: List<QaCase>, framework: String, project: String): String {
+        val bot = cl().qaAutomate(cases, framework, project)
+        upsert(bot)
+        return bot.id
+    }
+    suspend fun qaSaveCases(project: String, cases: List<QaCase>, input: String, source: String) = cl().qaSaveCases(project, cases, input, source)
+    suspend fun qaSavedCases(project: String) = cl().qaSavedCases(project)
+    suspend fun qaRun(taskId: String): QaRunResult = cl().qaRun(taskId)
+
+    private fun cl() = client ?: throw HostException.unreachable()
+    suspend fun ticketSetup(): TicketSetup = cl().ticketSetup()
+    suspend fun ticketResolve(input: String, project: String?): TicketResolve = cl().ticketResolve(input, project)
+    suspend fun ticketPlan(ticket: Issue, project: String): TicketPlanResult = cl().ticketPlan(ticket, project)
+    suspend fun ticketStart(ticket: Issue, plan: TicketPlan, project: String): String {
+        val bot = cl().ticketStart(ticket, plan, project)
+        upsert(bot)
+        return bot.id
+    }
+    suspend fun ticketReview(taskId: String): TicketReview = cl().ticketReview(taskId)
+    suspend fun ticketPublish(taskId: String, title: String, body: String): TicketPr = cl().ticketPublish(taskId, title, body)
+
     /** Open GitHub issues and Jira tickets to start a task from. */
     suspend fun issues(): IssueList = client?.issues() ?: IssueList()
 
@@ -463,6 +495,16 @@ class HypurrStore(
         need().triage(text, project, mode, previous)
     suspend fun triageSources(project: String) = need().triageSources(project).sources
     suspend fun triageSource(project: String, kind: String, id: String) = need().triageSource(project, kind, id).text
+    suspend fun standup(projects: List<String>, useAgent: Boolean = true) =
+        (client ?: throw HostException.unreachable()).standup(projects, useAgent)
+
+    /** `null` when this phone isn't an admin (the host refuses) or the computer is unreachable. */
+    suspend fun teamStandup() = runCatching { client?.teamStandup() }.getOrNull()
+
+    suspend fun standupReminder() = runCatching { client?.standupReminder()?.reminder }.getOrNull()
+
+    suspend fun setStandupReminder(enabled: Boolean, time: String, timeZone: String) =
+        (client ?: throw HostException.unreachable()).setStandupReminder(enabled, time, timeZone).reminder
 
     // MARK: work tools and costs
 
@@ -554,6 +596,27 @@ class HypurrStore(
     private val _audit = MutableStateFlow<AuditLog?>(null)
     val audit: StateFlow<AuditLog?> = _audit.asStateFlow()
 
+    private val _spend = MutableStateFlow<com.ragul84.hypurr.model.SpendByPerson?>(null)
+    val spendByPerson: StateFlow<com.ragul84.hypurr.model.SpendByPerson?> = _spend.asStateFlow()
+    private val _itKit = MutableStateFlow<com.ragul84.hypurr.model.ItKit?>(null)
+    val itKit: StateFlow<com.ragul84.hypurr.model.ItKit?> = _itKit.asStateFlow()
+    private val _pricing = MutableStateFlow<com.ragul84.hypurr.model.Pricing?>(null)
+    val pricing: StateFlow<com.ragul84.hypurr.model.Pricing?> = _pricing.asStateFlow()
+
+    suspend fun loadItKit() {
+        val c = client ?: return
+        runCatching { c.itKit() }.getOrNull()?.let { _itKit.value = it }
+    }
+
+    suspend fun loadPricing() {
+        val c = client ?: return
+        runCatching { c.pricing() }.getOrNull()?.let { _pricing.value = it }
+    }
+
+    /** The audit log as a CSV file, for the share sheet (admins only). */
+    suspend fun auditExport(): com.ragul84.hypurr.model.AuditExport =
+        client?.auditExport("csv") ?: throw HostException.unreachable()
+
     /** Loads what the Team admin screen shows; admin-only parts are skipped for others. */
     suspend fun loadAdmin() {
         val c = client ?: return
@@ -565,6 +628,7 @@ class HypurrStore(
         if (_you.value?.isAdmin != false) {
             runCatching { c.activity() }.getOrNull()?.let { _activity.value = it }
             runCatching { c.auditLog() }.getOrNull()?.let { _audit.value = it }
+            runCatching { c.spendByPerson() }.getOrNull()?.let { _spend.value = it }
         }
     }
 
@@ -579,6 +643,7 @@ class HypurrStore(
         _policies.value = saved
         _setup.update { it?.copy(safety = saved.safety) }
         runCatching { client?.auditLog() }.getOrNull()?.let { _audit.value = it }
+        runCatching { client?.spendByPerson() }.getOrNull()?.let { _spend.value = it }
     }
 
     suspend fun setRole(key: String, role: String?) {

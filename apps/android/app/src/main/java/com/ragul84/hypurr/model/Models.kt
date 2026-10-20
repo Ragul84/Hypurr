@@ -363,6 +363,8 @@ data class Checkpoint(val id: String, val label: String = "", val at: Long = 0, 
 @Serializable
 data class TaskInfo(
     val id: String,
+    /** Set when the task came from Ticket to PR: the approved plan and, later, the pull request. */
+    val ticket: TicketExtra? = null,
     val botId: String = "",
     val goal: String = "",
     val title: String = "",
@@ -466,7 +468,107 @@ data class Policies(
     val askFrom: String = "high",
     /** low | medium | high | off: at or above, only an admin approves. */
     val adminApprovesFrom: String = "off",
+    /** ₹ per person per day / month; 0 means no limit. */
+    val personDailyInr: Double = 0.0,
+    val personMonthlyInr: Double = 0.0,
+    /** Overrides by device key. */
+    val personLimits: Map<String, PersonLimit> = emptyMap(),
+    val teamMonthlyInr: Double = 0.0,
+    /** Enforced on the computer: no Hypurr cloud, LAN pairing, approved model endpoints only. */
+    val localOnly: Boolean = false,
+    val modelEndpoints: List<String> = emptyList(),
+    /** Folder rules: tasks and bots only inside these. Empty: any folder. */
+    val allowedFolders: List<String> = emptyList(),
+    val usdToInr: Double = 84.0,
 )
+
+@Serializable
+data class PersonLimit(val dailyInr: Double = 0.0, val monthlyInr: Double = 0.0)
+
+/** `spendByPerson`: this month's and today's spend in rupees, per person. */
+@Serializable
+data class PersonSpend(
+    val key: String = "",
+    val name: String = "",
+    val todayInr: Double = 0.0,
+    val monthInr: Double = 0.0,
+    val dailyInr: Double = 0.0,
+    val monthlyInr: Double = 0.0,
+    val custom: Boolean = false,
+)
+
+@Serializable
+data class SpendByPerson(
+    val people: List<PersonSpend> = emptyList(),
+    val teamMonthInr: Double = 0.0,
+    val teamMonthlyInr: Double = 0.0,
+    val usdToInr: Double = 84.0,
+)
+
+/** `auditExport`: a file to share. */
+@Serializable
+data class AuditExport(
+    val text: String = "",
+    val mime: String = "text/csv",
+    val fileName: String = "hypurr-audit.csv",
+    val rows: Int = 0,
+    val total: Int = 0,
+    val intact: Boolean = true,
+    val brokenAt: Long? = null,
+)
+
+@Serializable
+data class ItKitPage(val id: String = "", val title: String = "", val markdown: String = "")
+
+/** `itKit`: the IT approval kit with this computer's live values. */
+@Serializable
+data class ItKit(
+    val facts: List<String> = emptyList(),
+    val pages: List<ItKitPage> = emptyList(),
+    val text: String = "",
+    val port: Int = 19222,
+    val cloud: String? = null,
+)
+
+@Serializable
+data class Plan(
+    val id: String = "",
+    val name: String = "",
+    /** Rupees; null: not decided yet. */
+    val priceInr: Double? = null,
+    val per: String = "",
+    val tasksPerDay: Int? = null,
+    val summary: String = "",
+    val features: List<String> = emptyList(),
+)
+
+@Serializable
+data class Payments(val provider: String = "", val ready: Boolean = false)
+
+/** `pricing`: plans from pricing/plans.json, in rupees. */
+@Serializable
+data class Pricing(
+    val currency: String = "INR",
+    val symbol: String = "₹",
+    val gstNote: String = "",
+    val plans: List<Plan> = emptyList(),
+    val payments: Payments = Payments(),
+)
+
+/** ₹1,23,456 (Indian grouping), whole rupees. */
+fun rupees(amount: Double): String {
+    val n = Math.round(amount).coerceAtLeast(0).toString()
+    if (n.length <= 3) return "₹$n"
+    val head = n.dropLast(3)
+    val grouped = head.reversed().chunked(2).joinToString(",").reversed()
+    return "₹$grouped,${n.takeLast(3)}"
+}
+
+fun planPrice(p: Plan): String = when {
+    p.priceInr == null -> "Price to be announced"
+    p.priceInr <= 0.0 -> "Free"
+    else -> "${rupees(p.priceInr)} / ${p.per}"
+}
 
 @Serializable
 data class PolicyInfo(
@@ -633,3 +735,172 @@ data class TriageSources(val sources: List<TriageSource> = emptyList())
 
 @Serializable
 data class TriageSourceText(val text: String = "")
+// Daily standup (host `standup`, `teamStandup`, `standupReminder`).
+
+@Serializable
+data class Standup(
+    val yesterday: List<String> = emptyList(),
+    val today: List<String> = emptyList(),
+    val blockers: List<String> = emptyList(),
+)
+
+@Serializable
+data class StandupCommit(val project: String = "", val sha: String = "", val subject: String = "", val at: Long = 0, val today: Boolean = false)
+
+@Serializable
+data class StandupTask(
+    val title: String = "",
+    val project: String = "",
+    val status: String = "",
+    val today: Boolean = false,
+    val waiting: Boolean = false,
+    val pr: String? = null,
+    val ticket: String? = null,
+)
+
+@Serializable
+data class StandupFacts(
+    val projects: List<String> = emptyList(),
+    val commits: List<StandupCommit> = emptyList(),
+    val tasks: List<StandupTask> = emptyList(),
+)
+
+@Serializable
+data class StandupResult(
+    val standup: Standup = Standup(),
+    val text: String = "",
+    /** `agent` when an agent wrote it, `facts` for the plain draft. */
+    val by: String = "facts",
+    val facts: StandupFacts = StandupFacts(),
+    val date: String = "",
+)
+
+@Serializable
+data class StandupReminder(val enabled: Boolean = false, val time: String = "09:30", val timeZone: String = "Asia/Kolkata")
+
+@Serializable
+data class StandupReminderReply(val reminder: StandupReminder? = null)
+
+@Serializable
+data class TeamStandupPerson(
+    val key: String = "",
+    val name: String? = null,
+    val yesterday: List<String> = emptyList(),
+    val today: List<String> = emptyList(),
+    val finished: Int = 0,
+    val open: Int = 0,
+)
+
+@Serializable
+data class TeamStandup(val available: Boolean = false, val reason: String? = null, val people: List<TeamStandupPerson> = emptyList())
+// MARK: Ticket to PR (host `ticket.rs`)
+
+@Serializable
+data class PlanFile(val path: String = "", val why: String = "", val exists: Boolean = true)
+
+@Serializable
+data class TicketPlan(
+    val understood: String = "",
+    val files: List<PlanFile> = emptyList(),
+    val checks: List<String> = emptyList(),
+    val tests: List<String> = emptyList(),
+    val testCommand: String = "",
+)
+
+@Serializable
+data class TicketResolve(val ticket: Issue? = null, val needsSetup: String? = null, val key: String = "")
+
+@Serializable
+data class TicketPlanResult(val plan: TicketPlan = TicketPlan(), val by: String = "ticket")
+
+@Serializable
+data class TicketPublishInfo(
+    /** github | gitlab | azure | other | none */
+    val provider: String = "none",
+    /** How the PR would be opened; empty: copy the description instead. */
+    val via: String = "",
+    val branch: String = "",
+    val base: String = "",
+    val protected: Boolean = false,
+)
+
+@Serializable
+data class TicketPr(
+    val pushed: Boolean = false,
+    val branch: String = "",
+    val provider: String = "",
+    val url: String? = null,
+    val number: Long? = null,
+    /** No PR tool signed in: the user copies the description. */
+    val copy: Boolean = false,
+    val error: String? = null,
+)
+
+@Serializable
+data class TicketExtra(val plan: TicketPlan? = null, val pr: TicketPr? = null)
+
+@Serializable
+data class TicketReview(
+    val ticket: Issue = Issue("text", ""),
+    val files: List<FileChange> = emptyList(),
+    val summary: String = "",
+    val by: String = "files",
+    val prTitle: String = "",
+    val prBody: String = "",
+    val comment: String = "",
+    val publish: TicketPublishInfo = TicketPublishInfo(),
+    val pr: TicketPr? = null,
+    val testCommand: String = "",
+)
+
+@Serializable
+data class TicketCli(val gh: Boolean = false, val glab: Boolean = false, val az: Boolean = false)
+
+@Serializable
+data class TicketSetup(val integrations: Integrations = Integrations(), val cli: TicketCli = TicketCli())
+
+// MARK: QA test writer (host `qa.rs`)
+
+@Serializable
+data class QaCase(
+    val id: String = "",
+    val title: String = "",
+    val steps: List<String> = emptyList(),
+    val expected: String = "",
+    /** high | medium | low */
+    val priority: String = "medium",
+    /** positive | negative | edge */
+    val kind: String = "positive",
+    val why: String = "",
+    val automatable: Boolean = false,
+)
+
+@Serializable
+data class QaFramework(val id: String = "", val name: String = "", val command: String = "", val needsDevice: Boolean = false)
+
+@Serializable
+data class QaCasesResult(
+    val cases: List<QaCase> = emptyList(),
+    val by: String = "template",
+    val frameworks: List<QaFramework> = emptyList(),
+    val ticket: Issue? = null,
+    val needsSetup: String? = null,
+    val explain: Boolean = false,
+)
+
+@Serializable
+data class QaSaved(val cases: List<QaCase> = emptyList(), val input: String = "", val source: String = "text", val savedAt: Long = 0)
+
+@Serializable
+data class QaRunResult(
+    val ok: Boolean = false,
+    val passed: Long = 0,
+    val failed: Long = 0,
+    val timedOut: Boolean = false,
+    val command: String = "",
+    val seconds: Long = 0,
+    val output: String = "",
+    val automated: List<String> = emptyList(),
+    val manual: List<String> = emptyList(),
+    val needsDevice: Boolean = false,
+)

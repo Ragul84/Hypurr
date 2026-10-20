@@ -33,6 +33,9 @@ static GONE: Mutex<Vec<String>> = Mutex::new(Vec::new());
 const SWIFT_REFERENCE_EPOCH: f64 = 978_307_200.0;
 
 fn relay_url(hub: &Hub) -> Option<String> {
+    if crate::admin::local_only::on(&hub.store) {
+        return None;
+    }
     std::env::var("HYPURR_RELAY_URL").ok().or_else(|| hub.store.kv_get("relay_url")).filter(|u| !u.is_empty())
 }
 

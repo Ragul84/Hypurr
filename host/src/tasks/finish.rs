@@ -83,7 +83,9 @@ pub async fn finish(hub: &Arc<Hub>, task_id: &str, b: &Value) -> Result<Value> {
         bail!("the agent is still working; wait for it or stop it first");
     }
     let cfg = Integrations::load(&hub.store);
-    let open_pr = b["openPr"].as_bool().unwrap_or(cfg.auto_pr);
+    // Ticket to PR uploads only after its own Needs-you approval.
+    let ticket = task.extra.contains_key("ticket");
+    let open_pr = !ticket && b["openPr"].as_bool().unwrap_or(cfg.auto_pr);
     let notify = b["notify"].as_bool().unwrap_or(cfg.notify);
     let learning = b["learning"].as_bool().unwrap_or(cfg.learning);
     {
@@ -202,6 +204,7 @@ async fn complete_inner(hub: &Arc<Hub>, task_id: &str, summary: Option<String>) 
     // Jira comment.
     if let Some(issue) = task.issue().filter(|i| i.source == "jira")
         && cfg.jira_ready()
+        && !task.extra.contains_key("ticket")
     {
         let text = format!("Hypurr finished “{}”.\n{summary}", task.title);
         match jira::comment(&cfg.jira, &issue.key, &text, pr_url.as_deref()).await {

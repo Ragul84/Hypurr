@@ -3,6 +3,15 @@ package com.ragul84.hypurr.net
 import com.ragul84.hypurr.data.DeviceIdentity
 import com.ragul84.hypurr.model.Backend
 import com.ragul84.hypurr.model.Bot
+import com.ragul84.hypurr.model.TicketSetup
+import com.ragul84.hypurr.model.QaCase
+import com.ragul84.hypurr.model.QaCasesResult
+import com.ragul84.hypurr.model.QaRunResult
+import com.ragul84.hypurr.model.TicketResolve
+import com.ragul84.hypurr.model.TicketPlanResult
+import com.ragul84.hypurr.model.TicketPlan
+import com.ragul84.hypurr.model.TicketReview
+import com.ragul84.hypurr.model.TicketPr
 import com.ragul84.hypurr.model.Computer
 import com.ragul84.hypurr.model.Entry
 import com.ragul84.hypurr.model.Hello
@@ -336,6 +345,68 @@ class HostClient(val transport: ChannelTransport) {
 
     suspend fun taskCosts(): TaskCosts = call("taskCosts")
 
+    // QA test writer
+    suspend fun qaCases(source: String, input: String, project: String?): QaCasesResult = call("qaCases", buildJsonObject {
+        put("source", source); put("input", input); project?.let { put("project", it) }
+    }, timeoutMs = 180_000)
+
+    suspend fun qaAutomate(cases: List<QaCase>, framework: String, project: String): Bot {
+        val res = transport.call("qaAutomate", buildJsonObject {
+            put("cases", HypurrJson.encodeToJsonElement(kotlinx.serialization.builtins.ListSerializer(QaCase.serializer()), cases))
+            put("framework", framework); put("project", project)
+        }, timeoutMs = 120_000)
+        return HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("bot"))
+    }
+
+    suspend fun qaSaveCases(project: String, cases: List<QaCase>, input: String, source: String) {
+        transport.call("qaSaveCases", buildJsonObject {
+            put("project", project); put("input", input); put("source", source)
+            put("cases", HypurrJson.encodeToJsonElement(kotlinx.serialization.builtins.ListSerializer(QaCase.serializer()), cases))
+        })
+    }
+
+    suspend fun qaSavedCases(project: String): com.ragul84.hypurr.model.QaSaved =
+        call("qaSavedCases", buildJsonObject { put("project", project) })
+
+    suspend fun qaRun(taskId: String): QaRunResult {
+        val res = transport.call("qaRun", buildJsonObject { put("taskId", taskId) }, timeoutMs = 960_000)
+        return HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("result"))
+    }
+
+    // Ticket to PR
+    suspend fun ticketSetup(): TicketSetup = call("ticketSetup", timeoutMs = 30_000)
+
+    suspend fun ticketResolve(input: String, project: String?): TicketResolve =
+        call("ticketResolve", buildJsonObject { put("input", input); project?.let { put("project", it) } }, timeoutMs = 45_000)
+
+    suspend fun ticketPlan(ticket: Issue, project: String): TicketPlanResult = call("ticketPlan", buildJsonObject {
+        put("ticket", HypurrJson.encodeToJsonElement(Issue.serializer(), ticket))
+        put("project", project)
+    }, timeoutMs = 180_000)
+
+    suspend fun ticketStart(ticket: Issue, plan: TicketPlan, project: String): Bot {
+        val res = transport.call("ticketStart", buildJsonObject {
+            put("ticket", HypurrJson.encodeToJsonElement(Issue.serializer(), ticket))
+            put("plan", HypurrJson.encodeToJsonElement(TicketPlan.serializer(), plan))
+            put("project", project)
+        }, timeoutMs = 120_000)
+        return HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("bot"))
+    }
+
+    suspend fun ticketReview(taskId: String): TicketReview =
+        call("ticketReview", buildJsonObject { put("taskId", taskId) }, timeoutMs = 180_000)
+
+    /** Uploads the branch and opens the PR. Only called from the Needs-you approval. */
+    suspend fun ticketPublish(taskId: String, title: String, body: String): TicketPr {
+        val res = transport.call("ticketPublish", buildJsonObject {
+            put("taskId", taskId)
+            put("approved", true)
+            put("title", title)
+            put("body", body)
+        }, timeoutMs = 120_000)
+        return HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("pr"))
+    }
+
     suspend fun saveTemplate(template: TaskTemplate): TaskTemplate {
         val res = transport.call("saveTemplate", HypurrJson.encodeToJsonElement(TaskTemplate.serializer(), template).jsonObject)
         return HypurrJson.decodeFromJsonElement(res.jsonObject.getValue("template"))
@@ -363,6 +434,15 @@ class HostClient(val transport: ChannelTransport) {
     suspend fun setTeam(defaultRole: String): TeamInfo = call("setTeam", buildJsonObject { put("defaultRole", defaultRole) })
 
     suspend fun policies(): PolicyInfo = call("policies")
+
+    suspend fun spendByPerson(): com.ragul84.hypurr.model.SpendByPerson = call("spendByPerson")
+
+    suspend fun auditExport(format: String = "csv"): com.ragul84.hypurr.model.AuditExport =
+        call("auditExport", buildJsonObject { put("format", format) })
+
+    suspend fun itKit(): com.ragul84.hypurr.model.ItKit = call("itKit")
+
+    suspend fun pricing(): com.ragul84.hypurr.model.Pricing = call("pricing")
 
     /** Partial update of the team rules and the safety net settings. */
     suspend fun setPolicies(patch: JsonObject): PolicyInfo = call("setPolicies", patch)
@@ -394,6 +474,23 @@ class HostClient(val transport: ChannelTransport) {
             put("kind", kind)
             put("id", id)
         }, timeoutMs = 60_000)
+    /** The agent may take a minute to write it; the host falls back to a plain draft. */
+    suspend fun standup(projects: List<String>, useAgent: Boolean = true): com.ragul84.hypurr.model.StandupResult =
+        call("standup", buildJsonObject {
+            put("projects", kotlinx.serialization.json.JsonArray(projects.map { kotlinx.serialization.json.JsonPrimitive(it) }))
+            put("useAgent", useAgent)
+        }, timeoutMs = 150_000)
+
+    suspend fun teamStandup(): com.ragul84.hypurr.model.TeamStandup = call("teamStandup")
+
+    suspend fun standupReminder(): com.ragul84.hypurr.model.StandupReminderReply = call("standupReminder")
+
+    suspend fun setStandupReminder(enabled: Boolean, time: String, timeZone: String): com.ragul84.hypurr.model.StandupReminderReply =
+        call("setStandupReminder", buildJsonObject {
+            put("enabled", enabled)
+            put("time", time)
+            put("timeZone", timeZone)
+        })
 
     fun events(since: Long): Flow<HostEvent> = transport.events(since).mapNotNull(HostEvent::parse)
 }

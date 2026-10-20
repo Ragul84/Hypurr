@@ -865,6 +865,7 @@ impl Actor {
             self.hub.set_runtime(&self.id(), |r| r.activity = "Starting agent…".into());
             // Keys saved from an "environment variable" sign-in.
             let env = crate::agent::auth::env(&self.hub.store, &self.cfg.backend)?;
+            crate::admin::local_only::check_agent(&self.hub.store, &self.cfg.backend, &env)?;
             let mut last_err = None;
             for (i, command) in candidates.iter().enumerate() {
                 let fallback_left = i + 1 < candidates.len();

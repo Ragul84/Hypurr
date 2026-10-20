@@ -190,7 +190,7 @@ class ScreenshotTest {
     // Stage C: team admin.
 
     private fun admin(tab: AdminTab, you: com.ragul84.hypurr.model.Actor = Samples.admin) = TeamAdminUiState(
-        you, Samples.team.copy(you = you), Samples.policies, Samples.activity, Samples.auditLog, tab, now = Samples.NOW)
+        you, Samples.team.copy(you = you), Samples.policies, Samples.activity, Samples.auditLog, tab = tab, now = Samples.NOW)
 
     @Test
     @Config(qualifiers = "w412dp-h1500dp-xxhdpi")
