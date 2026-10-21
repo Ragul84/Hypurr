@@ -737,9 +737,13 @@ pub fn costs(store: &Store) -> Result<Value> {
         // Hypurr gateway (Stage F): host may refresh these from cloud `/v1/gateway/balance`.
         "gatewayFreeRemaining": std::env::var("HYPURR_GATEWAY_FREE_REMAINING").ok().unwrap_or_else(|| "—".into()),
         "gatewayCreditsLabel": std::env::var("HYPURR_GATEWAY_CREDITS").ok().unwrap_or_else(|| "—".into()),
-        "buyCreditsUrl": std::env::var("HYPURR_BUY_CREDITS_URL").ok().unwrap_or_else(|| {
-            "https://checkout.stripe.com/c/pay/cs_test_placeholder".into()
-        }),
+        // Web checkout (Razorpay later); none by default. Credits are bought in the app via Google Play.
+        "buyCreditsUrl": std::env::var("HYPURR_BUY_CREDITS_URL").ok().filter(|u| !u.is_empty()),
+        // RevenueCat app user id for in-app credit purchases: the gateway subject of this computer.
+        "gatewayAppUserId": crate::agent::builtin::gateway_subject(store),
+        // Free messages today (Hypurr's models); absent when this computer has no gateway.
+        "freeTurnsLeft": crate::agent::builtin::gateway_ready().then(|| crate::agent::builtin::free_messages_left(store)),
+        "freeTurnsLimit": crate::agent::builtin::gateway_ready().then_some(crate::agent::builtin::FREE_MESSAGES_PER_DAY),
     }))
 }
 

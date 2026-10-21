@@ -12,7 +12,11 @@
       "per": "forever",
       "tasksPerDay": 5,
       "summary": "For trying Hypurr on your own laptop.",
-      "features": ["Up to 5 tasks a day", "Safe branches, approvals and undo", "Your own model keys"]
+      "features": [
+        "10 free messages with Hypurr's models",
+        "Safe branches, approvals and undo",
+        "Your own model keys"
+      ]
     },
     {
       "id": "pro",
@@ -21,7 +25,11 @@
       "per": "person / month",
       "tasksPerDay": null,
       "summary": "For one person who works from their phone every day.",
-      "features": ["Unlimited tasks", "Ticket to PR, Fix from a log, Write tests", "Daily standup"]
+      "features": [
+        "Unlimited tasks",
+        "Ticket to PR, Fix from a log, Write tests",
+        "Daily standup"
+      ]
     },
     {
       "id": "team",
@@ -30,12 +38,66 @@
       "per": "seat / month",
       "tasksPerDay": null,
       "summary": "For teams that need IT sign-off and a manager console.",
-      "features": ["Everything in Pro", "Manager console: roles, rules, ₹ limits", "Audit log export", "Local-only mode"]
+      "features": [
+        "Everything in Pro",
+        "Manager console: roles, rules, ₹ limits",
+        "Audit log export",
+        "Local-only mode"
+      ]
     }
   ],
   "payments": {
-    "provider": "razorpay",
-    "razorpay": { "keyId": "", "planIds": { "pro": "", "team": "" } },
-    "stripe": { "publishableKey": "", "priceIds": { "pro": "", "team": "" } }
-  }
+    "provider": "revenuecat",
+    "_comment": "Android: RevenueCat over Google Play Billing (app user id = gateway subject id). Web later: Razorpay. Stripe is off (PAYMENTS_STRIPE=1 on the Worker turns its old routes back on).",
+    "revenuecat": {
+      "androidApiKey": "",
+      "offeringId": "credits"
+    },
+    "razorpay": {
+      "keyId": "",
+      "planIds": {
+        "pro": "",
+        "team": ""
+      }
+    },
+    "stripe": {
+      "publishableKey": "",
+      "priceIds": {
+        "pro": "",
+        "team": ""
+      }
+    }
+  },
+  "creditPacks": {
+    "_comment": "Hypurr credits, sold as Google Play consumables via RevenueCat. productId must match the Play Console product and RevenueCat. creditsCents is what the gateway grants (USD cents of model usage, after Google's 15% and 18% GST). A message is one task turn sent from the phone; once the 10 free messages (lifetime) are used, messages are paid from credits. approxMessages assumes ~0.5¢ per message on Hypurr Free (an agent turn of ~20-40k tokens); bigger tasks or Hypurr Pro use more.",
+    "packs": [
+      {
+        "id": "credits_99",
+        "productId": "hypurr_credits_99",
+        "priceInr": 99,
+        "creditsCents": 80,
+        "label": "About 150 messages",
+        "approxMessages": 150
+      },
+      {
+        "id": "credits_249",
+        "productId": "hypurr_credits_249",
+        "priceInr": 249,
+        "creditsCents": 210,
+        "label": "About 400 messages",
+        "approxMessages": 400
+      },
+      {
+        "id": "credits_499",
+        "productId": "hypurr_credits_499",
+        "priceInr": 499,
+        "creditsCents": 440,
+        "label": "About 850 messages",
+        "approxMessages": 850
+      }
+    ]
+  },
+  "freeMessages": 10,
+  "freeTokenCap": 300000,
+  "freeAllowanceNote": "Free allowance is a lifetime total per PC (hashed machine id) or account, not per day. After it, credits only."
 }

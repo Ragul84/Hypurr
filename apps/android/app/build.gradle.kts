@@ -21,14 +21,19 @@ android {
         minSdk = 26
         targetSdk = 35
         // Same version as apps/project.yml MARKETING_VERSION and host/Cargo.toml.
-        versionName = "2.4.2"
-        versionCode = 20402
+        versionName = "2.5.0"
+        versionCode = 20500
         // The push relay (relay/). Placeholder until it is deployed; matches SharedStore.relayURL on iOS.
         // Override without editing: ./gradlew assembleRelease -Phypurr.relayUrl=https://relay.example.com
         val relayUrl = providers.gradleProperty("hypurr.relayUrl").getOrElse("https://hypurr-relay.example.workers.dev")
         buildConfigField("String", "RELAY_URL", "\"$relayUrl\"")
         // Push is on only when a real Firebase config is present (see docs/setup/push.md).
         buildConfigField("boolean", "PUSH_CONFIGURED", pushConfigured.toString())
+        // RevenueCat public Android SDK key (goog_…) for buying credits via Google Play. Empty: the
+        // Buy buttons stay disabled. -Phypurr.revenuecatKey=goog_… or env REVENUECAT_ANDROID_KEY.
+        val rcKey = providers.gradleProperty("hypurr.revenuecatKey")
+            .orElse(providers.environmentVariable("REVENUECAT_ANDROID_KEY")).getOrElse("")
+        buildConfigField("String", "REVENUECAT_KEY", "\"$rcKey\"")
     }
 
     buildTypes {
@@ -95,6 +100,7 @@ dependencies {
     implementation(libs.mlkit.text)
     // Remote screen: WebRTC (Google's libwebrtc, packaged by Stream), receive-only video + data channels.
     implementation(libs.webrtc)
+    implementation(libs.revenuecat)
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
 

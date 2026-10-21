@@ -500,6 +500,9 @@ impl Actor {
         if e.to_string().contains(crate::agent::builtin::NO_GATEWAY) {
             crate::agent::builtin::NO_GATEWAY.clone_into(&mut msg);
         }
+        if e.to_string().contains(crate::agent::builtin::FREE_EXHAUSTED) {
+            crate::agent::builtin::FREE_EXHAUSTED.clone_into(&mut msg);
+        }
         if e.to_string().to_lowercase().contains("auth")
             && let Some(h) = crate::agent::backends::harness(&self.cfg.backend)
         {
@@ -711,6 +714,10 @@ impl Actor {
             prompt = format!("{prompt}\n\n{update}");
             self.announce = Some((snapshot, identity));
         }
+        // Hypurr's free models count user messages: open one per turn (agent calls inside are free).
+        if crate::agent::builtin::uses_gateway(&self.cfg.backend, self.cfg.model.as_deref()) {
+            crate::agent::builtin::open_turn(&self.hub.store).await?;
+        }
         self.hub.set_runtime(&self.id(), |r| r.activity = "Thinking…".into());
         let acp = self.conn.as_ref().ok_or_else(|| anyhow!("agent not running"))?.acp.clone();
         let params = json!({
@@ -867,7 +874,12 @@ impl Actor {
             .await?;
             self.hub.set_runtime(&self.id(), |r| r.activity = "Starting agent…".into());
             // Keys saved from an "environment variable" sign-in.
-            let env = crate::agent::auth::env(&self.hub.store, &self.cfg.backend)?;
+            let mut env = crate::agent::auth::env(&self.hub.store, &self.cfg.backend)?;
+            if self.cfg.backend == crate::agent::builtin::BACKEND_ID
+                && !env.iter().any(|(k, _)| k == "OPENCODE_CONFIG_CONTENT")
+            {
+                env.extend(crate::agent::builtin::launch_env(&self.hub.store).await);
+            }
             crate::admin::local_only::check_agent(&self.hub.store, &self.cfg.backend, &env)?;
             let mut last_err = None;
             for (i, command) in candidates.iter().enumerate() {

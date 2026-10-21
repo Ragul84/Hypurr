@@ -27,18 +27,210 @@ pub const FREE_MODELS: &[FreeModel] = &[
 pub const NO_GATEWAY: &str =
     "Free models aren't available yet. Add your own key in Hypurr Agent, or pick Claude or Codex.";
 
-/// The Hypurr gateway that serves the free models, when this computer has one
-/// (`HYPURR_GATEWAY_URL`, or the cloud from `HYPURR_DEFAULT_CLOUD_URL`). None today by default.
-pub fn gateway_url() -> Option<String> {
+/// Where Hypurr's own gateway lives once deployed (cloud/DEPLOY.md). Only used after its
+/// `/v1/health` answers, so nothing changes for users until the deploy is live.
+pub const DEFAULT_GATEWAY_URL: &str = "https://hypurr.mindgains.ai";
+
+static DEFAULT_HEALTHY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// The explicit choice on this computer: `HYPURR_GATEWAY_URL` (or `off`), else the cloud from
+/// `HYPURR_DEFAULT_CLOUD_URL`. `Some("")` means turned off.
+fn configured_gateway() -> Option<String> {
     ["HYPURR_GATEWAY_URL", "HYPURR_DEFAULT_CLOUD_URL"]
         .iter()
         .filter_map(|k| std::env::var(k).ok())
-        .map(|v| v.trim().to_owned())
+        .map(|v| v.trim().trim_end_matches('/').to_owned())
         .find(|v| !v.is_empty())
+        .map(|v| if v.eq_ignore_ascii_case("off") { String::new() } else { v })
+}
+
+/// The Hypurr gateway that serves the free models, when this computer has one: an explicit
+/// `HYPURR_GATEWAY_URL`, or [`DEFAULT_GATEWAY_URL`] once its health check has passed.
+pub fn gateway_url() -> Option<String> {
+    match configured_gateway() {
+        Some(v) if v.is_empty() => None,
+        Some(v) => Some(v),
+        None => DEFAULT_HEALTHY.load(std::sync::atomic::Ordering::Relaxed).then(|| DEFAULT_GATEWAY_URL.to_owned()),
+    }
 }
 
 pub fn gateway_ready() -> bool {
     gateway_url().is_some()
+}
+
+/// Whether `{base}/v1/health` answers `{"ok": true}`.
+pub async fn gateway_healthy(base: &str) -> bool {
+    let Ok(client) = reqwest::Client::builder().timeout(Duration::from_secs(8)).build() else { return false };
+    match client.get(format!("{}/v1/health", base.trim_end_matches('/'))).send().await {
+        Ok(r) if r.status().is_success() => r.json::<Value>().await.is_ok_and(|v| v["ok"] == true),
+        _ => false,
+    }
+}
+
+/// Keeps [`DEFAULT_GATEWAY_URL`]'s health fresh (start, then every 10 minutes). No-op when the
+/// computer names its own gateway or turned it off.
+pub async fn health_loop() {
+    loop {
+        if configured_gateway().is_none() {
+            let ok = gateway_healthy(DEFAULT_GATEWAY_URL).await;
+            if ok != DEFAULT_HEALTHY.swap(ok, std::sync::atomic::Ordering::Relaxed) {
+                tracing::info!(gateway = DEFAULT_GATEWAY_URL, ok, "Hypurr gateway health changed");
+            }
+        }
+        tokio::time::sleep(Duration::from_secs(600)).await;
+    }
+}
+
+/// kv: this computer's id at the gateway, and (vault) its trial key.
+const GATEWAY_HOST_ID: &str = "gateway_host_id";
+const GATEWAY_KEY_SLOT: &str = "gateway_key";
+
+/// This computer's gateway key, minted once through `POST /v1/gateway/trial-key` and kept in
+/// the vault (shown once by the gateway).
+pub async fn gateway_key(store: &crate::store::Store, base: &str) -> Result<String> {
+    if let Some(k) = crate::market::vault::read(store, GATEWAY_KEY_SLOT)?.filter(|k| !k.is_empty()) {
+        return Ok(k);
+    }
+    let host_id = gateway_host_id(store)?;
+    let client = reqwest::Client::builder().timeout(Duration::from_secs(15)).build()?;
+    let res = client
+        .post(format!("{}/v1/gateway/trial-key", base.trim_end_matches('/')))
+        .json(&json!({"hostId": host_id}))
+        .send()
+        .await
+        .context("reaching the Hypurr gateway")?;
+    if !res.status().is_success() {
+        bail!("{NO_GATEWAY} (gateway said {})", res.status());
+    }
+    let v: Value = res.json().await?;
+    let Some(key) = v["apiKey"].as_str().filter(|k| !k.is_empty()) else {
+        bail!("{NO_GATEWAY} (this computer's free key was lost; reinstalling Hypurr resets it)");
+    };
+    crate::market::vault::write(store, GATEWAY_KEY_SLOT, key)?;
+    Ok(key.to_owned())
+}
+
+/// Shown on the phone when the day's free messages are used and there are no credits.
+pub const FREE_EXHAUSTED: &str = "You've used your free messages. Buy credits to keep going.";
+/// Free messages in total, ever (pricing/plans.json `freeMessages`; the gateway enforces it).
+pub const FREE_MESSAGES_PER_DAY: i64 = 10;
+/// kv: free messages left, from the gateway's last answer.
+const FREE_LEFT: &str = "gateway_free_left";
+
+/// Free messages left (lifetime) as last reported by the gateway.
+pub fn free_messages_left(store: &crate::store::Store) -> i64 {
+    store.kv_get(FREE_LEFT).and_then(|v| v.parse().ok()).unwrap_or(FREE_MESSAGES_PER_DAY)
+}
+
+/// This PC's stable machine id (survives reinstalling Hypurr), if the OS has one.
+fn machine_id() -> Option<String> {
+    #[cfg(target_os = "linux")]
+    let raw = ["/etc/machine-id", "/var/lib/dbus/machine-id"].iter().find_map(|p| std::fs::read_to_string(p).ok());
+    #[cfg(windows)]
+    let raw = std::process::Command::new("reg")
+        .args(["query", r"HKLM\SOFTWARE\Microsoft\Cryptography", "/v", "MachineGuid"])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .and_then(|t| t.split_whitespace().last().map(str::to_owned));
+    #[cfg(target_os = "macos")]
+    let raw = std::process::Command::new("ioreg")
+        .args(["-rd1", "-c", "IOPlatformExpertDevice"])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .and_then(|t| {
+            t.lines().find(|l| l.contains("IOPlatformUUID")).and_then(|l| l.split('"').nth(3)).map(str::to_owned)
+        });
+    #[cfg(not(any(target_os = "linux", windows, target_os = "macos")))]
+    let raw: Option<String> = None;
+    raw.map(|s| s.trim().to_owned()).filter(|s| s.len() >= 8)
+}
+
+/// The id this PC uses at the gateway: SHA-256 of the machine id (never sent raw), so the same
+/// PC keeps one free allowance across reinstalls. Falls back to a saved random id.
+fn gateway_host_id(store: &crate::store::Store) -> Result<String> {
+    let id = if let Some(m) = machine_id() {
+        sha256_hex(format!("hypurr-gateway:{m}").as_bytes())
+    } else if let Some(id) = store.kv_get(GATEWAY_HOST_ID).filter(|v| v.len() == 64) {
+        id
+    } else {
+        sha256_hex(uuid::Uuid::new_v4().as_bytes())
+    };
+    store.kv_set(GATEWAY_HOST_ID, &id)?;
+    Ok(id)
+}
+
+/// Whether a turn with this backend and model runs on Hypurr's gateway.
+pub fn uses_gateway(backend: &str, model: Option<&str>) -> bool {
+    backend == BACKEND_ID
+        && gateway_ready()
+        && is_gateway_model(model.filter(|m| !m.is_empty()).unwrap_or(DEFAULT_MODEL))
+}
+
+/// Opens one user message at the gateway (`POST /v1/gateway/turn`): counted once, however many
+/// model calls the agent makes inside it. Refuses with [`FREE_EXHAUSTED`] when none are left.
+pub async fn open_turn(store: &crate::store::Store) -> Result<()> {
+    let Some(base) = gateway_url() else { bail!(NO_GATEWAY) };
+    let key = gateway_key(store, &base).await?;
+    let client = reqwest::Client::builder().timeout(Duration::from_secs(15)).build()?;
+    let res = client
+        .post(format!("{}/v1/gateway/turn", base.trim_end_matches('/')))
+        .bearer_auth(key)
+        .json(&json!({}))
+        .send()
+        .await
+        .context("reaching the Hypurr gateway")?;
+    let status = res.status();
+    let v: Value = res.json().await.unwrap_or_default();
+    if let Some(left) = v["freeMessagesLeft"].as_i64() {
+        store.kv_set(FREE_LEFT, &left.to_string())?;
+    }
+    if status.as_u16() == 402 {
+        bail!(FREE_EXHAUSTED);
+    }
+    if !status.is_success() {
+        bail!("{NO_GATEWAY} (gateway said {status})");
+    }
+    Ok(())
+}
+
+/// This computer's gateway subject (`trial:<host id>`), once it has a gateway key. Credits
+/// bought on the phone are granted to it (the app user id at the payment provider).
+pub fn gateway_subject(store: &crate::store::Store) -> Option<String> {
+    gateway_ready().then(|| store.kv_get(GATEWAY_HOST_ID)).flatten().map(|id| format!("trial:{id}"))
+}
+
+/// Hypurr Agent config that adds the `hypurr` provider (OpenAI-compatible, the gateway).
+pub fn agent_config(base: &str, key: &str) -> Value {
+    let models: serde_json::Map<String, Value> =
+        FREE_MODELS.iter().map(|m| (m.id.trim_start_matches("hypurr/").to_owned(), json!({"name": m.name}))).collect();
+    json!({
+        "provider": {
+            "hypurr": {
+                "npm": "@ai-sdk/openai-compatible",
+                "name": "Hypurr",
+                "options": {"baseURL": format!("{}/v1", base.trim_end_matches('/')), "apiKey": key},
+                "models": models,
+            }
+        }
+    })
+}
+
+/// Extra environment for a Hypurr Agent launch: the gateway provider, when there is one.
+/// Never in local-only mode. Failures just leave the free models off (own keys still work).
+pub async fn launch_env(store: &crate::store::Store) -> Vec<(String, String)> {
+    if crate::admin::local_only::on(store) {
+        return Vec::new();
+    }
+    let Some(base) = gateway_url() else { return Vec::new() };
+    match gateway_key(store, &base).await {
+        Ok(key) => vec![("OPENCODE_CONFIG_CONTENT".to_owned(), agent_config(&base, &key).to_string())],
+        Err(e) => {
+            tracing::warn!(error = format!("{e:#}"), "no Hypurr gateway key");
+            Vec::new()
+        }
+    }
 }
 
 /// A model id served only by the Hypurr gateway.
@@ -345,6 +537,39 @@ mod tests {
         assert!(is_gateway_model("hypurr/hypurr-free"));
         assert!(!is_gateway_model("anthropic/claude-sonnet"));
         assert!(NO_GATEWAY.contains("Free models aren't available yet"));
+    }
+
+    #[test]
+    fn free_messages_are_lifetime_and_host_id_is_hashed() {
+        let store = crate::store::Store::open(Path::new(":memory:")).unwrap();
+        assert_eq!(free_messages_left(&store), 10);
+        store.kv_set(FREE_LEFT, "0").unwrap();
+        assert_eq!(free_messages_left(&store), 0);
+        assert_eq!(FREE_EXHAUSTED, "You've used your free messages. Buy credits to keep going.");
+        assert!(!uses_gateway("claude", Some("hypurr/hypurr-free")));
+        let a = gateway_host_id(&store).unwrap();
+        assert_eq!(a.len(), 64);
+        assert!(a.chars().all(|c| c.is_ascii_hexdigit()));
+        assert_eq!(a, gateway_host_id(&store).unwrap(), "stable on the same PC");
+    }
+
+    #[test]
+    fn agent_config_points_hypurr_provider_at_gateway() {
+        let c = agent_config("https://hypurr.mindgains.ai/", "hk_x");
+        let p = &c["provider"]["hypurr"];
+        assert_eq!(p["options"]["baseURL"], "https://hypurr.mindgains.ai/v1");
+        assert_eq!(p["options"]["apiKey"], "hk_x");
+        assert!(p["models"]["hypurr-free"].is_object());
+        assert!(p["models"]["hypurr-fast"].is_object());
+    }
+
+    #[test]
+    fn default_gateway_waits_for_health() {
+        assert_eq!(DEFAULT_GATEWAY_URL, "https://hypurr.mindgains.ai");
+        if configured_gateway().is_none() {
+            // Nothing has probed it in this test process: not offered yet.
+            assert_eq!(gateway_url(), None);
+        }
     }
 
     #[test]

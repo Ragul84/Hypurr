@@ -155,6 +155,14 @@ object Samples {
         teams = WebhookStatus(),
     )
     val setupWork = setup.copy(integrations = integrations)
+    val setupHypurr = setup.copy(agents = listOf(Agent("hypurr-agent", "Hypurr Agent")) + setup.agents)
+    val pricingWithPacks = com.ragul84.hypurr.model.Pricing(
+        creditPacks = com.ragul84.hypurr.model.CreditPacks(listOf(
+            com.ragul84.hypurr.model.CreditPack("credits_99", "hypurr_credits_99", 99.0, 80, 150),
+            com.ragul84.hypurr.model.CreditPack("credits_249", "hypurr_credits_249", 249.0, 210, 400),
+            com.ragul84.hypurr.model.CreditPack("credits_499", "hypurr_credits_499", 499.0, 440, 850),
+        )),
+    )
 
     val ghIssue = Issue("github", "#142", "Checkout button does nothing on Safari", "https://github.com/acme/shop/issues/142",
         "Clicking Checkout on Safari 17 does nothing.", "/Users/priya/shop")
@@ -221,11 +229,11 @@ object Samples {
             CostRow("t-6", "b5", "Host", NOW - 146 * 60 * MIN, TaskUsage(totalTokens = 9_000, cost = 0.40, estimated = false, turns = 3)),
         ),
         total = CostTotal(12.09, 278_000, 8, estimated = false), week = 12.09, today = 6.30,
-        gatewayFreeRemaining = "18 / 40 turns",
+        gatewayFreeRemaining = "7 / 10 messages",
         gatewayCreditsLabel = "$12.40",
-        buyCreditsUrl = "https://checkout.stripe.com/c/pay/cs_test_placeholder",
-        freeTurnsLeft = 18,
-        freeTurnsLimit = 40,
+        buyCreditsUrl = null,
+        freeTurnsLeft = 7,
+        freeTurnsLimit = 10,
         freeResetLabel = "Resets at midnight IST",
     )
 

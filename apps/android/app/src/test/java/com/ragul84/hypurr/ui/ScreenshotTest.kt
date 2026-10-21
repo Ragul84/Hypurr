@@ -87,6 +87,27 @@ class ScreenshotTest {
             bots = Samples.bots.associateBy { it.id }, now = Samples.NOW)
     }
 
+    /** Free messages used up: the plain line and Add credits, with the Google Play packs open. */
+    @Test
+    @Config(qualifiers = "w412dp-h1520dp-xxhdpi")
+    fun spendFreeUsedUp() = shoot("spend-free-used-up") {
+        SpendScreen(Samples.computer.name, LinkState.Ready(Route.Direct), Samples.costs.copy(freeTurnsLeft = 0, gatewayCreditsLabel = "$0.00"),
+            bots = Samples.bots.associateBy { it.id }, now = Samples.NOW, pricing = Samples.pricingWithPacks)
+    }
+
+    /** "7 of 10 free messages left today" under the task box when Hypurr Agent runs it. */
+    @Test
+    fun newTaskFreeMessages() = shoot("newtask-free-messages") {
+        NewTaskScreen(NewTaskUiState(Samples.setupHypurr, goal = "Add a loading spinner to the AI Tutor send button", agent = "hypurr-agent",
+            project = "/Users/priya/shop"), {}, {}, {}, freeLeft = 7, freeLimit = 10)
+    }
+
+    @Test
+    fun newTaskFreeUsedUp() = shoot("newtask-free-used-up") {
+        NewTaskScreen(NewTaskUiState(Samples.setupHypurr, goal = "Add a loading spinner to the AI Tutor send button", agent = "hypurr-agent",
+            project = "/Users/priya/shop"), {}, {}, {}, freeLeft = 0, freeLimit = 10)
+    }
+
     @Test
     fun tasks() = shoot("tasks") {
         TasksScreen(Samples.computer.name, LinkState.Ready(Route.Direct), Samples.templates,
