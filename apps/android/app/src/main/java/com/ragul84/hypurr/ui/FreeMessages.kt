@@ -12,14 +12,14 @@ import androidx.compose.ui.unit.dp
 import com.ragul84.hypurr.ui.theme.Hypurr
 
 /** Same words as the host and gateway (host/src/agent/builtin.rs FREE_EXHAUSTED). */
-const val FREE_MESSAGES_EXHAUSTED = "You've used today's free messages. Buy credits or come back tomorrow."
+const val FREE_MESSAGES_EXHAUSTED = "You've used your free messages. Buy credits to keep going."
 
 fun freeMessagesLine(left: Int, limit: Int): String =
-    "${left.coerceIn(0, limit)} of $limit free ${if (limit == 1) "message" else "messages"} left today"
+    "${left.coerceIn(0, limit)} of $limit free ${if (limit == 1) "message" else "messages"} left"
 
 /**
  * Hypurr's free models are counted in messages (one per task turn sent from the phone).
- * Shows "N of 10 free messages left today", or the plain used-up line with Add credits.
+ * Shows "N of 10 free messages left" (a lifetime total), or the plain used-up line with Add credits.
  */
 @Composable
 fun FreeMessagesNote(left: Int, limit: Int, onAddCredits: () -> Unit, modifier: Modifier = Modifier) {

@@ -91,13 +91,7 @@ pub async fn gateway_key(store: &crate::store::Store, base: &str) -> Result<Stri
     if let Some(k) = crate::market::vault::read(store, GATEWAY_KEY_SLOT)?.filter(|k| !k.is_empty()) {
         return Ok(k);
     }
-    let host_id = if let Some(id) = store.kv_get(GATEWAY_HOST_ID) {
-        id
-    } else {
-        let id = uuid::Uuid::new_v4().simple().to_string();
-        store.kv_set(GATEWAY_HOST_ID, &id)?;
-        id
-    };
+    let host_id = gateway_host_id(store)?;
     let client = reqwest::Client::builder().timeout(Duration::from_secs(15)).build()?;
     let res = client
         .post(format!("{}/v1/gateway/trial-key", base.trim_end_matches('/')))
@@ -117,30 +111,54 @@ pub async fn gateway_key(store: &crate::store::Store, base: &str) -> Result<Stri
 }
 
 /// Shown on the phone when the day's free messages are used and there are no credits.
-pub const FREE_EXHAUSTED: &str = "You've used today's free messages. Buy credits or come back tomorrow.";
-/// Free messages per day (pricing/plans.json `freeMessagesPerDay`; the gateway enforces it).
+pub const FREE_EXHAUSTED: &str = "You've used your free messages. Buy credits to keep going.";
+/// Free messages in total, ever (pricing/plans.json `freeMessages`; the gateway enforces it).
 pub const FREE_MESSAGES_PER_DAY: i64 = 10;
-/// kv: `<left>|<UTC day>` from the gateway's last answer.
+/// kv: free messages left, from the gateway's last answer.
 const FREE_LEFT: &str = "gateway_free_left";
 
-fn utc_day() -> i64 {
-    chrono_free_day(std::time::SystemTime::now())
-}
-
-fn chrono_free_day(t: std::time::SystemTime) -> i64 {
-    let secs = t.duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
-    i64::try_from(secs / 86_400).unwrap_or(0)
-}
-
-/// Free messages left today as last reported by the gateway (a new UTC day resets it).
+/// Free messages left (lifetime) as last reported by the gateway.
 pub fn free_messages_left(store: &crate::store::Store) -> i64 {
-    store
-        .kv_get(FREE_LEFT)
-        .and_then(|v| {
-            let (left, day) = v.split_once('|')?;
-            (day.parse::<i64>().ok()? == utc_day()).then(|| left.parse::<i64>().ok())?
-        })
-        .unwrap_or(FREE_MESSAGES_PER_DAY)
+    store.kv_get(FREE_LEFT).and_then(|v| v.parse().ok()).unwrap_or(FREE_MESSAGES_PER_DAY)
+}
+
+/// This PC's stable machine id (survives reinstalling Hypurr), if the OS has one.
+fn machine_id() -> Option<String> {
+    #[cfg(target_os = "linux")]
+    let raw = ["/etc/machine-id", "/var/lib/dbus/machine-id"].iter().find_map(|p| std::fs::read_to_string(p).ok());
+    #[cfg(windows)]
+    let raw = std::process::Command::new("reg")
+        .args(["query", r"HKLM\SOFTWARE\Microsoft\Cryptography", "/v", "MachineGuid"])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .and_then(|t| t.split_whitespace().last().map(str::to_owned));
+    #[cfg(target_os = "macos")]
+    let raw = std::process::Command::new("ioreg")
+        .args(["-rd1", "-c", "IOPlatformExpertDevice"])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .and_then(|t| {
+            t.lines().find(|l| l.contains("IOPlatformUUID")).and_then(|l| l.split('"').nth(3)).map(str::to_owned)
+        });
+    #[cfg(not(any(target_os = "linux", windows, target_os = "macos")))]
+    let raw: Option<String> = None;
+    raw.map(|s| s.trim().to_owned()).filter(|s| s.len() >= 8)
+}
+
+/// The id this PC uses at the gateway: SHA-256 of the machine id (never sent raw), so the same
+/// PC keeps one free allowance across reinstalls. Falls back to a saved random id.
+fn gateway_host_id(store: &crate::store::Store) -> Result<String> {
+    let id = if let Some(m) = machine_id() {
+        sha256_hex(format!("hypurr-gateway:{m}").as_bytes())
+    } else if let Some(id) = store.kv_get(GATEWAY_HOST_ID).filter(|v| v.len() == 64) {
+        id
+    } else {
+        sha256_hex(uuid::Uuid::new_v4().as_bytes())
+    };
+    store.kv_set(GATEWAY_HOST_ID, &id)?;
+    Ok(id)
 }
 
 /// Whether a turn with this backend and model runs on Hypurr's gateway.
@@ -166,7 +184,7 @@ pub async fn open_turn(store: &crate::store::Store) -> Result<()> {
     let status = res.status();
     let v: Value = res.json().await.unwrap_or_default();
     if let Some(left) = v["freeMessagesLeft"].as_i64() {
-        store.kv_set(FREE_LEFT, &format!("{left}|{}", utc_day()))?;
+        store.kv_set(FREE_LEFT, &left.to_string())?;
     }
     if status.as_u16() == 402 {
         bail!(FREE_EXHAUSTED);
@@ -522,15 +540,17 @@ mod tests {
     }
 
     #[test]
-    fn free_messages_default_and_reset_by_day() {
+    fn free_messages_are_lifetime_and_host_id_is_hashed() {
         let store = crate::store::Store::open(Path::new(":memory:")).unwrap();
         assert_eq!(free_messages_left(&store), 10);
-        store.kv_set(FREE_LEFT, &format!("3|{}", utc_day())).unwrap();
-        assert_eq!(free_messages_left(&store), 3);
-        store.kv_set(FREE_LEFT, &format!("0|{}", utc_day() - 1)).unwrap();
-        assert_eq!(free_messages_left(&store), 10, "yesterday's count doesn't carry over");
-        assert!(FREE_EXHAUSTED.starts_with("You've used today's free messages."));
+        store.kv_set(FREE_LEFT, "0").unwrap();
+        assert_eq!(free_messages_left(&store), 0);
+        assert_eq!(FREE_EXHAUSTED, "You've used your free messages. Buy credits to keep going.");
         assert!(!uses_gateway("claude", Some("hypurr/hypurr-free")));
+        let a = gateway_host_id(&store).unwrap();
+        assert_eq!(a.len(), 64);
+        assert!(a.chars().all(|c| c.is_ascii_hexdigit()));
+        assert_eq!(a, gateway_host_id(&store).unwrap(), "stable on the same PC");
     }
 
     #[test]

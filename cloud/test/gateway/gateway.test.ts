@@ -60,6 +60,9 @@ function memoryDb() {
             const subject = binds[0];
             return (tables.gateway_credits.find((r) => r.subject_id === subject) as T) ?? null;
           }
+          if (sql.includes("gateway_api_keys") && sql.includes("WHERE host_id = ?")) {
+            return (tables.gateway_api_keys.find((r) => r.host_id === binds[0] && r.kind === "trial" && !r.revoked_at) as T) ?? null;
+          }
           if (sql.includes("gateway_api_keys") && sql.includes("key_hash")) {
             const hash = binds[0];
             const row = tables.gateway_api_keys.find((r) => r.key_hash === hash && !r.revoked_at);
@@ -133,7 +136,10 @@ function memoryDb() {
           if (sql.includes("INSERT INTO gateway_usage")) {
             tables.gateway_usage.push({ binds: [...binds] });
           }
-          if (sql.includes("INSERT INTO gateway_api_keys")) {
+          if (sql.includes("INSERT INTO gateway_api_keys") && sql.includes("'trial', 'trial'")) {
+            const [id, host_id, key_hash, key_prefix, created_at] = binds as any;
+            tables.gateway_api_keys.push({ id, user_id: null, host_id, key_hash, key_prefix, kind: "trial", created_at, revoked_at: null });
+          } else if (sql.includes("INSERT INTO gateway_api_keys")) {
             tables.gateway_api_keys.push({
               id: binds[0],
               user_id: binds[1],
@@ -145,6 +151,10 @@ function memoryDb() {
               created_at: binds[7],
               revoked_at: null,
             });
+          }
+          if (sql.includes("UPDATE gateway_api_keys SET revoked_at")) {
+            const row = tables.gateway_api_keys.find((r) => r.id === binds[1]);
+            if (row) row.revoked_at = binds[0];
           }
           if (sql.includes("UPDATE gateway_api_keys SET last_used_at")) {
             /* noop */
@@ -383,7 +393,7 @@ describe("openrouter defaults", () => {
     const refused = (await openTurn(ctx(db, "/v1/gateway/turn", {}, auth))) as Response;
     expect(refused.status).toBe(402);
     expect(((await refused.json()) as any).error.message).toBe(FREE_EXHAUSTED);
-    expect(FREE_EXHAUSTED).toBe("You've used today's free messages. Buy credits or come back tomorrow.");
+    expect(FREE_EXHAUSTED).toBe("You've used your free messages. Buy credits to keep going.");
     // With credits the 11th message goes through and its model calls are charged.
     await topUp(db, "user:u9", 100, {}, 1);
     const paid = (await openTurn(ctx(db, "/v1/gateway/turn", {}, auth))) as any;
@@ -440,12 +450,41 @@ describe("trial keys", () => {
     const { issueTrial } = await import("../../src/gateway/handler");
     const n = DEFAULT_GATEWAY_CONFIG.trialKeysPerIpPerDay;
     for (let i = 0; i < n; i++) {
-      await issueTrial(ctx(db, "/v1/gateway/trial-key", { hostId: `host-000${i}` }, { "cf-connecting-ip": "1.2.3.4" }));
+      await issueTrial(ctx(db, "/v1/gateway/trial-key", { hostId: `${i}`.padStart(64, "a") }, { "cf-connecting-ip": "1.2.3.4" }));
     }
     await expect(
-      issueTrial(ctx(db, "/v1/gateway/trial-key", { hostId: "host-9999" }, { "cf-connecting-ip": "1.2.3.4" })),
+      issueTrial(ctx(db, "/v1/gateway/trial-key", { hostId: "b".repeat(64) }, { "cf-connecting-ip": "1.2.3.4" })),
     ).rejects.toMatchObject({ code: "rateLimited" });
     await expect(issueTrial(ctx(db, "/v1/gateway/trial-key", { hostId: "x" }, {}))).rejects.toMatchObject({ code: "badRequest" });
+    expect(n).toBe(2);
+  });
+
+  it("the same PC (reinstalled) gets a new key but keeps its used free allowance", async () => {
+    const db = memoryDb();
+    const { issueTrial, openTurn } = await import("../../src/gateway/handler");
+    const pc = "c".repeat(64);
+    const first = (await issueTrial(ctx(db, "/v1/gateway/trial-key", { hostId: pc }, { "cf-connecting-ip": "9.9.9.1" }))) as any;
+    for (let i = 0; i < DEFAULT_GATEWAY_CONFIG.freeDailyMessages; i++) {
+      await openTurn(ctx(db, "/v1/gateway/turn", {}, { authorization: `Bearer ${first.apiKey}` }));
+    }
+    const again = (await issueTrial(ctx(db, "/v1/gateway/trial-key", { hostId: pc }, { "cf-connecting-ip": "9.9.9.2" }))) as any;
+    expect(again.apiKey).toBeTruthy();
+    expect(again.apiKey).not.toBe(first.apiKey);
+    await expect(openTurn(ctx(db, "/v1/gateway/turn", {}, { authorization: `Bearer ${first.apiKey}` }))).rejects.toMatchObject({ code: "unauthenticated" });
+    const r = (await openTurn(ctx(db, "/v1/gateway/turn", {}, { authorization: `Bearer ${again.apiKey}` }))) as Response;
+    expect(r.status).toBe(402);
+  });
+
+  it("free messages are lifetime: a new day doesn't refill them", async () => {
+    const db = memoryDb();
+    const { secret, hash, prefix } = await mintKeySecret();
+    (db as any)._tables.gateway_api_keys.push({ id: "k", user_id: "u7", host_id: null, key_hash: hash, key_prefix: prefix, kind: "user", revoked_at: null });
+    const { openTurn } = await import("../../src/gateway/handler");
+    const auth = { authorization: `Bearer ${secret}` };
+    for (let i = 0; i < 10; i++) await openTurn(ctx(db, "/v1/gateway/turn", {}, auth));
+    const later = { ...ctx(db, "/v1/gateway/turn", {}, auth), now: Date.UTC(2026, 11, 25) };
+    expect(((await openTurn(later)) as Response).status).toBe(402);
+    expect(DEFAULT_GATEWAY_CONFIG.freeLifetime).toBe(true);
   });
 });
 

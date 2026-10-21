@@ -75,7 +75,9 @@ export async function issueTrialKey(db: D1Database, hostId: string, now = Date.n
     .bind(hostId)
     .first<{ id: string; key_prefix: string }>();
   if (existing) {
-    return { id: existing.id, secret: null as string | null, prefix: existing.key_prefix, reused: true };
+    // Same PC again (e.g. reinstalled): retire the old key and hand out a new one. The subject
+    // (trial:<hostId>) and its lifetime free allowance stay the same.
+    await db.prepare(`UPDATE gateway_api_keys SET revoked_at = ? WHERE id = ?`).bind(now, existing.id).run();
   }
   const { secret, prefix, hash } = await mintKeySecret();
   const id = `key_${randomId(8)}`;
@@ -86,7 +88,7 @@ export async function issueTrialKey(db: D1Database, hostId: string, now = Date.n
     )
     .bind(id, hostId, hash, prefix, now)
     .run();
-  return { id, secret, prefix, reused: false };
+  return { id, secret: secret as string | null, prefix, reused: Boolean(existing) };
 }
 
 export async function issueUserKey(db: D1Database, userId: string, label = "default", now = Date.now()) {

@@ -91,7 +91,7 @@ export function usageTap(
   });
 }
 
-export const FREE_EXHAUSTED = "You've used today's free messages. Buy credits or come back tomorrow.";
+export const FREE_EXHAUSTED = "You've used your free messages. Buy credits to keep going.";
 
 const rateBuckets = new Map<string, { n: number; reset: number }>();
 
@@ -456,7 +456,9 @@ export async function issueTrial(c: Ctx) {
   } catch {
     throw new ApiError("badRequest");
   }
-  if (!body.hostId || !/^[A-Za-z0-9_-]{8,128}$/.test(body.hostId)) throw new ApiError("badRequest");
+  // hostId is a hash of the PC's stable machine id (host/src/agent/builtin.rs), so reinstalling
+  // gets a new key for the same subject and the same (used) free allowance.
+  if (!body.hostId || !/^[a-f0-9]{64}$/.test(body.hostId)) throw new ApiError("badRequest");
   // Free trial keys are the farmable resource: cap new ones per client IP per day.
   const ip = c.req.headers.get("cf-connecting-ip") ?? "unknown";
   if (!(await allowTrialIp(c.env.DB, ip, cfg.trialKeysPerIpPerDay, c.now))) throw new ApiError("rateLimited");

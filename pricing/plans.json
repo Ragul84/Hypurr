@@ -13,7 +13,7 @@
       "tasksPerDay": 5,
       "summary": "For trying Hypurr on your own laptop.",
       "features": [
-        "10 free messages a day with Hypurr's models",
+        "10 free messages with Hypurr's models",
         "Safe branches, approvals and undo",
         "Your own model keys"
       ]
@@ -69,7 +69,7 @@
     }
   },
   "creditPacks": {
-    "_comment": "Hypurr credits, sold as Google Play consumables via RevenueCat. productId must match the Play Console product and RevenueCat. creditsCents is what the gateway grants (USD cents of model usage, after Google's 15% and 18% GST). A message is one task turn sent from the phone; once the 10 free messages are used, messages are paid from credits. approxMessages assumes ~0.5¢ per message on Hypurr Free (an agent turn of ~20-40k tokens); bigger tasks or Hypurr Pro use more.",
+    "_comment": "Hypurr credits, sold as Google Play consumables via RevenueCat. productId must match the Play Console product and RevenueCat. creditsCents is what the gateway grants (USD cents of model usage, after Google's 15% and 18% GST). A message is one task turn sent from the phone; once the 10 free messages (lifetime) are used, messages are paid from credits. approxMessages assumes ~0.5¢ per message on Hypurr Free (an agent turn of ~20-40k tokens); bigger tasks or Hypurr Pro use more.",
     "packs": [
       {
         "id": "credits_99",
@@ -97,6 +97,7 @@
       }
     ]
   },
-  "freeMessagesPerDay": 10,
-  "freeDailyTokenCap": 300000
+  "freeMessages": 10,
+  "freeTokenCap": 300000,
+  "freeAllowanceNote": "Free allowance is a lifetime total per PC (hashed machine id) or account, not per day. After it, credits only."
 }

@@ -129,7 +129,7 @@ fun NewTaskScreen(
     onPickIssue: () -> Unit = {},
     /** Opens the project-folder picker (folders listed by the computer). */
     onPickFolder: () -> Unit = {},
-    /** Free messages left today on Hypurr's models (null: no gateway on this computer). */
+    /** Free messages left (lifetime) on Hypurr's models (null: no gateway on this computer). */
     freeLeft: Int? = null,
     freeLimit: Int? = null,
     onAddCredits: () -> Unit = {},

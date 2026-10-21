@@ -13,7 +13,9 @@ export type UpstreamAdapter = {
 
 export type GatewayConfig = {
   freeDailyTokens: number;
-  /** Free user messages (phone turns) per subject per UTC day. The product's free allowance. */
+  /** Free allowance is a lifetime total per subject (true), not per UTC day. */
+  freeLifetime: boolean;
+  /** Free user messages (phone turns) per subject, ever (see freeLifetime). The product's free allowance. */
   freeDailyMessages: number;
   /** Abuse limits: max_tokens is clamped to this on every request. */
   maxOutputTokens: number;
@@ -52,12 +54,13 @@ export type GatewayConfig = {
 // Paid-per-token (not ":free") variants on purpose: ":free" routes are heavily rate-limited and
 // may log prompts. All of these support tool calls, which Hypurr Agent needs.
 export const DEFAULT_GATEWAY_CONFIG: GatewayConfig = {
-  // Hidden safety cap behind the 10 messages; past it a turn needs credits.
+  freeLifetime: true,
+  // Hidden lifetime safety cap behind the 10 messages; past it a turn needs credits.
   freeDailyTokens: 300_000,
   freeDailyMessages: 10,
   maxOutputTokens: 8_192,
   maxPromptTokens: 120_000,
-  trialKeysPerIpPerDay: 5,
+  trialKeysPerIpPerDay: 2,
   // Kill switch ≈ US$1/day: agent turns are input-heavy, so hypurr-free blends to about
   // $0.12 per 1M tokens (incl. markup) → ~8M tokens.
   globalFreeDailyTokens: 8_000_000,

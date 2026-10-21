@@ -208,7 +208,7 @@ fun SpendScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(signalIcon(SignalIcons.Shield), null, tint = c.text, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(8.dp))
-                                Text("Free messages today · ${data.freeResetLabel ?: "resets daily"}", color = c.secondary,
+                                Text("Free messages used", color = c.secondary,
                                     style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f), maxLines = 1)
                                 DotFigure("$used", SignalType.figureSmall, c.text)
                                 Text(" / $limit", color = c.tertiary, style = MaterialTheme.typography.labelMedium)
@@ -260,7 +260,7 @@ private fun paceLine(data: TaskCosts, freeLeft: Int): String {
     val credits = data.gatewayCreditsLabel?.filter { it.isDigit() || it == '.' }?.toDoubleOrNull() ?: 0.0
     val perDay = data.week / 7.0
     return when {
-        credits <= 0.0 && freeLeft > 0 -> "$freeLeft free messages left today"
+        credits <= 0.0 && freeLeft > 0 -> "$freeLeft free messages left"
         perDay <= 0.0 -> "No spend this week"
         else -> {
             val days = (credits / perDay).toInt()

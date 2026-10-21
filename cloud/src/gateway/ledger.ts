@@ -27,7 +27,8 @@ export async function getAllowance(
   now = Date.now(),
 ): Promise<Allowance> {
   const limit = kind === "trial" ? cfg.trialDailyTokens : cfg.freeDailyTokens;
-  const periodStart = dayBucket(now);
+  // Lifetime allowance: one bucket forever (cfg.freeLifetime); otherwise per UTC day.
+  const periodStart = cfg.freeLifetime ? 0 : dayBucket(now);
   const row = await db
     .prepare(`SELECT tokens_used, tokens_limit, period_start, messages_used FROM gateway_allowance WHERE subject_id = ?`)
     .bind(subjectId)
