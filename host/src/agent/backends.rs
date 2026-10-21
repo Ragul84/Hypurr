@@ -599,7 +599,7 @@ pub fn list() -> Vec<Value> {
             });
             if managed {
                 let st = crate::agent::builtin::status();
-                for k in ["builtin", "free", "defaultModel", "freeModels", "needsInstall", "version", "subtitle", "agentName", "consent", "license", "source"] {
+                for k in ["builtin", "free", "defaultModel", "freeModels", "gatewayReady", "needsInstall", "version", "subtitle", "agentName", "consent", "license", "source"] {
                     row[k] = st[k].clone();
                 }
                 row["name"] = if crate::agent::builtin::is_installed() || path.is_some() {

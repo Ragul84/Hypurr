@@ -55,6 +55,19 @@ fn project_words(p: &Project) -> Vec<String> {
 
 /// Picks a project and agent. `last_project` (the newest task's) breaks ties.
 pub fn route(goal: &str, read_only: bool, projects: &[Project], agents: &[Agent], last_project: Option<&str>) -> Route {
+    route_with(goal, read_only, projects, agents, last_project, crate::agent::builtin::gateway_ready())
+}
+
+/// Without the Hypurr gateway, Hypurr Agent has no free models, so an agent the user already
+/// signed in to (Claude, Codex, …) goes first; Hypurr Agent is only the last resort.
+fn route_with(
+    goal: &str,
+    read_only: bool,
+    projects: &[Project],
+    agents: &[Agent],
+    last_project: Option<&str>,
+    gateway: bool,
+) -> Route {
     let goal_words = words(goal);
     let mut best: Option<(usize, &Project, Vec<String>)> = None;
     for p in projects {
@@ -78,10 +91,17 @@ pub fn route(goal: &str, read_only: bool, projects: &[Project], agents: &[Agent]
     // Named in the goal ("use codex …") wins; otherwise the preference order.
     let named =
         agents.iter().find(|a| goal_words.contains(&a.id) || words(&a.name).iter().all(|w| goal_words.contains(w)));
-    let order = if read_only { PREFER_READING } else { PREFER_CHANGES };
+    let base = if read_only { PREFER_READING } else { PREFER_CHANGES };
+    let builtin = |id: &str| matches!(id, "hypurr-agent" | "opencode");
+    let order: Vec<&str> = base.iter().copied().filter(|id| gateway || !builtin(id)).collect();
     let (agent, agent_reason) = if let Some(a) = named {
         (Some(a.clone()), format!("you asked for {}", a.name))
-    } else if let Some(a) = order.iter().find_map(|id| agents.iter().find(|a| a.id == *id)).or_else(|| agents.first()) {
+    } else if let Some(a) = order
+        .iter()
+        .find_map(|id| agents.iter().find(|a| a.id == *id))
+        .or_else(|| agents.iter().find(|a| !builtin(&a.id)))
+        .or_else(|| agents.first())
+    {
         let why = if read_only { "good at reading and explaining code" } else { "good at making careful code changes" };
         (Some(a.clone()), format!("{} is installed and {why}", a.name))
     } else {
@@ -142,10 +162,20 @@ mod tests {
     fn prefers_builtin_hypurr_agent_when_available() {
         let projects = [p("Shop", "/w/shop", &[])];
         let agents = [a("hypurr-agent", "Hypurr Agent"), a("claude", "Claude Code")];
-        let r = route("Fix the checkout total", false, &projects, &agents, None);
+        let r = route_with("Fix the checkout total", false, &projects, &agents, None, true);
         assert_eq!(r.agent.unwrap().id, "hypurr-agent");
         let only = [a("hypurr-agent", "Hypurr Agent")];
-        let r = route("Explain main.rs", true, &projects, &only, None);
+        let r = route_with("Explain main.rs", true, &projects, &only, None, false);
         assert_eq!(r.agent.unwrap().id, "hypurr-agent");
+    }
+
+    #[test]
+    fn without_gateway_prefers_a_signed_in_agent() {
+        let projects = [p("Shop", "/w/shop", &[])];
+        let agents = [a("hypurr-agent", "Hypurr Agent"), a("codex", "Codex"), a("claude", "Claude Code")];
+        let r = route_with("Fix the checkout total", false, &projects, &agents, None, false);
+        assert_eq!(r.agent.unwrap().id, "claude");
+        let odd = [a("hypurr-agent", "Hypurr Agent"), a("aider", "Aider")];
+        assert_eq!(route_with("x", false, &projects, &odd, None, false).agent.unwrap().id, "aider");
     }
 }

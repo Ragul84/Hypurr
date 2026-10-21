@@ -223,7 +223,16 @@ impl Hub {
         cfg.created_at = crate::store::now_ms();
         // Built-in Hypurr Agent: default to a free gateway model when the client didn't pick one.
         if cfg.backend == crate::agent::builtin::BACKEND_ID && cfg.model.as_deref().unwrap_or("").is_empty() {
-            cfg.model = Some(crate::agent::builtin::DEFAULT_MODEL.to_owned());
+            cfg.model = crate::agent::builtin::default_model().map(str::to_owned);
+        }
+        if cfg.model.as_deref().is_some_and(crate::agent::builtin::is_gateway_model)
+            && !crate::agent::builtin::gateway_ready()
+        {
+            if cfg.backend == crate::agent::builtin::BACKEND_ID {
+                cfg.model = None;
+            } else {
+                bail!(crate::agent::builtin::NO_GATEWAY);
+            }
         }
         // No name yet (Grok Bot's flow): it gets one after its first few conversations.
         cfg.auto_name = !cfg.is_group() && cfg.name.trim().is_empty();

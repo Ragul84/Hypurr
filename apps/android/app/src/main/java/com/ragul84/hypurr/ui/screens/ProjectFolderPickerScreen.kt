@@ -105,10 +105,10 @@ fun ProjectFolderPickerScreen(
                                     IconBubble(signalIcon(SignalIcons.Back), "Up", size = 34.dp) { onBrowse(it) }
                                     Spacer(Modifier.width(8.dp))
                                 }
-                                Text(listing.path, color = c.text, style = com.ragul84.hypurr.ui.theme.SignalType.mono, maxLines = 2,
+                                Text(listing.path.ifEmpty { "This PC" }, color = c.text, style = com.ragul84.hypurr.ui.theme.SignalType.mono, maxLines = 2,
                                     modifier = Modifier.weight(1f))
                             }
-                            SoftButton(
+                            if (listing.path.isNotEmpty()) SoftButton(
                                 if (selectedPath == listing.path) "Selected" else "Use this folder",
                                 Modifier.fillMaxWidth(),
                                 icon = signalIcon(SignalIcons.Check),

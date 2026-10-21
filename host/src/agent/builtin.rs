@@ -23,6 +23,39 @@ pub const FREE_MODELS: &[FreeModel] = &[
     FreeModel { id: "hypurr/hypurr-fast", name: "Hypurr Fast", note: "Fast free-tier model via Hypurr gateway" },
 ];
 
+/// Plain message when someone picks a Hypurr free model but no gateway serves it.
+pub const NO_GATEWAY: &str =
+    "Free models aren't available yet. Add your own key in Hypurr Agent, or pick Claude or Codex.";
+
+/// The Hypurr gateway that serves the free models, when this computer has one
+/// (`HYPURR_GATEWAY_URL`, or the cloud from `HYPURR_DEFAULT_CLOUD_URL`). None today by default.
+pub fn gateway_url() -> Option<String> {
+    ["HYPURR_GATEWAY_URL", "HYPURR_DEFAULT_CLOUD_URL"]
+        .iter()
+        .filter_map(|k| std::env::var(k).ok())
+        .map(|v| v.trim().to_owned())
+        .find(|v| !v.is_empty())
+}
+
+pub fn gateway_ready() -> bool {
+    gateway_url().is_some()
+}
+
+/// A model id served only by the Hypurr gateway.
+pub fn is_gateway_model(model: &str) -> bool {
+    model.starts_with("hypurr/")
+}
+
+/// Free models to offer: none without a gateway.
+pub fn offered_free_models() -> Value {
+    if gateway_ready() { free_models_json() } else { json!([]) }
+}
+
+/// Default model for a new Hypurr Agent bot: only a free one when the gateway is there.
+pub fn default_model() -> Option<&'static str> {
+    gateway_ready().then_some(DEFAULT_MODEL)
+}
+
 pub struct FreeModel {
     pub id: &'static str,
     pub name: &'static str,
@@ -129,15 +162,16 @@ pub fn status() -> Value {
         "id": BACKEND_ID,
         "name": DISPLAY_NAME,
         "agentName": "Hypurr Agent",
-        "subtitle": "Hypurr Agent · free models",
+        "subtitle": if gateway_ready() { "Hypurr Agent · free models" } else { "Hypurr Agent · your own key" },
         "builtin": true,
-        "free": true,
+        "free": gateway_ready(),
         "installed": installed,
         "available": installed || release().is_ok(),
         "version": VERSION,
         "path": installed.then(|| bin_path().to_string_lossy().into_owned()),
-        "defaultModel": DEFAULT_MODEL,
-        "freeModels": free_models_json(),
+        "defaultModel": default_model(),
+        "freeModels": offered_free_models(),
+        "gatewayReady": gateway_ready(),
         "needsInstall": !installed,
         "license": "MIT",
         "source": format!("https://github.com/{RELEASE_REPO}"),
@@ -307,15 +341,29 @@ mod tests {
     }
 
     #[test]
+    fn gateway_models_are_recognised() {
+        assert!(is_gateway_model("hypurr/hypurr-free"));
+        assert!(!is_gateway_model("anthropic/claude-sonnet"));
+        assert!(NO_GATEWAY.contains("Free models aren't available yet"));
+    }
+
+    #[test]
     fn status_marks_builtin() {
         let s = status();
         assert_eq!(s["id"], BACKEND_ID);
         assert_eq!(s["builtin"], true);
-        assert_eq!(s["free"], true);
         assert_eq!(s["agentName"], "Hypurr Agent");
-        assert_eq!(s["defaultModel"], DEFAULT_MODEL);
         let free_models = s["freeModels"].as_array().unwrap();
-        assert_ne!(free_models.len(), 0);
+        if gateway_ready() {
+            assert_eq!(s["defaultModel"], DEFAULT_MODEL);
+            assert_ne!(free_models.len(), 0);
+        } else {
+            // No gateway: never offer or default to a model nothing serves.
+            assert!(s["defaultModel"].is_null());
+            assert_eq!(free_models.as_slice(), &[] as &[Value]);
+            assert_eq!(s["free"], false);
+            assert_eq!(s["gatewayReady"], false);
+        }
         let blob = s.to_string().to_lowercase();
         assert!(!blob.contains("opencode"), "user-visible status must not say opencode: {blob}");
     }
