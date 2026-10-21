@@ -74,7 +74,8 @@ mod tests {
         assert!(p["payments"].get("razorpay").is_none() && p["payments"]["ready"] == false);
         assert!(p.get("_comment").is_none());
         let packs = p["creditPacks"]["packs"].as_array().unwrap();
-        assert!(packs.iter().all(|k| k["productId"].as_str().unwrap().starts_with("hypurr_credits_") && k["priceInr"].as_f64().unwrap() > 0.0));
+        assert!(packs.iter().all(|k| k["productId"].as_str().unwrap().starts_with("hypurr_credits_")
+            && k["priceInr"].as_f64().unwrap() > 0.0));
         assert_eq!(p["payments"]["provider"], "revenuecat");
     }
 
