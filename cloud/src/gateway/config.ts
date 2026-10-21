@@ -53,7 +53,7 @@ export type GatewayConfig = {
 // may log prompts. All of these support tool calls, which Hypurr Agent needs.
 export const DEFAULT_GATEWAY_CONFIG: GatewayConfig = {
   // Hidden safety cap behind the 10 messages; past it a turn needs credits.
-  freeDailyTokens: 50_000,
+  freeDailyTokens: 300_000,
   freeDailyMessages: 10,
   maxOutputTokens: 8_192,
   maxPromptTokens: 120_000,
@@ -62,7 +62,7 @@ export const DEFAULT_GATEWAY_CONFIG: GatewayConfig = {
   // $0.12 per 1M tokens (incl. markup) → ~8M tokens.
   globalFreeDailyTokens: 8_000_000,
   freeMonthlyTokens: 2_000_000,
-  trialDailyTokens: 50_000,
+  trialDailyTokens: 300_000,
   rateLimitPerMinute: 20,
   minBalanceCents: 1,
   defaultModel: "hypurr-free",

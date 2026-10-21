@@ -86,7 +86,7 @@ turn is paid from credits; with no credits the gateway answers 402 with
 | Setting | Default |
 |---|---|
 | Free messages per user / trial key per UTC day | 10 |
-| Hidden token cap per user per day (then credits) | 50,000 |
+| Hidden token cap per user per day (then credits) | 300,000 |
 | Requests per minute per key | 20 |
 | Max output tokens per request | 8,192 |
 | Max prompt per request | 120,000 tokens |

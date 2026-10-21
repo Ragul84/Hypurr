@@ -97,5 +97,6 @@
       }
     ]
   },
-  "freeMessagesPerDay": 10
+  "freeMessagesPerDay": 10,
+  "freeDailyTokenCap": 300000
 }

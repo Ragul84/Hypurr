@@ -401,7 +401,7 @@ describe("openrouter defaults", () => {
     const auth = { authorization: `Bearer ${secret}` };
     await openTurn(ctx(db, "/v1/gateway/turn", {}, auth));
     (db as any)._tables.gateway_allowance[0].tokens_used = DEFAULT_GATEWAY_CONFIG.freeDailyTokens;
-    expect(DEFAULT_GATEWAY_CONFIG.freeDailyTokens).toBe(50_000);
+    expect(DEFAULT_GATEWAY_CONFIG.freeDailyTokens).toBe(300_000);
     const res = await chatCompletions(ctx(db, "/v1/chat/completions", { model: "hypurr-free", messages: [{ role: "user", content: "hi" }] }, auth));
     expect(res.status).toBe(402);
   });
