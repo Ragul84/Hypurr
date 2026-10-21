@@ -13,6 +13,16 @@ export type UpstreamAdapter = {
 
 export type GatewayConfig = {
   freeDailyTokens: number;
+  /** Abuse limits: free-tier requests per subject per UTC day. */
+  freeDailyRequests: number;
+  /** Abuse limits: max_tokens is clamped to this on every request. */
+  maxOutputTokens: number;
+  /** Abuse limits: a single request's prompt can't exceed this many (approx) tokens. */
+  maxPromptTokens: number;
+  /** Abuse limits: new trial keys per client IP per UTC day. */
+  trialKeysPerIpPerDay: number;
+  /** Kill switch: free tokens served per UTC day across everyone (caps the OpenRouter bill). */
+  globalFreeDailyTokens: number;
   freeMonthlyTokens: number;
   trialDailyTokens: number;
   /** Max requests per minute per subject */
@@ -26,6 +36,8 @@ export type GatewayConfig = {
     /** free | paid */
     tier: "free" | "paid";
     upstreamModel: string;
+    /** OpenRouter fallbacks tried in order when the primary is down or rate-limited. */
+    fallbacks?: string[];
     adapter: string;
     /** Assumed USD per 1M input tokens (estimate for metering when upstream omits usage) */
     assumeInputPerMTok: number;
@@ -36,11 +48,20 @@ export type GatewayConfig = {
   stripeCheckoutPlaceholder: string;
 };
 
+// Upstream model ids verified against https://openrouter.ai/api/v1/models on 2026-10-21.
+// Paid-per-token (not ":free") variants on purpose: ":free" routes are heavily rate-limited and
+// may log prompts. All of these support tool calls, which Hypurr Agent needs.
 export const DEFAULT_GATEWAY_CONFIG: GatewayConfig = {
   freeDailyTokens: 200_000,
+  freeDailyRequests: 150,
+  maxOutputTokens: 8_192,
+  maxPromptTokens: 120_000,
+  trialKeysPerIpPerDay: 5,
+  // ~$0.14/1M blended on hypurr-free: 40M tokens is roughly $6 (≈ ₹500) a day at most.
+  globalFreeDailyTokens: 40_000_000,
   freeMonthlyTokens: 2_000_000,
-  trialDailyTokens: 50_000,
-  rateLimitPerMinute: 30,
+  trialDailyTokens: 200_000,
+  rateLimitPerMinute: 20,
   minBalanceCents: 1,
   defaultModel: "hypurr-free",
   models: [
@@ -48,28 +69,33 @@ export const DEFAULT_GATEWAY_CONFIG: GatewayConfig = {
       id: "hypurr-free",
       name: "Hypurr Free",
       tier: "free",
-      upstreamModel: "openai/gpt-4o-mini",
+      // ~$0.09 in / $0.18 out per 1M tokens, 1M context.
+      upstreamModel: "deepseek/deepseek-v4-flash",
+      fallbacks: ["z-ai/glm-5.3-flash", "qwen/qwen3.7-flash"],
       adapter: "openrouter",
-      assumeInputPerMTok: 0.15,
-      assumeOutputPerMTok: 0.6,
+      assumeInputPerMTok: 0.091,
+      assumeOutputPerMTok: 0.182,
     },
     {
       id: "hypurr-fast",
       name: "Hypurr Fast",
       tier: "free",
-      upstreamModel: "llama-3.1-8b-instant",
-      adapter: "groq",
-      assumeInputPerMTok: 0.05,
-      assumeOutputPerMTok: 0.08,
+      // Small coding model; ~$0.07 in / $0.28 out per 1M tokens.
+      upstreamModel: "qwen/qwen3-coder-30b-a3b-instruct",
+      fallbacks: ["openai/gpt-oss-20b"],
+      adapter: "openrouter",
+      assumeInputPerMTok: 0.07,
+      assumeOutputPerMTok: 0.28,
     },
     {
       id: "hypurr-pro",
       name: "Hypurr Pro",
       tier: "paid",
-      upstreamModel: "anthropic/claude-sonnet-4",
+      upstreamModel: "qwen/qwen3-coder",
+      fallbacks: ["deepseek/deepseek-v3.2"],
       adapter: "openrouter",
-      assumeInputPerMTok: 3.0,
-      assumeOutputPerMTok: 15.0,
+      assumeInputPerMTok: 0.3,
+      assumeOutputPerMTok: 1.0,
     },
   ],
   adapters: [
@@ -77,24 +103,6 @@ export const DEFAULT_GATEWAY_CONFIG: GatewayConfig = {
       id: "openrouter",
       baseUrl: "https://openrouter.ai/api/v1",
       apiKeyEnv: "UPSTREAM_OPENROUTER_API_KEY",
-      markup: 1.2,
-    },
-    {
-      id: "groq",
-      baseUrl: "https://api.groq.com/openai/v1",
-      apiKeyEnv: "UPSTREAM_GROQ_API_KEY",
-      markup: 1.2,
-    },
-    {
-      id: "together",
-      baseUrl: "https://api.together.xyz/v1",
-      apiKeyEnv: "UPSTREAM_TOGETHER_API_KEY",
-      markup: 1.2,
-    },
-    {
-      id: "deepinfra",
-      baseUrl: "https://api.deepinfra.com/v1/openai",
-      apiKeyEnv: "UPSTREAM_DEEPINFRA_API_KEY",
       markup: 1.2,
     },
     {
@@ -114,5 +122,5 @@ export const FREE_TIER_COST_ASSUMPTIONS = {
   freeModelAssumeUsdPerTask: 0.002,
   dailyBudgetTokens: DEFAULT_GATEWAY_CONFIG.freeDailyTokens,
   approxTasksPerDay: Math.floor(DEFAULT_GATEWAY_CONFIG.freeDailyTokens / 8_000),
-  note: "Estimates for cheap open models via OpenRouter/Groq; real cost depends on upstream pricing and markup.",
+  note: "Estimates for cheap open models via OpenRouter; real cost depends on upstream pricing and markup.",
 };

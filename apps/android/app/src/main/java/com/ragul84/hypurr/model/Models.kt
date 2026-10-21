@@ -244,8 +244,10 @@ data class TaskCosts(
     val gatewayFreeRemaining: String? = null,
     /** Credits balance label, e.g. "$5.00". */
     val gatewayCreditsLabel: String? = null,
-    /** Stripe Checkout URL (placeholder until live). */
+    /** Web checkout URL (Razorpay later); null: buy in the app via Google Play. */
     val buyCreditsUrl: String? = null,
+    /** RevenueCat app user id (the computer's gateway subject); null until the gateway is live. */
+    val gatewayAppUserId: String? = null,
     /** Free daily turns left / limit for the gauge (Sunfield Spend). */
     val freeTurnsLeft: Int? = null,
     val freeTurnsLimit: Int? = null,
@@ -561,7 +563,21 @@ data class Pricing(
     val gstNote: String = "",
     val plans: List<Plan> = emptyList(),
     val payments: Payments = Payments(),
+    val creditPacks: CreditPacks = CreditPacks(),
 )
+
+/** Hypurr credits sold as Google Play consumables via RevenueCat (pricing/plans.json). */
+@Serializable
+data class CreditPack(
+    val id: String = "",
+    val productId: String = "",
+    val priceInr: Double = 0.0,
+    val creditsCents: Int = 0,
+    val label: String = "",
+)
+
+@Serializable
+data class CreditPacks(val packs: List<CreditPack> = emptyList())
 
 /** ₹1,23,456 (Indian grouping), whole rupees. */
 fun rupees(amount: Double): String {

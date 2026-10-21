@@ -867,7 +867,12 @@ impl Actor {
             .await?;
             self.hub.set_runtime(&self.id(), |r| r.activity = "Starting agent…".into());
             // Keys saved from an "environment variable" sign-in.
-            let env = crate::agent::auth::env(&self.hub.store, &self.cfg.backend)?;
+            let mut env = crate::agent::auth::env(&self.hub.store, &self.cfg.backend)?;
+            if self.cfg.backend == crate::agent::builtin::BACKEND_ID
+                && !env.iter().any(|(k, _)| k == "OPENCODE_CONFIG_CONTENT")
+            {
+                env.extend(crate::agent::builtin::launch_env(&self.hub.store).await);
+            }
             crate::admin::local_only::check_agent(&self.hub.store, &self.cfg.backend, &env)?;
             let mut last_err = None;
             for (i, command) in candidates.iter().enumerate() {

@@ -223,7 +223,7 @@ object Samples {
         total = CostTotal(12.09, 278_000, 8, estimated = false), week = 12.09, today = 6.30,
         gatewayFreeRemaining = "18 / 40 turns",
         gatewayCreditsLabel = "$12.40",
-        buyCreditsUrl = "https://checkout.stripe.com/c/pay/cs_test_placeholder",
+        buyCreditsUrl = null,
         freeTurnsLeft = 18,
         freeTurnsLimit = 40,
         freeResetLabel = "Resets at midnight IST",

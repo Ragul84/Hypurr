@@ -2,13 +2,18 @@ import { ApiError, type Ctx } from "../api";
 import { DEFAULT_GATEWAY_CONFIG, type GatewayConfig } from "./config";
 import { bearer, issueTrialKey, issueUserKey, resolveSubject, type GatewaySubject } from "./auth";
 import {
+  addGlobalFree,
+  allowTrialIp,
   consumeAllowance,
+  countRequest,
+  globalFreeUsed,
   getAllowance,
   getCredits,
   recordUsage,
   spendCredits,
   topUp,
 } from "./ledger";
+import { CREDIT_PACKS } from "./revenuecat";
 import { estimateCostCents, tokensFromMessages } from "./meter";
 
 function json(data: unknown, status = 200): Response {
@@ -27,10 +32,64 @@ export type GatewayEnv = {
   UPSTREAM_FAKE_API_KEY?: string;
   /** When set, all upstream calls go here (e2e / local fake). */
   GATEWAY_UPSTREAM_OVERRIDE?: string;
+  /** "1" keeps the old Stripe checkout + webhook routes alive; off by default (RevenueCat is the payment path). */
+  PAYMENTS_STRIPE?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   STRIPE_SECRET_KEY?: string;
+  /** Exact value RevenueCat sends in the Authorization header of its webhooks. */
+  REVENUECAT_WEBHOOK_AUTH?: string;
   CLERK_SECRET_KEY?: string;
+  /** Workers Rate Limiting binding: chat requests per subject per minute (all isolates). */
+  GATEWAY_LIMITER?: RateLimit;
+  /** Public URL used as OpenRouter's HTTP-Referer (app attribution). */
+  GATEWAY_PUBLIC_URL?: string;
 };
+
+/** Passes SSE bytes through untouched and reports the final `usage` block when the stream ends. */
+export function usageTap(
+  onUsage: (total: number, prompt: number, completion: number) => Promise<void>,
+): TransformStream<Uint8Array, Uint8Array> {
+  const dec = new TextDecoder();
+  let tail = "";
+  let usage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | undefined;
+  const scan = (text: string) => {
+    for (const line of text.split("\n")) {
+      const t = line.trim();
+      if (!t.startsWith("data:") || !t.includes('"usage"')) continue;
+      try {
+        const u = JSON.parse(t.slice(5).trim()).usage;
+        if (u) usage = u;
+      } catch {
+        /* partial or non-JSON line */
+      }
+    }
+  };
+  return new TransformStream({
+    transform(chunk, ctl) {
+      ctl.enqueue(chunk);
+      const text = tail + dec.decode(chunk, { stream: true });
+      const cut = text.lastIndexOf("\n");
+      if (cut >= 0) {
+        scan(text.slice(0, cut));
+        tail = text.slice(cut + 1);
+      } else {
+        tail = text;
+      }
+      if (tail.length > 65_536) tail = "";
+    },
+    async flush() {
+      scan(tail);
+      if (!usage) return;
+      const p = usage.prompt_tokens ?? 0;
+      const o = usage.completion_tokens ?? 0;
+      try {
+        await onUsage(usage.total_tokens ?? p + o, p, o);
+      } catch (e) {
+        console.log(JSON.stringify({ gateway: "reconcile_failed", error: String(e) }));
+      }
+    },
+  });
+}
 
 const rateBuckets = new Map<string, { n: number; reset: number }>();
 
@@ -85,6 +144,9 @@ export async function chatCompletions(c: Ctx): Promise<Response> {
   if (!rateLimit(sub.subjectId, cfg.rateLimitPerMinute, c.now)) {
     throw new ApiError("rateLimited");
   }
+  if (env.GATEWAY_LIMITER && !(await env.GATEWAY_LIMITER.limit({ key: sub.subjectId })).success) {
+    throw new ApiError("rateLimited");
+  }
 
   let body: Record<string, unknown>;
   try {
@@ -98,9 +160,39 @@ export async function chatCompletions(c: Ctx): Promise<Response> {
   if (!model) throw new ApiError("notFound");
 
   const approxIn = tokensFromMessages(body);
+  if (approxIn > cfg.maxPromptTokens) {
+    return json(
+      { error: { message: "This request is too long for Hypurr's free models.", type: "invalid_request_error", code: "prompt_too_long" } },
+      413,
+    );
+  }
   const allowance = await getAllowance(c.env.DB, sub.subjectId, cfg, sub.kind, c.now);
 
   if (model.tier === "free") {
+    if (allowance.requestsUsed >= cfg.freeDailyRequests) {
+      return json(
+        {
+          error: {
+            message: "You've reached today's free request limit. Try again tomorrow or buy credits.",
+            type: "insufficient_quota",
+            code: "free_requests_exhausted",
+          },
+        },
+        429,
+      );
+    }
+    if ((await globalFreeUsed(c.env.DB, c.now)) >= cfg.globalFreeDailyTokens) {
+      return json(
+        {
+          error: {
+            message: "Hypurr's free models are busy today. Try again tomorrow, or use credits or your own key.",
+            type: "insufficient_quota",
+            code: "free_pool_exhausted",
+          },
+        },
+        503,
+      );
+    }
     if (allowance.remaining < approxIn) {
       return json(
         {
@@ -141,17 +233,30 @@ export async function chatCompletions(c: Ctx): Promise<Response> {
     : secretForAdapter(env, adapter?.apiKeyEnv ?? "") || "";
 
   const stream = Boolean(body.stream);
-  const upstreamBody = {
+  const asked = Number(body.max_tokens ?? body.max_completion_tokens ?? cfg.maxOutputTokens);
+  const maxTokens = Math.max(1, Math.min(Number.isFinite(asked) ? asked : cfg.maxOutputTokens, cfg.maxOutputTokens));
+  const upstreamBody: Record<string, unknown> = {
     ...body,
     model: model.upstreamModel,
     stream,
+    max_tokens: maxTokens,
   };
+  delete upstreamBody.max_completion_tokens;
+  if (stream) upstreamBody.stream_options = { include_usage: true };
+  if (!override && model.adapter === "openrouter") {
+    if (model.fallbacks?.length) upstreamBody.models = [model.upstreamModel, ...model.fallbacks];
+    // Don't let OpenRouter route to providers that train on prompts.
+    upstreamBody.provider = { data_collection: "deny", allow_fallbacks: true };
+  }
+  await countRequest(c.env.DB, sub.subjectId, c.now);
 
   const upstreamRes = await fetch(`${upstreamBase}/chat/completions`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
       authorization: `Bearer ${upstreamKey}`,
+      "http-referer": env.GATEWAY_PUBLIC_URL || "https://hypurr.mindgains.ai",
+      "x-title": "Hypurr",
       // Privacy: do not forward original prompts to logs; only upstream.
     },
     body: JSON.stringify(upstreamBody),
@@ -161,6 +266,13 @@ export async function chatCompletions(c: Ctx): Promise<Response> {
     const text = await upstreamRes.text();
     // Log status only — never prompt bodies.
     console.log(JSON.stringify({ gateway: "upstream_error", status: upstreamRes.status, model: modelId }));
+    // Our own OpenRouter account problems (no credits, bad key) aren't the user's to fix.
+    if ([401, 402, 403].includes(upstreamRes.status)) {
+      return json(
+        { error: { message: "Hypurr's free models are unavailable right now. Try again later, or use your own key.", type: "service_unavailable", code: "upstream_unavailable" } },
+        503,
+      );
+    }
     return new Response(text || JSON.stringify({ error: { message: "Upstream provider error" } }), {
       status: upstreamRes.status,
       headers: { "content-type": upstreamRes.headers.get("content-type") || "application/json" },
@@ -173,6 +285,7 @@ export async function chatCompletions(c: Ctx): Promise<Response> {
     const total = approxIn + estOut;
     if (model.tier === "free") {
       await consumeAllowance(c.env.DB, sub.subjectId, total, c.now);
+      await addGlobalFree(c.env.DB, total, c.now);
       await recordUsage(
         c.env.DB,
         {
@@ -204,7 +317,22 @@ export async function chatCompletions(c: Ctx): Promise<Response> {
         c.now,
       );
     }
-    return new Response(upstreamRes.body, {
+    // Reconcile with the real usage OpenRouter reports in the last SSE chunk.
+    const db = c.env.DB;
+    const now = c.now;
+    const reconcile = async (realTotal: number, realIn: number, realOut: number) => {
+      const extra = realTotal - total;
+      if (extra <= 0) return;
+      if (model.tier === "free") {
+        await consumeAllowance(db, sub.subjectId, extra, now);
+        await addGlobalFree(db, extra, now);
+      } else {
+        const more = Math.max(0, estimateCostCents(cfg, modelId, realIn, realOut) - estimateCostCents(cfg, modelId, approxIn, estOut));
+        if (more > 0) await spendCredits(db, sub.subjectId, more, { model: modelId, reconcile: true }, now);
+      }
+    };
+    const body2 = upstreamRes.body.pipeThrough(usageTap(reconcile));
+    return new Response(body2, {
       status: 200,
       headers: {
         "content-type": upstreamRes.headers.get("content-type") || "text/event-stream",
@@ -223,6 +351,7 @@ export async function chatCompletions(c: Ctx): Promise<Response> {
 
   if (model.tier === "free") {
     await consumeAllowance(c.env.DB, sub.subjectId, total, c.now);
+    await addGlobalFree(c.env.DB, total, c.now);
     await recordUsage(
       c.env.DB,
       {
@@ -285,13 +414,30 @@ export async function spendingBalance(c: Ctx) {
       balanceCents: credits,
       balanceUsd: credits / 100,
     },
-    buyCreditsUrl: cfg.stripeCheckoutPlaceholder,
+    // RevenueCat app user id the phone must log in as, so purchases credit this subject.
+    appUserId: sub.subjectId,
+    payments: "revenuecat",
+    creditPacks: CREDIT_PACKS.map(({ id, productId, priceInr, creditsCents, label }) => ({ id, productId, priceInr, creditsCents, label })),
+    buyCreditsUrl: stripeOn(c) ? cfg.stripeCheckoutPlaceholder : null,
   };
 }
 
+function stripeOn(c: Ctx): boolean {
+  return (c.env as unknown as GatewayEnv).PAYMENTS_STRIPE === "1";
+}
+
 export async function issueTrial(c: Ctx) {
-  const body = JSON.parse(new TextDecoder().decode(c.raw) || "{}") as { hostId?: string };
-  if (!body.hostId || body.hostId.length > 128) throw new ApiError("badRequest");
+  const cfg = cfgFrom(c.env as unknown as GatewayEnv);
+  let body: { hostId?: string };
+  try {
+    body = JSON.parse(new TextDecoder().decode(c.raw) || "{}") as { hostId?: string };
+  } catch {
+    throw new ApiError("badRequest");
+  }
+  if (!body.hostId || !/^[A-Za-z0-9_-]{8,128}$/.test(body.hostId)) throw new ApiError("badRequest");
+  // Free trial keys are the farmable resource: cap new ones per client IP per day.
+  const ip = c.req.headers.get("cf-connecting-ip") ?? "unknown";
+  if (!(await allowTrialIp(c.env.DB, ip, cfg.trialKeysPerIpPerDay, c.now))) throw new ApiError("rateLimited");
   const out = await issueTrialKey(c.env.DB, body.hostId, c.now);
   return {
     keyId: out.id,
@@ -310,6 +456,7 @@ export async function issueUserGatewayKey(c: Ctx, userId: string, label?: string
 }
 
 export async function createCheckout(c: Ctx) {
+  if (!stripeOn(c)) throw new ApiError("notFound");
   const cfg = cfgFrom(c.env as unknown as GatewayEnv);
   const sub = await requireSubject(c);
   // Placeholder: real Stripe Checkout Session would use STRIPE_SECRET_KEY.
@@ -322,6 +469,7 @@ export async function createCheckout(c: Ctx) {
 
 /** Stripe webhook (test-mode placeholders). Verifies signature when secret set. */
 export async function stripeWebhook(c: Ctx): Promise<Response> {
+  if (!stripeOn(c)) throw new ApiError("notFound");
   const env = c.env as unknown as GatewayEnv;
   const sig = c.req.headers.get("stripe-signature") || "";
   if (env.STRIPE_WEBHOOK_SECRET) {

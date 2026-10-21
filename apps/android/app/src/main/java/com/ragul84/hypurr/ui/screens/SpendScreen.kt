@@ -24,6 +24,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -31,7 +34,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.ragul84.hypurr.billing.Credits
 import com.ragul84.hypurr.model.Bot
+import com.ragul84.hypurr.model.rupees
 import com.ragul84.hypurr.model.TaskCosts
 import com.ragul84.hypurr.model.costLabel
 import com.ragul84.hypurr.net.LinkState
@@ -75,6 +80,10 @@ fun SpendScreen(
     val c = Hypurr.colors
     val ctx = LocalContext.current
     var range by remember { mutableIntStateOf(0) }
+    var showPacks by remember { mutableStateOf(false) }
+    var buying by remember { mutableStateOf<String?>(null) }
+    var buyNote by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
     val data = costs ?: TaskCosts(
         gatewayCreditsLabel = "$0.00",
         freeTurnsLeft = 40,
@@ -118,11 +127,58 @@ fun SpendScreen(
                         Spacer(Modifier.height(16.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             PrimaryButton("Add credits", Modifier.weight(1f), icon = signalIcon(SignalIcons.Plus)) {
-                                val url = data.buyCreditsUrl ?: "https://checkout.stripe.com/c/pay/cs_test_placeholder"
-                                if (onBuyCredits != null) onBuyCredits(url)
-                                else try { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } catch (_: Exception) { }
+                                val url = data.buyCreditsUrl
+                                when {
+                                    url != null && onBuyCredits != null -> onBuyCredits(url)
+                                    url != null -> try { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } catch (_: Exception) { }
+                                    else -> showPacks = !showPacks
+                                }
                             }
                             SoftButton("Limits", Modifier.weight(1f).height(48.dp), icon = signalIcon(SignalIcons.Limit), onClick = onLimits)
+                        }
+                    }
+                }
+                if (showPacks) item {
+                    val packs = pricing?.creditPacks?.packs.orEmpty()
+                    val appUser = data.gatewayAppUserId
+                    SignalCard(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("Credits for Hypurr's paid models, paid through Google Play.", color = c.secondary,
+                                style = MaterialTheme.typography.bodyMedium)
+                            if (!Credits.canBuy(appUser) || packs.isEmpty()) {
+                                Text(
+                                    if (!Credits.configured) "Buying credits isn't switched on in this build yet."
+                                    else "Credits open once Hypurr's free models are live on your computer.",
+                                    color = c.tertiary, style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                            packs.forEach { pack ->
+                                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(rupees(pack.priceInr), color = c.text, style = MaterialTheme.typography.titleMedium)
+                                        Text(pack.label.substringAfter("· ", pack.label), color = c.tertiary, style = MaterialTheme.typography.labelMedium)
+                                    }
+                                    PrimaryButton(
+                                        if (buying == pack.productId) "Opening…" else "Buy",
+                                        Modifier.width(112.dp),
+                                        enabled = Credits.canBuy(appUser) && buying == null,
+                                    ) {
+                                        val activity = ctx as? android.app.Activity ?: return@PrimaryButton
+                                        val user = appUser ?: return@PrimaryButton
+                                        buying = pack.productId
+                                        buyNote = null
+                                        scope.launch {
+                                            buyNote = when (val r = Credits.buy(activity, user, pack.productId)) {
+                                                Credits.Outcome.Bought -> "Thanks! Your credits appear here within a minute."
+                                                Credits.Outcome.Cancelled -> null
+                                                is Credits.Outcome.Failed -> r.message
+                                            }
+                                            buying = null
+                                        }
+                                    }
+                                }
+                            }
+                            buyNote?.let { Text(it, color = c.secondary, style = MaterialTheme.typography.bodySmall) }
                         }
                     }
                 }

@@ -53,6 +53,9 @@ pub fn public() -> Value {
     if let Some(o) = c.as_object_mut() {
         o.remove("_comment");
     }
+    if let Some(o) = c.get_mut("creditPacks").and_then(Value::as_object_mut) {
+        o.remove("_comment");
+    }
     c
 }
 
@@ -70,6 +73,9 @@ mod tests {
         let p = public();
         assert!(p["payments"].get("razorpay").is_none() && p["payments"]["ready"] == false);
         assert!(p.get("_comment").is_none());
+        let packs = p["creditPacks"]["packs"].as_array().unwrap();
+        assert!(packs.iter().all(|k| k["productId"].as_str().unwrap().starts_with("hypurr_credits_") && k["priceInr"].as_f64().unwrap() > 0.0));
+        assert_eq!(p["payments"]["provider"], "revenuecat");
     }
 
     #[test]

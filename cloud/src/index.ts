@@ -4,6 +4,7 @@
 
 import * as api from "./api";
 import * as gateway from "./gateway/handler";
+import { revenuecatWebhook } from "./gateway/revenuecat";
 import { ApiError, type Ctx } from "./api";
 import type { ComputerRelay } from "./relay";
 
@@ -34,8 +35,13 @@ export interface Env {
   UPSTREAM_TOGETHER_API_KEY?: string;
   UPSTREAM_DEEPINFRA_API_KEY?: string;
   UPSTREAM_FAKE_API_KEY?: string;
+  PAYMENTS_STRIPE?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   STRIPE_SECRET_KEY?: string;
+  REVENUECAT_WEBHOOK_AUTH?: string;
+  REVENUECAT_ALLOW_SANDBOX?: string;
+  GATEWAY_LIMITER?: RateLimit;
+  GATEWAY_PUBLIC_URL?: string;
 }
 
 
@@ -80,6 +86,8 @@ const routes: [string, RegExp, Handler][] = [
   ["GET", /^\/v1\/gateway\/balance$/, gateway.spendingBalance],
   ["POST", /^\/v1\/gateway\/trial-key$/, gateway.issueTrial],
   ["POST", /^\/v1\/gateway\/checkout$/, gateway.createCheckout],
+  ["POST", /^\/v1\/webhooks\/revenuecat$/, revenuecatWebhook],
+  // Off unless PAYMENTS_STRIPE=1 (404 otherwise).
   ["POST", /^\/v1\/webhooks\/stripe$/, gateway.stripeWebhook],
 ];
 

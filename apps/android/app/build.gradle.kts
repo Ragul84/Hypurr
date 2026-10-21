@@ -29,6 +29,11 @@ android {
         buildConfigField("String", "RELAY_URL", "\"$relayUrl\"")
         // Push is on only when a real Firebase config is present (see docs/setup/push.md).
         buildConfigField("boolean", "PUSH_CONFIGURED", pushConfigured.toString())
+        // RevenueCat public Android SDK key (goog_…) for buying credits via Google Play. Empty: the
+        // Buy buttons stay disabled. -Phypurr.revenuecatKey=goog_… or env REVENUECAT_ANDROID_KEY.
+        val rcKey = providers.gradleProperty("hypurr.revenuecatKey")
+            .orElse(providers.environmentVariable("REVENUECAT_ANDROID_KEY")).getOrElse("")
+        buildConfigField("String", "REVENUECAT_KEY", "\"$rcKey\"")
     }
 
     buildTypes {
@@ -95,6 +100,7 @@ dependencies {
     implementation(libs.mlkit.text)
     // Remote screen: WebRTC (Google's libwebrtc, packaged by Stream), receive-only video + data channels.
     implementation(libs.webrtc)
+    implementation(libs.revenuecat)
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
 

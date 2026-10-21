@@ -39,6 +39,9 @@ function memoryDb() {
     gateway_usage: [],
     gateway_api_keys: [],
     gateway_stripe_events: [],
+    gateway_payment_events: [],
+    gateway_trial_ips: [],
+    gateway_global_budget: [],
   };
   const api = {
     prepare(sql: string) {
@@ -62,6 +65,15 @@ function memoryDb() {
             const row = tables.gateway_api_keys.find((r) => r.key_hash === hash && !r.revoked_at);
             return (row as T) ?? null;
           }
+          if (sql.includes("gateway_payment_events") && sql.includes("SELECT")) {
+            return (tables.gateway_payment_events.find((r) => r.id === binds[0]) as T) ?? null;
+          }
+          if (sql.includes("gateway_trial_ips") && sql.includes("SELECT")) {
+            return (tables.gateway_trial_ips.find((r) => r.ip === binds[0] && r.day === binds[1]) as T) ?? null;
+          }
+          if (sql.includes("gateway_global_budget") && sql.includes("SELECT")) {
+            return (tables.gateway_global_budget.find((r) => r.day === binds[0]) as T) ?? null;
+          }
           if (sql.includes("gateway_stripe_events") && sql.includes("SELECT")) {
             const id = binds[0];
             return (tables.gateway_stripe_events.find((r) => r.id === id) as T) ?? null;
@@ -75,6 +87,7 @@ function memoryDb() {
             if (existing) {
               existing.period_start = period_start;
               existing.tokens_used = 0;
+              existing.requests_used = 0;
               existing.tokens_limit = tokens_limit;
               existing.updated_at = updated_at;
             } else {
@@ -135,6 +148,23 @@ function memoryDb() {
           }
           if (sql.includes("UPDATE gateway_api_keys SET last_used_at")) {
             /* noop */
+          }
+          if (sql.includes("INSERT INTO gateway_payment_events")) {
+            tables.gateway_payment_events.push({ id: binds[0], subject_id: binds[1], amount_cents: binds[3] });
+          }
+          if (sql.includes("INSERT INTO gateway_trial_ips")) {
+            const row = tables.gateway_trial_ips.find((r) => r.ip === binds[0] && r.day === binds[1]);
+            if (row) row.count += 1;
+            else tables.gateway_trial_ips.push({ ip: binds[0], day: binds[1], count: 1 });
+          }
+          if (sql.includes("INSERT INTO gateway_global_budget")) {
+            const row = tables.gateway_global_budget.find((r) => r.day === binds[0]);
+            if (row) row.free_tokens += binds[1];
+            else tables.gateway_global_budget.push({ day: binds[0], free_tokens: binds[1] });
+          }
+          if (sql.includes("SET requests_used = requests_used + 1")) {
+            const row = tables.gateway_allowance.find((r) => r.subject_id === binds[1]);
+            if (row) row.requests_used = (row.requests_used ?? 0) + 1;
           }
           if (sql.includes("INSERT INTO gateway_stripe_events")) {
             tables.gateway_stripe_events.push({ id: binds[0], created_at: binds[1] });
@@ -240,7 +270,7 @@ describe("stripe webhook signature", () => {
     await expect(
       stripeWebhook({
         req,
-        env: { DB: db, STRIPE_WEBHOOK_SECRET: "whsec_test" } as any,
+        env: { DB: db, STRIPE_WEBHOOK_SECRET: "whsec_test", PAYMENTS_STRIPE: "1" } as any,
         exec: {} as any,
         url: new URL(req.url),
         raw,
@@ -266,7 +296,7 @@ describe("stripe webhook signature", () => {
     });
     const res = await stripeWebhook({
       req,
-      env: { DB: db, STRIPE_WEBHOOK_SECRET: "whsec_test" } as any,
+      env: { DB: db, STRIPE_WEBHOOK_SECRET: "whsec_test", PAYMENTS_STRIPE: "1" } as any,
       exec: {} as any,
       url: new URL(req.url),
       raw,
@@ -275,5 +305,169 @@ describe("stripe webhook signature", () => {
     expect(res.status).toBe(200);
     const { getCredits } = await import("../../src/gateway/ledger");
     expect(await getCredits(db, "user:u1")).toBe(1000);
+  });
+});
+
+function ctx(db: D1Database, path: string, body: unknown, headers: Record<string, string>, env: Record<string, unknown> = {}) {
+  const raw = new TextEncoder().encode(JSON.stringify(body));
+  const req = new Request(`http://localhost${path}`, { method: "POST", headers, body: raw });
+  return { req, env: { DB: db, ...env } as any, exec: {} as any, url: new URL(req.url), raw, now: Date.UTC(2026, 9, 21, 6) };
+}
+
+describe("openrouter defaults", () => {
+  it("free models go to OpenRouter with fallbacks and abuse caps", () => {
+    const free = DEFAULT_GATEWAY_CONFIG.models.filter((m) => m.tier === "free");
+    expect(free.map((m) => m.id)).toEqual(["hypurr-free", "hypurr-fast"]);
+    for (const m of DEFAULT_GATEWAY_CONFIG.models) {
+      expect(m.adapter).toBe("openrouter");
+      expect(m.upstreamModel).not.toMatch(/:free$/);
+    }
+    expect(DEFAULT_GATEWAY_CONFIG.maxOutputTokens).toBeGreaterThan(0);
+    expect(DEFAULT_GATEWAY_CONFIG.freeDailyRequests).toBeGreaterThan(0);
+  });
+
+  it("clamps max_tokens, sends fallbacks and counts the request", async () => {
+    const seen: any[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_u: string, init: RequestInit) => {
+        seen.push(JSON.parse(String(init.body)));
+        return new Response(JSON.stringify({ choices: [], usage: { prompt_tokens: 5, completion_tokens: 5 } }));
+      }),
+    );
+    const db = memoryDb();
+    const { secret, hash, prefix } = await mintKeySecret();
+    (db as any)._tables.gateway_api_keys.push({ id: "k", user_id: null, host_id: "host12345", key_hash: hash, key_prefix: prefix, kind: "trial", revoked_at: null });
+    const { chatCompletions } = await import("../../src/gateway/handler");
+    const c = ctx(
+      db,
+      "/v1/chat/completions",
+      { model: "hypurr-free", max_tokens: 999_999, messages: [{ role: "user", content: "hi" }] },
+      { authorization: `Bearer ${secret}` },
+      { UPSTREAM_OPENROUTER_API_KEY: "sk-test" },
+    );
+    const res = await chatCompletions(c);
+    expect(res.status).toBe(200);
+    expect(seen[0].max_tokens).toBe(DEFAULT_GATEWAY_CONFIG.maxOutputTokens);
+    expect(seen[0].model).toBe("deepseek/deepseek-v4-flash");
+    expect(seen[0].models[0]).toBe("deepseek/deepseek-v4-flash");
+    expect(seen[0].provider.data_collection).toBe("deny");
+    expect((db as any)._tables.gateway_allowance[0].requests_used).toBe(1);
+    expect((db as any)._tables.gateway_global_budget[0].free_tokens).toBe(10);
+    vi.unstubAllGlobals();
+  });
+
+  it("refuses free requests over the daily request cap", async () => {
+    const db = memoryDb();
+    const { secret, hash, prefix } = await mintKeySecret();
+    (db as any)._tables.gateway_api_keys.push({ id: "k", user_id: "u9", host_id: null, key_hash: hash, key_prefix: prefix, kind: "user", revoked_at: null });
+    const { getAllowance } = await import("../../src/gateway/ledger");
+    const now = Date.UTC(2026, 9, 21, 6);
+    await getAllowance(db, "user:u9", DEFAULT_GATEWAY_CONFIG, "user", now);
+    (db as any)._tables.gateway_allowance[0].requests_used = DEFAULT_GATEWAY_CONFIG.freeDailyRequests;
+    const { chatCompletions } = await import("../../src/gateway/handler");
+    const res = await chatCompletions(ctx(db, "/v1/chat/completions", { model: "hypurr-free", messages: [] }, { authorization: `Bearer ${secret}` }));
+    expect(res.status).toBe(429);
+  });
+});
+
+describe("usage tap", () => {
+  it("passes bytes through and reports final usage", async () => {
+    const { usageTap } = await import("../../src/gateway/handler");
+    let got: number[] = [];
+    const sse =
+      'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n' +
+      'data: {"choices":[],"usage":{"prompt_tokens":40,"completion_tokens":2,"total_tokens":42}}\n\ndata: [DONE]\n\n';
+    const enc = new TextEncoder().encode(sse);
+    const src = new ReadableStream({
+      start(c) {
+        c.enqueue(enc.slice(0, 30));
+        c.enqueue(enc.slice(30));
+        c.close();
+      },
+    });
+    const out = await new Response(
+      src.pipeThrough(
+        usageTap(async (t, p, o) => {
+          got = [t, p, o];
+        }),
+      ),
+    ).text();
+    expect(out).toBe(sse);
+    expect(got).toEqual([42, 40, 2]);
+  });
+});
+
+describe("trial keys", () => {
+  it("caps new trial keys per IP per day", async () => {
+    const db = memoryDb();
+    const { issueTrial } = await import("../../src/gateway/handler");
+    const n = DEFAULT_GATEWAY_CONFIG.trialKeysPerIpPerDay;
+    for (let i = 0; i < n; i++) {
+      await issueTrial(ctx(db, "/v1/gateway/trial-key", { hostId: `host-000${i}` }, { "cf-connecting-ip": "1.2.3.4" }));
+    }
+    await expect(
+      issueTrial(ctx(db, "/v1/gateway/trial-key", { hostId: "host-9999" }, { "cf-connecting-ip": "1.2.3.4" })),
+    ).rejects.toMatchObject({ code: "rateLimited" });
+    await expect(issueTrial(ctx(db, "/v1/gateway/trial-key", { hostId: "x" }, {}))).rejects.toMatchObject({ code: "badRequest" });
+  });
+});
+
+describe("stripe is off by default", () => {
+  it("404s the stripe webhook without PAYMENTS_STRIPE", async () => {
+    const { stripeWebhook } = await import("../../src/gateway/handler");
+    await expect(stripeWebhook(ctx(memoryDb(), "/v1/webhooks/stripe", { id: "e" }, {}))).rejects.toMatchObject({ code: "notFound" });
+  });
+});
+
+describe("revenuecat webhook", () => {
+  const AUTH = "rc_secret_value";
+  const purchase = (id: string, extra: Record<string, unknown> = {}) => ({
+    api_version: "1.0",
+    event: {
+      id,
+      type: "NON_RENEWING_PURCHASE",
+      app_user_id: "trial:host12345",
+      product_id: "hypurr_credits_249",
+      environment: "PRODUCTION",
+      transaction_id: "GPA.1",
+      ...extra,
+    },
+  });
+
+  it("refuses without the configured secret, or when none is configured", async () => {
+    const { revenuecatWebhook } = await import("../../src/gateway/revenuecat");
+    await expect(
+      revenuecatWebhook(ctx(memoryDb(), "/v1/webhooks/revenuecat", purchase("e1"), { authorization: "nope" }, { REVENUECAT_WEBHOOK_AUTH: AUTH })),
+    ).rejects.toMatchObject({ code: "unauthenticated" });
+    await expect(
+      revenuecatWebhook(ctx(memoryDb(), "/v1/webhooks/revenuecat", purchase("e1"), { authorization: "" })),
+    ).rejects.toMatchObject({ code: "unauthenticated" });
+  });
+
+  it("grants the pack once, ignores sandbox, claws back refunds", async () => {
+    const db = memoryDb();
+    const { revenuecatWebhook, CREDIT_PACKS } = await import("../../src/gateway/revenuecat");
+    const { getCredits } = await import("../../src/gateway/ledger");
+    const pack = CREDIT_PACKS.find((p) => p.productId === "hypurr_credits_249")!;
+    const h = { authorization: `Bearer ${AUTH}` };
+    const env = { REVENUECAT_WEBHOOK_AUTH: AUTH };
+    expect((await revenuecatWebhook(ctx(db, "/x", purchase("e1"), h, env))).status).toBe(200);
+    await revenuecatWebhook(ctx(db, "/x", purchase("e1"), h, env)); // retry: no double grant
+    expect(await getCredits(db, "trial:host12345")).toBe(pack.creditsCents);
+    await revenuecatWebhook(ctx(db, "/x", purchase("e2", { environment: "SANDBOX" }), h, env));
+    expect(await getCredits(db, "trial:host12345")).toBe(pack.creditsCents);
+    await revenuecatWebhook(ctx(db, "/x", purchase("e3", { type: "CANCELLATION", cancel_reason: "CUSTOMER_SUPPORT" }), h, env));
+    expect(await getCredits(db, "trial:host12345")).toBe(0);
+  });
+
+  it("packs match pricing/plans.json rupee prices", async () => {
+    const { CREDIT_PACKS } = await import("../../src/gateway/revenuecat");
+    expect(CREDIT_PACKS.length).toBeGreaterThan(0);
+    for (const p of CREDIT_PACKS) {
+      expect(p.productId).toMatch(/^hypurr_credits_\d+$/);
+      expect(p.priceInr).toBeGreaterThan(0);
+      expect(p.creditsCents).toBeGreaterThan(0);
+    }
   });
 });

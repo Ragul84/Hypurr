@@ -14,11 +14,13 @@ firebaseBom = "33.7.0"
 googleServices = "4.4.2"
 zxing = "4.3.0"
 webrtc = "1.3.10"
+revenuecat = "10.28.1"
 junit = "4.13.2"
 robolectric = "4.14.1"
 roborazzi = "1.39.0"
 
 [libraries]
+revenuecat = { module = "com.revenuecat.purchases:purchases", version.ref = "revenuecat" }
 mlkit-text = { module = "com.google.android.gms:play-services-mlkit-text-recognition", version.ref = "mlkitText" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
