@@ -573,6 +573,8 @@ data class CreditPack(
     val productId: String = "",
     val priceInr: Double = 0.0,
     val creditsCents: Int = 0,
+    /** Rough messages this pack buys once the free ones are used (plans.json). */
+    val approxMessages: Int? = null,
     val label: String = "",
 )
 

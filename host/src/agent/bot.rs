@@ -500,6 +500,9 @@ impl Actor {
         if e.to_string().contains(crate::agent::builtin::NO_GATEWAY) {
             crate::agent::builtin::NO_GATEWAY.clone_into(&mut msg);
         }
+        if e.to_string().contains(crate::agent::builtin::FREE_EXHAUSTED) {
+            crate::agent::builtin::FREE_EXHAUSTED.clone_into(&mut msg);
+        }
         if e.to_string().to_lowercase().contains("auth")
             && let Some(h) = crate::agent::backends::harness(&self.cfg.backend)
         {
@@ -710,6 +713,10 @@ impl Actor {
         if let Some((update, identity)) = context::profile_update(&self.hub.store, &snapshot, &self.cfg) {
             prompt = format!("{prompt}\n\n{update}");
             self.announce = Some((snapshot, identity));
+        }
+        // Hypurr's free models count user messages: open one per turn (agent calls inside are free).
+        if crate::agent::builtin::uses_gateway(&self.cfg.backend, self.cfg.model.as_deref()) {
+            crate::agent::builtin::open_turn(&self.hub.store).await?;
         }
         self.hub.set_runtime(&self.id(), |r| r.activity = "Thinking…".into());
         let acp = self.conn.as_ref().ok_or_else(|| anyhow!("agent not running"))?.acp.clone();

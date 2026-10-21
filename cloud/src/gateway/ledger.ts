@@ -1,7 +1,7 @@
 import type { GatewayConfig } from "./config";
 
 export type Allowance = {
-  requestsUsed: number;
+  messagesUsed: number;
   tokensUsed: number;
   tokensLimit: number;
   periodStart: number;
@@ -29,9 +29,9 @@ export async function getAllowance(
   const limit = kind === "trial" ? cfg.trialDailyTokens : cfg.freeDailyTokens;
   const periodStart = dayBucket(now);
   const row = await db
-    .prepare(`SELECT tokens_used, tokens_limit, period_start, requests_used FROM gateway_allowance WHERE subject_id = ?`)
+    .prepare(`SELECT tokens_used, tokens_limit, period_start, messages_used FROM gateway_allowance WHERE subject_id = ?`)
     .bind(subjectId)
-    .first<{ tokens_used: number; tokens_limit: number; period_start: number; requests_used?: number }>();
+    .first<{ tokens_used: number; tokens_limit: number; period_start: number; messages_used?: number }>();
   if (!row || row.period_start !== periodStart) {
     await db
       .prepare(
@@ -40,16 +40,16 @@ export async function getAllowance(
          ON CONFLICT(subject_id) DO UPDATE SET
            period_start = excluded.period_start,
            tokens_used = 0,
-           requests_used = 0,
+           messages_used = 0,
            tokens_limit = excluded.tokens_limit,
            updated_at = excluded.updated_at`,
       )
       .bind(subjectId, periodStart, limit, now)
       .run();
-    return { requestsUsed: 0, tokensUsed: 0, tokensLimit: limit, periodStart, remaining: limit };
+    return { messagesUsed: 0, tokensUsed: 0, tokensLimit: limit, periodStart, remaining: limit };
   }
   return {
-    requestsUsed: row.requests_used ?? 0,
+    messagesUsed: row.messages_used ?? 0,
     tokensUsed: row.tokens_used,
     tokensLimit: row.tokens_limit,
     periodStart: row.period_start,
@@ -163,9 +163,9 @@ export async function recordUsage(
 }
 
 /** One more request against today's per-subject request cap. */
-export async function countRequest(db: D1Database, subjectId: string, now = Date.now()) {
+export async function countMessage(db: D1Database, subjectId: string, now = Date.now()) {
   await db
-    .prepare(`UPDATE gateway_allowance SET requests_used = requests_used + 1, updated_at = ? WHERE subject_id = ?`)
+    .prepare(`UPDATE gateway_allowance SET messages_used = messages_used + 1, updated_at = ? WHERE subject_id = ?`)
     .bind(now, subjectId)
     .run();
 }

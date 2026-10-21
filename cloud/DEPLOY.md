@@ -74,14 +74,24 @@ The host already defaults to `https://hypurr.mindgains.ai`, but only offers free
 until the deploy is live. `HYPURR_GATEWAY_URL=https://…` overrides it (e.g. the dev copy), and
 `HYPURR_GATEWAY_URL=off` turns the gateway off on that computer. Local-only mode never uses it.
 
-## Limits (cloud/src/gateway/config.ts, overridable with the GATEWAY_CONFIG_JSON var)
+## Free messages and limits (cloud/src/gateway/config.ts, overridable with the GATEWAY_CONFIG_JSON var)
+
+The free allowance is **10 messages per user per UTC day**. A message is one task turn sent from
+the phone: the host calls `POST /v1/gateway/turn` once at the start of the turn, and all the
+agent's model calls inside that turn are free of further counting. The answer carries
+`freeMessagesLeft` (also in `GET /v1/gateway/balance` as `free.messagesLeft`). After the 10th, a
+turn is paid from credits; with no credits the gateway answers 402 with
+"You've used today's free messages. Buy credits or come back tomorrow."
 
 | Setting | Default |
 |---|---|
-| Free tokens per user / trial key per UTC day | 200,000 |
-| Free requests per user per day | 150 |
+| Free messages per user / trial key per UTC day | 10 |
+| Hidden token cap per user per day (then credits) | 50,000 |
 | Requests per minute per key | 20 |
 | Max output tokens per request | 8,192 |
 | Max prompt per request | 120,000 tokens |
 | New trial keys per IP per day | 5 |
-| All free usage per day (kill switch) | 40M tokens ≈ US$6 |
+| All free usage per day (kill switch) | 8M tokens ≈ US$1 |
+
+Credit packs (`pricing/plans.json`): ₹99 ≈ 150 messages, ₹249 ≈ 400, ₹499 ≈ 850, assuming
+about 0.5¢ of model use per message on Hypurr Free. Big tasks or Hypurr Pro use more.

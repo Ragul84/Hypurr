@@ -85,6 +85,7 @@ const routes: [string, RegExp, Handler][] = [
   ["GET", /^\/v1\/models$/, gateway.listModels],
   ["GET", /^\/v1\/gateway\/balance$/, gateway.spendingBalance],
   ["POST", /^\/v1\/gateway\/trial-key$/, gateway.issueTrial],
+  ["POST", /^\/v1\/gateway\/turn$/, gateway.openTurn],
   ["POST", /^\/v1\/gateway\/checkout$/, gateway.createCheckout],
   ["POST", /^\/v1\/webhooks\/revenuecat$/, revenuecatWebhook],
   // Off unless PAYMENTS_STRIPE=1 (404 otherwise).

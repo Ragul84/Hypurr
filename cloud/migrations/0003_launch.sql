@@ -2,7 +2,7 @@
 -- per-subject daily request cap, per-IP trial-key cap, a global daily free-token budget,
 -- and RevenueCat (Google Play Billing) purchase idempotency.
 
-ALTER TABLE gateway_allowance ADD COLUMN requests_used INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE gateway_allowance ADD COLUMN messages_used INTEGER NOT NULL DEFAULT 0;
 
 CREATE TABLE gateway_trial_ips (
   ip          TEXT NOT NULL,

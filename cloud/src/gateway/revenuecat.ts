@@ -8,7 +8,7 @@ import { ApiError, type Ctx } from "../api";
 import plans from "../../../pricing/plans.json";
 import { claw, topUp } from "./ledger";
 
-export type CreditPack = { id: string; productId: string; priceInr: number; creditsCents: number; label: string };
+export type CreditPack = { id: string; productId: string; priceInr: number; creditsCents: number; approxMessages: number; label: string };
 
 export const CREDIT_PACKS: CreditPack[] = (plans as { creditPacks: { packs: CreditPack[] } }).creditPacks.packs;
 

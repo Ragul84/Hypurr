@@ -86,13 +86,12 @@ fun SpendScreen(
     val scope = rememberCoroutineScope()
     val data = costs ?: TaskCosts(
         gatewayCreditsLabel = "$0.00",
-        freeTurnsLeft = 40,
-        freeTurnsLimit = 40,
         freeResetLabel = "Resets at midnight",
-        gatewayFreeRemaining = "40 / 40 turns",
     )
+    // Free messages exist only when the computer has Hypurr's gateway.
+    val freeOn = data.freeTurnsLimit != null
     val left = data.freeTurnsLeft ?: 0
-    val limit = (data.freeTurnsLimit ?: 40).coerceAtLeast(1)
+    val limit = (data.freeTurnsLimit ?: 10).coerceAtLeast(1)
     val used = (limit - left).coerceIn(0, limit)
     val byBot = data.tasks
         .groupBy { it.botId.ifEmpty { it.title } }
@@ -123,7 +122,8 @@ fun SpendScreen(
                         Spacer(Modifier.height(6.dp))
                         DotFigure(data.gatewayCreditsLabel ?: "$0.00", SignalType.hero, c.text)
                         Spacer(Modifier.height(8.dp))
-                        Text(paceLine(data, left), color = c.secondary, style = MaterialTheme.typography.bodyMedium)
+                        if (freeOn) com.ragul84.hypurr.ui.FreeMessagesNote(left, limit, onAddCredits = { showPacks = true })
+                        else Text(paceLine(data, left), color = c.secondary, style = MaterialTheme.typography.bodyMedium)
                         Spacer(Modifier.height(16.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             PrimaryButton("Add credits", Modifier.weight(1f), icon = signalIcon(SignalIcons.Plus)) {
@@ -143,7 +143,7 @@ fun SpendScreen(
                     val appUser = data.gatewayAppUserId
                     SignalCard(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text("Credits for Hypurr's paid models, paid through Google Play.", color = c.secondary,
+                            Text("Credits keep Hypurr's models going after your free messages, paid through Google Play.", color = c.secondary,
                                 style = MaterialTheme.typography.bodyMedium)
                             if (!Credits.canBuy(appUser) || packs.isEmpty()) {
                                 Text(
@@ -156,7 +156,7 @@ fun SpendScreen(
                                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                     Column(Modifier.weight(1f)) {
                                         Text(rupees(pack.priceInr), color = c.text, style = MaterialTheme.typography.titleMedium)
-                                        Text(pack.label.substringAfter("· ", pack.label), color = c.tertiary, style = MaterialTheme.typography.labelMedium)
+                                        Text(pack.approxMessages?.let { "About $it messages" } ?: pack.label, color = c.tertiary, style = MaterialTheme.typography.labelMedium)
                                     }
                                     PrimaryButton(
                                         if (buying == pack.productId) "Opening…" else "Buy",
@@ -202,13 +202,13 @@ fun SpendScreen(
                         }
                     }
                 }
-                item {
+                if (freeOn) item {
                     SignalCard(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(signalIcon(SignalIcons.Shield), null, tint = c.text, modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(8.dp))
-                                Text("Free turns today · ${data.freeResetLabel ?: "resets daily"}", color = c.secondary,
+                                Text("Free messages today · ${data.freeResetLabel ?: "resets daily"}", color = c.secondary,
                                     style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f), maxLines = 1)
                                 DotFigure("$used", SignalType.figureSmall, c.text)
                                 Text(" / $limit", color = c.tertiary, style = MaterialTheme.typography.labelMedium)
@@ -260,7 +260,7 @@ private fun paceLine(data: TaskCosts, freeLeft: Int): String {
     val credits = data.gatewayCreditsLabel?.filter { it.isDigit() || it == '.' }?.toDoubleOrNull() ?: 0.0
     val perDay = data.week / 7.0
     return when {
-        credits <= 0.0 && freeLeft > 0 -> "$freeLeft free turns left today"
+        credits <= 0.0 && freeLeft > 0 -> "$freeLeft free messages left today"
         perDay <= 0.0 -> "No spend this week"
         else -> {
             val days = (credits / perDay).toInt()

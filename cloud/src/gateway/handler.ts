@@ -5,7 +5,7 @@ import {
   addGlobalFree,
   allowTrialIp,
   consumeAllowance,
-  countRequest,
+  countMessage,
   globalFreeUsed,
   getAllowance,
   getCredits,
@@ -91,6 +91,8 @@ export function usageTap(
   });
 }
 
+export const FREE_EXHAUSTED = "You've used today's free messages. Buy credits or come back tomorrow.";
+
 const rateBuckets = new Map<string, { n: number; reset: number }>();
 
 function cfgFrom(env: GatewayEnv): GatewayConfig {
@@ -168,19 +170,19 @@ export async function chatCompletions(c: Ctx): Promise<Response> {
   }
   const allowance = await getAllowance(c.env.DB, sub.subjectId, cfg, sub.kind, c.now);
 
-  if (model.tier === "free") {
-    if (allowance.requestsUsed >= cfg.freeDailyRequests) {
-      return json(
-        {
-          error: {
-            message: "You've reached today's free request limit. Try again tomorrow or buy credits.",
-            type: "insufficient_quota",
-            code: "free_requests_exhausted",
-          },
-        },
-        429,
-      );
-    }
+  // Free models are counted in messages (one per user turn, opened by POST /v1/gateway/turn).
+  // A turn past the daily free messages, or past the hidden token cap, is paid from credits.
+  const paidTurn =
+    model.tier === "free" &&
+    (allowance.messagesUsed > cfg.freeDailyMessages || allowance.remaining < approxIn);
+  const freeTurn = model.tier === "free" && !paidTurn;
+  if (model.tier === "free" && allowance.messagesUsed === 0) {
+    return json(
+      { error: { message: "Send your message from the Hypurr app.", type: "insufficient_quota", code: "no_message_open" } },
+      402,
+    );
+  }
+  if (freeTurn) {
     if ((await globalFreeUsed(c.env.DB, c.now)) >= cfg.globalFreeDailyTokens) {
       return json(
         {
@@ -193,18 +195,9 @@ export async function chatCompletions(c: Ctx): Promise<Response> {
         503,
       );
     }
-    if (allowance.remaining < approxIn) {
-      return json(
-        {
-          error: {
-            message:
-              "You've used today's free Hypurr allowance. Try again tomorrow, buy credits, or use your own API key in Hypurr Agent.",
-            type: "insufficient_quota",
-            code: "free_allowance_exhausted",
-          },
-        },
-        402,
-      );
+  } else if (paidTurn) {
+    if ((await getCredits(c.env.DB, sub.subjectId)) < cfg.minBalanceCents) {
+      return json({ error: { message: FREE_EXHAUSTED, type: "insufficient_quota", code: "free_messages_exhausted" } }, 402);
     }
   } else {
     const bal = await getCredits(c.env.DB, sub.subjectId);
@@ -248,7 +241,6 @@ export async function chatCompletions(c: Ctx): Promise<Response> {
     // Don't let OpenRouter route to providers that train on prompts.
     upstreamBody.provider = { data_collection: "deny", allow_fallbacks: true };
   }
-  await countRequest(c.env.DB, sub.subjectId, c.now);
 
   const upstreamRes = await fetch(`${upstreamBase}/chat/completions`, {
     method: "POST",
@@ -283,7 +275,7 @@ export async function chatCompletions(c: Ctx): Promise<Response> {
     // Meter approximate tokens up-front for free tier; refine on paid via estimate.
     const estOut = 512;
     const total = approxIn + estOut;
-    if (model.tier === "free") {
+    if (freeTurn) {
       await consumeAllowance(c.env.DB, sub.subjectId, total, c.now);
       await addGlobalFree(c.env.DB, total, c.now);
       await recordUsage(
@@ -323,7 +315,7 @@ export async function chatCompletions(c: Ctx): Promise<Response> {
     const reconcile = async (realTotal: number, realIn: number, realOut: number) => {
       const extra = realTotal - total;
       if (extra <= 0) return;
-      if (model.tier === "free") {
+      if (freeTurn) {
         await consumeAllowance(db, sub.subjectId, extra, now);
         await addGlobalFree(db, extra, now);
       } else {
@@ -349,7 +341,7 @@ export async function chatCompletions(c: Ctx): Promise<Response> {
   const completionTokens = data.usage?.completion_tokens ?? 64;
   const total = promptTokens + completionTokens;
 
-  if (model.tier === "free") {
+  if (freeTurn) {
     await consumeAllowance(c.env.DB, sub.subjectId, total, c.now);
     await addGlobalFree(c.env.DB, total, c.now);
     await recordUsage(
@@ -405,6 +397,8 @@ export async function spendingBalance(c: Ctx) {
   const credits = await getCredits(c.env.DB, sub.subjectId);
   return {
     free: {
+      messagesLeft: Math.max(0, cfg.freeDailyMessages - allowance.messagesUsed),
+      messagesLimit: cfg.freeDailyMessages,
       remaining: allowance.remaining,
       limit: allowance.tokensLimit,
       used: allowance.tokensUsed,
@@ -417,13 +411,41 @@ export async function spendingBalance(c: Ctx) {
     // RevenueCat app user id the phone must log in as, so purchases credit this subject.
     appUserId: sub.subjectId,
     payments: "revenuecat",
-    creditPacks: CREDIT_PACKS.map(({ id, productId, priceInr, creditsCents, label }) => ({ id, productId, priceInr, creditsCents, label })),
+    creditPacks: CREDIT_PACKS.map(({ id, productId, priceInr, creditsCents, approxMessages, label }) => ({ id, productId, priceInr, creditsCents, approxMessages, label })),
     buyCreditsUrl: stripeOn(c) ? cfg.stripeCheckoutPlaceholder : null,
   };
 }
 
 function stripeOn(c: Ctx): boolean {
   return (c.env as unknown as GatewayEnv).PAYMENTS_STRIPE === "1";
+}
+
+/**
+ * Opens one user message (a task turn sent from the phone). The host calls this once per turn;
+ * the agent's own model calls inside the turn don't count. Free while messages are left today,
+ * then from credits; refused when neither.
+ */
+export async function openTurn(c: Ctx) {
+  const cfg = cfgFrom(c.env as unknown as GatewayEnv);
+  const sub = await requireSubject(c);
+  const a = await getAllowance(c.env.DB, sub.subjectId, cfg, sub.kind, c.now);
+  const limit = cfg.freeDailyMessages;
+  const credits = await getCredits(c.env.DB, sub.subjectId);
+  if (a.messagesUsed >= limit && credits < cfg.minBalanceCents) {
+    return json(
+      { error: { message: FREE_EXHAUSTED, type: "insufficient_quota", code: "free_messages_exhausted" }, freeMessagesLeft: 0, freeMessagesLimit: limit },
+      402,
+    );
+  }
+  await countMessage(c.env.DB, sub.subjectId, c.now);
+  const used = a.messagesUsed + 1;
+  return {
+    ok: true,
+    paidFrom: used > limit ? "credits" : "free",
+    freeMessagesLeft: Math.max(0, limit - used),
+    freeMessagesLimit: limit,
+    creditsCents: credits,
+  };
 }
 
 export async function issueTrial(c: Ctx) {

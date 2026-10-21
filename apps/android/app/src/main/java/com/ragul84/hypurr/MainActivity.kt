@@ -572,8 +572,16 @@ class MainActivity : ComponentActivity() {
                         picked.value = null
                         task = task.copy(files = task.files + it, error = null)
                     }
+                    val taskCosts by store.costs.collectAsState()
+                    LaunchedEffect(Unit) { store.loadCosts() }
                     NewTaskScreen(
                         task.copy(setup = setup, models = com.ragul84.hypurr.ui.screens.runnableModels(taskHello)),
+                        freeLeft = taskCosts?.freeTurnsLeft,
+                        freeLimit = taskCosts?.freeTurnsLimit,
+                        onAddCredits = {
+                            taskDraft = null
+                            screen = "spend"
+                        },
                         onChange = { task = it },
                         onStart = {
                             task = task.copy(busy = true, error = null)

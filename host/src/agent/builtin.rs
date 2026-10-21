@@ -116,6 +116,67 @@ pub async fn gateway_key(store: &crate::store::Store, base: &str) -> Result<Stri
     Ok(key.to_owned())
 }
 
+/// Shown on the phone when the day's free messages are used and there are no credits.
+pub const FREE_EXHAUSTED: &str = "You've used today's free messages. Buy credits or come back tomorrow.";
+/// Free messages per day (pricing/plans.json `freeMessagesPerDay`; the gateway enforces it).
+pub const FREE_MESSAGES_PER_DAY: i64 = 10;
+/// kv: `<left>|<UTC day>` from the gateway's last answer.
+const FREE_LEFT: &str = "gateway_free_left";
+
+fn utc_day() -> i64 {
+    chrono_free_day(std::time::SystemTime::now())
+}
+
+fn chrono_free_day(t: std::time::SystemTime) -> i64 {
+    let secs = t.duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
+    i64::try_from(secs / 86_400).unwrap_or(0)
+}
+
+/// Free messages left today as last reported by the gateway (a new UTC day resets it).
+pub fn free_messages_left(store: &crate::store::Store) -> i64 {
+    store
+        .kv_get(FREE_LEFT)
+        .and_then(|v| {
+            let (left, day) = v.split_once('|')?;
+            (day.parse::<i64>().ok()? == utc_day()).then(|| left.parse::<i64>().ok())?
+        })
+        .unwrap_or(FREE_MESSAGES_PER_DAY)
+}
+
+/// Whether a turn with this backend and model runs on Hypurr's gateway.
+pub fn uses_gateway(backend: &str, model: Option<&str>) -> bool {
+    backend == BACKEND_ID
+        && gateway_ready()
+        && is_gateway_model(model.filter(|m| !m.is_empty()).unwrap_or(DEFAULT_MODEL))
+}
+
+/// Opens one user message at the gateway (`POST /v1/gateway/turn`): counted once, however many
+/// model calls the agent makes inside it. Refuses with [`FREE_EXHAUSTED`] when none are left.
+pub async fn open_turn(store: &crate::store::Store) -> Result<()> {
+    let Some(base) = gateway_url() else { bail!(NO_GATEWAY) };
+    let key = gateway_key(store, &base).await?;
+    let client = reqwest::Client::builder().timeout(Duration::from_secs(15)).build()?;
+    let res = client
+        .post(format!("{}/v1/gateway/turn", base.trim_end_matches('/')))
+        .bearer_auth(key)
+        .json(&json!({}))
+        .send()
+        .await
+        .context("reaching the Hypurr gateway")?;
+    let status = res.status();
+    let v: Value = res.json().await.unwrap_or_default();
+    if let Some(left) = v["freeMessagesLeft"].as_i64() {
+        store.kv_set(FREE_LEFT, &format!("{left}|{}", utc_day()))?;
+    }
+    if status.as_u16() == 402 {
+        bail!(FREE_EXHAUSTED);
+    }
+    if !status.is_success() {
+        bail!("{NO_GATEWAY} (gateway said {status})");
+    }
+    Ok(())
+}
+
 /// This computer's gateway subject (`trial:<host id>`), once it has a gateway key. Credits
 /// bought on the phone are granted to it (the app user id at the payment provider).
 pub fn gateway_subject(store: &crate::store::Store) -> Option<String> {
@@ -458,6 +519,18 @@ mod tests {
         assert!(is_gateway_model("hypurr/hypurr-free"));
         assert!(!is_gateway_model("anthropic/claude-sonnet"));
         assert!(NO_GATEWAY.contains("Free models aren't available yet"));
+    }
+
+    #[test]
+    fn free_messages_default_and_reset_by_day() {
+        let store = crate::store::Store::open(Path::new(":memory:")).unwrap();
+        assert_eq!(free_messages_left(&store), 10);
+        store.kv_set(FREE_LEFT, &format!("3|{}", utc_day())).unwrap();
+        assert_eq!(free_messages_left(&store), 3);
+        store.kv_set(FREE_LEFT, &format!("0|{}", utc_day() - 1)).unwrap();
+        assert_eq!(free_messages_left(&store), 10, "yesterday's count doesn't carry over");
+        assert!(FREE_EXHAUSTED.starts_with("You've used today's free messages."));
+        assert!(!uses_gateway("claude", Some("hypurr/hypurr-free")));
     }
 
     #[test]
