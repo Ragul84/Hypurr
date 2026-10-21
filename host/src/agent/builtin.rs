@@ -117,7 +117,7 @@ pub async fn gateway_key(store: &crate::store::Store, base: &str) -> Result<Stri
 }
 
 /// This computer's gateway subject (`trial:<host id>`), once it has a gateway key. Credits
-/// bought on the phone are granted to it (RevenueCat app user id).
+/// bought on the phone are granted to it (the app user id at the payment provider).
 pub fn gateway_subject(store: &crate::store::Store) -> Option<String> {
     gateway_ready().then(|| store.kv_get(GATEWAY_HOST_ID)).flatten().map(|id| format!("trial:{id}"))
 }
