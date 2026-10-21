@@ -1,5 +1,7 @@
 package com.ragul84.hypurr.ui.screens
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -161,7 +163,8 @@ fun BotListScreen(
         if (synced && bots.isEmpty()) {
             Greeting(computerName, link, now, Modifier.padding(horizontal = 20.dp, vertical = 10.dp))
             builtinInstall?.let { BuiltinInstallCard(it, onInstallBuiltin, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) }
-            EmptyRoster(onNewTask, onPair = onSettings, onInstall = onInstallBuiltin, windows = isWindows(hostOs) && builtinInstall == null)
+            EmptyRoster(onNewTask, onPair = onSettings, onInstall = onInstallBuiltin, windows = isWindows(hostOs) && builtinInstall == null,
+                progress = setupProgress, computerName = computerName)
             return@Column
         }
         if (!synced && bots.isEmpty()) {
@@ -462,7 +465,7 @@ private fun EmptyRoster(
 ) {
     val c = Hypurr.colors
     Column(
-        Modifier.fillMaxSize().padding(horizontal = 20.dp).padding(bottom = 110.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(top = 8.dp, bottom = 110.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
