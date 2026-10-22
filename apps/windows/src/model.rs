@@ -35,6 +35,10 @@ pub struct Snapshot {
     pub connected_phones: usize,
     pub agent: Agent,
     pub network: Network,
+    /// Remote screen is switched on (phones may view and control this PC).
+    pub screen_enabled: bool,
+    /// The screen helper is connected, so Remote screen actually works.
+    pub screen_ready: bool,
 }
 
 impl Snapshot {

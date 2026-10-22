@@ -89,3 +89,22 @@ Live acceptance requires the configured Worker and fresh host/helper/phone build
 - Verify LAN/direct-only mode without internet access, and the explicit error when relay secrets are absent.
 
 See [Cloudflare testing](../guides/cloudflare-testing.md) for transport checks and [architecture](../architecture/overview.md) for data flow.
+
+## Windows helper
+
+`apps/screen-windows` builds `hypurr-screen.exe`, which the host starts (hidden) while Remote screen
+is on, like `hypurr-screen` on Linux. It connects to the per-user named pipe
+`\.\pipe\hypurr-screen-<USERNAME>` (rejects remote clients) and speaks the same JSON-RPC.
+
+- Capture: Windows Graphics Capture (`windows-capture`), BGRA, cursor included, one capture per
+  display shared by viewers and screenshots. The process is per-monitor DPI aware, so display points
+  are physical pixels.
+- Video: crop/scale from the phone's `view` message, BGRA → I420, OpenH264 (screen-content mode,
+  keyframe on PLI and every 4 s, built from source, no system codec needed), sent over webrtc-rs.
+- Input: `SendInput` on the virtual desktop; text as Unicode key events; keys mapped to virtual keys
+  for the current layout. Windows blocks input into elevated (admin) windows; the phone sees an error.
+- Not yet: the accessibility tree (`uiTree` / `focusedField` return an error), so bots work from
+  screenshots on Windows.
+- Turn it on from the Windows app (**Remote screen** switch); phones can't enable it themselves.
+- Check without a phone: `cargo run --release --example smoke -- shot.jpg` (in `apps/screen-windows`)
+  plays host and phone, saves a screenshot and counts the H.264 packets received.

@@ -2,9 +2,11 @@
 //! bots operate it through the built-in `computer` MCP server (`mcp.rs`).
 //!
 //! Capture, encoding and input injection live in a separate *screen helper*
-//! that connects to `~/.hypurr/screen.sock` — on macOS `HypurrScreen.app`
+//! that connects to `~/.hypurr/screen.sock` (a per-user named pipe on Windows,
+//! see [`pipe_name`]) — on macOS `HypurrScreen.app`
 //! (a signed bundle, so Screen Recording / Accessibility grants stick), on
-//! Linux `hypurr-screen` (xdg portals + `GStreamer`). The host stays the only
+//! Linux `hypurr-screen` (xdg portals + `GStreamer`), on Windows `hypurr-screen.exe`
+//! (Graphics Capture + OpenH264 + webrtc-rs, `apps/screen-windows`). The host stays the only
 //! network-facing process: it relays WebRTC signaling, gates access (off by
 //! default, enabled only from this computer) and arbitrates control between
 //! the user and bots.
@@ -39,10 +41,9 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 #[cfg(unix)]
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-#[cfg(unix)]
-use tokio::net::{UnixListener, UnixStream};
+use tokio::net::UnixListener;
 use tokio::sync::{broadcast, mpsc, oneshot};
 
 /// Long edge of screenshots handed to agents: sharp enough to read UI text,
@@ -775,11 +776,36 @@ fn scale_frames(node: &mut Value, s: f64) {
 
 // MARK: helper socket
 
-/// Remote screen has no Windows helper yet, so there is nothing to accept.
-#[cfg(not(unix))]
-#[allow(clippy::unused_async)]
-pub async fn serve_helpers(_screen: Arc<Screen>) {
-    tracing::info!("remote screen isn't available on Windows yet");
+/// The named pipe `hypurr-screen.exe` connects to, one per Windows user.
+#[cfg(windows)]
+pub fn pipe_name() -> String {
+    let user = std::env::var("USERNAME").unwrap_or_default();
+    format!(r"\\.\pipe\hypurr-screen-{}", user.replace(['\\', '/'], "_"))
+}
+
+/// Accepts screen helpers on a per-user named pipe. The newest connection wins.
+#[cfg(windows)]
+pub async fn serve_helpers(screen: Arc<Screen>) {
+    use tokio::net::windows::named_pipe::ServerOptions;
+    let name = pipe_name();
+    let mut first = true;
+    loop {
+        // Default pipe security: only this user, SYSTEM and administrators can write.
+        let server = match ServerOptions::new().first_pipe_instance(first).reject_remote_clients(true).create(&name) {
+            Ok(s) => s,
+            Err(error) => {
+                tracing::error!(%error, name, "can't listen for the screen helper");
+                return;
+            }
+        };
+        first = false;
+        if let Err(error) = server.connect().await {
+            tracing::warn!(%error, "screen helper accept failed");
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            continue;
+        }
+        tokio::spawn(run_link(screen.clone(), server));
+    }
 }
 
 /// Accepts screen helpers on `~/.hypurr/screen.sock`. The newest connection wins.
@@ -813,18 +839,22 @@ pub async fn serve_helpers(screen: Arc<Screen>) {
     }
 }
 
-/// Linux: the host runs `hypurr-screen` itself while Remote screen is on (on macOS
-/// launchd runs Hypurr Screen for the app). Restarts it if it exits; stops it when turned off.
-#[cfg(target_os = "linux")]
-pub async fn supervise_linux_helper(screen: Arc<Screen>) {
-    let exe = std::env::current_exe().ok().and_then(|p| p.parent().map(|d| d.join("hypurr-screen")));
+/// Linux and Windows: the host runs `hypurr-screen` itself while Remote screen is on (on
+/// macOS launchd runs Hypurr Screen for the app). Restarts it if it exits; stops it when turned off.
+#[cfg(any(target_os = "linux", windows))]
+pub async fn supervise_helper(screen: Arc<Screen>) {
+    let name = if cfg!(windows) { "hypurr-screen.exe" } else { "hypurr-screen" };
+    let exe = std::env::current_exe().ok().and_then(|p| p.parent().map(|d| d.join(name)));
     let program = exe.filter(|p| p.is_file()).unwrap_or_else(|| "hypurr-screen".into());
     let mut child: Option<tokio::process::Child> = None;
     let mut backoff = Duration::from_secs(1);
     loop {
         let running = child.as_mut().is_some_and(|c| matches!(c.try_wait(), Ok(None)));
         if screen.enabled() && !running {
-            match tokio::process::Command::new(&program).kill_on_drop(true).spawn() {
+            let mut cmd = tokio::process::Command::new(&program);
+            #[cfg(windows)]
+            cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+            match cmd.kill_on_drop(true).spawn() {
                 Ok(c) => child = Some(c),
                 Err(error) => tracing::warn!(%error, program = %program.display(), "can't start hypurr-screen"),
             }
@@ -844,9 +874,8 @@ pub async fn supervise_linux_helper(screen: Arc<Screen>) {
     }
 }
 
-#[cfg(unix)]
-async fn run_link(screen: Arc<Screen>, stream: UnixStream) {
-    let (rd, mut wr) = stream.into_split();
+async fn run_link<S: AsyncRead + AsyncWrite + Send + 'static>(screen: Arc<Screen>, stream: S) {
+    let (rd, mut wr) = tokio::io::split(stream);
     let (tx, mut rx) = mpsc::unbounded_channel::<String>();
     let link = Arc::new(Link {
         id: screen.next_link.fetch_add(1, Ordering::Relaxed),

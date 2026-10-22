@@ -153,6 +153,13 @@ impl eframe::App for App {
         if act.hide {
             ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));
         }
+        if let Some(on) = act.toggle_screen
+            && let Some(h) = &self.host
+        {
+            *h.set_screen.lock().unwrap() = Some(on);
+            // Show the switch moving now; the next poll confirms it.
+            self.state.lock().unwrap().screen_enabled = on;
+        }
         if let Some(on) = act.toggle_autostart
             && autostart::set(on).is_ok()
         {

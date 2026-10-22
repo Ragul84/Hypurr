@@ -98,6 +98,7 @@ pub struct Actions {
     pub back_to_status: bool,
     pub hide: bool,
     pub toggle_autostart: Option<bool>,
+    pub toggle_screen: Option<bool>,
 }
 
 pub struct View<'a> {
@@ -381,6 +382,30 @@ fn status_screen(ui: &mut egui::Ui, p: &Palette, v: &View, a: &mut Actions) {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if toggle(ui, p, v.autostart) {
                     a.toggle_autostart = Some(!v.autostart);
+                }
+            });
+        });
+    });
+    ui.add_space(10.0);
+    card(ui, p, |ui| {
+        ui.horizontal(|ui| {
+            ui.vertical(|ui| {
+                ui.label(
+                    egui::RichText::new("Remote screen")
+                        .font(semibold(15.0))
+                        .color(p.text),
+                );
+                ui.add_space(2.0);
+                let note = match (v.snap.screen_enabled, v.snap.screen_ready) {
+                    (false, _) => "Let your phones and bots see and control this PC.",
+                    (true, false) => "Starting the screen helper...",
+                    (true, true) => "On. Your phones and bots can see and control this PC.",
+                };
+                ui.label(egui::RichText::new(note).font(inter(13.0)).color(p.tertiary));
+            });
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if toggle(ui, p, v.snap.screen_enabled) {
+                    a.toggle_screen = Some(!v.snap.screen_enabled);
                 }
             });
         });

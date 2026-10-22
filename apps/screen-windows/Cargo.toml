@@ -1,0 +1,30 @@
+[package]
+name = "hypurr-screen"
+version = "2.1.0"
+edition = "2024"
+description = "Hypurr Remote screen helper for Windows: Graphics Capture + OpenH264 + webrtc-rs"
+license = "MIT"
+
+[[bin]]
+name = "hypurr-screen"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+base64 = "0.22"
+bytes = "1"
+clipboard-win = "5"
+image = { version = "0.25", default-features = false, features = ["jpeg"] }
+openh264 = "0.8"
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util", "sync", "time", "process"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+webrtc = "0.13"
+windows-capture = "1.4"
+windows = { version = "0.61", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging", "Win32_UI_HiDpi"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true

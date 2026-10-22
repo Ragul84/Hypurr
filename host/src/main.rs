@@ -498,8 +498,8 @@ async fn serve(bind: &str, port: u16) -> Result<()> {
     tokio::spawn(update::automatic_loop(hub.clone()));
     tokio::spawn(screen::serve_helpers(hub.screen.clone()));
     tokio::spawn(relay::run(hub.clone()));
-    #[cfg(target_os = "linux")]
-    tokio::spawn(screen::supervise_linux_helper(hub.screen.clone()));
+    #[cfg(any(target_os = "linux", windows))]
+    tokio::spawn(screen::supervise_helper(hub.screen.clone()));
     tracing::info!(version = env!("CARGO_PKG_VERSION"), bind, port, "hypurr-host listening");
     // Peer addresses: some settings may only be changed from this computer.
     let app = api::router(hub.clone()).into_make_service_with_connect_info::<std::net::SocketAddr>();

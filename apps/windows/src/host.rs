@@ -54,13 +54,17 @@ struct Api {
 
 impl Api {
     fn call(&self, method: &str) -> Result<Value, String> {
+        self.call_with(method, &json!({}))
+    }
+
+    fn call_with(&self, method: &str, body: &Value) -> Result<Value, String> {
         let token = std::fs::read_to_string(data_dir().join("token"))
             .map_err(|_| "not started".to_owned())?;
         let res = self
             .http
             .post(format!("http://127.0.0.1:{PORT}/api/{method}"))
             .bearer_auth(token.trim())
-            .json(&json!({}))
+            .json(body)
             .send()
             .map_err(|e| e.to_string())?;
         let ok = res.status().is_success();
@@ -78,6 +82,8 @@ pub struct Host {
     pub state: Arc<Mutex<Snapshot>>,
     child: Arc<Mutex<Option<Child>>>,
     pub force_new_code: Arc<Mutex<bool>>,
+    /// Remote screen on/off, applied on the next poll.
+    pub set_screen: Arc<Mutex<Option<bool>>>,
 }
 
 impl Host {
@@ -88,12 +94,14 @@ impl Host {
         }));
         let child = Arc::new(Mutex::new(None));
         let force = Arc::new(Mutex::new(false));
-        let (st, ch, fo) = (state.clone(), child.clone(), force.clone());
-        std::thread::spawn(move || run(st, ch, fo, repaint));
+        let screen = Arc::new(Mutex::new(None));
+        let (st, ch, fo, sc) = (state.clone(), child.clone(), force.clone(), screen.clone());
+        std::thread::spawn(move || run(st, ch, fo, sc, repaint));
         Host {
             state,
             child,
             force_new_code: force,
+            set_screen: screen,
         }
     }
 
@@ -120,6 +128,7 @@ fn run(
     state: Arc<Mutex<Snapshot>>,
     child: Arc<Mutex<Option<Child>>>,
     force: Arc<Mutex<bool>>,
+    set_screen: Arc<Mutex<Option<bool>>>,
     repaint: impl Fn(),
 ) {
     let api = Api {
@@ -157,6 +166,8 @@ fn run(
                     s.error = None;
                     s.computer = h["name"].as_str().unwrap_or_default().to_owned();
                     s.agent = model::agent_from_hello(h);
+                    s.screen_enabled = h["screen"]["enabled"].as_bool().unwrap_or(false);
+                    s.screen_ready = h["screen"]["connected"].as_bool().unwrap_or(false);
                 }
                 Err(_) => {
                     s.running = false;
@@ -168,6 +179,13 @@ fn run(
             }
         }
         if hello.is_ok() {
+            let wanted = set_screen.lock().unwrap().take();
+            if let Some(on) = wanted {
+                match api.call_with("setScreenEnabled", &json!({"enabled": on})) {
+                    Ok(st) => state.lock().unwrap().screen_enabled = st["enabled"].as_bool().unwrap_or(on),
+                    Err(e) => state.lock().unwrap().error = Some(format!("Couldn't change Remote screen: {e}")),
+                }
+            }
             if let Ok(d) = api.call("devices") {
                 let (p, c) = model::phones(&d);
                 let mut s = state.lock().unwrap();
