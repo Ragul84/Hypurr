@@ -4,6 +4,7 @@
 
 mod autostart;
 mod host;
+mod icon;
 mod model;
 #[cfg(windows)]
 mod tray;

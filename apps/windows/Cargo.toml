@@ -17,6 +17,10 @@ serde_json = "1"
 image = { version = "0.25", default-features = false, features = ["png"] }
 dirs = "6"
 
+[build-dependencies]
+image = { version = "0.25", default-features = false, features = ["png"] }
+winresource = "0.1"
+
 [target.'cfg(windows)'.dependencies]
 tray-icon = "0.21"
 winreg = "0.55"

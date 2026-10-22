@@ -7,17 +7,7 @@ use eframe::egui::{
     Sense, Stroke, Vec2,
 };
 
-pub const CAT: [&str; 9] = [
-    "#ooooooo#",
-    "##ooooo##",
-    "#########",
-    "#########",
-    "##o###o##",
-    "#########",
-    "####o####",
-    "o#######o",
-    "oo#####oo",
-];
+pub use crate::icon::{CAT, cat_icon_rgba};
 
 #[derive(Clone, Copy)]
 pub struct Palette {
@@ -430,33 +420,6 @@ fn toggle(ui: &mut egui::Ui, p: &Palette, on: bool) -> bool {
     );
     resp.on_hover_cursor(egui::CursorIcon::PointingHand)
         .clicked()
-}
-
-/// The cat mark as RGBA (black dots on transparent) for the tray and window icon.
-pub fn cat_icon_rgba(size: u32) -> (Vec<u8>, u32) {
-    let mut px = vec![0u8; (size * size * 4) as usize];
-    let cell = size as f32 / 9.0;
-    for (y, row) in CAT.iter().enumerate() {
-        for (x, ch) in row.chars().enumerate() {
-            let (cx, cy) = ((x as f32 + 0.5) * cell, (y as f32 + 0.5) * cell);
-            let (r, col) = if ch == '#' {
-                (cell * 0.42, [0x0E, 0x0E, 0x0E])
-            } else {
-                (cell * 0.30, [0xB0, 0xB0, 0xAA])
-            };
-            for py in 0..size {
-                for pxl in 0..size {
-                    let (dx, dy) = (pxl as f32 + 0.5 - cx, py as f32 + 0.5 - cy);
-                    if dx * dx + dy * dy <= r * r {
-                        let i = ((py * size + pxl) * 4) as usize;
-                        px[i..i + 3].copy_from_slice(&col);
-                        px[i + 3] = 255;
-                    }
-                }
-            }
-        }
-    }
-    (px, size)
 }
 
 #[cfg(test)]
