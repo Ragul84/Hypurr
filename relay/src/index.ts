@@ -22,6 +22,21 @@ export interface Env extends FcmEnv {
   APNS_SIGNING_KEY: string;
   /** base64 of 32 random bytes: `openssl rand -base64 32` */
   TICKET_KEY: string;
+  /** Abuse limits (wrangler.toml `ratelimits`); absent in unit tests. */
+  REGISTER_LIMITER?: RateLimit;
+  PUSH_LIMITER?: RateLimit;
+}
+
+/** Workers rate-limit binding (subset). */
+interface RateLimit {
+  limit(o: { key: string }): Promise<{ success: boolean }>;
+}
+
+/** Per-IP abuse limit; false = answer 429. */
+export async function allowed(limiter: RateLimit | undefined, req: Request): Promise<boolean> {
+  if (!limiter) return true;
+  const ip = req.headers.get("CF-Connecting-IP") ?? "unknown";
+  return (await limiter.limit({ key: ip })).success;
 }
 
 type ApnsEnv = "sandbox" | "production";
@@ -247,6 +262,9 @@ export default {
     const { pathname } = new URL(req.url);
     if (req.method === "GET" && pathname === "/health") return json({ ok: true });
     if (req.method !== "POST") return json({ error: "method not allowed" }, 405);
+    if (Number(req.headers.get("Content-Length") ?? 0) > 512 * 1024) return json({ error: "too large" }, 413);
+    const limiter = pathname === "/register" ? env.REGISTER_LIMITER : env.PUSH_LIMITER;
+    if (!(await allowed(limiter, req))) return json({ error: "rate limited" }, 429);
     if (pathname === "/register") return register(req, env);
     if (pathname === "/push") return push(req, env);
     if (pathname === "/push-batch") return pushBatch(req, env);

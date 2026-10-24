@@ -231,6 +231,9 @@ class HypurrStore(
     /** Runs after every handshake on a fresh channel (push registration). */
     var onConnected: (suspend (HostClient) -> Unit)? = null
 
+    /** A bot needs you, finished or failed while the channel is live (local fallback for push). */
+    var onLocalAlert: ((com.ragul84.hypurr.push.LocalAlerts.Kind, Bot) -> Unit)? = null
+
     fun setTheme(mode: ThemeMode) {
         themeMode.value = mode
         persistence.write(THEME, mode.name)
@@ -355,6 +358,9 @@ class HypurrStore(
 
     private fun upsert(bot: Bot) {
         rev = maxOf(rev, bot.rev)
+        com.ragul84.hypurr.push.LocalAlerts.detect(_bots.value[bot.id], bot)?.let { kind ->
+            if (notifications.value) runCatching { onLocalAlert?.invoke(kind, bot) }
+        }
         if (bot.deleted == true) _bots.update { it - bot.id } else _bots.update { it + (bot.id to bot) }
     }
 
