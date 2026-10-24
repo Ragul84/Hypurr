@@ -143,9 +143,17 @@ fun OnboardingScreen(
                         contentAlignment = Alignment.Center,
                     ) { DotCat(c.text, 32.dp, off = c.dotOff) }
                     Spacer(Modifier.width(14.dp))
-                    com.ragul84.hypurr.ui.Eyebrow(if (editing) "Your profile" else "Tune Hypurr to you", color = c.secondary)
+                    com.ragul84.hypurr.ui.Eyebrow(if (editing) "Your profile" else "Welcome to Hypurr", color = c.secondary)
                 }
-                Spacer(Modifier.height(20.dp))
+                if (!editing) {
+                    Spacer(Modifier.height(18.dp))
+                    Text(com.ragul84.hypurr.ui.Pitch.Headline, style = MaterialTheme.typography.headlineMedium, color = c.text)
+                    Spacer(Modifier.height(14.dp))
+                    SignalCard(Modifier.fillMaxWidth()) { com.ragul84.hypurr.ui.PitchPillars(Modifier.padding(14.dp), compact = true) }
+                    Spacer(Modifier.height(24.dp))
+                    com.ragul84.hypurr.ui.Eyebrow("Tune it to you", color = c.secondary)
+                    Spacer(Modifier.height(8.dp))
+                } else Spacer(Modifier.height(20.dp))
             }
             AnimatedContent(current, transitionSpec = { fadeIn(Motion.effects()) togetherWith fadeOut(Motion.effects()) }, label = "step") { s ->
                 Column {

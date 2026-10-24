@@ -90,7 +90,7 @@ fun PairingScreen(
             Text("Meet Hypurr", style = MaterialTheme.typography.headlineLarge, color = c.text)
             Spacer(Modifier.height(8.dp))
             Text(
-                "AI coding agents, safe enough for anyone. Install the agent on your computer, then pair this phone.",
+                com.ragul84.hypurr.ui.Pitch.Subhead,
                 color = c.secondary, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge,
             )
             if (state.success && state.computerName != null) {
@@ -110,6 +110,10 @@ fun PairingScreen(
                     }
                 } else {
                     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                        if (!state.success) {
+                            SignalCard(Modifier.fillMaxWidth()) { com.ragul84.hypurr.ui.PitchPillars(Modifier.padding(16.dp)) }
+                            Spacer(Modifier.height(14.dp))
+                        }
                         SignalCard(Modifier.fillMaxWidth()) {
                             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                                 Step(1, "Start Hypurr on your PC (hypurr-host or the start script)")
