@@ -556,8 +556,14 @@ class HostClient(val transport: ChannelTransport) {
 
 /** Opens channels to computers (§7.5) and pairs new ones from a QR (§4.1). */
 object HostConnector {
-    fun connect(computer: Computer, identity: DeviceIdentity, scope: CoroutineScope, dial: Dialer = OkHttpSocket.dial): ChannelTransport =
-        ChannelTransport(computer, identity, scope, dial = dial).also { it.start() }
+    fun connect(
+        computer: Computer,
+        identity: DeviceIdentity,
+        scope: CoroutineScope,
+        dial: Dialer = OkHttpSocket.dial,
+        useRelay: () -> Boolean = { true },
+    ): ChannelTransport =
+        ChannelTransport(computer, identity, scope, dial = dial, useRelay = useRelay).also { it.start() }
 
     /**
      * Proves the QR's one-time code inside a channel to the QR's host key; the host then authorizes

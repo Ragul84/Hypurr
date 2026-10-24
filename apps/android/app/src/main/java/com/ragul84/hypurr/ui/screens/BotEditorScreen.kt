@@ -232,7 +232,7 @@ fun BotEditorScreen(
                     val selected = backends.firstOrNull { it.id == state.backend }
                     if (selected != null && (selected.free || selected.builtin) && selected.freeModels.isNotEmpty()) {
                         Text("Free model", color = c.secondary, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 8.dp))
-                        Text(selected.subtitle.ifEmpty { "Hypurr gateway · free daily allowance" }, color = c.tertiary,
+                        Text(selected.subtitle.ifEmpty { "Hypurr Free · for trying out, not for company code" }, color = c.tertiary,
                             style = MaterialTheme.typography.bodySmall)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.padding(top = 8.dp)) {

@@ -138,7 +138,8 @@ fun sizeLabel(bytes: Long): String = when {
 data class Attachment(val id: String, val name: String = "", val size: Long = 0)
 
 @Serializable
-data class FileChange(val path: String, val added: Long = 0, val removed: Long = 0)
+/** One changed file; [patch] is its unified diff (host-capped), empty for binary or older hosts. */
+data class FileChange(val path: String, val added: Long = 0, val removed: Long = 0, val patch: String = "")
 
 @Serializable
 data class PullRequest(val number: Long = 0, val url: String = "", val repo: String? = null)

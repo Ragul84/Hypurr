@@ -24,11 +24,17 @@ android {
         // Google Play requires API 36 for new apps and updates since Aug 31, 2026.
         targetSdk = 36
         // Same version as apps/project.yml MARKETING_VERSION and host/Cargo.toml.
+<<<<<<< ours
         versionName = "2.5.0"
         versionCode = 20501
         // The push relay (relay/). Placeholder until it is deployed; matches SharedStore.relayURL on iOS.
+=======
+        versionName = "2.6.0"
+        versionCode = 20600
+        // The push relay (relay/, deployed at push.mindgains.ai): host -> relay -> FCM.
+>>>>>>> theirs
         // Override without editing: ./gradlew assembleRelease -Phypurr.relayUrl=https://relay.example.com
-        val relayUrl = providers.gradleProperty("hypurr.relayUrl").getOrElse("https://hypurr-relay.example.workers.dev")
+        val relayUrl = providers.gradleProperty("hypurr.relayUrl").getOrElse("https://push.mindgains.ai")
         buildConfigField("String", "RELAY_URL", "\"$relayUrl\"")
         // Push is on only when a real Firebase config is present (see docs/setup/push.md).
         buildConfigField("boolean", "PUSH_CONFIGURED", pushConfigured.toString())

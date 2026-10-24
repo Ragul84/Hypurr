@@ -4,8 +4,8 @@
 
 # Hypurr
 
-**Message your coding agents like teammates. They purr while they work.**<br>
-Free, open source, native on iPhone, Mac, Linux and the terminal.
+**Coding agents, safe for anyone.**<br>
+Ask in plain words. Hypurr keeps it safe, proves it works, and comes with free AI.
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-a78bfa)](LICENSE)
 ![iOS](https://img.shields.io/badge/iOS-18+-f472b6?logo=apple)
@@ -27,6 +27,25 @@ Hypurr turns the coding agents on your computer — Claude Code, Codex, Cursor, 
 > Why bots? On a phone, "find the right working session, then pick an environment" is too slow. With bots you already know who to hand the intent to: open the chat, type, done.
 
 ## Why Hypurr
+
+Plenty of apps let you control a coding agent from your phone. Hypurr is built for people who
+aren't experts, and leads with three things the others don't do:
+
+1. **Safe for non-experts.** Every approval is one plain sentence with a risk level. The agent
+   stays in the one folder you picked, never touches production (pushes to `main` are refused),
+   and every step has a checkpoint you can roll back to with one tap. On Android you can speak
+   tasks and approvals in eight Indian languages, and a spoken "yes" never approves a risky action
+   without a tap.
+2. **Proof it works.** *Show me it works* runs your app and brings back screenshots. *Trace a
+   click* follows a button to the function, API call and file:line behind it. *Page map* lists
+   every screen and its APIs. *What changed* shows each file, lines added and removed, and the diff.
+3. **Free AI built in.** No AI account? *Hypurr Free* gives you 10 free messages to try it
+   (for trying out, not for company code). Claude Code or Codex you already have work as they are,
+   at no extra cost.
+
+See [marketing/pitch.md](marketing/pitch.md) for the full positioning.
+
+### Everything else
 
 - **Free and open source.** No subscription, no paid tier, MIT licensed. It runs on your computer with the agents and accounts you already have.
 - **Bring any coding agent.** Claude Code, Codex, Cursor, Gemini, Copilot, Hypurr Agent, Pi, Grok Build and ~40 more — everything in the [ACP registry](https://agentclientprotocol.com/registry). Installed agents are found automatically, the rest are fetched on first use, and every bot picks its own. Mix them freely: a Claude bot can ask a Codex bot for a review.

@@ -96,6 +96,8 @@ data class NewTaskUiState(
     /** The issue picker: open, and what the host found (null while loading). */
     val pickingIssue: Boolean = false,
     val issues: IssueList? = null,
+    /** Some of the goal was said by voice (adds a note for the agent). */
+    val spoken: Boolean = false,
 ) {
     /** What the router reads: the goal, or the picked issue. */
     val routeText: String get() = listOf(goal, issue?.title.orEmpty(), input).filter { it.isNotBlank() }.joinToString(" ")
@@ -149,6 +151,7 @@ fun NewTaskScreen(
                 color = c.secondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
             Field(state.goal, template?.goalHint?.takeIf { it.isNotEmpty() } ?: "e.g. Fix the login bug in ticket 142",
                 minHeight = 96.dp) { onChange(state.copy(goal = it, error = null)) }
+            VoiceGoal(state, onChange)
             if (freeLeft != null && freeLimit != null && state.usesHypurrModels) {
                 com.ragul84.hypurr.ui.FreeMessagesNote(freeLeft, freeLimit, onAddCredits, Modifier.padding(top = 8.dp))
             }
@@ -276,6 +279,9 @@ private fun SetupPickers(state: NewTaskUiState, onChange: (NewTaskUiState) -> Un
                         models.forEach { m ->
                             Choice(m.name.ifEmpty { m.id }, m.id == state.model) { onChange(state.copy(model = m.id)); open = null }
                         }
+                    }
+                    models.firstOrNull { it.id == state.model }?.description?.takeIf { it.isNotBlank() }?.let {
+                        Text(it, color = c.tertiary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 6.dp))
                     }
                 }
             }
@@ -434,6 +440,31 @@ private fun IssuePicker(list: IssueList?, onPick: (Issue) -> Unit, onClose: () -
         list?.issues.orEmpty().forEach { i -> IssueRow(i, onClick = { onPick(i) }) }
         list?.errors.orEmpty().forEach { e ->
             Text(e.message, color = c.needsText, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+/** Mic under the task box: speak the task in the chosen language; the words land in the box to check. */
+@Composable
+private fun VoiceGoal(state: NewTaskUiState, onChange: (NewTaskUiState) -> Unit) {
+    val c = Hypurr.colors
+    val voice = com.ragul84.hypurr.voice.LocalVoiceSettings.current
+    val latest = androidx.compose.runtime.rememberUpdatedState(state)
+    val mic = com.ragul84.hypurr.voice.rememberVoiceInput(voice.language) { said ->
+        val s = latest.value
+        onChange(s.copy(goal = listOf(s.goal.trim(), said.trim()).filter { it.isNotEmpty() }.joinToString(" "), spoken = true, error = null))
+    }
+    Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        com.ragul84.hypurr.ui.MicButton(mic.listening, voice.language) { if (mic.listening) mic.stop() else mic.start() }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(if (mic.listening) "Listening…" else "Say it in ${voice.language.label}", color = c.text,
+                style = MaterialTheme.typography.titleSmall)
+            com.ragul84.hypurr.ui.VoiceHint(mic.listening, mic.partial, mic.error, voice.language)
+            if (!mic.listening && mic.error == null) {
+                Text(if (voice.explainInMyLanguage && !voice.language.isEnglish) "Code stays in English. It explains in ${voice.language.label}."
+                    else "Change the language in You.", color = c.tertiary, style = MaterialTheme.typography.bodySmall)
+            }
         }
     }
 }

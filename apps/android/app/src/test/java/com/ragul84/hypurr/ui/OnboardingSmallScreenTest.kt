@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.ragul84.hypurr.data.ThemeMode
 import com.ragul84.hypurr.data.UserProfile
@@ -40,18 +41,20 @@ class OnboardingSmallScreenTest {
     @Test fun continueIsVisibleAndWorksOnEveryStep() {
         var done: UserProfile? = null
         compose.setContent { HypurrTheme(ThemeMode.Light) { OnboardingScreen(UserProfile(), onFinished = { done = it }) } }
-        val picks = listOf("Tester/QA", "New", "Java", "Write tests")
+        val picks = listOf("Tester/QA", "New", "Java", "Write tests", "Hindi")
         picks.forEachIndexed { i, pick ->
             compose.onNodeWithText("Continue").assertIsDisplayed()
             compose.onNodeWithText("Skip for now").assertIsDisplayed()
-            compose.onNodeWithText(pick).performClick()
+            compose.onNodeWithText(pick).performScrollTo().performClick()
             compose.waitForIdle()
-            if (i == picks.lastIndex) shot("onboarding-small-4-goals-selected")
+            if (i == 3) shot("onboarding-small-4-goals-selected")
+            if (i == picks.lastIndex) shot("onboarding-small-5-voice-hindi")
             compose.onNodeWithText("Continue").assertIsDisplayed().assertIsEnabled().performClick()
             compose.waitForIdle()
         }
         assertEquals(listOf("Write tests"), done?.goals)
         assertEquals("Tester/QA", done?.role)
+        assertEquals("hi-IN", done?.voiceLanguage)
     }
 
     @Test fun roleNeedsAnAnswerButOptionalStepsDoNot() {

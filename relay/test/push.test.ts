@@ -66,3 +66,14 @@ assert.deepEqual(await batch.json(), { results: [
 ] });
 assert.equal((await request("/push-batch", { notifications: [] })).status, 400);
 console.log("physical device deduplication tests ok");
+
+{
+  // Abuse limits: a refusing limiter answers 429 before any work; no limiter (tests) allows.
+  const { allowed } = await import("../src/index.ts");
+  const req = new Request("https://push.mindgains.ai/register", { method: "POST", headers: { "CF-Connecting-IP": "203.0.113.9" } });
+  const seen: string[] = [];
+  const no = { limit: async (o: { key: string }) => (seen.push(o.key), { success: false }) };
+  if ((await allowed(no, req)) !== false || seen[0] !== "203.0.113.9") throw new Error("limiter not applied per IP");
+  if ((await allowed(undefined, req)) !== true) throw new Error("missing limiter must allow");
+  console.log("ok rate limits");
+}

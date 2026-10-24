@@ -86,7 +86,7 @@ fun SpendScreen(
     val scope = rememberCoroutineScope()
     val data = costs ?: TaskCosts(
         gatewayCreditsLabel = "$0.00",
-        freeResetLabel = "Resets at midnight",
+        freeResetLabel = "",
     )
     // Free messages exist only when the computer has Hypurr's gateway.
     val freeOn = data.freeTurnsLimit != null
@@ -182,6 +182,7 @@ fun SpendScreen(
                         }
                     }
                 }
+                item { HypurrFreeCard(freeOn, left, used, limit) }
                 item {
                     SignalCard(Modifier.fillMaxWidth().padding(top = 6.dp)) {
                         Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 14.dp)) {
@@ -199,21 +200,6 @@ fun SpendScreen(
                                 }
                             }
                             DotBars(perDay, labels, highlight = 6, modifier = Modifier.padding(top = 14.dp))
-                        }
-                    }
-                }
-                if (freeOn) item {
-                    SignalCard(Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(signalIcon(SignalIcons.Shield), null, tint = c.text, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text("Free messages used", color = c.secondary,
-                                    style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f), maxLines = 1)
-                                DotFigure("$used", SignalType.figureSmall, c.text)
-                                Text(" / $limit", color = c.tertiary, style = MaterialTheme.typography.labelMedium)
-                            }
-                            DotProgress(used.toFloat() / limit, Modifier.padding(top = 12.dp))
                         }
                     }
                 }
@@ -242,7 +228,7 @@ fun SpendScreen(
                     }
                 }
                 item {
-                    Text("Using your own Claude or OpenAI key? That's free here.", color = c.tertiary,
+                    Text("Using Claude Code or Codex you already have? Hypurr adds nothing to your bill.", color = c.tertiary,
                         style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp))
                 }
             }
@@ -265,6 +251,27 @@ private fun paceLine(data: TaskCosts, freeLeft: Int): String {
         else -> {
             val days = (credits / perDay).toInt()
             if (days <= 1) "About a day at your usual pace" else "About $days days at your usual pace"
+        }
+    }
+}
+
+/** Hypurr Free, said plainly: what it is, how much, and what not to use it for. */
+@Composable
+private fun HypurrFreeCard(on: Boolean, left: Int, used: Int, limit: Int) {
+    val c = Hypurr.colors
+    SignalCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                com.ragul84.hypurr.ui.DotCat(c.text, 20.dp)
+                Spacer(Modifier.width(10.dp))
+                Text("Hypurr Free", color = c.text, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                com.ragul84.hypurr.ui.Pill(if (on) "$left of $limit left" else "$limit messages", c.text)
+            }
+            Text("Free AI built in, for people without Claude Code or Codex. For trying out, not for company code.",
+                color = c.secondary, style = MaterialTheme.typography.bodySmall)
+            if (on) DotProgress(used.toFloat() / limit, Modifier.padding(top = 6.dp, bottom = 2.dp))
+            Text("Claude Code and Codex you already have work as they are, at no extra cost.",
+                color = c.tertiary, style = MaterialTheme.typography.bodySmall)
         }
     }
 }

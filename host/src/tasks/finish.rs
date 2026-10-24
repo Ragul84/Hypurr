@@ -31,6 +31,41 @@ pub struct FileChange {
     pub path: String,
     pub added: u64,
     pub removed: u64,
+    /// This file's unified diff for the phone's "What changed" view, capped at
+    /// [`PATCH_MAX_LINES`] lines / [`PATCH_MAX_BYTES`] bytes. Empty for binary files.
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub patch: String,
+}
+
+/// Caps for one file's patch on the wire: enough to read on a phone, never a huge message.
+pub const PATCH_MAX_LINES: usize = 400;
+pub const PATCH_MAX_BYTES: usize = 32 * 1024;
+
+/// Trims a patch to the caps, ending with a plain note when cut.
+pub fn cap_patch(patch: &str) -> String {
+    let mut out = String::new();
+    for (n, line) in patch.lines().enumerate() {
+        if n >= PATCH_MAX_LINES || out.len() + line.len() + 1 > PATCH_MAX_BYTES {
+            out.push_str("… (more changes not shown on the phone)\n");
+            return out;
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    out
+}
+
+/// One file's diff since `from`, without the `diff --git` / index header lines.
+fn file_patch(dir: &Path, from: &str, path: &str) -> String {
+    let out = std::process::Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(["diff", "--no-color", "--no-renames", "--unified=3", from, "HEAD", "--", path])
+        .output();
+    let Ok(out) = out else { return String::new() };
+    let text = String::from_utf8_lossy(&out.stdout);
+    let body: String = text.lines().skip_while(|l| !l.starts_with("@@")).flat_map(|l| [l, "\n"]).collect();
+    cap_patch(&body)
 }
 
 /// Files changed on the task branch since it started (`git diff --numstat`).
@@ -46,7 +81,17 @@ pub fn changes(dir: &Path, from: &str) -> Vec<FileChange> {
         .filter_map(|l| {
             let mut p = l.splitn(3, '\t');
             let (a, r, path) = (p.next()?, p.next()?, p.next()?);
-            Some(FileChange { path: path.to_owned(), added: a.parse().unwrap_or(0), removed: r.parse().unwrap_or(0) })
+            Some(FileChange {
+                path: path.to_owned(),
+                added: a.parse().unwrap_or(0),
+                removed: r.parse().unwrap_or(0),
+                patch: String::new(),
+            })
+        })
+        .take(200)
+        .map(|mut f| {
+            f.patch = file_patch(dir, from, &f.path);
+            f
         })
         .collect()
 }
@@ -292,8 +337,48 @@ mod tests {
     use super::*;
 
     #[test]
+    fn patch_is_capped_with_a_note() {
+        let long: String = (0..1000).fold(String::new(), |mut s, i| {
+            s.push_str("+line ");
+            s.push_str(&i.to_string());
+            s.push('\n');
+            s
+        });
+        let capped = cap_patch(&long);
+        assert_eq!(capped.lines().count(), PATCH_MAX_LINES + 1);
+        assert!(capped.ends_with("(more changes not shown on the phone)\n"));
+        assert_eq!(cap_patch("@@ -1 +1 @@\n-a\n+b\n"), "@@ -1 +1 @@\n-a\n+b\n");
+    }
+
+    #[test]
+    fn changes_carry_each_files_patch() {
+        let dir = std::env::temp_dir().join(format!("hypurr-patch-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let p = dir.as_path();
+        let git = |args: &[&str]| {
+            let ok = std::process::Command::new("git").arg("-C").arg(p).args(args).output().unwrap().status.success();
+            assert!(ok, "git {args:?}");
+        };
+        git(&["init", "-q"]);
+        git(&["config", "user.email", "t@t"]);
+        git(&["config", "user.name", "t"]);
+        std::fs::write(p.join("a.txt"), "one\ntwo\n").unwrap();
+        git(&["add", "."]);
+        git(&["commit", "-qm", "base"]);
+        std::fs::write(p.join("a.txt"), "one\nTWO\nthree\n").unwrap();
+        git(&["commit", "-qam", "change"]);
+        let files = changes(p, "HEAD~1");
+        assert_eq!(files.len(), 1);
+        assert_eq!((files[0].added, files[0].removed), (2, 1));
+        assert!(files[0].patch.starts_with("@@"), "{}", files[0].patch);
+        assert!(files[0].patch.contains("-two\n+TWO\n+three\n"), "{}", files[0].patch);
+        assert!(!files[0].patch.contains("diff --git"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn summaries_read_plainly() {
-        let f = |p: &str, a, r| FileChange { path: p.into(), added: a, removed: r };
+        let f = |p: &str, a, r| FileChange { path: p.into(), added: a, removed: r, ..Default::default() };
         assert_eq!(fallback_summary(&[]), "No files were changed.");
         assert_eq!(fallback_summary(&[f("a.rs", 1, 0)]), "Changed 1 file: a.rs (1 line added, 0 removed).");
         let many: Vec<FileChange> = (0..6).map(|i| f(&format!("f{i}"), 2, 1)).collect();

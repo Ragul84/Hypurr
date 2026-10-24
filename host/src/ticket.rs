@@ -840,7 +840,8 @@ mod tests {
     #[test]
     fn pr_and_comment_texts() {
         let gh = Issue { source: "github".into(), key: "#12".into(), title: "Fix cart".into(), ..Issue::default() };
-        let files = vec![crate::tasks::finish::FileChange { path: "a.rs".into(), added: 3, removed: 1 }];
+        let files =
+            vec![crate::tasks::finish::FileChange { path: "a.rs".into(), added: 3, removed: 1, ..Default::default() }];
         let p = Plan { checks: vec!["works".into()], ..Plan::default() };
         let body = pr_body(&gh, Some(&p), "It works now.", &files);
         assert!(body.starts_with("Closes #12") && body.contains("`a.rs` (+3 −1)") && body.contains("- [ ] works"));

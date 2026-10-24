@@ -278,7 +278,7 @@ private fun greetingFor(now: Long): String {
 private fun Greeting(computerName: String, link: LinkState, now: Long, modifier: Modifier = Modifier) {
     val c = Hypurr.colors
     val (line, dot) = when (link) {
-        is LinkState.Ready -> ("$computerName is online" + (if (link.route == com.ragul84.hypurr.net.Route.Relay) " · relay" else "")) to c.text
+        is LinkState.Ready -> ("$computerName · " + com.ragul84.hypurr.ui.linkText(link).replaceFirstChar { it.lowercase() }) to c.text
         LinkState.Connecting -> "Connecting to $computerName" to c.tertiary
         is LinkState.HostOffline -> "$computerName is offline" to c.needs
         is LinkState.Unauthorized -> "Not allowed on $computerName" to c.needs
@@ -474,7 +474,7 @@ private fun EmptyRoster(
         Text(if (progress.ready) "You're set up" else "Meet Hypurr", style = MaterialTheme.typography.headlineMedium, color = c.text)
         Spacer(Modifier.height(6.dp))
         Text(
-            if (progress.ready) "Start your first task." else "AI coding agents, safe enough for anyone.",
+            if (progress.ready) "Ask in plain words. It asks before anything risky and shows you it works." else com.ragul84.hypurr.ui.Pitch.Subhead,
             color = c.secondary, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge,
         )
         Spacer(Modifier.height(20.dp))
@@ -492,6 +492,8 @@ private fun EmptyRoster(
                 }
             }
         }
+        Spacer(Modifier.height(12.dp))
+        SignalCard(Modifier.fillMaxWidth()) { com.ragul84.hypurr.ui.PitchPillars(Modifier.padding(16.dp), compact = true) }
         Spacer(Modifier.height(18.dp))
         when {
             progress.ready -> PrimaryButton("Start a task", Modifier.fillMaxWidth(), onClick = onNewTask)
@@ -548,11 +550,11 @@ fun StatusLine(bot: Bot) {
     }
 }
 
-/** Offer to install Hypurr's built-in Hypurr Agent (free Zen models). */
+/** Offer to install Hypurr's built-in Hypurr Agent (Hypurr Free models). */
 data class BuiltinInstallPrompt(
     val title: String = "Hypurr Agent",
-    val body: String = "Install Hypurr Agent into ~/.hypurr/agents/hypurr-agent and start with free models via the Hypurr gateway. No other AI account needed.",
-    val consent: String = "Free models use the Hypurr gateway with a daily allowance; paid models use credits. Bring-your-own-key is also supported.",
+    val body: String = "For people without Claude Code or Codex. Starts with Hypurr Free: 10 messages to try, no AI account needed.",
+    val consent: String = "Hypurr Free is for trying out, not for company code. After 10 messages, buy credits or use your own key.",
     val busy: Boolean = false,
     val error: String? = null,
 )

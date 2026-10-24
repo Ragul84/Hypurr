@@ -201,6 +201,7 @@ fun TasksScreen(
                     }
                 }
                 val taskBots = recent.filter { it.task != null }
+                if (taskBots.isEmpty()) item { NoTasksYet() }
                 if (taskBots.isNotEmpty()) {
                     item { SectionHeader("Recent", Modifier.padding(start = 4.dp)) }
                     items(taskBots, key = { it.id }) { bot ->
@@ -230,5 +231,19 @@ fun TasksScreen(
             needsYou = recent.count { it.needsInput },
             onSelect = onTab,
         )
+    }
+}
+
+/** Tasks with nothing run yet: what a finished task gives you. */
+@Composable
+private fun NoTasksYet() {
+    val c = Hypurr.colors
+    SignalCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("No tasks yet", color = c.text, style = MaterialTheme.typography.titleMedium)
+            Text("Every task runs on its own branch, stays in your project folder and asks before anything risky. " +
+                "When it's done you get Show me it works screenshots and What changed, file by file.",
+                color = c.secondary, style = MaterialTheme.typography.bodySmall)
+        }
     }
 }

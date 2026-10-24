@@ -55,6 +55,7 @@ enum class OnboardingStep(val title: String, val hint: String) {
     Experience("How much code do you write?", "Hypurr explains more, or less, to match."),
     Stack("Main stack", "Optional. Pick any that apply."),
     Goals("What will you mostly do?", "Pick any. We'll put those templates first."),
+    Voice("Which language do you speak?", "For the mic and read-aloud. Code always stays in English."),
 }
 
 private val ExperienceHints = mapOf(
@@ -91,6 +92,8 @@ fun OnboardingScreen(
     var experience by remember { mutableStateOf(initial.experience) }
     var stacks by remember { mutableStateOf(initial.stacks.toSet()) }
     var goals by remember { mutableStateOf(initial.goals.toSet()) }
+    var voiceLanguage by remember { mutableStateOf(com.ragul84.hypurr.voice.VoiceLanguage.of(initial.voiceLanguage)) }
+    var explain by remember { mutableStateOf(initial.explainInMyLanguage) }
     val steps = OnboardingStep.entries
     val current = steps[step.coerceIn(0, steps.lastIndex)]
     val last = step >= steps.lastIndex
@@ -99,6 +102,7 @@ fun OnboardingScreen(
         OnboardingStep.Experience -> experience != null
         OnboardingStep.Stack -> stacks.isNotEmpty()
         OnboardingStep.Goals -> goals.isNotEmpty()
+        OnboardingStep.Voice -> true
     }
 
     fun answers(skipped: Boolean) = UserProfile(
@@ -108,6 +112,8 @@ fun OnboardingScreen(
         experience = experience,
         stacks = UserProfile.Stacks.filter { it in stacks },
         goals = UserProfile.Goals.filter { it in goals },
+        voiceLanguage = voiceLanguage.tag,
+        explainInMyLanguage = explain && !voiceLanguage.isEnglish,
     )
 
     Column(Modifier.fillMaxSize().background(c.bg).safeDrawingPadding().padding(horizontal = 24.dp)) {
@@ -137,9 +143,17 @@ fun OnboardingScreen(
                         contentAlignment = Alignment.Center,
                     ) { DotCat(c.text, 32.dp, off = c.dotOff) }
                     Spacer(Modifier.width(14.dp))
-                    com.ragul84.hypurr.ui.Eyebrow(if (editing) "Your profile" else "Tune Hypurr to you", color = c.secondary)
+                    com.ragul84.hypurr.ui.Eyebrow(if (editing) "Your profile" else "Welcome to Hypurr", color = c.secondary)
                 }
-                Spacer(Modifier.height(20.dp))
+                if (!editing) {
+                    Spacer(Modifier.height(18.dp))
+                    Text(com.ragul84.hypurr.ui.Pitch.Headline, style = MaterialTheme.typography.headlineMedium, color = c.text)
+                    Spacer(Modifier.height(14.dp))
+                    SignalCard(Modifier.fillMaxWidth()) { com.ragul84.hypurr.ui.PitchPillars(Modifier.padding(14.dp), compact = true) }
+                    Spacer(Modifier.height(24.dp))
+                    com.ragul84.hypurr.ui.Eyebrow("Tune it to you", color = c.secondary)
+                    Spacer(Modifier.height(8.dp))
+                } else Spacer(Modifier.height(20.dp))
             }
             AnimatedContent(current, transitionSpec = { fadeIn(Motion.effects()) togetherWith fadeOut(Motion.effects()) }, label = "step") { s ->
                 Column {
@@ -174,6 +188,13 @@ fun OnboardingScreen(
                         ) {
                             UserProfile.Goals.forEach { g ->
                                 OptionTile(g, null, goalIcon(g), g in goals, Modifier.weight(1f)) { goals = if (g in goals) goals - g else goals + g }
+                            }
+                        }
+                        OnboardingStep.Voice -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            com.ragul84.hypurr.ui.VoiceLanguagePicker(voiceLanguage) { voiceLanguage = it }
+                            if (!voiceLanguage.isEnglish) {
+                                OptionTile("Explain in my language", "Code in English, steps and summary in ${voiceLanguage.label}",
+                                    SignalIcons.Speaker, explain, Modifier.fillMaxWidth()) { explain = !explain }
                             }
                         }
                     }

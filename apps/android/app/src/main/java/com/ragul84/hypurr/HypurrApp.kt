@@ -11,6 +11,8 @@ import com.ragul84.hypurr.data.HypurrStore
 import com.ragul84.hypurr.data.KeystoreSecrets
 import com.ragul84.hypurr.data.Persistence
 import com.ragul84.hypurr.model.Pairing
+import com.ragul84.hypurr.push.HypurrMessagingService
+import com.ragul84.hypurr.push.LocalAlerts
 import com.ragul84.hypurr.push.PushRegistrar
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -43,6 +45,12 @@ class HypurrApp : Application() {
         store = HypurrStore(scope, PrefsPersistence(this), identity, deviceName)
         registrar = PushRegistrar(BuildConfig.RELAY_URL, tokenSource = ::fcmToken)
         store.onConnected = { client -> registrar.register(client, deviceName, identity.pushKey) }
+        registerActivityLifecycleCallbacks(foreground)
+        store.onLocalAlert = { kind, bot ->
+            if (!foreground.visible) {
+                HypurrMessagingService.show(this, LocalAlerts.alert(kind, bot, store.computer.value?.name.orEmpty()))
+            }
+        }
         store.connect()
     }
 
@@ -58,6 +66,21 @@ class HypurrApp : Application() {
                 cont.resume(if (task.isSuccessful) task.result else null)
             }
         }
+    }
+
+    private val foreground = Foreground()
+
+    /** Whether any Hypurr screen is on top (local alerts only show when none is). */
+    private class Foreground : ActivityLifecycleCallbacks {
+        private var started = 0
+        val visible: Boolean get() = started > 0
+        override fun onActivityStarted(activity: android.app.Activity) { started++ }
+        override fun onActivityStopped(activity: android.app.Activity) { started = maxOf(0, started - 1) }
+        override fun onActivityCreated(activity: android.app.Activity, savedInstanceState: android.os.Bundle?) = Unit
+        override fun onActivityResumed(activity: android.app.Activity) = Unit
+        override fun onActivityPaused(activity: android.app.Activity) = Unit
+        override fun onActivitySaveInstanceState(activity: android.app.Activity, outState: android.os.Bundle) = Unit
+        override fun onActivityDestroyed(activity: android.app.Activity) = Unit
     }
 
     private class PrefsPersistence(context: Context) : Persistence {

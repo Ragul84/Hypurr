@@ -36,7 +36,48 @@ fn relay_url(hub: &Hub) -> Option<String> {
     if crate::admin::local_only::on(&hub.store) {
         return None;
     }
-    std::env::var("HYPURR_RELAY_URL").ok().or_else(|| hub.store.kv_get("relay_url")).filter(|u| !u.is_empty())
+    std::env::var("HYPURR_RELAY_URL")
+        .ok()
+        .or_else(|| hub.store.kv_get("relay_url"))
+        .or_else(|| Some(DEFAULT_PUSH_URL.to_owned()))
+        .filter(|u| !u.is_empty() && u != "off")
+}
+
+/// Hypurr's push relay (`relay/`, host -> here -> FCM/APNs). Pushes only go to phones that
+/// registered a ticket with it; `HYPURR_RELAY_URL=off` turns pushes off.
+pub const DEFAULT_PUSH_URL: &str = "https://push.mindgains.ai";
+
+/// The only text the relay, FCM and APNs ever see: what happened and on which computer.
+/// Never the task, the agent's words or code.
+pub fn generic_line(kind: AlertKind, computer: &str) -> String {
+    let computer: String =
+        computer.chars().filter(|c| c.is_alphanumeric() || matches!(c, '-' | '_' | ' ')).take(40).collect();
+    let on = if computer.trim().is_empty() { String::new() } else { format!(" on {}", computer.trim()) };
+    match kind {
+        AlertKind::NeedsInput => format!("Hypurr needs you{on}"),
+        AlertKind::Done => format!("Task finished{on}"),
+        AlertKind::Failed => format!("Task failed{on}"),
+    }
+}
+
+/// The sealed body, still kept short and free of code: fenced blocks become "(code)".
+pub fn plain_body(body: &str) -> String {
+    let mut out = String::new();
+    let mut in_code = false;
+    for line in body.lines() {
+        if line.trim_start().starts_with("```") {
+            if !in_code {
+                out.push_str("(code)\n");
+            }
+            in_code = !in_code;
+            continue;
+        }
+        if !in_code {
+            out.push_str(line);
+            out.push('\n');
+        }
+    }
+    crate::agent::acp::truncate(out.trim(), 200)
 }
 
 /// True when `key` was sent less than `min_gap` ago; otherwise records now.
@@ -117,19 +158,15 @@ pub fn notify(hub: &Hub, bot: &BotConfig, from: Option<&str>, title: &str, body:
         return;
     }
     let Some(relay) = relay_url(hub) else { return };
-    // The relay and APNs only see a generic line; the real one is sealed to each device (§6.7).
-    let generic = match kind {
-        AlertKind::NeedsInput => "A bot needs your response. Open Hypurr to review.",
-        AlertKind::Done => "Your task is complete. Open Hypurr to read the result.",
-        AlertKind::Failed => "A task could not finish. Open Hypurr to review the issue.",
-    };
+    // The relay, FCM and APNs only see a generic line; the real one is sealed to each device (§6.7).
+    let generic = generic_line(kind, &crate::service::host_name());
     let subtitle = match kind {
         AlertKind::Done => "Task complete",
         AlertKind::NeedsInput => "Response needed",
         AlertKind::Failed => "Task failed",
     };
     let mut secret = json!({"title": crate::agent::acp::truncate(title, 80), "subtitle": subtitle,
-        "body": crate::agent::acp::truncate(body, 400)});
+        "body": plain_body(body)});
     if let Some(from) = from.filter(|f| *f != bot.id) {
         secret["from"] = from.into();
     }
@@ -188,6 +225,21 @@ fn activity_payload(rt: &Runtime) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn generic_line_names_only_the_event_and_computer() {
+        assert_eq!(generic_line(AlertKind::NeedsInput, "raavan"), "Hypurr needs you on raavan");
+        assert_eq!(generic_line(AlertKind::Done, "raavan"), "Task finished on raavan");
+        assert_eq!(generic_line(AlertKind::Failed, ""), "Task failed");
+        assert_eq!(generic_line(AlertKind::Done, "<b>x</b>"), "Task finished on bxb");
+    }
+
+    #[test]
+    fn sealed_body_drops_code() {
+        let b = plain_body("Fixed it:\n```rust\nlet secret = 1;\n```\nDone.");
+        assert!(!b.contains("secret"), "{b}");
+        assert!(b.contains("(code)") && b.contains("Done."));
+    }
 
     #[test]
     fn activity_failure_ends_with_error_and_never_includes_task_text() {

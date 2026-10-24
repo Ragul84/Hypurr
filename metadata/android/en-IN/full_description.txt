@@ -1,0 +1,27 @@
+Hypurr lets anyone run AI coding agents from their phone, safely. Ask in plain words, approve in plain words, and see proof that it works before you share it.
+
+SAFE FOR NON-EXPERTS
+• Every approval is one plain sentence with a risk level: "The agent wants to delete the build folder." Allow, or Deny.
+• The agent stays in the one project folder you picked.
+• It never touches production: pushes to main and other risky moves are refused or always ask you.
+• Each task runs on its own branch with a checkpoint after every step, so one tap rolls it back.
+• Speak your task or answer approvals in English, Hindi, Tamil, Telugu, Kannada, Malayalam, Marathi or Bengali. A spoken "yes" never approves a risky action without a tap.
+
+PROOF IT WORKS
+• Show me it works: Hypurr runs your app and brings back screenshots of the change, so you can tap Looks right or Not right.
+• Trace a click: tap-by-tap from a button to the function, the API call and the file and line behind it.
+• Page map: every screen of your app and the APIs it calls, at a glance.
+• What changed: every file the agent touched, lines added and removed, and the diff one tap away.
+
+FREE AI BUILT IN
+• No AI account? Hypurr Free gives you 10 free messages to try it. For trying out, not for company code.
+• Already have Claude Code or Codex? Hypurr uses them on your own PC with your own sign-in, at no extra cost.
+• Need more? Credit packs from ₹99 through Google Play.
+
+YOUR PC, YOUR CODE
+Agents run on your own Windows, Mac or Linux computer. Your code and sign-ins stay there; the phone talks to it directly over your Wi-Fi, end-to-end encrypted.
+
+GET STARTED
+1. Install Hypurr on your PC.
+2. Scan the QR code with this app.
+3. Tap Start a task and say what you need.
