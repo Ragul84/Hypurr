@@ -21,8 +21,8 @@ android {
         minSdk = 26
         targetSdk = 35
         // Same version as apps/project.yml MARKETING_VERSION and host/Cargo.toml.
-        versionName = "2.5.0"
-        versionCode = 20500
+        versionName = "2.6.0"
+        versionCode = 20600
         // The push relay (relay/). Placeholder until it is deployed; matches SharedStore.relayURL on iOS.
         // Override without editing: ./gradlew assembleRelease -Phypurr.relayUrl=https://relay.example.com
         val relayUrl = providers.gradleProperty("hypurr.relayUrl").getOrElse("https://hypurr-relay.example.workers.dev")

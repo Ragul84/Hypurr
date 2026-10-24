@@ -63,6 +63,7 @@ object SignalIcons {
     val Moon get() = R.drawable.ic_sg_moon
     val Trace get() = R.drawable.ic_sg_trace
     val Map get() = R.drawable.ic_sg_map
+    val Speaker get() = R.drawable.ic_sg_speaker
 }
 
 @Composable

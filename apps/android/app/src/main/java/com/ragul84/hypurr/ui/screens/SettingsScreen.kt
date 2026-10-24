@@ -91,6 +91,8 @@ data class SettingsUiState(
     val projectFolder: String? = null,
     /** Learning mode for new tasks (on by default for New experience or Student). */
     val learningMode: Boolean = false,
+    /** Mic and read-aloud language, and whether the agent explains in it. */
+    val voice: com.ragul84.hypurr.voice.VoiceSettings = com.ragul84.hypurr.voice.VoiceSettings(),
     /** Plans in rupees from the computer (pricing/plans.json). */
     val pricing: com.ragul84.hypurr.model.Pricing? = null,
 )
@@ -114,6 +116,7 @@ fun SettingsScreen(
     onEditProfile: () -> Unit = {},
     onClearProfile: () -> Unit = {},
     onPickFolder: () -> Unit = {},
+    onVoice: (com.ragul84.hypurr.voice.VoiceSettings) -> Unit = {},
     showHomeTabs: Boolean = false,
     onTab: (HomeTab) -> Unit = {},
 ) {
@@ -156,6 +159,17 @@ fun SettingsScreen(
                 Text(state.projectFolder, color = c.tertiary, fontFamily = FontFamily.Monospace, fontSize = 12.sp, maxLines = 2)
             } else {
                 SoftButton("Pick a folder", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Folder), onClick = onPickFolder)
+            }
+        }
+        Section("Voice") {
+            Text("Speak tasks and answer approvals. Uses this phone's own speech, nothing goes to a Hypurr server.",
+                color = c.secondary, style = MaterialTheme.typography.bodySmall)
+            com.ragul84.hypurr.ui.VoiceLanguagePicker(state.voice.language) { onVoice(state.voice.copy(language = it)) }
+            ToggleRow("Explain in my language",
+                if (state.voice.language.isEnglish) "Pick an Indian language above to use this. Code always stays in English."
+                else "The agent writes code in English and explains its steps in ${state.voice.language.label}.",
+                state.voice.explainInMyLanguage && !state.voice.language.isEnglish, !state.voice.language.isEnglish) {
+                onVoice(state.voice.copy(explainInMyLanguage = it))
             }
         }
         Section("Learning") {
