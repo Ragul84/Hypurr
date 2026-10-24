@@ -87,7 +87,7 @@ export const DEFAULT_GATEWAY_CONFIG: GatewayConfig = {
     {
       id: "hypurr-fast",
       name: "Hypurr Fast",
-      description: "Quick replies. For trying out, not for company code",
+      description: "Quick. For trying out, not company code",
       tier: "free",
       upstreamModel: "nvidia/nemotron-3.5-lightning:free",
       fallbacks: ["poolside/laguna-xs-2.1:free"],
