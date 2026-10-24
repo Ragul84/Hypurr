@@ -128,6 +128,7 @@ export async function listModels(c: Ctx) {
       owned_by: "hypurr",
       tier: m.tier,
       name: m.name,
+      description: m.description ?? "",
     })),
   };
 }
@@ -238,8 +239,9 @@ export async function chatCompletions(c: Ctx): Promise<Response> {
   if (stream) upstreamBody.stream_options = { include_usage: true };
   if (!override && model.adapter === "openrouter") {
     if (model.fallbacks?.length) upstreamBody.models = [model.upstreamModel, ...model.fallbacks];
-    // Don't let OpenRouter route to providers that train on prompts.
-    upstreamBody.provider = { data_collection: "deny", allow_fallbacks: true };
+    // Free tier runs on ":free" variants, which may need providers that log prompts (labelled
+    // "not for company code"). Paid models never route to providers that keep prompts.
+    upstreamBody.provider = { data_collection: model.tier === "free" ? "allow" : "deny", allow_fallbacks: true };
   }
 
   const upstreamRes = await fetch(`${upstreamBase}/chat/completions`, {
@@ -265,10 +267,14 @@ export async function chatCompletions(c: Ctx): Promise<Response> {
         503,
       );
     }
-    return new Response(text || JSON.stringify({ error: { message: "Upstream provider error" } }), {
-      status: upstreamRes.status,
-      headers: { "content-type": upstreamRes.headers.get("content-type") || "application/json" },
-    });
+    // ":free" routes share a daily request cap on our key; never name the provider.
+    if (upstreamRes.status === 429 && model.tier === "free") {
+      return json(
+        { error: { message: "Hypurr Free is busy right now. Try again later, or buy credits.", type: "rate_limited", code: "free_busy" } },
+        429,
+      );
+    }
+    return json({ error: { message: "Hypurr's model service had a problem. Try again in a moment.", type: "upstream_error" } }, upstreamRes.status >= 500 ? 502 : upstreamRes.status);
   }
 
   if (stream && upstreamRes.body) {

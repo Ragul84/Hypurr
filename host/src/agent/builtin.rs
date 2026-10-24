@@ -19,8 +19,8 @@ pub const RELEASE_REPO: &str = "Ragul84/hypurr-agent";
 
 /// Free models served by the Hypurr gateway (OpenAI-compatible).
 pub const FREE_MODELS: &[FreeModel] = &[
-    FreeModel { id: "hypurr/hypurr-free", name: "Hypurr Free", note: "Daily free allowance via Hypurr gateway" },
-    FreeModel { id: "hypurr/hypurr-fast", name: "Hypurr Fast", note: "Fast free-tier model via Hypurr gateway" },
+    FreeModel { id: "hypurr/hypurr-free", name: "Hypurr Free", note: "For trying out, not for company code" },
+    FreeModel { id: "hypurr/hypurr-fast", name: "Hypurr Fast", note: "Quick replies. For trying out, not for company code" },
 ];
 
 /// Plain message when someone picks a Hypurr free model but no gateway serves it.

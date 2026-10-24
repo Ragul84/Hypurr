@@ -331,8 +331,14 @@ describe("openrouter defaults", () => {
     expect(free.map((m) => m.id)).toEqual(["hypurr-free", "hypurr-fast"]);
     for (const m of DEFAULT_GATEWAY_CONFIG.models) {
       expect(m.adapter).toBe("openrouter");
-      expect(m.upstreamModel).not.toMatch(/:free$/);
+      // Free tiers cost nothing (":free" variants only); paid never uses ":free".
+      for (const u of [m.upstreamModel, ...(m.fallbacks ?? [])]) {
+        if (m.tier === "free") expect(u).toMatch(/:free$/);
+        else expect(u).not.toMatch(/:free$/);
+      }
+      expect(JSON.stringify(m)).not.toMatch(/"(name|description)":"[^"]*openrouter/i);
     }
+    expect(DEFAULT_GATEWAY_CONFIG.models.find((m) => m.id === "hypurr-free")?.description).toBe("For trying out, not for company code");
     expect(DEFAULT_GATEWAY_CONFIG.maxOutputTokens).toBeGreaterThan(0);
     expect(DEFAULT_GATEWAY_CONFIG.freeDailyMessages).toBeGreaterThan(0);
   });
@@ -364,11 +370,27 @@ describe("openrouter defaults", () => {
     // A second agent call inside the same message isn't another message.
     expect((await chatCompletions(ctx(db, "/v1/chat/completions", { model: "hypurr-free", messages: [] }, { authorization: `Bearer ${secret}` }, { UPSTREAM_OPENROUTER_API_KEY: "sk-test" }))).status).toBe(200);
     expect(seen[0].max_tokens).toBe(DEFAULT_GATEWAY_CONFIG.maxOutputTokens);
-    expect(seen[0].model).toBe("deepseek/deepseek-v4-flash");
-    expect(seen[0].models[0]).toBe("deepseek/deepseek-v4-flash");
-    expect(seen[0].provider.data_collection).toBe("deny");
+    expect(seen[0].model).toBe("cohere/north-mini-code:free");
+    expect(seen[0].models[0]).toBe("cohere/north-mini-code:free");
+    // Free variants may need prompt-logging providers; only free tier relaxes this.
+    expect(seen[0].provider.data_collection).toBe("allow");
     expect((db as any)._tables.gateway_allowance[0].messages_used).toBe(1);
     expect((db as any)._tables.gateway_global_budget[0].free_tokens).toBe(20);
+    vi.unstubAllGlobals();
+  });
+
+  it("upstream 429 on free says Hypurr Free is busy, never names the provider", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: { message: "rate-limited upstream", metadata: { provider_name: "OpenRouter" } } }), { status: 429 })));
+    const db = memoryDb();
+    const { secret, hash, prefix } = await mintKeySecret();
+    (db as any)._tables.gateway_api_keys.push({ id: "k", user_id: null, host_id: "host12345", key_hash: hash, key_prefix: prefix, kind: "trial", revoked_at: null });
+    const { chatCompletions, openTurn } = await import("../../src/gateway/handler");
+    await openTurn(ctx(db, "/v1/gateway/turn", {}, { authorization: `Bearer ${secret}` }));
+    const res = await chatCompletions(ctx(db, "/v1/chat/completions", { model: "hypurr-free", messages: [{ role: "user", content: "hi" }] }, { authorization: `Bearer ${secret}` }, { UPSTREAM_OPENROUTER_API_KEY: "sk-test" }));
+    expect(res.status).toBe(429);
+    const body = await res.text();
+    expect(body).toContain("Hypurr Free is busy right now. Try again later, or buy credits.");
+    expect(body.toLowerCase()).not.toContain("openrouter");
     vi.unstubAllGlobals();
   });
 
