@@ -138,6 +138,7 @@ fun NewTaskScreen(
 ) {
     val c = Hypurr.colors
     val template = state.selectedTemplate
+    var showTemplates by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().background(c.bg).safeDrawingPadding().imePadding()) {
         Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             IconBubble(signalIcon(SignalIcons.Back), "Back", onClick = onBack)
@@ -146,10 +147,7 @@ fun NewTaskScreen(
         }
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
             SetupPickers(state, onChange, onPickFolder)
-            Text("What do you need?", style = MaterialTheme.typography.titleLarge, color = c.text, modifier = Modifier.padding(top = 4.dp))
-            Text("Describe it in your own words. The agent works only in that folder, and your code stays safe.",
-                color = c.secondary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
-            Field(state.goal, template?.goalHint?.takeIf { it.isNotEmpty() } ?: "e.g. Fix the login bug in ticket 142",
+            Field(state.goal, template?.goalHint?.takeIf { it.isNotEmpty() } ?: "What do you need? e.g. Fix the login bug",
                 minHeight = 96.dp) { onChange(state.copy(goal = it, error = null)) }
             VoiceGoal(state, onChange)
             if (freeLeft != null && freeLimit != null && state.usesHypurrModels) {
@@ -161,6 +159,9 @@ fun NewTaskScreen(
                 ActionChip(signalIcon(SignalIcons.Image), "Add screenshot", onAddImage)
                 ActionChip(signalIcon(SignalIcons.Paste), "Paste", onPaste)
                 if (state.setup?.integrations?.anyIssues == true) ActionChip(signalIcon(SignalIcons.Check), "From an issue", onPickIssue)
+                if (state.setup?.templates.orEmpty().isNotEmpty()) {
+                    ActionChip(signalIcon(SignalIcons.Docs), template?.title ?: "Template") { showTemplates = !showTemplates }
+                }
             }
             AnimatedVisibility(state.files.isNotEmpty(), enter = expandVertically(Motion.spatialDefault()) + fadeIn(),
                 exit = shrinkVertically() + fadeOut()) {
@@ -180,17 +181,14 @@ fun NewTaskScreen(
                 }, onClose = { onChange(state.copy(pickingIssue = false)) })
             }
 
-            Text("OR START FROM A TEMPLATE", color = c.tertiary, style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
-                modifier = Modifier.padding(start = 6.dp, top = 20.dp, bottom = 8.dp))
-            val templates = state.setup?.templates.orEmpty()
-            if (templates.isEmpty()) {
-                Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) { DotCatMark(32.dp) }
-            }
+            val templates = if (showTemplates) state.setup?.templates.orEmpty() else emptyList()
+            if (templates.isNotEmpty()) Spacer(Modifier.height(10.dp))
             templates.chunked(2).forEach { row ->
                 Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     row.forEach { t ->
                         TemplateCard(t, t.id == state.template, Modifier.weight(1f)) {
                             onChange(state.copy(template = if (state.template == t.id) null else t.id, error = null))
+                            showTemplates = false
                         }
                     }
                     if (row.size == 1) Spacer(Modifier.weight(1f))
@@ -204,7 +202,6 @@ fun NewTaskScreen(
                     Field(state.input, "Paste it here", minHeight = 88.dp, mono = true) { onChange(state.copy(input = it, error = null)) }
                 }
             }
-            Plan(state)
             AnimatedVisibility(state.error != null) {
                 Text(state.error.orEmpty(), color = c.needsText, style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(top = 12.dp, start = 6.dp))
@@ -257,8 +254,8 @@ private fun SetupPickers(state: NewTaskUiState, onChange: (NewTaskUiState) -> Un
     val c = Hypurr.colors
     var open by remember { mutableStateOf<String?>(null) }
     val agents = state.setup?.agents.orEmpty()
-    Column(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        PickerCard("1", "Agent", state.agentName?.let { n -> state.modelName?.let { "$n · $it" } ?: n },
+    Column(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        PickerCard("Agent", state.agentName?.let { n -> state.modelName?.let { "$n · $it" } ?: n },
             if (agents.isEmpty()) "No agent ready. Install Claude Code or Codex and sign in." else "Choose an agent",
             open == "agent") { open = if (open == "agent") null else "agent" }
         AnimatedVisibility(open == "agent") {
@@ -286,67 +283,24 @@ private fun SetupPickers(state: NewTaskUiState, onChange: (NewTaskUiState) -> Un
                 }
             }
         }
-        PickerCard("2", "Project folder", state.projectPath?.let { state.projectName ?: folderName(it) }, "Choose a folder on your PC",
-            open == "folder", detail = state.projectPath) { open = if (open == "folder") null else "folder" }
-        AnimatedVisibility(open == "folder") {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                val recent = state.setup?.projects.orEmpty()
-                if (recent.isNotEmpty()) {
-                    Text("Recent", color = c.secondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 6.dp))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        recent.forEach { p ->
-                            Choice(p.name, p.path == state.projectPath) { onChange(state.copy(project = p.path, error = null)); open = null }
-                        }
-                    }
-                }
-                SoftButton("Browse folders on your PC", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Folder)) {
-                    open = null
-                    onPickFolder()
-                }
-            }
-        }
+        PickerCard("Folder", state.projectPath?.let { state.projectName ?: folderName(it) }, "Choose a folder on your PC",
+            false, detail = state.projectPath) { open = null; onPickFolder() }
     }
 }
 
 @Composable
-private fun PickerCard(n: String, label: String, value: String?, empty: String, open: Boolean, detail: String? = null, onClick: () -> Unit) {
+private fun PickerCard(label: String, value: String?, empty: String, open: Boolean, detail: String? = null, onClick: () -> Unit) {
     val c = Hypurr.colors
     SignalCard(Modifier.fillMaxWidth().pressable("$label: ${value ?: empty}", onClick = onClick), emphasis = open) {
-        Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-            DotFigure(n, SignalType.figureSmall, if (value != null) c.tertiary else c.text, Modifier.width(26.dp))
-            Spacer(Modifier.width(8.dp))
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(label.uppercase(), color = c.tertiary, style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp))
+                Text(label, color = c.tertiary, style = MaterialTheme.typography.labelMedium)
                 Text(value ?: empty, color = if (value != null) c.text else c.secondary, style = MaterialTheme.typography.titleMedium,
-                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (detail != null) Text(detail, color = c.tertiary, style = MaterialTheme.typography.bodySmall, maxLines = 1,
                     overflow = TextOverflow.Ellipsis)
             }
-            Spacer(Modifier.width(8.dp))
-            if (value != null) Pill("Set", c.text) else Pill("Required", c.secondary)
-        }
-    }
-}
-
-/** Why these picks, and the safety promise. */
-@Composable
-private fun Plan(state: NewTaskUiState) {
-    val c = Hypurr.colors
-    Text("HYPURR'S PLAN", color = c.tertiary, style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.2.sp),
-        modifier = Modifier.padding(start = 6.dp, top = 20.dp, bottom = 8.dp))
-    Column(Modifier.fillMaxWidth().panel(RoundedCornerShape(20.dp), c.surface).padding(16.dp).animateContentSize(Motion.spatialDefault()),
-        verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        val reason = when {
-            state.agent != null -> "You picked the agent yourself."
-            else -> state.route?.agent?.let { state.route.reason.substringAfter("; ").ifEmpty { null } }
-        }
-        if (!reason.isNullOrEmpty()) Text(reason, color = c.secondary, style = MaterialTheme.typography.bodySmall)
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(c.surface2).padding(12.dp),
-            verticalAlignment = Alignment.Top) {
-            Icon(signalIcon(SignalIcons.Shield), null, tint = c.success, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(10.dp))
-            Text("Runs on its own branch with a checkpoint after every step. You can go back with one tap, and main stays untouched.",
-                color = c.text, style = MaterialTheme.typography.bodySmall)
+            Icon(signalIcon(SignalIcons.Chevron), null, tint = c.tertiary, modifier = Modifier.size(16.dp))
         }
     }
 }
@@ -461,10 +415,6 @@ private fun VoiceGoal(state: NewTaskUiState, onChange: (NewTaskUiState) -> Unit)
             Text(if (mic.listening) "Listening…" else "Say it in ${voice.language.label}", color = c.text,
                 style = MaterialTheme.typography.titleSmall)
             com.ragul84.hypurr.ui.VoiceHint(mic.listening, mic.partial, mic.error, voice.language)
-            if (!mic.listening && mic.error == null) {
-                Text(if (voice.explainInMyLanguage && !voice.language.isEnglish) "Code stays in English. It explains in ${voice.language.label}."
-                    else "Change the language in You.", color = c.tertiary, style = MaterialTheme.typography.bodySmall)
-            }
         }
     }
 }

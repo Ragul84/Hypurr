@@ -46,13 +46,15 @@ class NewTaskPickersTest {
 
     @Test fun startNeedsAgentAndFolder() {
         var state by mutableStateOf(NewTaskUiState(setup = setup, goal = "Fix the login bug"))
-        compose.setContent { HypurrTheme(ThemeMode.Light) { NewTaskScreen(state, onChange = { state = it }, onStart = {}, onBack = {}) } }
+        compose.setContent { HypurrTheme(ThemeMode.Light) {
+            NewTaskScreen(state, onChange = { state = it }, onStart = {}, onBack = {},
+                onPickFolder = { state = state.copy(project = "C:\\Users\\ragul\\work\\shop-web") })
+        } }
         compose.onNodeWithText("Start task").assertIsNotEnabled()
         compose.onNodeWithText("Choose an agent").performClick()
         compose.onNodeWithText("Codex").performClick()
         compose.onNodeWithText("Start task").assertIsNotEnabled()
         compose.onNodeWithText("Choose a folder on your PC").performClick()
-        compose.onNodeWithText("shop-web").performClick()
         compose.onNodeWithText("Start task").assertIsEnabled()
         val dir = File(System.getProperty("roborazzi.output.dir") ?: "build/roborazzi").apply { mkdirs() }
         compose.onRoot().captureRoboImage(File(dir, "android-new-task-pickers-small.png").absolutePath)
