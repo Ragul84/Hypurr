@@ -57,7 +57,7 @@ jobs:
           arch: x86_64
           target: google_apis
           working-directory: apps/android
-          script: bash scripts/release-smoke.sh app/build/outputs/apk/release/app-release.apk
+          script: bash scripts/release-smoke.sh app/build/outputs/apk/release
       - name: Remove keystore
         if: always()
         run: rm -f "$RUNNER_TEMP/upload.jks"
