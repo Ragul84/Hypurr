@@ -4,7 +4,9 @@ compatibility_date = "2026-09-01"
 compatibility_flags = ["nodejs_compat"]
 
 # main: production at hypurr.mindgains.ai (a Custom Domain on the mindgains.ai zone; see DEPLOY.md).
-routes = [{ pattern = "hypurr.mindgains.ai", custom_domain = true }]
+# relay.mindgains.ai: the same Worker, the address hosts and phones use for the encrypted relay
+# ("Connect from anywhere"). It only ever forwards ciphertext.
+routes = [{ pattern = "hypurr.mindgains.ai", custom_domain = true }, { pattern = "relay.mindgains.ai", custom_domain = true }]
 
 [[migrations]]
 tag = "v1"
@@ -50,6 +52,12 @@ name = "GATEWAY_LIMITER"
 namespace_id = "1031"
 simple = { limit = 20, period = 60 }
 
+# Relay socket opens (GET /v1/relay/*) per computer or device IP; the DO also caps messages and bytes.
+[[ratelimits]]
+name = "RELAY_LIMITER"
+namespace_id = "1041"
+simple = { limit = 60, period = 60 }
+
 [triggers]
 crons = ["*/15 * * * *"]
 
@@ -60,7 +68,7 @@ routes = [{ pattern = "hypurr-dev.mindgains.ai", custom_domain = true }]
 vars = { CLERK_ISSUER = "https://your-dev-instance.clerk.accounts.dev" }
 d1_databases = [{ binding = "DB", database_name = "hypurr-dev", database_id = "REPLACE_WITH_YOUR_DEV_D1_DATABASE_ID", migrations_dir = "migrations" }]
 durable_objects.bindings = [{ name = "RELAY", class_name = "ComputerRelay" }]
-ratelimits = [{ name = "REGISTER_LIMITER", namespace_id = "1002", simple = { limit = 10, period = 60 } }, { name = "TURN_LIMITER", namespace_id = "1012", simple = { limit = 12, period = 60 } }, { name = "HOOK_LIMITER", namespace_id = "1022", simple = { limit = 60, period = 60 } }, { name = "GATEWAY_LIMITER", namespace_id = "1032", simple = { limit = 20, period = 60 } }]
+ratelimits = [{ name = "REGISTER_LIMITER", namespace_id = "1002", simple = { limit = 10, period = 60 } }, { name = "TURN_LIMITER", namespace_id = "1012", simple = { limit = 12, period = 60 } }, { name = "HOOK_LIMITER", namespace_id = "1022", simple = { limit = 60, period = 60 } }, { name = "GATEWAY_LIMITER", namespace_id = "1032", simple = { limit = 20, period = 60 } }, { name = "RELAY_LIMITER", namespace_id = "1042", simple = { limit = 60, period = 60 } }]
 triggers = { crons = ["*/15 * * * *"] }
 
 # local: wrangler dev / e2e with a local D1; CLERK_JWT_KEY is injected by the test (--var).
@@ -70,4 +78,4 @@ routes = []
 vars = { CLERK_ISSUER = "https://clerk.test.local" }
 d1_databases = [{ binding = "DB", database_name = "hypurr-local", database_id = "local", migrations_dir = "migrations" }]
 durable_objects.bindings = [{ name = "RELAY", class_name = "ComputerRelay" }]
-ratelimits = [{ name = "REGISTER_LIMITER", namespace_id = "1003", simple = { limit = 10, period = 60 } }, { name = "TURN_LIMITER", namespace_id = "1013", simple = { limit = 12, period = 60 } }, { name = "HOOK_LIMITER", namespace_id = "1023", simple = { limit = 60, period = 60 } }, { name = "GATEWAY_LIMITER", namespace_id = "1033", simple = { limit = 20, period = 60 } }]
+ratelimits = [{ name = "REGISTER_LIMITER", namespace_id = "1003", simple = { limit = 10, period = 60 } }, { name = "TURN_LIMITER", namespace_id = "1013", simple = { limit = 12, period = 60 } }, { name = "HOOK_LIMITER", namespace_id = "1023", simple = { limit = 60, period = 60 } }, { name = "GATEWAY_LIMITER", namespace_id = "1033", simple = { limit = 20, period = 60 } }, { name = "RELAY_LIMITER", namespace_id = "1043", simple = { limit = 60, period = 60 } }]

@@ -19,6 +19,8 @@ export async function waitFor<T>(what: string, check: () => T | undefined | Prom
 /** A WebSocket with a queue of parsed messages and the close code. */
 export class Wire {
   readonly msgs: Json[] = [];
+  /** Every text frame as it crossed the wire (what the relay saw). */
+  readonly raw: string[] = [];
   close?: { code: number; reason: string };
   onMessage?: (m: Json) => boolean; // true = consumed
   readonly opened: Promise<void>;
@@ -32,6 +34,7 @@ export class Wire {
       ws.addEventListener("error", () => reject(new Error(`WebSocket to ${ws.url} failed`)));
     });
     ws.addEventListener("message", (e) => {
+      this.raw.push(String(e.data));
       const m = JSON.parse(String(e.data));
       if (!this.onMessage?.(m)) this.msgs.push(m);
     });

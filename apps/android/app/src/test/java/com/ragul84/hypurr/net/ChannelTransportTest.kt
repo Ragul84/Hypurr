@@ -72,6 +72,24 @@ class ChannelTransportTest {
     }
 
     @Test
+    fun relayCarriesTheChannelUnlessConnectFromAnywhereIsOff() = runBlocking {
+        host.authorized += identity.publicKey
+        val away = host.computer(urls = emptyList(), cloud = "https://relay.mindgains.ai")
+        val t = HostConnector.connect(away, identity, scope, host.dialer) { true }
+        withTimeout(5_000) { t.state.first { it == LinkState.Ready(Route.Relay) } }
+        assertTrue(host.relayEndpoints.single().url.startsWith("https://relay.mindgains.ai/v1/relay/device/"))
+        assertEquals("Connected from anywhere", com.ragul84.hypurr.ui.linkText(t.state.value))
+        t.shutdown()
+
+        host.relayEndpoints.clear()
+        val off = HostConnector.connect(away, identity, scope, host.dialer) { false }
+        kotlinx.coroutines.delay(800)
+        assertTrue(host.relayEndpoints.isEmpty())
+        assertFalse(off.state.value is LinkState.Ready)
+        off.shutdown()
+    }
+
+    @Test
     fun hostErrorsBecomeHttpErrorsAndTimeoutsCancel() = runBlocking {
         host.authorized += identity.publicKey
         var session: FakeHost.Session? = null

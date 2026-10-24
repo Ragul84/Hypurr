@@ -21,6 +21,8 @@ export interface Env {
   TURN_LIMITER?: RateLimit;
   /** Public routine webhook deliveries per sender IP and hook. */
   HOOK_LIMITER?: RateLimit;
+  /** Relay socket opens per computer (host) or IP (device). */
+  RELAY_LIMITER?: RateLimit;
   CLERK_ISSUER: string;
   CLERK_SECRET_KEY?: string;
   /** dev / e2e only: networkless verification with this public key. */

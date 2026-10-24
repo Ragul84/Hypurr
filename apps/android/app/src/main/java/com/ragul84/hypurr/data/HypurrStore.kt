@@ -128,6 +128,8 @@ class HypurrStore(
     val themeMode = MutableStateFlow(persistence.read(THEME)?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.System)
     val dynamicColor = MutableStateFlow(persistence.read(DYNAMIC) == "1")
     val notifications = MutableStateFlow(persistence.read(NOTIFY) != "0")
+    /** "Connect from anywhere": reach the computer through the encrypted relay when not on its Wi-Fi. */
+    val anywhere = MutableStateFlow(persistence.read(ANYWHERE) != "0")
 
     private val _userProfile = MutableStateFlow(
         persistence.read(USER_PROFILE)?.let {
@@ -242,6 +244,12 @@ class HypurrStore(
         persistence.write(DYNAMIC, if (on) "1" else "0")
     }
 
+    fun setAnywhere(on: Boolean) {
+        anywhere.value = on
+        persistence.write(ANYWHERE, if (on) "1" else "0")
+        if (_computer.value != null) connect()
+    }
+
     fun setNotifications(on: Boolean) {
         notifications.value = on
         persistence.write(NOTIFY, if (on) "1" else "0")
@@ -269,7 +277,7 @@ class HypurrStore(
     fun connect() {
         val computer = _computer.value ?: return
         disconnect()
-        val t = HostConnector.connect(computer, identity, scope, dial)
+        val t = HostConnector.connect(computer, identity, scope, dial) { anywhere.value }
         transport = t
         jobs = listOf(
             scope.launch { t.state.collect { _link.value = it } },
@@ -721,6 +729,7 @@ class HypurrStore(
         const val THEME = "theme"
         const val DYNAMIC = "dynamicColor"
         const val NOTIFY = "notifications"
+        const val ANYWHERE = "connect_anywhere"
         const val USER_PROFILE = "user.profile"
         const val PROJECT_FOLDER = "project.folder"
         const val LAST_TASK_AGENT = "task.agent"

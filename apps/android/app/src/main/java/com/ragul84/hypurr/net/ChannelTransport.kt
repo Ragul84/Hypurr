@@ -77,6 +77,8 @@ class ChannelTransport(
     private val pairingCode: String? = null,
     private val dial: Dialer = OkHttpSocket.dial,
     private val directBudgetMs: Long = 1500,
+    /** "Connect from anywhere": off means direct (LAN / Tailscale) only, never the relay. */
+    private val useRelay: () -> Boolean = { true },
 ) {
     private val _state = MutableStateFlow<LinkState>(LinkState.Connecting)
     val state: StateFlow<LinkState> = _state.asStateFlow()
@@ -183,7 +185,7 @@ class ChannelTransport(
     }
 
     private suspend fun attempt(): Outcome {
-        val c = _computer.value
+        val c = _computer.value.let { if (useRelay()) it else it.copy(cloud = null) }
         val direct = c.urls.mapNotNull(::channelUrl)
         if (direct.isNotEmpty()) {
             when (val r = raceDirect(direct)) {
