@@ -379,6 +379,22 @@ describe("openrouter defaults", () => {
     vi.unstubAllGlobals();
   });
 
+  it("rewrites upstream model and provider fields to the Hypurr alias (JSON and SSE)", async () => {
+    const { scrubUpstream, scrubSse } = await import("../../src/gateway/handler");
+    const j = scrubUpstream({ model: "cohere/x:free", provider: "Cohere", system_fingerprint: "f", usage: { total_tokens: 3, cost: 0, is_byok: false, cost_details: {} }, choices: [] } as any, "hypurr-free");
+    expect(j.model).toBe("hypurr-free");
+    expect(JSON.stringify(j)).not.toMatch(/cohere|provider|cost|byok/i);
+    expect(j.usage.total_tokens).toBe(3);
+    const sse = ': OPENROUTER PROCESSING\n\ndata: {"model":"cohere/x:free","provider":"Cohere","choices":[]}\n\ndata: {"model":"cohere/x:free","usage":{"total_tokens":5,"cost":0}}\n\ndata: [DONE]\n\n';
+    const bytes = new TextEncoder().encode(sse);
+    const src = new ReadableStream({ start(c) { c.enqueue(bytes.slice(0, 40)); c.enqueue(bytes.slice(40)); c.close(); } });
+    const out = await new Response(src.pipeThrough(scrubSse("hypurr-free"))).text();
+    expect(out).not.toMatch(/cohere|openrouter|provider|cost/i);
+    expect(out.match(/"model":"hypurr-free"/g)?.length).toBe(2);
+    expect(out).toContain("data: [DONE]");
+    expect(out).toContain('"total_tokens":5');
+  });
+
   it("upstream 429 on free says Hypurr Free is busy, never names the provider", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: { message: "rate-limited upstream", metadata: { provider_name: "OpenRouter" } } }), { status: 429 })));
     const db = memoryDb();

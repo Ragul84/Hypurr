@@ -45,6 +45,59 @@ export type GatewayEnv = {
   GATEWAY_PUBLIC_URL?: string;
 };
 
+/** Hide which upstream served a response: alias the model and drop provider/cost fields. */
+export function scrubUpstream<T>(obj: T, alias: string): T {
+  if (!obj || typeof obj !== "object") return obj;
+  const o = obj as Record<string, unknown>;
+  if ("model" in o) o.model = alias;
+  delete o.provider;
+  delete o.system_fingerprint;
+  delete o.service_tier;
+  const u = o.usage as Record<string, unknown> | undefined;
+  if (u && typeof u === "object") {
+    delete u.cost;
+    delete u.cost_details;
+    delete u.is_byok;
+  }
+  if (o.error && typeof o.error === "object") delete (o.error as Record<string, unknown>).metadata;
+  return obj;
+}
+
+/** Rewrites each SSE `data:` JSON line through scrubUpstream; upstream comment lines become a neutral keep-alive. */
+export function scrubSse(alias: string): TransformStream<Uint8Array, Uint8Array> {
+  const dec = new TextDecoder();
+  const enc = new TextEncoder();
+  let tail = "";
+  const line = (l: string): string => {
+    const t = l.trim();
+    if (t.startsWith(":")) return ": keep-alive";
+    if (!t.startsWith("data:")) return l;
+    const payload = t.slice(5).trim();
+    if (payload === "[DONE]") return l;
+    try {
+      return "data: " + JSON.stringify(scrubUpstream(JSON.parse(payload), alias));
+    } catch {
+      return l;
+    }
+  };
+  return new TransformStream({
+    transform(chunk, ctl) {
+      const text = tail + dec.decode(chunk, { stream: true });
+      const cut = text.lastIndexOf("\n");
+      if (cut < 0) {
+        tail = text;
+        return;
+      }
+      tail = text.slice(cut + 1);
+      ctl.enqueue(enc.encode(text.slice(0, cut + 1).split("\n").map((l, i, a) => (i === a.length - 1 ? l : line(l))).join("\n")));
+    },
+    flush(ctl) {
+      tail += dec.decode();
+      if (tail) ctl.enqueue(enc.encode(line(tail)));
+    },
+  });
+}
+
 /** Passes SSE bytes through untouched and reports the final `usage` block when the stream ends. */
 export function usageTap(
   onUsage: (total: number, prompt: number, completion: number) => Promise<void>,
@@ -329,7 +382,7 @@ export async function chatCompletions(c: Ctx): Promise<Response> {
         if (more > 0) await spendCredits(db, sub.subjectId, more, { model: modelId, reconcile: true }, now);
       }
     };
-    const body2 = upstreamRes.body.pipeThrough(usageTap(reconcile));
+    const body2 = upstreamRes.body.pipeThrough(scrubSse(modelId)).pipeThrough(usageTap(reconcile));
     return new Response(body2, {
       status: 200,
       headers: {
@@ -393,7 +446,7 @@ export async function chatCompletions(c: Ctx): Promise<Response> {
     }),
   );
 
-  return json(data);
+  return json(scrubUpstream(data, modelId));
 }
 
 export async function spendingBalance(c: Ctx) {
