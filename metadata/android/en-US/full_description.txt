@@ -1,0 +1,10 @@
+Hypurr turns the coding agents on your PC — Claude Code, Codex, or the built-in Hypurr Agent — into helpers you can direct from your phone.
+
+• Start a task in plain language: pick the agent, pick the project folder, describe what you want.
+• Approve risky steps from your phone. Production is refused, work stays inside the folder you chose, and every change can be rolled back.
+• "Show me it works": screenshots and test results prove the change before you accept it.
+• Trace a click and Page map: see exactly what happens when a button is tapped, from screen to server.
+• Uses your own Claude or Codex sign-in — nothing extra to pay. No Claude or Codex? Try Hypurr Free or buy affordable credits.
+• Your code stays on your PC. Phone and PC pair with a QR code and talk end-to-end encrypted.
+
+Requires the free Hypurr app for Windows on your PC.
