@@ -21,8 +21,8 @@ android {
         minSdk = 26
         targetSdk = 35
         // Same version as apps/project.yml MARKETING_VERSION and host/Cargo.toml.
-        versionName = "2.5.0"
-        versionCode = 20500
+        versionName = "2.6.0"
+        versionCode = 20600
         // The push relay (relay/, deployed at push.mindgains.ai): host -> relay -> FCM.
         // Override without editing: ./gradlew assembleRelease -Phypurr.relayUrl=https://relay.example.com
         val relayUrl = providers.gradleProperty("hypurr.relayUrl").getOrElse("https://push.mindgains.ai")
