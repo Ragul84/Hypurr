@@ -35,6 +35,8 @@ export type GatewayConfig = {
   models: Array<{
     id: string;
     name: string;
+    /** User-facing one-liner shown under the model name. Never mention upstream providers. */
+    description?: string;
     /** free | paid */
     tier: "free" | "paid";
     upstreamModel: string;
@@ -51,8 +53,9 @@ export type GatewayConfig = {
 };
 
 // Upstream model ids verified against https://openrouter.ai/api/v1/models on 2026-10-21.
-// Paid-per-token (not ":free") variants on purpose: ":free" routes are heavily rate-limited and
-// may log prompts. All of these support tool calls, which Hypurr Agent needs.
+// Free tiers use ":free" variants (zero cost; shared daily request cap on our key; some providers
+// may log prompts, hence the "not for company code" label). Pro stays paid with strict privacy.
+// All of these support tool calls, which Hypurr Agent needs.
 export const DEFAULT_GATEWAY_CONFIG: GatewayConfig = {
   freeLifetime: true,
   // Hidden lifetime safety cap behind the 10 messages; past it a turn needs credits.
@@ -73,28 +76,29 @@ export const DEFAULT_GATEWAY_CONFIG: GatewayConfig = {
     {
       id: "hypurr-free",
       name: "Hypurr Free",
+      description: "For trying out, not for company code",
       tier: "free",
-      // ~$0.09 in / $0.18 out per 1M tokens, 1M context.
-      upstreamModel: "deepseek/deepseek-v4-flash",
-      fallbacks: ["z-ai/glm-5.3-flash", "qwen/qwen3.7-flash"],
+      upstreamModel: "cohere/north-mini-code:free",
+      fallbacks: ["poolside/laguna-s-2.1:free", "google/gemma-4-31b-it:free"],
       adapter: "openrouter",
-      assumeInputPerMTok: 0.091,
-      assumeOutputPerMTok: 0.182,
+      assumeInputPerMTok: 0,
+      assumeOutputPerMTok: 0,
     },
     {
       id: "hypurr-fast",
       name: "Hypurr Fast",
+      description: "Quick. For trying out, not company code",
       tier: "free",
-      // Small coding model; ~$0.07 in / $0.28 out per 1M tokens.
-      upstreamModel: "qwen/qwen3-coder-30b-a3b-instruct",
-      fallbacks: ["openai/gpt-oss-20b"],
+      upstreamModel: "nvidia/nemotron-3.5-lightning:free",
+      fallbacks: ["poolside/laguna-xs-2.1:free"],
       adapter: "openrouter",
-      assumeInputPerMTok: 0.07,
-      assumeOutputPerMTok: 0.28,
+      assumeInputPerMTok: 0,
+      assumeOutputPerMTok: 0,
     },
     {
       id: "hypurr-pro",
       name: "Hypurr Pro",
+      description: "Stronger model. Private: providers can't keep your prompts",
       tier: "paid",
       upstreamModel: "qwen/qwen3-coder",
       fallbacks: ["deepseek/deepseek-v3.2"],

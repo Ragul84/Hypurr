@@ -956,6 +956,7 @@ class MainActivity : ComponentActivity() {
                     val theme by store.themeMode.collectAsState()
                     val dynamic by store.dynamicColor.collectAsState()
                     val notify by store.notifications.collectAsState()
+                    val anywhere by store.anywhere.collectAsState()
                     val setup by store.setup.collectAsState()
                     val integrations by store.integrations.collectAsState()
                     val costs by store.costs.collectAsState()
@@ -973,7 +974,7 @@ class MainActivity : ComponentActivity() {
                         SettingsUiState(current, linkState, theme, dynamic, notify, app.pushAvailable, BuildConfig.VERSION_NAME,
                             safety = setup?.safety, customTemplates = setup?.templates.orEmpty().filter { !it.builtin },
                             integrations = integrations, costs = costs, testResults = tests, you = you, profile = userProfile,
-                            projectFolder = projectFolder, learningMode = learningMode, pricing = pricing,
+                            projectFolder = projectFolder, learningMode = learningMode, pricing = pricing, anywhere = anywhere,
                             voice = com.ragul84.hypurr.voice.VoiceSettings(com.ragul84.hypurr.voice.VoiceLanguage.of(userProfile.voiceLanguage),
                                 userProfile.explainInMyLanguage)),
                         onVoice = { v -> store.setUserProfile(userProfile.copy(voiceLanguage = v.language.tag, explainInMyLanguage = v.explainInMyLanguage)) },
@@ -996,6 +997,7 @@ class MainActivity : ComponentActivity() {
                         onTheme = store::setTheme,
                         onDynamic = store::setDynamicColor,
                         onNotifications = store::setNotifications,
+                        onAnywhere = store::setAnywhere,
                         onForget = {
                             scope.launch {
                                 store.forget()

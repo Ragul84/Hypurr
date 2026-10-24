@@ -1,5 +1,7 @@
 # Push notifications: what you need to provide
 
+> The current, step-by-step version is [docs/PUSH-SETUP.md](../PUSH-SETUP.md) (relay live at `push.mindgains.ai`).
+
 Hypurr sends a phone notification when an agent **needs you** (an approval card) and when a task is
 **done** or **failed**. The code is wired end to end; it stays off until you supply the three things
 below. Without them the app builds and runs normally, and Settings says push isn't set up.

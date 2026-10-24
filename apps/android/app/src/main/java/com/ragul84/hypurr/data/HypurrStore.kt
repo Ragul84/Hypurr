@@ -128,6 +128,8 @@ class HypurrStore(
     val themeMode = MutableStateFlow(persistence.read(THEME)?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.System)
     val dynamicColor = MutableStateFlow(persistence.read(DYNAMIC) == "1")
     val notifications = MutableStateFlow(persistence.read(NOTIFY) != "0")
+    /** "Connect from anywhere": reach the computer through the encrypted relay when not on its Wi-Fi. */
+    val anywhere = MutableStateFlow(persistence.read(ANYWHERE) != "0")
 
     private val _userProfile = MutableStateFlow(
         persistence.read(USER_PROFILE)?.let {
@@ -229,6 +231,9 @@ class HypurrStore(
     /** Runs after every handshake on a fresh channel (push registration). */
     var onConnected: (suspend (HostClient) -> Unit)? = null
 
+    /** A bot needs you, finished or failed while the channel is live (local fallback for push). */
+    var onLocalAlert: ((com.ragul84.hypurr.push.LocalAlerts.Kind, Bot) -> Unit)? = null
+
     fun setTheme(mode: ThemeMode) {
         themeMode.value = mode
         persistence.write(THEME, mode.name)
@@ -237,6 +242,12 @@ class HypurrStore(
     fun setDynamicColor(on: Boolean) {
         dynamicColor.value = on
         persistence.write(DYNAMIC, if (on) "1" else "0")
+    }
+
+    fun setAnywhere(on: Boolean) {
+        anywhere.value = on
+        persistence.write(ANYWHERE, if (on) "1" else "0")
+        if (_computer.value != null) connect()
     }
 
     fun setNotifications(on: Boolean) {
@@ -266,7 +277,7 @@ class HypurrStore(
     fun connect() {
         val computer = _computer.value ?: return
         disconnect()
-        val t = HostConnector.connect(computer, identity, scope, dial)
+        val t = HostConnector.connect(computer, identity, scope, dial) { anywhere.value }
         transport = t
         jobs = listOf(
             scope.launch { t.state.collect { _link.value = it } },
@@ -347,6 +358,9 @@ class HypurrStore(
 
     private fun upsert(bot: Bot) {
         rev = maxOf(rev, bot.rev)
+        com.ragul84.hypurr.push.LocalAlerts.detect(_bots.value[bot.id], bot)?.let { kind ->
+            if (notifications.value) runCatching { onLocalAlert?.invoke(kind, bot) }
+        }
         if (bot.deleted == true) _bots.update { it - bot.id } else _bots.update { it + (bot.id to bot) }
     }
 
@@ -715,6 +729,7 @@ class HypurrStore(
         const val THEME = "theme"
         const val DYNAMIC = "dynamicColor"
         const val NOTIFY = "notifications"
+        const val ANYWHERE = "connect_anywhere"
         const val USER_PROFILE = "user.profile"
         const val PROJECT_FOLDER = "project.folder"
         const val LAST_TASK_AGENT = "task.agent"

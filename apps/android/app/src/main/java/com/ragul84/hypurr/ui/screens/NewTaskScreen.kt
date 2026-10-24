@@ -280,6 +280,9 @@ private fun SetupPickers(state: NewTaskUiState, onChange: (NewTaskUiState) -> Un
                             Choice(m.name.ifEmpty { m.id }, m.id == state.model) { onChange(state.copy(model = m.id)); open = null }
                         }
                     }
+                    models.firstOrNull { it.id == state.model }?.description?.takeIf { it.isNotBlank() }?.let {
+                        Text(it, color = c.tertiary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 6.dp))
+                    }
                 }
             }
         }
