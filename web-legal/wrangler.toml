@@ -1,0 +1,8 @@
+# Static legal pages for Hypurr (privacy policy for Google Play). Separate from hypurr-cloud and
+# from the mindgains.ai site worker; deploy with: npx wrangler deploy
+name = "hypurr-legal"
+compatibility_date = "2026-09-01"
+routes = [{ pattern = "hypurr-legal.mindgains.ai", custom_domain = true }]
+[assets]
+directory = "./public"
+html_handling = "drop-trailing-slash"

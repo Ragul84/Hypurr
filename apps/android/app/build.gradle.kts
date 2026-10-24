@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -14,12 +16,13 @@ if (pushConfigured) apply(plugin = "com.google.gms.google-services")
 
 android {
     namespace = "com.ragul84.hypurr"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.ragul84.hypurr"
         minSdk = 26
-        targetSdk = 35
+        // Google Play requires API 36 for new apps and updates since Aug 31, 2026.
+        targetSdk = 36
         // Same version as apps/project.yml MARKETING_VERSION and host/Cargo.toml.
         versionName = "2.6.0"
         versionCode = 20600
@@ -36,8 +39,30 @@ android {
         buildConfigField("String", "REVENUECAT_KEY", "\"$rcKey\"")
     }
 
+    // Upload-key signing for Play. Nothing secret is committed: values come from env vars
+    // (CI: GitHub secrets) or from a git-ignored keystore.properties. Without them the release
+    // build is simply unsigned.
+    val ksProps = Properties().apply {
+        val f = rootProject.file("keystore.properties")
+        if (f.exists()) f.inputStream().use { load(it) }
+    }
+    fun signingValue(env: String, prop: String): String? =
+        System.getenv(env)?.takeIf { it.isNotBlank() } ?: ksProps.getProperty(prop)?.takeIf { it.isNotBlank() }
+    val uploadStoreFile = signingValue("HYPURR_UPLOAD_STORE_FILE", "storeFile")
+    signingConfigs {
+        if (uploadStoreFile != null) {
+            create("upload") {
+                storeFile = file(uploadStoreFile)
+                storePassword = signingValue("HYPURR_UPLOAD_STORE_PASSWORD", "storePassword")
+                keyAlias = signingValue("HYPURR_UPLOAD_KEY_ALIAS", "keyAlias")
+                keyPassword = signingValue("HYPURR_UPLOAD_KEY_PASSWORD", "keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (uploadStoreFile != null) signingConfig = signingConfigs.getByName("upload")
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }

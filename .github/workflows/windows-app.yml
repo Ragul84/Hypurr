@@ -71,6 +71,12 @@ jobs:
           $pe = [BitConverter]::ToInt32($b, 0x3C)
           $sub = [BitConverter]::ToUInt16($b, $pe + 24 + 68)
           if ($sub -ne 2) { throw "expected IMAGE_SUBSYSTEM_WINDOWS_GUI (2), got $sub" }
+      - name: Sign app + host (skipped without a cert secret)
+        shell: pwsh
+        env:
+          WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: packaging/windows/sign.ps1 dist/windows/hypurr.exe dist/windows/hypurr-host.exe
       - name: Build installer (Inno Setup, per-user)
         shell: pwsh
         run: |
@@ -78,6 +84,12 @@ jobs:
           if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
           & $iscc /DAppVersion=0.1.0 "/DSrcDir=$PWD\dist\windows" "/O$PWD\dist" packaging\windows\hypurr.iss
           if ($LASTEXITCODE -ne 0) { throw "iscc failed" }
+      - name: Sign installer (skipped without a cert secret)
+        shell: pwsh
+        env:
+          WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: packaging/windows/sign.ps1 (Get-ChildItem dist\HypurrSetup-*.exe | Select -First 1).FullName
       - name: Silent per-user install + uninstall (no admin)
         shell: pwsh
         run: |
