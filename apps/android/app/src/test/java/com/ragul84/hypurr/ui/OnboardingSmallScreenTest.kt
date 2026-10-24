@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.github.takahirom.roborazzi.captureRoboImage
 import com.ragul84.hypurr.data.ThemeMode
 import com.ragul84.hypurr.data.UserProfile
@@ -44,7 +45,7 @@ class OnboardingSmallScreenTest {
         picks.forEachIndexed { i, pick ->
             compose.onNodeWithText("Continue").assertIsDisplayed()
             compose.onNodeWithText("Skip for now").assertIsDisplayed()
-            compose.onNodeWithText(pick).performClick()
+            compose.onNodeWithText(pick).performScrollTo().performClick()
             compose.waitForIdle()
             if (i == picks.lastIndex) shot("onboarding-small-4-goals-selected")
             compose.onNodeWithText("Continue").assertIsDisplayed().assertIsEnabled().performClick()

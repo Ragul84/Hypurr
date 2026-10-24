@@ -724,21 +724,7 @@ private fun LearningCard(l: Learning, onOpenLink: (String) -> Unit) {
         }
         SelectionContainer { Text(l.summary, color = c.text, style = MaterialTheme.typography.bodyLarge) }
         DoneRule(visible = true, Modifier.padding(top = 8.dp))
-        if (l.files.isNotEmpty()) {
-            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(c.surface2).padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                l.files.take(8).forEach { f ->
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(f.path, color = c.text, style = SignalType.mono, maxLines = 1,
-                            overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                        Text("+${f.added}", color = c.text, style = MaterialTheme.typography.labelMedium)
-                        Spacer(Modifier.width(6.dp))
-                        Text("−${f.removed}", color = c.needsText, style = MaterialTheme.typography.labelMedium)
-                    }
-                }
-                if (l.files.size > 8) Text("and ${l.files.size - 8} more", color = c.tertiary, style = MaterialTheme.typography.labelSmall)
-            }
-        }
+        if (l.files.isNotEmpty()) WhatChangedFiles(l.files)
         val posted = l.posted.map { when (it) { "slack" -> "Slack"; "teams" -> "Teams"; "jira" -> "Jira"; else -> it } }
         if (posted.isNotEmpty()) Text("Posted to ${posted.joinToString(", ")}", color = c.secondary, style = MaterialTheme.typography.bodySmall)
         l.errors.forEach { Text(it, color = c.needsText, style = MaterialTheme.typography.bodySmall) }
