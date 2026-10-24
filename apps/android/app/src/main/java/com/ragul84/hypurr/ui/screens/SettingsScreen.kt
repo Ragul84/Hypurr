@@ -239,8 +239,9 @@ fun SettingsScreen(
         if (admin) state.integrations?.let { work -> WorkTools(work, state.testResults, onIntegrations, onTestIntegration) }
         state.costs?.let { Spending(it) }
         Section("Notifications") {
-            ToggleRow("Alerts", if (state.pushAvailable) "Needs you, done and failed, sealed end to end"
-            else "Push isn't configured in this build (placeholder Firebase project)", state.notifications, true, onNotifications)
+            ToggleRow("Alerts", if (state.pushAvailable) "Needs you, done and failed, even when the app is closed"
+            else "Needs you, done and failed while Hypurr is connected. Alerts with the app closed aren't set up in this build yet.",
+                state.notifications, true, onNotifications)
         }
         Section("About") {
             Detail("Version", state.version)
