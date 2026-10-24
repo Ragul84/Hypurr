@@ -161,7 +161,13 @@ class MainActivity : ComponentActivity() {
             val store = app.store
             val mode by store.themeMode.collectAsState()
             val dynamic by store.dynamicColor.collectAsState()
-            HypurrTheme(mode, dynamic) { App(store) }
+            HypurrTheme(mode, dynamic) {
+                val voiceProfile by store.userProfile.collectAsState()
+                androidx.compose.runtime.CompositionLocalProvider(
+                    com.ragul84.hypurr.voice.LocalVoiceSettings provides com.ragul84.hypurr.voice.VoiceSettings(
+                        com.ragul84.hypurr.voice.VoiceLanguage.of(voiceProfile.voiceLanguage), voiceProfile.explainInMyLanguage),
+                ) { App(store) }
+            }
         }
     }
 
@@ -587,7 +593,10 @@ class MainActivity : ComponentActivity() {
                             task = task.copy(busy = true, error = null)
                             scope.launch {
                                 try {
-                                    val botId = store.startTask(task.goal, task.template, task.input, task.projectPath, task.agentId,
+                                    val voice = store.userProfile.value
+                                    val note = com.ragul84.hypurr.voice.voiceTaskNote(
+                                        com.ragul84.hypurr.voice.VoiceLanguage.of(voice.voiceLanguage), voice.explainInMyLanguage, task.spoken)
+                                    val botId = store.startTask(com.ragul84.hypurr.voice.withVoiceNote(task.goal, note), task.template, task.input, task.projectPath, task.agentId,
                                         task.files, task.issue, model = task.model)
                                     store.rememberTaskPicks(task.agentId, task.model, task.projectPath)
                                     taskDraft = null
@@ -947,6 +956,7 @@ class MainActivity : ComponentActivity() {
                     val theme by store.themeMode.collectAsState()
                     val dynamic by store.dynamicColor.collectAsState()
                     val notify by store.notifications.collectAsState()
+                    val anywhere by store.anywhere.collectAsState()
                     val setup by store.setup.collectAsState()
                     val integrations by store.integrations.collectAsState()
                     val costs by store.costs.collectAsState()
@@ -964,7 +974,10 @@ class MainActivity : ComponentActivity() {
                         SettingsUiState(current, linkState, theme, dynamic, notify, app.pushAvailable, BuildConfig.VERSION_NAME,
                             safety = setup?.safety, customTemplates = setup?.templates.orEmpty().filter { !it.builtin },
                             integrations = integrations, costs = costs, testResults = tests, you = you, profile = userProfile,
-                            projectFolder = projectFolder, learningMode = learningMode, pricing = pricing),
+                            projectFolder = projectFolder, learningMode = learningMode, pricing = pricing, anywhere = anywhere,
+                            voice = com.ragul84.hypurr.voice.VoiceSettings(com.ragul84.hypurr.voice.VoiceLanguage.of(userProfile.voiceLanguage),
+                                userProfile.explainInMyLanguage)),
+                        onVoice = { v -> store.setUserProfile(userProfile.copy(voiceLanguage = v.language.tag, explainInMyLanguage = v.explainInMyLanguage)) },
                         onEditProfile = { screen = "profile" },
                         onPickFolder = { screen = "folderpick:settings" },
                         onClearProfile = { store.clearUserProfile() },
@@ -984,6 +997,7 @@ class MainActivity : ComponentActivity() {
                         onTheme = store::setTheme,
                         onDynamic = store::setDynamicColor,
                         onNotifications = store::setNotifications,
+                        onAnywhere = store::setAnywhere,
                         onForget = {
                             scope.launch {
                                 store.forget()

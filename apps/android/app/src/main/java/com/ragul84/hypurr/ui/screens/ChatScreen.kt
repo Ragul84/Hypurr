@@ -694,6 +694,7 @@ private fun PermissionCard(entry: Entry, task: TaskInfo?, onRespond: (Entry, Str
             }
             if (canAnswer) {
                 ApprovalActions(d.options.orEmpty(), Modifier.padding(top = 14.dp)) { onRespond(entry, it) }
+                VoiceApproval(entry.id, d.risk, d.options.orEmpty(), Modifier.padding(top = 12.dp)) { onRespond(entry, it) }
             } else if (!blocked && !pending) {
                 val option = d.options?.firstOrNull { it.optionId == d.selected }
                 Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -723,6 +724,7 @@ private fun LearningCard(l: Learning, onOpenLink: (String) -> Unit) {
             l.cost?.let { Pill(it.label, c.text) }
         }
         SelectionContainer { Text(l.summary, color = c.text, style = MaterialTheme.typography.bodyLarge) }
+        ReadAloud(l.summary)
         DoneRule(visible = true, Modifier.padding(top = 8.dp))
         if (l.files.isNotEmpty()) WhatChangedFiles(l.files)
         val posted = l.posted.map { when (it) { "slack" -> "Slack"; "teams" -> "Teams"; "jira" -> "Jira"; else -> it } }
@@ -813,4 +815,66 @@ private fun Composer(draft: String, onDraftChange: (String) -> Unit, onSend: () 
             }
         }
     }
+}
+
+/**
+ * Answer an approval by voice: "haan / yes / aamaa / allow" or "no / nahi / illa / stop".
+ * "No" sends at once. "Yes" sends only for a low-risk action; anything else asks for a tap on
+ * screen, so voice alone never approves a risky action. "Always" options are never picked by voice.
+ */
+@Composable
+internal fun VoiceApproval(entryId: String, risk: String?, options: List<com.ragul84.hypurr.model.PermissionOption>,
+                           modifier: Modifier = Modifier, initialConfirm: String? = null, onChoose: (String?) -> Unit) {
+    val c = Hypurr.colors
+    val voice = com.ragul84.hypurr.voice.LocalVoiceSettings.current
+    val deny = options.firstOrNull { it.kind.startsWith("reject") }
+    val allow = options.firstOrNull { !it.kind.startsWith("reject") && !it.kind.contains("always", true) && !it.name.contains("always", true) }
+    var confirm by remember(entryId) { mutableStateOf(initialConfirm) }
+    var hint by remember(entryId) { mutableStateOf<String?>(null) }
+    val mic = com.ragul84.hypurr.voice.rememberVoiceInput(voice.language) { said ->
+        when (com.ragul84.hypurr.voice.voiceApprovalStep(com.ragul84.hypurr.voice.parseVoiceAnswer(said), risk)) {
+            com.ragul84.hypurr.voice.VoiceStep.SendDeny -> deny?.let { onChoose(it.optionId) }
+            com.ragul84.hypurr.voice.VoiceStep.SendAllow -> allow?.let { onChoose(it.optionId) }
+            com.ragul84.hypurr.voice.VoiceStep.ConfirmOnScreen -> { confirm = said; hint = null }
+            com.ragul84.hypurr.voice.VoiceStep.AskAgain -> hint = "Heard “$said”. Say yes or no, or tap a button."
+        }
+    }
+    Column(modifier.fillMaxWidth().animateContentSize(Motion.spatialDefault())) {
+        val heard = confirm
+        if (heard != null && allow != null) {
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.surface2).padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("You said “$heard”. This one is ${if (risk == null) "not rated" else "$risk risk"}, so tap to confirm.",
+                    color = c.text, style = MaterialTheme.typography.bodyMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    com.ragul84.hypurr.ui.OutlineButton("Not now", Modifier.weight(1f)) { confirm = null }
+                    com.ragul84.hypurr.ui.SignalAllowButton("Yes, ${allow.name.lowercase()}", Modifier.weight(1f)) { onChoose(allow.optionId) }
+                }
+            }
+        } else {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                com.ragul84.hypurr.ui.MicButton(mic.listening, voice.language, size = 40.dp) { if (mic.listening) mic.stop() else mic.start() }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(if (mic.listening) "Listening…" else "Or say yes or no", color = c.secondary, style = MaterialTheme.typography.labelLarge)
+                    com.ragul84.hypurr.ui.VoiceHint(mic.listening, mic.partial, mic.error ?: hint, voice.language)
+                }
+            }
+        }
+    }
+}
+
+/** Read the agent's summary aloud in the chosen language (falls back to English with a note). */
+@Composable
+private fun ReadAloud(text: String) {
+    if (text.isBlank()) return
+    val c = Hypurr.colors
+    val voice = com.ragul84.hypurr.voice.LocalVoiceSettings.current
+    val speaker = com.ragul84.hypurr.voice.rememberSpeaker()
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        SoftButton(if (speaker.speaking) "Stop reading" else "Read aloud", icon = signalIcon(SignalIcons.Speaker)) {
+            if (speaker.speaking) speaker.stop() else speaker.speak(text, voice.language)
+        }
+    }
+    speaker.notice?.let { Text(it, color = c.secondary, style = MaterialTheme.typography.bodySmall) }
 }

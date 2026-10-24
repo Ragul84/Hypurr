@@ -17,6 +17,10 @@ data class UserProfile(
     val experience: String? = null,
     val stacks: List<String> = emptyList(),
     val goals: List<String> = emptyList(),
+    /** Voice: BCP-47 tag of the mic and read-aloud language (see voice.VoiceLanguage). Phone only. */
+    val voiceLanguage: String = "en-IN",
+    /** Ask the agent to explain in [voiceLanguage] (code stays English). Phone only. */
+    val explainInMyLanguage: Boolean = false,
 ) {
     val hasAnswers: Boolean
         get() = role != null || experience != null || stacks.isNotEmpty() || goals.isNotEmpty()
