@@ -278,7 +278,7 @@ private fun greetingFor(now: Long): String {
 private fun Greeting(computerName: String, link: LinkState, now: Long, modifier: Modifier = Modifier) {
     val c = Hypurr.colors
     val (line, dot) = when (link) {
-        is LinkState.Ready -> ("$computerName is online" + (if (link.route == com.ragul84.hypurr.net.Route.Relay) " · relay" else "")) to c.text
+        is LinkState.Ready -> ("$computerName · " + com.ragul84.hypurr.ui.linkText(link).replaceFirstChar { it.lowercase() }) to c.text
         LinkState.Connecting -> "Connecting to $computerName" to c.tertiary
         is LinkState.HostOffline -> "$computerName is offline" to c.needs
         is LinkState.Unauthorized -> "Not allowed on $computerName" to c.needs

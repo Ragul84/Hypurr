@@ -59,6 +59,7 @@ import com.ragul84.hypurr.model.Computer
 import com.ragul84.hypurr.net.LinkState
 import com.ragul84.hypurr.ui.IconBubble
 import com.ragul84.hypurr.ui.LinkPill
+import com.ragul84.hypurr.ui.linkText
 import com.ragul84.hypurr.ui.SoftButton
 import com.ragul84.hypurr.ui.panel
 import com.ragul84.hypurr.ui.pressable
@@ -93,6 +94,8 @@ data class SettingsUiState(
     val learningMode: Boolean = false,
     /** Plans in rupees from the computer (pricing/plans.json). */
     val pricing: com.ragul84.hypurr.model.Pricing? = null,
+    /** Reach the computer through the encrypted relay away from its Wi-Fi. */
+    val anywhere: Boolean = true,
 )
 
 @Composable
@@ -114,6 +117,7 @@ fun SettingsScreen(
     onEditProfile: () -> Unit = {},
     onClearProfile: () -> Unit = {},
     onPickFolder: () -> Unit = {},
+    onAnywhere: (Boolean) -> Unit = {},
     showHomeTabs: Boolean = false,
     onTab: (HomeTab) -> Unit = {},
 ) {
@@ -238,6 +242,11 @@ fun SettingsScreen(
         // Work tools hold the team's keys: admins only.
         if (admin) state.integrations?.let { work -> WorkTools(work, state.testResults, onIntegrations, onTestIntegration) }
         state.costs?.let { Spending(it) }
+        Section("Connection") {
+            Detail("Now", linkText(state.link))
+            ToggleRow("Connect from anywhere", if (state.anywhere) "Office or mobile data too. Locked end to end, so the relay can't read it."
+            else "Only on the same Wi-Fi as your computer", state.anywhere, true, onAnywhere)
+        }
         Section("Notifications") {
             ToggleRow("Alerts", if (state.pushAvailable) "Needs you, done and failed, sealed end to end"
             else "Push isn't configured in this build (placeholder Firebase project)", state.notifications, true, onNotifications)

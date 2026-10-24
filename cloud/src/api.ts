@@ -877,11 +877,17 @@ async function forward(c: Ctx, computerId: string, role: "host" | "device", s: S
   throw new ApiError(err?.error?.code ?? "internal", undefined, res.status);
 }
 
+/** Abuse limit on opening relay sockets (per computer for hosts, per IP and computer for devices); reconnect storms get 429. */
+async function relayLimit(c: Ctx, key: string): Promise<void> {
+  if (c.env.RELAY_LIMITER && !(await c.env.RELAY_LIMITER.limit({ key })).success) throw new ApiError("rateLimited");
+}
+
 export async function relayHost(c: Ctx): Promise<Response> {
   checkUpgrade(c);
   const s = await verifySig(c.req, c.raw, c.now);
   if (!s) throw new ApiError("badSignature");
   const id = await computerIdFor(fromB64url(s.kid, 32)!);
+  await relayLimit(c, `host|${id}`);
   const row = await c.env.DB.prepare("SELECT status FROM computers WHERE id = ?").bind(id).first<{ status: string }>();
   if (!row) throw new ApiError("unknownComputer", "Register first (POST /v1/host/register)");
   if (row.status !== "active") throw new ApiError("forbidden");
@@ -895,6 +901,7 @@ export async function relayDevice(c: Ctx, [computerId]: string[]): Promise<Respo
   if (pair && !fromB64url(pair, 16)) throw new ApiError("badRequest", "Invalid pair");
   const s = await verifySig(c.req, c.raw, c.now);
   if (!s) throw new ApiError("badSignature");
+  await relayLimit(c, `device|${c.req.headers.get("CF-Connecting-IP") ?? "local"}|${computerId}`);
   // Only registered computers get a DO; random IDs never create one.
   const row = await c.env.DB.prepare("SELECT status FROM computers WHERE id = ?").bind(computerId).first<{ status: string }>();
   if (!row || row.status !== "active") throw new ApiError("unknownComputer");
@@ -914,6 +921,7 @@ export async function routineHook(c: Ctx, [computerId, hookId]: string[]): Promi
     const ip = c.req.headers.get("CF-Connecting-IP") ?? "unknown";
     if (!(await c.env.HOOK_LIMITER.limit({ key: `${ip}|${computerId}/${hookId}` })).success) throw new ApiError("rateLimited");
   }
+  await relayLimit(c, `device|${c.req.headers.get("CF-Connecting-IP") ?? "local"}|${computerId}`);
   // Only registered computers get a DO; random IDs never create one.
   const row = await c.env.DB.prepare("SELECT status FROM computers WHERE id = ?").bind(computerId).first<{ status: string }>();
   if (!row || row.status !== "active") throw new ApiError("notFound");

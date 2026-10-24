@@ -16,10 +16,18 @@ use std::sync::Mutex;
 use std::time::Duration;
 use tokio::sync::watch;
 
-/// The cloud a fresh host uses: none unless the build sets `HYPURR_DEFAULT_CLOUD_URL`.
-/// The cloud isn't deployed yet (`api.hypurr.dev` doesn't resolve), so defaulting to it only
-/// produced retry noise; Wi-Fi pairing never needed it. Unit tests have none either.
-pub const DEFAULT_CLOUD_URL: Option<&str> = if cfg!(test) { None } else { option_env!("HYPURR_DEFAULT_CLOUD_URL") };
+/// The relay a fresh host uses so the phone can reach it away from home Wi-Fi: the
+/// build's `HYPURR_DEFAULT_CLOUD_URL`, else Hypurr's relay at `relay.mindgains.ai`. It only
+/// ever forwards ciphertext (keys come from the QR pairing). Turn it off with
+/// `HYPURR_CLOUD=off` or the "Connect from anywhere" setting. Unit tests have none.
+pub const DEFAULT_CLOUD_URL: Option<&str> = if cfg!(test) {
+    None
+} else {
+    match option_env!("HYPURR_DEFAULT_CLOUD_URL") {
+        Some(u) => Some(u),
+        None => Some("https://relay.mindgains.ai"),
+    }
+};
 
 /// Built-in placeholder URLs from older builds; a saved one counts as "no cloud".
 const PLACEHOLDER_URLS: [&str; 2] = ["https://api.hypurr.dev", "https://dev-api.hypurr.dev"];

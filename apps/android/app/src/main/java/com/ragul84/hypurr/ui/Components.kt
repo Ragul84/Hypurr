@@ -371,12 +371,21 @@ fun BotAvatar(bot: Bot, size: Dp = 48.dp, modifier: Modifier = Modifier) {
     }
 }
 
-/** The link state as a quiet pill: Direct / Cloud relay / Offline / Connecting. */
+/** Plain words for how the phone reaches the computer. */
+fun linkText(state: LinkState): String = when (state) {
+    is LinkState.Ready -> if (state.route == Route.Direct) "Connected directly" else "Connected from anywhere"
+    LinkState.Connecting -> "Connecting"
+    is LinkState.HostOffline -> "Computer offline"
+    is LinkState.Unauthorized -> "Not allowed"
+    is LinkState.Failed -> "Can't reach"
+}
+
+/** The link state as a quiet pill: Connected directly / from anywhere / Offline / Connecting. */
 @Composable
 fun LinkPill(state: LinkState, modifier: Modifier = Modifier) {
     val c = Hypurr.colors
     val (label, dot, ink) = when (state) {
-        is LinkState.Ready -> Triple(if (state.route == Route.Direct) "Direct" else "Cloud relay", c.text, c.text)
+        is LinkState.Ready -> Triple(linkText(state), c.text, c.text)
         LinkState.Connecting -> Triple("Connecting", c.tertiary, c.secondary)
         is LinkState.HostOffline -> Triple("Computer offline", c.needs, c.needsText)
         is LinkState.Unauthorized -> Triple("Not allowed", c.needs, c.needsText)
