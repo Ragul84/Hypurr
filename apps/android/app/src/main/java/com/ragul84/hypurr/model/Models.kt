@@ -112,10 +112,10 @@ data class ThreadSummary(val count: Int = 0, val lastAt: Long = 0, val authors: 
 
 /** A folder on the computer (`listDirs`), for a new bot's working folder. */
 @Serializable
-data class DirEntry(val name: String, val path: String, val isGit: Boolean = false)
+data class DirEntry(val name: String, val path: String, val isGit: Boolean = false, val isProject: Boolean = false, val isRoot: Boolean = false, val kind: String? = null)
 
 @Serializable
-data class DirListing(val path: String = "", val parent: String? = null, val isGit: Boolean = false, val dirs: List<DirEntry> = emptyList(), val drives: Boolean = false)
+data class DirListing(val path: String = "", val parent: String? = null, val isGit: Boolean = false, val dirs: List<DirEntry> = emptyList(), val drives: Boolean = false, val isProject: Boolean = false, val isRoot: Boolean = false)
 
 /** Quick reactions under a message (the iPhone's long-press row). */
 val QuickReactions = listOf("👍", "❤️", "😂", "🎉", "👀", "✅")

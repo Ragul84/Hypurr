@@ -222,8 +222,7 @@ async fn prepare_npx(package: &str, name: &str, progress: &impl Fn(&str)) -> Res
     }
     let _ = tokio::fs::remove_dir_all(&dir).await;
     progress(&format!("Downloading {name}…"));
-    let install = tokio::process::Command::new("npm")
-        .args(["exec", "--yes", "--package", package, "-c", "true"])
+    let install = npm_command(&["exec", "--yes", "--package", package, "-c", "true"])?
         // Away from any project, so npx doesn't settle for a local node_modules.
         .current_dir(crate::service::data_dir())
         .stdin(std::process::Stdio::null())
@@ -239,17 +238,27 @@ async fn prepare_npx(package: &str, name: &str, progress: &impl Fn(&str)) -> Res
     bail!("couldn't download {name} with npm: {failure}")
 }
 
+/// npm, found on PATH. On Windows npm is `npm.cmd`, which `Command::new("npm")` can't start
+/// (it only tries `.exe`), so it has to be resolved and run through cmd.
+fn npm_command(args: &[&str]) -> Result<tokio::process::Command> {
+    let Some(npm) = crate::agent::backends::which("npm") else {
+        bail!("{NO_NODE}");
+    };
+    Ok(crate::oscmd::program_command(&npm, args))
+}
+
+const NO_NODE: &str = "This agent needs Node.js on your computer. Install it from https://nodejs.org and try again, or pick Hypurr Agent, which needs nothing extra.";
+
 /// `npm config get cache`, asked once.
 async fn npm_cache() -> Result<&'static Path> {
     static DIR: tokio::sync::OnceCell<PathBuf> = tokio::sync::OnceCell::const_new();
     let dir = DIR
         .get_or_try_init(|| async {
-            let out = tokio::process::Command::new("npm")
-                .args(["config", "get", "cache"])
+            let out = npm_command(&["config", "get", "cache"])?
                 .stdin(std::process::Stdio::null())
                 .output()
                 .await
-                .context("running npm")?;
+                .context("npm couldn't start. Reinstall Node.js from https://nodejs.org, or pick Hypurr Agent")?;
             let dir = String::from_utf8_lossy(&out.stdout).trim().to_owned();
             if !out.status.success() || dir.is_empty() {
                 bail!("npm didn't report its cache directory");
@@ -388,6 +397,18 @@ mod tests {
     fn npx_command_is_quoted() {
         let npx = json!({"package": "@s/x@1.0.0", "args": ["--acp", "a b"], "env": {"K": "v", "BAD;rm": "x"}});
         assert_eq!(npx_cmd(&npx).acp(), "env K=v npx -y @s/x@1.0.0 --acp 'a b'");
+    }
+
+    #[tokio::test]
+    async fn npm_resolves_like_the_shell() {
+        // Regression: on Windows `Command::new("npm")` failed ("running npm") because npm is npm.cmd.
+        let cmd = npm_command(&["--version"]);
+        if crate::agent::backends::which("npm").is_some() {
+            let out = cmd.unwrap().output().await.unwrap();
+            assert!(out.status.success());
+        } else {
+            assert!(format!("{:#}", cmd.unwrap_err()).contains("Node.js"));
+        }
     }
 
     #[test]

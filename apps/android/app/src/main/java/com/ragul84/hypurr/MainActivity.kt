@@ -858,18 +858,13 @@ class MainActivity : ComponentActivity() {
                     }
                     LaunchedEffect(Unit) {
                         store.loadSetup()
-                        if (store.setup.value?.projects.isNullOrEmpty()) browse(null)
+                        browse(null)
                     }
                     ProjectFolderPickerScreen(
                         projects = setup?.projects.orEmpty(),
                         browsing = browsing,
                         selectedPath = selected,
-                        subtitle = when {
-                            mode == "pair" -> "Which folder should agents work in? You can change it anytime under You."
-                            mode == "settings" -> "New tasks start in this folder."
-                            mode.startsWith("chat:") -> "Pick a folder for a new task. This chat keeps its own folder."
-                            else -> "Pick the folder this task is about."
-                        },
+                        subtitle = if (mode == "pair") "Which folder should agents work in? You can change it later." else "",
                         confirmLabel = if (mode.startsWith("chat:")) selected?.let { "New task in ${com.ragul84.hypurr.ui.screens.folderName(it)}" } else null,
                         onBack = { screen = back },
                         onBrowse = ::browse,

@@ -1064,43 +1064,82 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
 }
 
 /// Blocking (`std::fs`): call through `spawn_blocking`.
+/// Read-only: names only, never file contents. One level per call, so the phone loads lazily.
+/// No path (or "" / "drives") is the top level: Home plus every drive on Windows, Home and `/` elsewhere.
 fn list_dirs(path: Option<std::path::PathBuf>) -> Result<Value> {
-    // Read-only: names only, never file contents. Windows: "" (or "drives") lists the drives.
-    #[cfg(windows)]
-    if path.as_ref().is_some_and(|p| p.as_os_str().is_empty() || p.as_os_str() == "drives") {
-        let drives: Vec<Value> = (b'A'..=b'Z')
-            .map(|l| format!("{}:\\", char::from(l)))
-            .filter(|d| std::path::Path::new(d).is_dir())
-            .map(|d| json!({"name": d.trim_end_matches('\\'), "path": d, "isGit": false}))
-            .collect();
-        return Ok(json!({"path": "", "parent": null, "isGit": false, "dirs": drives, "drives": true}));
+    let top = path.as_ref().is_none_or(|p| p.as_os_str().is_empty() || p.as_os_str() == "drives");
+    if top {
+        let mut places = Vec::new();
+        if let Some(home) = dirs::home_dir() {
+            places.push(json!({"name": "Home", "path": home.to_string_lossy(), "isGit": false, "isProject": false, "isRoot": false, "kind": "home"}));
+        }
+        #[cfg(windows)]
+        places.extend(
+            (b'A'..=b'Z')
+                .map(|l| format!("{}:\\", char::from(l)))
+                .filter(|d| std::path::Path::new(d).is_dir())
+                .map(|d| json!({"name": d.trim_end_matches('\\'), "path": d, "isGit": false, "isProject": false, "isRoot": true, "kind": "drive"})),
+        );
+        #[cfg(not(windows))]
+        places.push(
+            json!({"name": "/", "path": "/", "isGit": false, "isProject": false, "isRoot": true, "kind": "drive"}),
+        );
+        return Ok(
+            json!({"path": "", "parent": null, "isGit": false, "isProject": false, "isRoot": false, "dirs": places, "drives": true}),
+        );
     }
-    let dir = match path {
-        Some(p) if !p.as_os_str().is_empty() => p,
-        _ => dirs::home_dir().ok_or_else(|| anyhow!("no home directory"))?,
-    };
+    let dir = path.unwrap_or_default();
     let mut dirs: Vec<Value> = std::fs::read_dir(&dir)
         .with_context(|| format!("listing {}", dir.display()))?
         .filter_map(Result::ok)
         .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
         .filter(|e| !hidden_dir(e))
+        .take(2000)
         .map(|e| {
             let name = e.file_name().to_string_lossy().into_owned();
             let p = e.path();
-            json!({"name": name, "path": p.to_string_lossy(), "isGit": p.join(".git").exists()})
+            json!({"name": name, "path": p.to_string_lossy(), "isGit": p.join(".git").exists(), "isProject": looks_like_project(&p), "isRoot": false})
         })
         .collect();
-    dirs.sort_by_key(|d| d["name"].as_str().unwrap_or_default().to_lowercase());
-    // At a drive root on Windows, "up" goes to the drive list.
-    let parent = dir.parent().map(|p| p.to_string_lossy().into_owned());
-    #[cfg(windows)]
-    let parent = parent.or_else(|| Some(String::new()));
+    // Projects first, then by name.
+    dirs.sort_by_key(|d| {
+        (!d["isProject"].as_bool().unwrap_or(false), d["name"].as_str().unwrap_or_default().to_lowercase())
+    });
+    // From a drive root or home, "up" goes back to the top level ("").
+    let parent = dir.parent().map(|p| p.to_string_lossy().into_owned()).or_else(|| Some(String::new()));
     Ok(json!({
         "path": dir.to_string_lossy(),
         "parent": parent,
         "isGit": dir.join(".git").exists(),
+        "isProject": looks_like_project(&dir),
+        "isRoot": is_drive_root(&dir),
         "dirs": dirs,
     }))
+}
+
+/// `C:\`, `/`: picking one hands the agent the whole drive.
+fn is_drive_root(dir: &std::path::Path) -> bool {
+    dir.parent().is_none()
+}
+
+/// A git repo or a folder with a build file in it.
+fn looks_like_project(dir: &std::path::Path) -> bool {
+    const MARKERS: &[&str] = &[
+        ".git",
+        "package.json",
+        "pyproject.toml",
+        "Cargo.toml",
+        "pom.xml",
+        "build.gradle",
+        "build.gradle.kts",
+        "go.mod",
+    ];
+    MARKERS.iter().any(|m| dir.join(m).exists())
+        || std::fs::read_dir(dir).is_ok_and(|rd| {
+            rd.filter_map(Result::ok)
+                .take(200)
+                .any(|e| e.file_name().to_string_lossy().to_ascii_lowercase().ends_with(".sln"))
+        })
 }
 
 /// Hidden, system and tool folders stay out of the folder picker.
@@ -1151,6 +1190,39 @@ mod list_dirs_tests {
         let names: Vec<&str> = v["dirs"].as_array().unwrap().iter().map(|d| d["name"].as_str().unwrap()).collect();
         assert_eq!(names, ["api", "shop"]);
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn projects_get_a_badge_and_sort_first() {
+        let root = std::env::temp_dir().join(format!("hypurr-ls-{}", uuid::Uuid::new_v4()));
+        for d in ["alpha", "zeta/.git", "mid", "web"] {
+            std::fs::create_dir_all(root.join(d)).unwrap();
+        }
+        std::fs::write(root.join("web/package.json"), "{}").unwrap();
+        std::fs::write(root.join("mid/App.sln"), "").unwrap();
+        let v = super::list_dirs(Some(root.clone())).unwrap();
+        let rows: Vec<(&str, bool)> = v["dirs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|d| (d["name"].as_str().unwrap(), d["isProject"].as_bool().unwrap()))
+            .collect();
+        assert_eq!(rows, [("mid", true), ("web", true), ("zeta", true), ("alpha", false)]);
+        assert_eq!(v["isRoot"], false);
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn top_level_lists_home_and_drive_roots() {
+        let v = super::list_dirs(None).unwrap();
+        assert_eq!(v["path"], "");
+        let places = v["dirs"].as_array().unwrap();
+        assert!(places.iter().any(|d| d["kind"] == "home"));
+        assert!(places.iter().any(|d| d["kind"] == "drive" && d["isRoot"] == true));
+        let root = places.iter().find(|d| d["kind"] == "drive").unwrap()["path"].as_str().unwrap().to_owned();
+        let at_root = super::list_dirs(Some(root.into())).unwrap();
+        assert_eq!(at_root["isRoot"], true);
+        assert_eq!(at_root["parent"], "");
     }
 }
 
