@@ -142,7 +142,7 @@ pub(crate) fn model_config(session: &Value) -> Option<&Value> {
         .or_else(|| options.iter().filter(is_select).find(|v| v["id"] == "model" || v["id"] == "models"))
 }
 
-fn model_catalog(session: &Value) -> Value {
+pub(crate) fn model_catalog(session: &Value) -> Value {
     fn collect(options: &Value, out: &mut Vec<Value>) {
         for option in options.as_array().into_iter().flatten() {
             if option["options"].is_array() {
