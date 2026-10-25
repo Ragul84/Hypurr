@@ -878,6 +878,11 @@ impl Actor {
             if self.cfg.backend == crate::agent::builtin::BACKEND_ID
                 && !env.iter().any(|(k, _)| k == "OPENCODE_CONFIG_CONTENT")
             {
+                // The free models' key lives in the vault: open it even for a bot with no
+                // connectors, or the key minted below can't be saved and Hypurr Free is off.
+                if let Err(e) = crate::market::vault::unlock(self.hub.clone()).await {
+                    tracing::warn!(error = format!("{e:#}"), "vault locked; Hypurr Free unavailable");
+                }
                 env.extend(crate::agent::builtin::launch_env(&self.hub.store).await);
             }
             if self.cfg.backend == "codex" {
