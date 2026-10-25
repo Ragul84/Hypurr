@@ -502,11 +502,8 @@ impl Actor {
             // Keep the reason ("(gateway said …)") so the phone says why.
             e.to_string()[i..].clone_into(&mut msg);
         }
-        if e.to_string().contains(crate::agent::builtin::FREE_EXHAUSTED) {
-            crate::agent::builtin::FREE_EXHAUSTED.clone_into(&mut msg);
-        }
-        if e.to_string().contains(crate::agent::builtin::FREE_BUSY) {
-            crate::agent::builtin::FREE_BUSY.clone_into(&mut msg);
+        if e.to_string().contains(crate::agent::builtin::NEEDS_ACCOUNT) {
+            crate::agent::builtin::NEEDS_ACCOUNT.clone_into(&mut msg);
         }
         if e.to_string().to_lowercase().contains("auth")
             && let Some(h) = crate::agent::backends::harness(&self.cfg.backend)
@@ -719,7 +716,7 @@ impl Actor {
             prompt = format!("{prompt}\n\n{update}");
             self.announce = Some((snapshot, identity));
         }
-        // Hypurr's free models count user messages: open one per turn (agent calls inside are free).
+        // Hypurr models on the gateway are paid from credits: open one message per turn.
         if crate::agent::builtin::uses_gateway(&self.cfg.backend, self.cfg.model.as_deref()) {
             crate::agent::builtin::open_turn(&self.hub.store).await?;
         }
@@ -888,7 +885,7 @@ impl Actor {
                 if let Err(e) = crate::market::vault::unlock(self.hub.clone()).await {
                     tracing::warn!(error = format!("{e:#}"), "vault locked; Hypurr Free unavailable");
                 }
-                env.extend(crate::agent::builtin::launch_env(&self.hub.store).await);
+                env.extend(crate::agent::builtin::launch_env(&self.hub.store, self.cfg.model.as_deref()).await);
             }
             if self.cfg.backend == "codex" {
                 codex_launch_env(&mut env);
@@ -1095,14 +1092,11 @@ impl Actor {
                 let detail = tail.map(|t| format!("\n\n{}", acp::truncate(&t, 1200))).unwrap_or_default();
                 let text = format!("{e:#}");
                 if text.contains("free_pool_exhausted")
-                    || text.contains("free models are busy today")
-                    || text.contains(crate::agent::builtin::FREE_BUSY)
+                    || text.contains("free_messages_exhausted")
+                    || text.contains("free_tier_retired")
+                    || text.contains(crate::agent::builtin::NEEDS_ACCOUNT)
                 {
-                    self.notice(crate::agent::builtin::FREE_BUSY, NoticeStyle::Error);
-                } else if text.contains("used your free messages")
-                    || text.contains(crate::agent::builtin::FREE_EXHAUSTED)
-                {
-                    self.notice(crate::agent::builtin::FREE_EXHAUSTED, NoticeStyle::Error);
+                    self.notice(crate::agent::builtin::NEEDS_ACCOUNT, NoticeStyle::Error);
                 } else {
                     self.notice(&format!("The agent failed: {e}{detail}"), NoticeStyle::Error);
                 }

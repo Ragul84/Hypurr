@@ -18,7 +18,7 @@ and comes with free AI.
 2. **Proof it works.** *Show me it works* runs the app and returns screenshots. *Trace a click*
    follows a button to the function, API and file:line. *Page map* lists every screen and its APIs.
    *What changed* shows each file, +/− lines and the diff.
-3. **Free AI built in.** *Hypurr Free*: 10 free messages to try, no AI account needed. Label it
+3. **Free AI built in.** *Start free with your own account*: sign in once and *Hypurr Free* runs on it at no cost. Label it
    every time: "For trying out, not for company code." Claude Code or Codex you already have work
    at no extra cost.
 

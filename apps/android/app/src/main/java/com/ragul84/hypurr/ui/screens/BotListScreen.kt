@@ -553,8 +553,8 @@ fun StatusLine(bot: Bot) {
 /** Offer to install Hypurr's built-in Hypurr Agent (Hypurr Free models). */
 data class BuiltinInstallPrompt(
     val title: String = "Hypurr Agent",
-    val body: String = "For people without Claude Code or Codex. Starts with Hypurr Free: 10 messages to try, no AI account needed.",
-    val consent: String = "Hypurr Free is for trying out, not for company code. After 10 messages, buy credits or use your own key.",
+    val body: String = "For people without Claude Code or Codex. Start free with your own account and Hypurr Free runs on it.",
+    val consent: String = "Hypurr Free is for trying out, not for company code. It runs on your own free account; credits or your own key also work.",
     val busy: Boolean = false,
     val error: String? = null,
 )

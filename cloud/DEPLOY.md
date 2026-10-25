@@ -74,24 +74,27 @@ The host already defaults to `https://hypurr.mindgains.ai`, but only offers free
 until the deploy is live. `HYPURR_GATEWAY_URL=https://…` overrides it (e.g. the dev copy), and
 `HYPURR_GATEWAY_URL=off` turns the gateway off on that computer. Local-only mode never uses it.
 
-## Free messages and limits (cloud/src/gateway/config.ts, overridable with the GATEWAY_CONFIG_JSON var)
+## No shared free use; limits (cloud/src/gateway/config.ts, overridable with the GATEWAY_CONFIG_JSON var)
 
-The free allowance is **10 messages per user in total, ever** (not per day); after that, credits only. Trial keys are tied to a SHA-256 of the PC's machine id, sent by the host; reinstalling gets a new key for the same subject and the same used allowance. A message is one task turn sent from
-the phone: the host calls `POST /v1/gateway/turn` once at the start of the turn, and all the
-agent's model calls inside that turn are free of further counting. The answer carries
-`freeMessagesLeft` (also in `GET /v1/gateway/balance` as `free.messagesLeft`). After the 10th, a
-turn is paid from credits; with no credits the gateway answers 402 with
-"You've used your free messages. Buy credits to keep going."
+There is **no shared free allowance on Hypurr's key** any more. Free use runs only on each user's
+own account, connected from the app with "Start free with your own account" (OAuth PKCE on the
+PC host, `host/src/agent/own_free.rs`); those requests never reach this gateway. The gateway is
+credits only:
+
+- `POST /v1/gateway/trial-key` issues a key only to a PC whose subject (`trial:<hostId>`, a
+  SHA-256 of the machine id) has credits; otherwise 403 `free_tier_retired`.
+- `POST /v1/gateway/turn` opens one paid message per task turn; with no credits it answers 402
+  "Start free with your own account, or add credits." (code `free_messages_exhausted`).
+- `freeDailyMessages` / `freeDailyTokens` are forced to 0, even if `GATEWAY_CONFIG_JSON` sets them.
+- Existing keys keep working for paid use; BYOK on the PC never uses the gateway.
 
 | Setting | Default |
 |---|---|
-| Free messages per user / PC, lifetime | 10 |
-| Hidden token cap per user / PC, lifetime (then credits) | 300,000 |
+| Free messages on Hypurr's key | 0 (removed) |
 | Requests per minute per key | 20 |
 | Max output tokens per request | 8,192 |
 | Max prompt per request | 120,000 tokens |
 | New trial keys per IP per day | 2 |
-| All free usage per day (kill switch) | 8M tokens ≈ US$1 |
 
 Credit packs (`pricing/plans.json`): ₹99 ≈ 150 messages, ₹249 ≈ 400, ₹499 ≈ 850, assuming
 about 0.5¢ of model use per message on Hypurr Free. Big tasks or Hypurr Pro use more.

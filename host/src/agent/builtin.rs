@@ -26,7 +26,7 @@ pub const FREE_MODELS: &[FreeModel] = &[
 
 /// Plain message when someone picks a Hypurr free model but no gateway serves it.
 pub const NO_GATEWAY: &str =
-    "Free models aren't available yet. Add your own key in Hypurr Agent, or pick Claude or Codex.";
+    "Free models aren't available yet. Start free with your own account, or pick Claude or Codex.";
 
 /// Where Hypurr's own gateway lives once deployed (cloud/DEPLOY.md). Only used after its
 /// `/v1/health` answers, so nothing changes for users until the deploy is live.
@@ -59,7 +59,7 @@ pub fn gateway_ready() -> bool {
     gateway_url().is_some()
 }
 
-/// The user connected their own `OpenRouter` account ("Keep going free"); kept in sync with the
+/// The user connected their own `OpenRouter` account ("Start free with your own account"); kept in sync with the
 /// vault slot by [`crate::agent::own_free`].
 pub static OWN_FREE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
@@ -67,7 +67,8 @@ pub fn own_free() -> bool {
     OWN_FREE.load(std::sync::atomic::Ordering::Relaxed)
 }
 
-/// Hypurr Free / Fast can run: through Hypurr's gateway, or on the user's own account.
+/// Hypurr Free / Fast can be picked: free on the user's own account, or paid from credits
+/// through Hypurr's gateway. There is no shared free allowance.
 pub fn free_ready() -> bool {
     gateway_ready() || own_free()
 }
@@ -117,6 +118,10 @@ pub async fn gateway_key(store: &crate::store::Store, base: &str) -> Result<Stri
         .send()
         .await
         .context("reaching the Hypurr gateway")?;
+    // The gateway only issues keys to computers with credits: free use is on the user's own account.
+    if matches!(res.status().as_u16(), 402 | 403) {
+        bail!(NEEDS_ACCOUNT);
+    }
     if !res.status().is_success() {
         bail!("{NO_GATEWAY} (gateway said {})", res.status());
     }
@@ -128,20 +133,8 @@ pub async fn gateway_key(store: &crate::store::Store, base: &str) -> Result<Stri
     Ok(key.to_owned())
 }
 
-/// Shown on the phone when the day's free messages are used and there are no credits.
-pub const FREE_EXHAUSTED: &str =
-    "You've used your 10 free messages. Keep going free with your own account, or add credits.";
-/// Shown when the shared free pool is used up for the day.
-pub const FREE_BUSY: &str = "Hypurr Free is busy today, try again tomorrow. Or keep going free with your own account.";
-/// Free messages in total, ever (pricing/plans.json `freeMessages`; the gateway enforces it).
-pub const FREE_MESSAGES_PER_DAY: i64 = 10;
-/// kv: free messages left, from the gateway's last answer.
-const FREE_LEFT: &str = "gateway_free_left";
-
-/// Free messages left (lifetime) as last reported by the gateway.
-pub fn free_messages_left(store: &crate::store::Store) -> i64 {
-    store.kv_get(FREE_LEFT).and_then(|v| v.parse().ok()).unwrap_or(FREE_MESSAGES_PER_DAY)
-}
+/// Shown when a Hypurr model is picked without a connected account and without credits.
+pub const NEEDS_ACCOUNT: &str = "Start free with your own account, or add credits.";
 
 /// This PC's stable machine id (survives reinstalling Hypurr), if the OS has one.
 fn machine_id() -> Option<String> {
@@ -182,7 +175,7 @@ fn gateway_host_id(store: &crate::store::Store) -> Result<String> {
     Ok(id)
 }
 
-/// Whether a turn with this backend and model runs on Hypurr's gateway.
+/// Whether a turn with this backend and model runs on Hypurr's gateway (paid from credits).
 pub fn uses_gateway(backend: &str, model: Option<&str>) -> bool {
     backend == BACKEND_ID
         && gateway_ready()
@@ -190,8 +183,8 @@ pub fn uses_gateway(backend: &str, model: Option<&str>) -> bool {
         && is_gateway_model(model.filter(|m| !m.is_empty()).unwrap_or(DEFAULT_MODEL))
 }
 
-/// Opens one user message at the gateway (`POST /v1/gateway/turn`): counted once, however many
-/// model calls the agent makes inside it. Refuses with [`FREE_EXHAUSTED`] when none are left.
+/// Opens one paid user message at the gateway (`POST /v1/gateway/turn`): counted once, however
+/// many model calls the agent makes inside it. Refuses with [`NEEDS_ACCOUNT`] without credits.
 pub async fn open_turn(store: &crate::store::Store) -> Result<()> {
     let Some(base) = gateway_url() else { bail!(NO_GATEWAY) };
     let key = gateway_key(store, &base).await?;
@@ -204,15 +197,8 @@ pub async fn open_turn(store: &crate::store::Store) -> Result<()> {
         .await
         .context("reaching the Hypurr gateway")?;
     let status = res.status();
-    let v: Value = res.json().await.unwrap_or_default();
-    if let Some(left) = v["freeMessagesLeft"].as_i64() {
-        store.kv_set(FREE_LEFT, &left.to_string())?;
-    }
-    if status.as_u16() == 402 {
-        bail!(FREE_EXHAUSTED);
-    }
-    if status.as_u16() == 503 && v["error"]["code"] == "free_pool_exhausted" {
-        bail!(FREE_BUSY);
+    if matches!(status.as_u16(), 402 | 403) {
+        bail!(NEEDS_ACCOUNT);
     }
     if !status.is_success() {
         bail!("{NO_GATEWAY} (gateway said {status})");
@@ -220,10 +206,10 @@ pub async fn open_turn(store: &crate::store::Store) -> Result<()> {
     Ok(())
 }
 
-/// This computer's gateway subject (`trial:<host id>`), once it has a gateway key. Credits
-/// bought on the phone are granted to it (the app user id at the payment provider).
+/// This computer's gateway subject (`trial:<host id>`). Credits bought on the phone are granted
+/// to it (the app user id at the payment provider); worked out locally, no key needed.
 pub fn gateway_subject(store: &crate::store::Store) -> Option<String> {
-    gateway_ready().then(|| store.kv_get(GATEWAY_HOST_ID)).flatten().map(|id| format!("trial:{id}"))
+    gateway_ready().then(|| gateway_host_id(store).ok()).flatten().map(|id| format!("trial:{id}"))
 }
 
 /// Hypurr Agent config that adds the `hypurr` provider (OpenAI-compatible, the gateway).
@@ -250,9 +236,10 @@ pub fn last_gateway_error() -> Option<String> {
     LAST_GATEWAY_ERROR.locked().clone()
 }
 
-/// Extra environment for a Hypurr Agent launch: the gateway provider, when there is one.
-/// Never in local-only mode. Failures just leave the free models off (own keys still work).
-pub async fn launch_env(store: &crate::store::Store) -> Vec<(String, String)> {
+/// Extra environment for a Hypurr Agent launch: the user's own account when connected (free),
+/// else the gateway (paid from credits) only when a Hypurr model is picked. Never in local-only
+/// mode. Failures just leave the Hypurr models off (own keys still work).
+pub async fn launch_env(store: &crate::store::Store, model: Option<&str>) -> Vec<(String, String)> {
     if crate::admin::local_only::on(store) {
         return Vec::new();
     }
@@ -266,6 +253,10 @@ pub async fn launch_env(store: &crate::store::Store) -> Vec<(String, String)> {
         }
         *LAST_GATEWAY_ERROR.locked() =
             Some(format!("{NO_GATEWAY} (couldn't open your connected account's key on this computer)"));
+        return Vec::new();
+    }
+    // No free key is ever requested: a gateway key is only for paid use of a picked Hypurr model.
+    if !model.is_some_and(is_gateway_model) {
         return Vec::new();
     }
     let Some(base) = gateway_url() else { return Vec::new() };
@@ -417,7 +408,7 @@ pub fn status() -> Value {
         "needsInstall": !installed,
         "license": "MIT",
         "source": format!("https://github.com/{RELEASE_REPO}"),
-        "consent": format!("Hypurr downloads Hypurr Agent into {} (no admin rights needed). Free models use the Hypurr gateway with a daily allowance; paid models use credits. Bring-your-own-key providers are also supported.", root().display()),
+        "consent": format!("Hypurr downloads Hypurr Agent into {} (no admin rights needed). Free models run on your own account; Hypurr credits also work. Bring-your-own-key providers are also supported.", root().display()),
     })
 }
 
@@ -600,13 +591,20 @@ mod tests {
         assert!(NO_GATEWAY.contains("Free models aren't available yet"));
     }
 
-    #[test]
-    fn free_messages_are_lifetime_and_host_id_is_hashed() {
+    #[tokio::test]
+    async fn never_requests_a_gateway_key_for_free_or_other_models() {
         let store = crate::store::Store::open(Path::new(":memory:")).unwrap();
-        assert_eq!(free_messages_left(&store), 10);
-        store.kv_set(FREE_LEFT, "0").unwrap();
-        assert_eq!(free_messages_left(&store), 0);
-        assert!(FREE_EXHAUSTED.contains("10 free messages") && FREE_EXHAUSTED.contains("Keep going free"));
+        // Not connected, no Hypurr model picked: nothing is minted or configured.
+        assert_eq!(launch_env(&store, None).await, Vec::<(String, String)>::new());
+        assert_eq!(launch_env(&store, Some("anthropic/claude-sonnet")).await, Vec::<(String, String)>::new());
+        assert!(crate::market::vault::read(&store, GATEWAY_KEY_SLOT).unwrap_or_default().is_none());
+    }
+
+    #[test]
+    fn no_shared_free_allowance_and_host_id_is_hashed() {
+        let store = crate::store::Store::open(Path::new(":memory:")).unwrap();
+        assert!(NEEDS_ACCOUNT.contains("Start free with your own account"));
+        assert!(!NEEDS_ACCOUNT.contains("10") && !NO_GATEWAY.contains("busy"));
         assert!(!uses_gateway("claude", Some("hypurr/hypurr-free")));
         let a = gateway_host_id(&store).unwrap();
         assert_eq!(a.len(), 64);

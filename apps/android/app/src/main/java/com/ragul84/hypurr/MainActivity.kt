@@ -167,15 +167,15 @@ class MainActivity : ComponentActivity() {
                     com.ragul84.hypurr.voice.LocalVoiceSettings provides com.ragul84.hypurr.voice.VoiceSettings(
                         com.ragul84.hypurr.voice.VoiceLanguage.of(voiceProfile.voiceLanguage), voiceProfile.explainInMyLanguage),
                 ) {
-                    var keepFree by remember { mutableStateOf(false) }
+                    var startFree by remember { mutableStateOf(false) }
                     androidx.compose.runtime.CompositionLocalProvider(
-                        com.ragul84.hypurr.ui.LocalKeepGoingFree provides { keepFree = true },
+                        com.ragul84.hypurr.ui.LocalStartFree provides { startFree = true },
                     ) { App(store) }
-                    if (keepFree) com.ragul84.hypurr.ui.KeepGoingFreeDialog(
+                    if (startFree) com.ragul84.hypurr.ui.StartFreeDialog(
                         start = { store.ownFreeStart() },
                         finish = { store.ownFreeFinish(it) },
-                        onDone = { keepFree = false },
-                        onDismiss = { keepFree = false },
+                        onDone = { startFree = false },
+                        onDismiss = { startFree = false },
                     )
                 }
             }
@@ -593,8 +593,6 @@ class MainActivity : ComponentActivity() {
                     LaunchedEffect(Unit) { store.loadCosts() }
                     NewTaskScreen(
                         task.copy(setup = setup, models = com.ragul84.hypurr.ui.screens.runnableModels(taskHello)),
-                        freeLeft = taskCosts?.freeTurnsLeft,
-                        freeLimit = taskCosts?.freeTurnsLimit,
                         ownFree = taskCosts?.ownFree == true,
                         onAddCredits = {
                             taskDraft = null

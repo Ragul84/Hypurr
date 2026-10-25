@@ -15,7 +15,8 @@ export type GatewayConfig = {
   freeDailyTokens: number;
   /** Free allowance is a lifetime total per subject (true), not per UTC day. */
   freeLifetime: boolean;
-  /** Free user messages (phone turns) per subject, ever (see freeLifetime). The product's free allowance. */
+  /** Free user messages per subject on Hypurr's key. Always 0: there is no shared free allowance;
+   * free use runs on each user's own account (host `own_free`). Kept for the ledger shape. */
   freeDailyMessages: number;
   /** Abuse limits: max_tokens is clamped to this on every request. */
   maxOutputTokens: number;
@@ -53,14 +54,14 @@ export type GatewayConfig = {
 };
 
 // Upstream model ids verified against https://openrouter.ai/api/v1/models on 2026-10-21.
-// Free tiers use ":free" variants (zero cost; shared daily request cap on our key; some providers
-// may log prompts, hence the "not for company code" label). Pro stays paid with strict privacy.
+// Free tiers use ":free" variants (some providers may log prompts, hence the "not for company
+// code" label). On the gateway they are paid from credits; free use is on the user's own account. Pro stays paid with strict privacy.
 // All of these support tool calls, which Hypurr Agent needs.
 export const DEFAULT_GATEWAY_CONFIG: GatewayConfig = {
   freeLifetime: true,
-  // Hidden lifetime safety cap behind the 10 messages; past it a turn needs credits.
-  freeDailyTokens: 300_000,
-  freeDailyMessages: 10,
+  // No shared free use on Hypurr's key: every gateway message is paid from credits.
+  freeDailyTokens: 0,
+  freeDailyMessages: 0,
   maxOutputTokens: 8_192,
   maxPromptTokens: 120_000,
   trialKeysPerIpPerDay: 2,

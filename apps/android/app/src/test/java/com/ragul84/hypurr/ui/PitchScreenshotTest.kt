@@ -75,7 +75,8 @@ class PitchScreenshotTest {
         val all = Pitch.Headline + Pitch.Subhead + Pitch.Pillars.joinToString { it.title + it.body }
         listOf("OpenCode", "OpenRouter").forEach { assertTrue(it, !all.contains(it, ignoreCase = true)) }
         assertTrue(all.contains("not for company code"))
-        assertTrue(all.contains("10 messages"))
+        assertTrue(all.contains("Start free with your own account"))
+        assertTrue(!all.contains("10 messages"))
     }
 
     @Test fun diffHelpers() {

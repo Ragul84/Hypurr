@@ -199,7 +199,8 @@ describe("gateway ledger", async () => {
     await consumeAllowance(db, "user:u1", 1000, Date.UTC(2026, 9, 5));
     const b = await getAllowance(db, "user:u1", DEFAULT_GATEWAY_CONFIG, "user", Date.UTC(2026, 9, 5));
     expect(b.tokensUsed).toBe(1000);
-    expect(b.remaining).toBe(DEFAULT_GATEWAY_CONFIG.freeDailyTokens - 1000);
+    // No shared free allowance: nothing remains (never negative).
+    expect(b.remaining).toBe(0);
   });
 
   it("tops up and spends credits", async () => {
@@ -236,6 +237,7 @@ describe("streaming passthrough with fake upstream", () => {
       kind: "user",
       revoked_at: null,
     });
+    await (await import("../../src/gateway/ledger")).topUp(db, "user:u1", 100, {}, 1);
 
     const { chatCompletions, openTurn } = await import("../../src/gateway/handler");
     await openTurn(ctx(db, "/v1/gateway/turn", {}, { authorization: `Bearer ${secret}` }));
@@ -340,7 +342,7 @@ describe("openrouter defaults", () => {
     }
     expect(DEFAULT_GATEWAY_CONFIG.models.find((m) => m.id === "hypurr-free")?.description).toBe("For trying out, not for company code");
     expect(DEFAULT_GATEWAY_CONFIG.maxOutputTokens).toBeGreaterThan(0);
-    expect(DEFAULT_GATEWAY_CONFIG.freeDailyMessages).toBeGreaterThan(0);
+    expect(DEFAULT_GATEWAY_CONFIG.freeDailyMessages).toBe(0);
   });
 
   it("clamps max_tokens, sends fallbacks and counts the request", async () => {
@@ -355,6 +357,7 @@ describe("openrouter defaults", () => {
     const db = memoryDb();
     const { secret, hash, prefix } = await mintKeySecret();
     (db as any)._tables.gateway_api_keys.push({ id: "k", user_id: null, host_id: "host12345", key_hash: hash, key_prefix: prefix, kind: "trial", revoked_at: null });
+    await (await import("../../src/gateway/ledger")).topUp(db, "trial:host12345", 100, {}, 1);
     const { chatCompletions } = await import("../../src/gateway/handler");
     const c = ctx(
       db,
@@ -375,7 +378,8 @@ describe("openrouter defaults", () => {
     // Free variants may need prompt-logging providers; only free tier relaxes this.
     expect(seen[0].provider.data_collection).toBe("allow");
     expect((db as any)._tables.gateway_allowance[0].messages_used).toBe(1);
-    expect((db as any)._tables.gateway_global_budget[0].free_tokens).toBe(20);
+    // Paid from credits: nothing counted against a shared free budget.
+    expect((db as any)._tables.gateway_global_budget ?? []).toHaveLength(0);
     vi.unstubAllGlobals();
   });
 
@@ -400,39 +404,34 @@ describe("openrouter defaults", () => {
     const db = memoryDb();
     const { secret, hash, prefix } = await mintKeySecret();
     (db as any)._tables.gateway_api_keys.push({ id: "k", user_id: null, host_id: "host12345", key_hash: hash, key_prefix: prefix, kind: "trial", revoked_at: null });
+    await (await import("../../src/gateway/ledger")).topUp(db, "trial:host12345", 100, {}, 1);
     const { chatCompletions, openTurn } = await import("../../src/gateway/handler");
     await openTurn(ctx(db, "/v1/gateway/turn", {}, { authorization: `Bearer ${secret}` }));
     const res = await chatCompletions(ctx(db, "/v1/chat/completions", { model: "hypurr-free", messages: [{ role: "user", content: "hi" }] }, { authorization: `Bearer ${secret}` }, { UPSTREAM_OPENROUTER_API_KEY: "sk-test" }));
     expect(res.status).toBe(429);
     const body = await res.text();
-    expect(body).toContain("Hypurr Free is busy right now. Try again later, or buy credits.");
+    expect(body).toContain("Hypurr Free is busy right now. Try again in a moment.");
     expect(body.toLowerCase()).not.toContain("openrouter");
     vi.unstubAllGlobals();
   });
 
-  it("counts messages, not model calls: 10 free, then credits, then the plain refusal", async () => {
+  it("no shared free messages: refused without credits, model calls charged with them", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ choices: [], usage: { prompt_tokens: 1000, completion_tokens: 1000 } }))));
     const db = memoryDb();
     const { secret, hash, prefix } = await mintKeySecret();
     (db as any)._tables.gateway_api_keys.push({ id: "k", user_id: "u9", host_id: null, key_hash: hash, key_prefix: prefix, kind: "user", revoked_at: null });
-    const { openTurn, chatCompletions, spendingBalance, FREE_EXHAUSTED } = await import("../../src/gateway/handler");
+    const { openTurn, chatCompletions, FREE_EXHAUSTED } = await import("../../src/gateway/handler");
     const { topUp, getCredits } = await import("../../src/gateway/ledger");
     const auth = { authorization: `Bearer ${secret}` };
     const chat = () => chatCompletions(ctx(db, "/v1/chat/completions", { model: "hypurr-free", messages: [] }, auth, { UPSTREAM_OPENROUTER_API_KEY: "k" }));
+    expect(DEFAULT_GATEWAY_CONFIG.freeDailyMessages).toBe(0);
     // No message opened: raw API use is refused.
     expect((await chat()).status).toBe(402);
-    const limit = DEFAULT_GATEWAY_CONFIG.freeDailyMessages;
-    expect(limit).toBe(10);
-    for (let i = 1; i <= limit; i++) {
-      const t = (await openTurn(ctx(db, "/v1/gateway/turn", {}, auth))) as any;
-      expect(t.freeMessagesLeft).toBe(limit - i);
-    }
-    expect((await spendingBalance(ctx(db, "/v1/gateway/balance", {}, auth))).free.messagesLeft).toBe(0);
+    // The very first message needs credits.
     const refused = (await openTurn(ctx(db, "/v1/gateway/turn", {}, auth))) as Response;
     expect(refused.status).toBe(402);
     expect(((await refused.json()) as any).error.message).toBe(FREE_EXHAUSTED);
-    expect(FREE_EXHAUSTED).toBe("You've used your free messages. Buy credits to keep going.");
-    // With credits the 11th message goes through and its model calls are charged.
+    expect(FREE_EXHAUSTED).toBe("Start free with your own account, or add credits.");
     await topUp(db, "user:u9", 100, {}, 1);
     const paid = (await openTurn(ctx(db, "/v1/gateway/turn", {}, auth))) as any;
     expect(paid.paidFrom).toBe("credits");
@@ -441,17 +440,16 @@ describe("openrouter defaults", () => {
     vi.unstubAllGlobals();
   });
 
-  it("the hidden token cap moves a free message onto credits", async () => {
+  it("a config override can't turn shared free use back on", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ choices: [] }))));
     const db = memoryDb();
     const { secret, hash, prefix } = await mintKeySecret();
     (db as any)._tables.gateway_api_keys.push({ id: "k", user_id: "u8", host_id: null, key_hash: hash, key_prefix: prefix, kind: "user", revoked_at: null });
-    const { openTurn, chatCompletions } = await import("../../src/gateway/handler");
-    const auth = { authorization: `Bearer ${secret}` };
-    await openTurn(ctx(db, "/v1/gateway/turn", {}, auth));
-    (db as any)._tables.gateway_allowance[0].tokens_used = DEFAULT_GATEWAY_CONFIG.freeDailyTokens;
-    expect(DEFAULT_GATEWAY_CONFIG.freeDailyTokens).toBe(300_000);
-    const res = await chatCompletions(ctx(db, "/v1/chat/completions", { model: "hypurr-free", messages: [{ role: "user", content: "hi" }] }, auth));
-    expect(res.status).toBe(402);
+    const { openTurn } = await import("../../src/gateway/handler");
+    const override = { GATEWAY_CONFIG_JSON: JSON.stringify({ freeDailyMessages: 10, freeDailyTokens: 300000 }) };
+    const r = (await openTurn(ctx(db, "/v1/gateway/turn", {}, { authorization: `Bearer ${secret}` }, override))) as Response;
+    expect(r.status).toBe(402);
+    vi.unstubAllGlobals();
   });
 });
 
@@ -483,46 +481,35 @@ describe("usage tap", () => {
 });
 
 describe("trial keys", () => {
-  it("caps new trial keys per IP per day", async () => {
+  it("no shared free keys: a computer without credits gets none", async () => {
     const db = memoryDb();
     const { issueTrial } = await import("../../src/gateway/handler");
-    const n = DEFAULT_GATEWAY_CONFIG.trialKeysPerIpPerDay;
-    for (let i = 0; i < n; i++) {
-      await issueTrial(ctx(db, "/v1/gateway/trial-key", { hostId: `${i}`.padStart(64, "a") }, { "cf-connecting-ip": "1.2.3.4" }));
-    }
-    await expect(
-      issueTrial(ctx(db, "/v1/gateway/trial-key", { hostId: "b".repeat(64) }, { "cf-connecting-ip": "1.2.3.4" })),
-    ).rejects.toMatchObject({ code: "rateLimited" });
-    await expect(issueTrial(ctx(db, "/v1/gateway/trial-key", { hostId: "x" }, {}))).rejects.toMatchObject({ code: "badRequest" });
-    expect(n).toBe(2);
+    const r = (await issueTrial(ctx(db, "/v1/gateway/trial-key", { hostId: "a".repeat(64) }, { "cf-connecting-ip": "1.2.3.4" }))) as Response;
+    expect(r.status).toBe(403);
+    const body = (await r.json()) as any;
+    expect(body.error.code).toBe("free_tier_retired");
+    expect(JSON.stringify(body).toLowerCase()).not.toContain("openrouter");
+    expect((db as any)._tables.gateway_api_keys ?? []).toHaveLength(0);
   });
 
-  it("the same PC (reinstalled) gets a new key but keeps its used free allowance", async () => {
+  it("a computer with credits gets a key; per-IP cap still applies", async () => {
     const db = memoryDb();
     const { issueTrial, openTurn } = await import("../../src/gateway/handler");
-    const pc = "c".repeat(64);
-    const first = (await issueTrial(ctx(db, "/v1/gateway/trial-key", { hostId: pc }, { "cf-connecting-ip": "9.9.9.1" }))) as any;
-    for (let i = 0; i < DEFAULT_GATEWAY_CONFIG.freeDailyMessages; i++) {
-      await openTurn(ctx(db, "/v1/gateway/turn", {}, { authorization: `Bearer ${first.apiKey}` }));
+    const { topUp } = await import("../../src/gateway/ledger");
+    const n = DEFAULT_GATEWAY_CONFIG.trialKeysPerIpPerDay;
+    for (let i = 0; i <= n; i++) await topUp(db, `trial:${`${i}`.padStart(64, "a")}`, 50, {}, 1);
+    let first: any;
+    for (let i = 0; i < n; i++) {
+      const k = (await issueTrial(ctx(db, "/v1/gateway/trial-key", { hostId: `${i}`.padStart(64, "a") }, { "cf-connecting-ip": "1.2.3.4" }))) as any;
+      expect(k.apiKey).toBeTruthy();
+      first ??= k;
     }
-    const again = (await issueTrial(ctx(db, "/v1/gateway/trial-key", { hostId: pc }, { "cf-connecting-ip": "9.9.9.2" }))) as any;
-    expect(again.apiKey).toBeTruthy();
-    expect(again.apiKey).not.toBe(first.apiKey);
-    await expect(openTurn(ctx(db, "/v1/gateway/turn", {}, { authorization: `Bearer ${first.apiKey}` }))).rejects.toMatchObject({ code: "unauthenticated" });
-    const r = (await openTurn(ctx(db, "/v1/gateway/turn", {}, { authorization: `Bearer ${again.apiKey}` }))) as Response;
-    expect(r.status).toBe(402);
-  });
-
-  it("free messages are lifetime: a new day doesn't refill them", async () => {
-    const db = memoryDb();
-    const { secret, hash, prefix } = await mintKeySecret();
-    (db as any)._tables.gateway_api_keys.push({ id: "k", user_id: "u7", host_id: null, key_hash: hash, key_prefix: prefix, kind: "user", revoked_at: null });
-    const { openTurn } = await import("../../src/gateway/handler");
-    const auth = { authorization: `Bearer ${secret}` };
-    for (let i = 0; i < 10; i++) await openTurn(ctx(db, "/v1/gateway/turn", {}, auth));
-    const later = { ...ctx(db, "/v1/gateway/turn", {}, auth), now: Date.UTC(2026, 11, 25) };
-    expect(((await openTurn(later)) as Response).status).toBe(402);
-    expect(DEFAULT_GATEWAY_CONFIG.freeLifetime).toBe(true);
+    await expect(
+      issueTrial(ctx(db, "/v1/gateway/trial-key", { hostId: `${n}`.padStart(64, "a") }, { "cf-connecting-ip": "1.2.3.4" })),
+    ).rejects.toMatchObject({ code: "rateLimited" });
+    await expect(issueTrial(ctx(db, "/v1/gateway/trial-key", { hostId: "x" }, {}))).rejects.toMatchObject({ code: "badRequest" });
+    const t = (await openTurn(ctx(db, "/v1/gateway/turn", {}, { authorization: `Bearer ${first.apiKey}` }))) as any;
+    expect(t.paidFrom).toBe("credits");
   });
 });
 

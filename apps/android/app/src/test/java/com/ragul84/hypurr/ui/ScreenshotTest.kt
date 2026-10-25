@@ -87,25 +87,28 @@ class ScreenshotTest {
             bots = Samples.bots.associateBy { it.id }, now = Samples.NOW)
     }
 
-    /** Free messages used up: the plain line and Add credits, with the Google Play packs open. */
+    /** No credits: Hypurr Free starts on your own account; Google Play packs open for paid use. */
     @Test
     @Config(qualifiers = "w412dp-h1520dp-xxhdpi")
-    fun spendFreeUsedUp() = shoot("spend-free-used-up") {
-        SpendScreen(Samples.computer.name, LinkState.Ready(Route.Direct), Samples.costs.copy(freeTurnsLeft = 0, gatewayCreditsLabel = "$0.00"),
-            bots = Samples.bots.associateBy { it.id }, now = Samples.NOW, pricing = Samples.pricingWithPacks)
+    fun spendStartFree() = shoot("spend-start-free") {
+        androidx.compose.runtime.CompositionLocalProvider(LocalStartFree provides {}) { SpendScreen(Samples.computer.name, LinkState.Ready(Route.Direct), Samples.costs.copy(gatewayCreditsLabel = "$0.00"),
+            bots = Samples.bots.associateBy { it.id }, now = Samples.NOW, pricing = Samples.pricingWithPacks) }
     }
 
-    /** "7 of 10 free messages left today" under the task box when Hypurr Agent runs it. */
+    /** Hypurr Agent picked, no account yet: "Start free with your own account" under the task box. */
     @Test
-    fun newTaskFreeMessages() = shoot("newtask-free-messages") {
-        NewTaskScreen(NewTaskUiState(Samples.setupHypurr, goal = "Add a loading spinner to the AI Tutor send button", agent = "hypurr-agent",
-            project = "/Users/priya/shop"), {}, {}, {}, freeLeft = 7, freeLimit = 10)
+    fun newTaskStartFree() = shoot("newtask-start-free") {
+        androidx.compose.runtime.CompositionLocalProvider(LocalStartFree provides {}) {
+            NewTaskScreen(NewTaskUiState(Samples.setupHypurr, goal = "Add a loading spinner to the AI Tutor send button", agent = "hypurr-agent",
+                project = "/Users/priya/shop"), {}, {}, {})
+        }
     }
 
+    /** Own account connected: one quiet line. */
     @Test
-    fun newTaskFreeUsedUp() = shoot("newtask-free-used-up") {
+    fun newTaskOwnFree() = shoot("newtask-own-free") {
         NewTaskScreen(NewTaskUiState(Samples.setupHypurr, goal = "Add a loading spinner to the AI Tutor send button", agent = "hypurr-agent",
-            project = "/Users/priya/shop"), {}, {}, {}, freeLeft = 0, freeLimit = 10)
+            project = "/Users/priya/shop"), {}, {}, {}, ownFree = true)
     }
 
     @Test

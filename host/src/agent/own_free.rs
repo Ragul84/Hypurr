@@ -1,11 +1,11 @@
-//! "Keep going free": the user's own `OpenRouter` account for Hypurr Free, connected with
+//! "Start free with your own account": the user's own `OpenRouter` account for Hypurr Free, connected with
 //! `OpenRouter`'s OAuth PKCE flow (<https://openrouter.ai/docs/use-cases/oauth-pkce>).
 //!
 //! The user signs in or signs up at `OpenRouter` themselves; Hypurr never creates accounts.
 //! Headless mode: the phone opens the auth page, `OpenRouter` shows a one-time code, the user
 //! pastes it back, and this computer (which holds the PKCE verifier) exchanges it for the
 //! user's own key. The key stays in this computer's vault; requests with it go straight to
-//! `OpenRouter`, so they never use the owner's key or the 10 Hypurr Free messages.
+//! `OpenRouter`, so they never use the owner's key. This is the only free path (no shared allowance).
 
 use anyhow::{Context, Result, bail};
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -71,10 +71,10 @@ pub async fn finish_at(store: &Store, code: &str, exchange_url: &str) -> Result<
     };
     let started: i64 = store.kv_get(STARTED).and_then(|v| v.parse().ok()).unwrap_or(0);
     let Some(verifier) = crate::market::vault::read(store, VERIFIER_SLOT)?.filter(|v| !v.is_empty()) else {
-        bail!("Start again: tap Keep going free.");
+        bail!("Start again: tap Start free with your own account.");
     };
     if crate::store::now_ms() - started > FLOW_TTL_MS {
-        bail!("That code has expired. Start again: tap Keep going free.");
+        bail!("That code has expired. Start again: tap Start free with your own account.");
     }
     let client = reqwest::Client::builder().timeout(Duration::from_secs(20)).build()?;
     let res = client
@@ -88,7 +88,8 @@ pub async fn finish_at(store: &Store, code: &str, exchange_url: &str) -> Result<
     if !status.is_success() {
         tracing::warn!(%status, "OpenRouter code exchange failed");
         bail!(match status.as_u16() {
-            400 | 403 => "OpenRouter didn't accept that code (it may have expired). Start again: tap Keep going free.",
+            400 | 403 =>
+                "OpenRouter didn't accept that code (it may have expired). Start again: tap Start free with your own account.",
             _ => "Couldn't connect to OpenRouter right now. Try again in a minute.",
         });
     }

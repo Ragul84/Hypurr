@@ -232,8 +232,6 @@ object Samples {
         gatewayFreeRemaining = "7 / 10 messages",
         gatewayCreditsLabel = "$12.40",
         buyCreditsUrl = null,
-        freeTurnsLeft = 7,
-        freeTurnsLimit = 10,
         freeResetLabel = "Resets at midnight IST",
     )
 

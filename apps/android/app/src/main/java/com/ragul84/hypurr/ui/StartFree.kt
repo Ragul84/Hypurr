@@ -26,47 +26,39 @@ import androidx.compose.ui.window.Dialog
 import com.ragul84.hypurr.ui.theme.Hypurr
 import kotlinx.coroutines.launch
 
-/** Opens "Keep going free" (provided by the app root; null in previews and tests). */
-val LocalKeepGoingFree = androidx.compose.runtime.staticCompositionLocalOf<(() -> Unit)?> { null }
+/** Opens "Start free with your own account" (provided by the app root; null in previews and tests). */
+val LocalStartFree = androidx.compose.runtime.staticCompositionLocalOf<(() -> Unit)?> { null }
 
-/** Same words as the host (host/src/agent/builtin.rs FREE_EXHAUSTED / FREE_BUSY). */
-const val FREE_MESSAGES_EXHAUSTED = "You've used your 10 free messages. Keep going free with your own account, or add credits."
-const val FREE_BUSY = "Hypurr Free is busy today, try again tomorrow. Or keep going free with your own account."
+const val START_FREE = "Start free with your own account"
+/** Same words as the host (host/src/agent/builtin.rs NEEDS_ACCOUNT). */
+const val NEEDS_ACCOUNT = "Start free with your own account, or add credits."
 const val NOT_FOR_COMPANY_CODE = "Free models: for trying out, not for company code."
 
-fun freeMessagesLine(left: Int, limit: Int): String =
-    "${left.coerceIn(0, limit)} of $limit free ${if (limit == 1) "message" else "messages"} left"
-
-/** A host notice the "Keep going free" action belongs under. */
-fun offersKeepGoingFree(text: String): Boolean = text.startsWith(FREE_MESSAGES_EXHAUSTED) || text.startsWith(FREE_BUSY)
+/** A host notice the "Start free" action belongs under. */
+fun offersStartFree(text: String): Boolean =
+    text.startsWith(NEEDS_ACCOUNT) || (text.startsWith("Free models aren't available yet") && text.contains(START_FREE))
 
 /**
- * Hypurr's free models are counted in messages (a lifetime total of 10). Shows "N of 10 free
- * messages left", the own-account line once connected, or the used-up card with
- * Keep going free and Add credits.
+ * Hypurr Free runs only on the user's own free account (no shared allowance). Shows one quiet
+ * line once connected; otherwise the start-free card, with Add credits as the paid option.
  */
 @Composable
-fun FreeMessagesNote(
-    left: Int,
-    limit: Int,
+fun StartFreeNote(
+    ownFree: Boolean,
     onAddCredits: () -> Unit,
     modifier: Modifier = Modifier,
-    ownFree: Boolean = false,
-    onKeepGoingFree: (() -> Unit)? = LocalKeepGoingFree.current,
+    onStartFree: (() -> Unit)? = LocalStartFree.current,
 ) {
     val c = Hypurr.colors
     if (ownFree) {
         Text("Hypurr Free on your own account · not for company code", color = c.secondary, style = MaterialTheme.typography.bodyMedium, modifier = modifier)
         return
     }
-    if (left > 0) {
-        Text(freeMessagesLine(left, limit), color = c.secondary, style = MaterialTheme.typography.bodyMedium, modifier = modifier)
-        return
-    }
     SignalCard(modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(FREE_MESSAGES_EXHAUSTED, color = c.text, style = MaterialTheme.typography.bodyLarge)
-            if (onKeepGoingFree != null) PrimaryButton("Keep going free", Modifier.fillMaxWidth(), onClick = onKeepGoingFree)
+            Text("Hypurr Free runs on your own free account. For trying out, not for company code.",
+                color = c.text, style = MaterialTheme.typography.bodyLarge)
+            if (onStartFree != null) PrimaryButton(START_FREE, Modifier.fillMaxWidth(), onClick = onStartFree)
             SoftButton("Add credits", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Plus), onClick = onAddCredits)
         }
     }
@@ -78,7 +70,7 @@ fun FreeMessagesNote(
  * keeps the key; Hypurr never creates accounts.
  */
 @Composable
-fun KeepGoingFreeDialog(
+fun StartFreeDialog(
     start: suspend () -> String,
     finish: suspend (String) -> Unit,
     onDone: () -> Unit,
@@ -96,9 +88,9 @@ fun KeepGoingFreeDialog(
     Dialog(onDismissRequest = onDismiss) {
         SignalCard(Modifier.fillMaxWidth()) {
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Keep going free", color = c.text, style = MaterialTheme.typography.titleLarge)
+                Text(START_FREE, color = c.text, style = MaterialTheme.typography.titleLarge)
                 Text(
-                    "Use your own free OpenRouter account. You sign in or sign up there yourself, and its free daily limit is yours.",
+                    "Hypurr Free runs on your own free OpenRouter account. You sign in or sign up there yourself, and its free daily limit is yours.",
                     color = c.secondary, style = MaterialTheme.typography.bodyMedium,
                 )
                 Text(NOT_FOR_COMPANY_CODE, color = c.secondary, style = MaterialTheme.typography.bodySmall)
@@ -137,10 +129,10 @@ fun KeepGoingFreeDialog(
     }
 }
 
-/** "Keep going free" under a used-up or busy notice in a chat. */
+/** "Start free with your own account" under a needs-an-account notice in a chat. */
 @Composable
-fun KeepGoingFreeAction(text: String, modifier: Modifier = Modifier) {
-    val open = LocalKeepGoingFree.current ?: return
-    if (!offersKeepGoingFree(text)) return
-    SoftButton("Keep going free", modifier, onClick = open)
+fun StartFreeAction(text: String, modifier: Modifier = Modifier) {
+    val open = LocalStartFree.current ?: return
+    if (!offersStartFree(text)) return
+    SoftButton(START_FREE, modifier, onClick = open)
 }

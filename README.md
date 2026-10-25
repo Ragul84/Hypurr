@@ -39,8 +39,8 @@ aren't experts, and leads with three things the others don't do:
 2. **Proof it works.** *Show me it works* runs your app and brings back screenshots. *Trace a
    click* follows a button to the function, API call and file:line behind it. *Page map* lists
    every screen and its APIs. *What changed* shows each file, lines added and removed, and the diff.
-3. **Free AI built in.** No AI account? *Hypurr Free* gives you 10 free messages to try it
-   (for trying out, not for company code). Claude Code or Codex you already have work as they are,
+3. **Free AI built in.** No AI account? *Start free with your own account*: sign in once and
+   *Hypurr Free* runs on it at no cost (for trying out, not for company code). Claude Code or Codex you already have work as they are,
    at no extra cost.
 
 See [marketing/pitch.md](marketing/pitch.md) for the full positioning.

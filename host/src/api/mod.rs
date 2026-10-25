@@ -953,7 +953,7 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
             crate::agent::builtin::install(|line| tracing::info!(%line, "builtin install")).await?
         }
         "builtinAgent" => crate::agent::builtin::status(),
-        // "Keep going free": the user's own OpenRouter account for Hypurr Free (OAuth PKCE).
+        // "Start free with your own account": the user's own OpenRouter account for Hypurr Free (OAuth PKCE).
         "ownFreeStatus" => crate::agent::own_free::status_json(&hub.store),
         "ownFreeStart" => {
             market::vault::unlock(hub.clone()).await?;
