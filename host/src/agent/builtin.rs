@@ -59,6 +59,19 @@ pub fn gateway_ready() -> bool {
     gateway_url().is_some()
 }
 
+/// The user connected their own `OpenRouter` account ("Keep going free"); kept in sync with the
+/// vault slot by [`crate::agent::own_free`].
+pub static OWN_FREE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub fn own_free() -> bool {
+    OWN_FREE.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Hypurr Free / Fast can run: through Hypurr's gateway, or on the user's own account.
+pub fn free_ready() -> bool {
+    gateway_ready() || own_free()
+}
+
 /// Whether `{base}/v1/health` answers `{"ok": true}`.
 pub async fn gateway_healthy(base: &str) -> bool {
     let Ok(client) = reqwest::Client::builder().timeout(Duration::from_secs(8)).build() else { return false };
@@ -116,7 +129,10 @@ pub async fn gateway_key(store: &crate::store::Store, base: &str) -> Result<Stri
 }
 
 /// Shown on the phone when the day's free messages are used and there are no credits.
-pub const FREE_EXHAUSTED: &str = "You've used your free messages. Buy credits to keep going.";
+pub const FREE_EXHAUSTED: &str =
+    "You've used your 10 free messages. Keep going free with your own account, or add credits.";
+/// Shown when the shared free pool is used up for the day.
+pub const FREE_BUSY: &str = "Hypurr Free is busy today, try again tomorrow. Or keep going free with your own account.";
 /// Free messages in total, ever (pricing/plans.json `freeMessages`; the gateway enforces it).
 pub const FREE_MESSAGES_PER_DAY: i64 = 10;
 /// kv: free messages left, from the gateway's last answer.
@@ -170,6 +186,7 @@ fn gateway_host_id(store: &crate::store::Store) -> Result<String> {
 pub fn uses_gateway(backend: &str, model: Option<&str>) -> bool {
     backend == BACKEND_ID
         && gateway_ready()
+        && !own_free()
         && is_gateway_model(model.filter(|m| !m.is_empty()).unwrap_or(DEFAULT_MODEL))
 }
 
@@ -193,6 +210,9 @@ pub async fn open_turn(store: &crate::store::Store) -> Result<()> {
     }
     if status.as_u16() == 402 {
         bail!(FREE_EXHAUSTED);
+    }
+    if status.as_u16() == 503 && v["error"]["code"] == "free_pool_exhausted" {
+        bail!(FREE_BUSY);
     }
     if !status.is_success() {
         bail!("{NO_GATEWAY} (gateway said {status})");
@@ -236,6 +256,18 @@ pub async fn launch_env(store: &crate::store::Store) -> Vec<(String, String)> {
     if crate::admin::local_only::on(store) {
         return Vec::new();
     }
+    if own_free() {
+        if let Some(key) = crate::agent::own_free::key(store) {
+            *LAST_GATEWAY_ERROR.locked() = None;
+            return vec![(
+                "OPENCODE_CONFIG_CONTENT".to_owned(),
+                crate::agent::own_free::agent_config(&key).to_string(),
+            )];
+        }
+        *LAST_GATEWAY_ERROR.locked() =
+            Some(format!("{NO_GATEWAY} (couldn't open your connected account's key on this computer)"));
+        return Vec::new();
+    }
     let Some(base) = gateway_url() else { return Vec::new() };
     match gateway_key(store, &base).await {
         Ok(key) => {
@@ -257,12 +289,12 @@ pub fn is_gateway_model(model: &str) -> bool {
 
 /// Free models to offer: none without a gateway.
 pub fn offered_free_models() -> Value {
-    if gateway_ready() { free_models_json() } else { json!([]) }
+    if free_ready() { free_models_json() } else { json!([]) }
 }
 
 /// Default model for a new Hypurr Agent bot: only a free one when the gateway is there.
 pub fn default_model() -> Option<&'static str> {
-    gateway_ready().then_some(DEFAULT_MODEL)
+    free_ready().then_some(DEFAULT_MODEL)
 }
 
 pub struct FreeModel {
@@ -371,9 +403,10 @@ pub fn status() -> Value {
         "id": BACKEND_ID,
         "name": DISPLAY_NAME,
         "agentName": "Hypurr Agent",
-        "subtitle": if gateway_ready() { "Hypurr Agent · free models" } else { "Hypurr Agent · your own key" },
+        "subtitle": if free_ready() { "Hypurr Agent · free models" } else { "Hypurr Agent · your own key" },
         "builtin": true,
-        "free": gateway_ready(),
+        "free": free_ready(),
+        "ownFree": own_free(),
         "installed": installed,
         "available": installed || release().is_ok(),
         "version": VERSION,
@@ -573,7 +606,7 @@ mod tests {
         assert_eq!(free_messages_left(&store), 10);
         store.kv_set(FREE_LEFT, "0").unwrap();
         assert_eq!(free_messages_left(&store), 0);
-        assert_eq!(FREE_EXHAUSTED, "You've used your free messages. Buy credits to keep going.");
+        assert!(FREE_EXHAUSTED.contains("10 free messages") && FREE_EXHAUSTED.contains("Keep going free"));
         assert!(!uses_gateway("claude", Some("hypurr/hypurr-free")));
         let a = gateway_host_id(&store).unwrap();
         assert_eq!(a.len(), 64);

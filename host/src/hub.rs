@@ -226,7 +226,7 @@ impl Hub {
             cfg.model = crate::agent::builtin::default_model().map(str::to_owned);
         }
         if cfg.model.as_deref().is_some_and(crate::agent::builtin::is_gateway_model)
-            && !crate::agent::builtin::gateway_ready()
+            && !crate::agent::builtin::free_ready()
         {
             if cfg.backend == crate::agent::builtin::BACKEND_ID {
                 cfg.model = None;

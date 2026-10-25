@@ -135,6 +135,7 @@ fun NewTaskScreen(
     freeLeft: Int? = null,
     freeLimit: Int? = null,
     onAddCredits: () -> Unit = {},
+    ownFree: Boolean = false,
 ) {
     val c = Hypurr.colors
     val template = state.selectedTemplate
@@ -151,7 +152,7 @@ fun NewTaskScreen(
                 minHeight = 96.dp) { onChange(state.copy(goal = it, error = null)) }
             VoiceGoal(state, onChange)
             if (freeLeft != null && freeLimit != null && state.usesHypurrModels) {
-                com.ragul84.hypurr.ui.FreeMessagesNote(freeLeft, freeLimit, onAddCredits, Modifier.padding(top = 8.dp))
+                com.ragul84.hypurr.ui.FreeMessagesNote(freeLeft, freeLimit, onAddCredits, Modifier.padding(top = 8.dp), ownFree = ownFree)
             }
             // Screenshot / error paste, and tickets.
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 10.dp),

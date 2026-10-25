@@ -252,6 +252,8 @@ data class TaskCosts(
     /** Free daily turns left / limit for the gauge (Sunfield Spend). */
     val freeTurnsLeft: Int? = null,
     val freeTurnsLimit: Int? = null,
+    /** "Keep going free": Hypurr Free runs on the user's own account (no message count). */
+    val ownFree: Boolean = false,
     /** e.g. "Resets at midnight IST". */
     val freeResetLabel: String? = null,
 )

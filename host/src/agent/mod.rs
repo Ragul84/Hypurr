@@ -6,6 +6,7 @@ pub mod auth;
 pub mod backends;
 pub mod bot;
 pub mod builtin;
+pub mod own_free;
 pub mod registry;
 pub mod term;
 pub mod workspace;

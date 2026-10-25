@@ -385,6 +385,11 @@ class HostClient(val transport: ChannelTransport) {
 
     suspend fun taskCosts(): TaskCosts = call("taskCosts")
 
+    // "Keep going free": the user's own OpenRouter account (OAuth PKCE; the computer keeps the key).
+    suspend fun ownFreeStart(): String = call<JsonObject>("ownFreeStart")["url"]!!.jsonPrimitive.content
+    suspend fun ownFreeFinish(code: String) { call<JsonObject>("ownFreeFinish", buildJsonObject { put("code", code) }, timeoutMs = 30_000) }
+    suspend fun ownFreeDisconnect() { call<JsonObject>("ownFreeDisconnect") }
+
     // Trace a click & Page map
     suspend fun traceStart(project: String, url: String, steps: List<String>): TraceReply = call("traceStart", buildJsonObject {
         put("project", project); put("url", url)

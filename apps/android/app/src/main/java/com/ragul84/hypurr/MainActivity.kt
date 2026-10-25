@@ -166,7 +166,18 @@ class MainActivity : ComponentActivity() {
                 androidx.compose.runtime.CompositionLocalProvider(
                     com.ragul84.hypurr.voice.LocalVoiceSettings provides com.ragul84.hypurr.voice.VoiceSettings(
                         com.ragul84.hypurr.voice.VoiceLanguage.of(voiceProfile.voiceLanguage), voiceProfile.explainInMyLanguage),
-                ) { App(store) }
+                ) {
+                    var keepFree by remember { mutableStateOf(false) }
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        com.ragul84.hypurr.ui.LocalKeepGoingFree provides { keepFree = true },
+                    ) { App(store) }
+                    if (keepFree) com.ragul84.hypurr.ui.KeepGoingFreeDialog(
+                        start = { store.ownFreeStart() },
+                        finish = { store.ownFreeFinish(it) },
+                        onDone = { keepFree = false },
+                        onDismiss = { keepFree = false },
+                    )
+                }
             }
         }
     }
@@ -584,6 +595,7 @@ class MainActivity : ComponentActivity() {
                         task.copy(setup = setup, models = com.ragul84.hypurr.ui.screens.runnableModels(taskHello)),
                         freeLeft = taskCosts?.freeTurnsLeft,
                         freeLimit = taskCosts?.freeTurnsLimit,
+                        ownFree = taskCosts?.ownFree == true,
                         onAddCredits = {
                             taskDraft = null
                             screen = "spend"
@@ -651,7 +663,8 @@ class MainActivity : ComponentActivity() {
                     }
                     val pricing by store.pricing.collectAsState()
                     LaunchedEffect(Unit) { store.loadPricing() }
-                    SpendScreen(current.name, linkState, costs, bots, onTab = ::go, pricing = pricing)
+                    SpendScreen(current.name, linkState, costs, bots, onTab = ::go, pricing = pricing,
+                        onDisconnectOwnFree = { scope.launch { runCatching { store.ownFreeDisconnect() } } })
                 }
                 target == "standup" -> {
                     var st by remember { mutableStateOf(com.ragul84.hypurr.ui.screens.StandupUiState(loading = true,

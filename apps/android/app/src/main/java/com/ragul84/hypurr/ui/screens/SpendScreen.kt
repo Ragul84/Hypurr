@@ -76,6 +76,7 @@ fun SpendScreen(
     pricing: com.ragul84.hypurr.model.Pricing? = null,
     /** Day the chart ends on; tests pin it. */
     now: Long = System.currentTimeMillis(),
+    onDisconnectOwnFree: (() -> Unit)? = null,
 ) {
     val c = Hypurr.colors
     val ctx = LocalContext.current
@@ -122,7 +123,7 @@ fun SpendScreen(
                         Spacer(Modifier.height(6.dp))
                         DotFigure(data.gatewayCreditsLabel ?: "$0.00", SignalType.hero, c.text)
                         Spacer(Modifier.height(8.dp))
-                        if (freeOn) com.ragul84.hypurr.ui.FreeMessagesNote(left, limit, onAddCredits = { showPacks = true })
+                        if (freeOn) com.ragul84.hypurr.ui.FreeMessagesNote(left, limit, onAddCredits = { showPacks = true }, ownFree = data.ownFree)
                         else Text(paceLine(data, left), color = c.secondary, style = MaterialTheme.typography.bodyMedium)
                         Spacer(Modifier.height(16.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -182,7 +183,7 @@ fun SpendScreen(
                         }
                     }
                 }
-                item { HypurrFreeCard(freeOn, left, used, limit) }
+                item { HypurrFreeCard(freeOn, left, used, limit, data.ownFree, onDisconnectOwnFree) }
                 item {
                     SignalCard(Modifier.fillMaxWidth().padding(top = 6.dp)) {
                         Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 14.dp)) {
@@ -257,7 +258,7 @@ private fun paceLine(data: TaskCosts, freeLeft: Int): String {
 
 /** Hypurr Free, said plainly: what it is, how much, and what not to use it for. */
 @Composable
-private fun HypurrFreeCard(on: Boolean, left: Int, used: Int, limit: Int) {
+private fun HypurrFreeCard(on: Boolean, left: Int, used: Int, limit: Int, ownFree: Boolean = false, onDisconnectOwnFree: (() -> Unit)? = null) {
     val c = Hypurr.colors
     SignalCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -272,6 +273,16 @@ private fun HypurrFreeCard(on: Boolean, left: Int, used: Int, limit: Int) {
             if (on) DotProgress(used.toFloat() / limit, Modifier.padding(top = 6.dp, bottom = 2.dp))
             Text("Claude Code and Codex you already have work as they are, at no extra cost.",
                 color = c.tertiary, style = MaterialTheme.typography.bodySmall)
+            // Optional: the user's own free account (the only place OpenRouter is named).
+            val keepGoing = com.ragul84.hypurr.ui.LocalKeepGoingFree.current
+            if (ownFree) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
+                    Text("Your own OpenRouter account is connected", color = c.secondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                    if (onDisconnectOwnFree != null) SoftButton("Disconnect", onClick = onDisconnectOwnFree)
+                }
+            } else if (keepGoing != null) {
+                SoftButton("Keep going free with your own account", Modifier.fillMaxWidth().padding(top = 6.dp), onClick = keepGoing)
+            }
         }
     }
 }

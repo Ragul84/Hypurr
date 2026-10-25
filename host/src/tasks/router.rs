@@ -55,7 +55,7 @@ fn project_words(p: &Project) -> Vec<String> {
 
 /// Picks a project and agent. `last_project` (the newest task's) breaks ties.
 pub fn route(goal: &str, read_only: bool, projects: &[Project], agents: &[Agent], last_project: Option<&str>) -> Route {
-    route_with(goal, read_only, projects, agents, last_project, crate::agent::builtin::gateway_ready())
+    route_with(goal, read_only, projects, agents, last_project, crate::agent::builtin::free_ready())
 }
 
 /// Without the Hypurr gateway, Hypurr Agent has no free models, so an agent the user already

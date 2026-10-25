@@ -953,6 +953,23 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
             crate::agent::builtin::install(|line| tracing::info!(%line, "builtin install")).await?
         }
         "builtinAgent" => crate::agent::builtin::status(),
+        // "Keep going free": the user's own OpenRouter account for Hypurr Free (OAuth PKCE).
+        "ownFreeStatus" => crate::agent::own_free::status_json(&hub.store),
+        "ownFreeStart" => {
+            market::vault::unlock(hub.clone()).await?;
+            crate::agent::own_free::start(&hub.store)?
+        }
+        "ownFreeFinish" => {
+            market::vault::unlock(hub.clone()).await?;
+            crate::agent::own_free::finish(&hub.store, str_arg(&b, "code")?).await?
+        }
+        "ownFreeDisconnect" => crate::agent::own_free::disconnect(&hub.store)?,
+        // Debug builds only: end-to-end tests stand in for a key the OAuth flow would return.
+        #[cfg(debug_assertions)]
+        "ownFreeTestKey" => {
+            market::vault::unlock(hub.clone()).await?;
+            crate::agent::own_free::save_key(&hub.store, str_arg(&b, "key")?)?
+        }
         "agentSetup" => {
             let step: crate::agent::term::Step =
                 serde_json::from_value(b["step"].clone()).context("`step` is install or login")?;
@@ -976,10 +993,10 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
                             .as_str()
                             .filter(|s| !s.is_empty())
                             .filter(|s| {
-                                !crate::agent::builtin::is_gateway_model(s) || crate::agent::builtin::gateway_ready()
+                                !crate::agent::builtin::is_gateway_model(s) || crate::agent::builtin::free_ready()
                             })
                             .map_or_else(|| json!(crate::agent::builtin::default_model()), |s| json!(s));
-                        json!({"models": models, "currentModelId": current, "free": crate::agent::builtin::gateway_ready()})
+                        json!({"models": models, "currentModelId": current, "free": crate::agent::builtin::free_ready()})
                     }
                 }
                 Ok(v) => v,
@@ -988,7 +1005,7 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
                         error = format!("{e:#}"),
                         "hypurr-agent model probe failed; using free gateway list"
                     );
-                    json!({"models": crate::agent::builtin::offered_free_models(), "currentModelId": crate::agent::builtin::default_model(), "free": crate::agent::builtin::gateway_ready()})
+                    json!({"models": crate::agent::builtin::offered_free_models(), "currentModelId": crate::agent::builtin::default_model(), "free": crate::agent::builtin::free_ready()})
                 }
                 Err(e) => return Err(e),
             }

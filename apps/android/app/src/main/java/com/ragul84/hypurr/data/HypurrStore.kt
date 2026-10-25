@@ -595,6 +595,10 @@ class HypurrStore(
     private val _costs = MutableStateFlow<TaskCosts?>(null)
     val costs: StateFlow<TaskCosts?> = _costs.asStateFlow()
 
+    suspend fun ownFreeStart(): String = (client ?: throw HostException.unreachable()).ownFreeStart()
+    suspend fun ownFreeFinish(code: String) { (client ?: throw HostException.unreachable()).ownFreeFinish(code); loadCosts(); refreshHello() }
+    suspend fun ownFreeDisconnect() { (client ?: throw HostException.unreachable()).ownFreeDisconnect(); loadCosts(); refreshHello() }
+
     suspend fun loadCosts(): TaskCosts? {
         val c = client ?: return _costs.value
         return runCatching { c.taskCosts() }.getOrNull()?.also { _costs.value = it } ?: _costs.value

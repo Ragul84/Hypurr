@@ -492,6 +492,7 @@ async fn serve(bind: &str, port: u16) -> Result<()> {
     let hub = hub::Hub::new(store, host_id, identity, token, port);
     hub.start()?;
     admin::local_only::sync(&hub.store);
+    agent::own_free::sync(&hub.store);
     tokio::spawn(registry::refresh_loop());
     tokio::spawn(backends::refresh_sign_in());
     tokio::spawn(agent::builtin::health_loop());

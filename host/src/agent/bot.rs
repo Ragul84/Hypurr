@@ -505,6 +505,9 @@ impl Actor {
         if e.to_string().contains(crate::agent::builtin::FREE_EXHAUSTED) {
             crate::agent::builtin::FREE_EXHAUSTED.clone_into(&mut msg);
         }
+        if e.to_string().contains(crate::agent::builtin::FREE_BUSY) {
+            crate::agent::builtin::FREE_BUSY.clone_into(&mut msg);
+        }
         if e.to_string().to_lowercase().contains("auth")
             && let Some(h) = crate::agent::backends::harness(&self.cfg.backend)
         {
@@ -1006,7 +1009,7 @@ impl Actor {
         let picked = picked.or_else(|| (self.cfg.backend == "codex").then(|| unusable_model_fallback(&res)).flatten());
         if let Some(model) = picked {
             tracing::info!(backend = self.cfg.backend, model, "session model");
-            if crate::agent::builtin::is_gateway_model(&model) && !crate::agent::builtin::gateway_ready() {
+            if crate::agent::builtin::is_gateway_model(&model) && !crate::agent::builtin::free_ready() {
                 bail!(crate::agent::builtin::NO_GATEWAY);
             }
             let config_id = crate::agent::auth::model_config(&res).and_then(|c| c["id"].as_str());
@@ -1090,7 +1093,19 @@ impl Actor {
             (Err(e), _) if !self.stop_requested => {
                 let tail = self.exit_tail.take().filter(|t| !t.is_empty());
                 let detail = tail.map(|t| format!("\n\n{}", acp::truncate(&t, 1200))).unwrap_or_default();
-                self.notice(&format!("The agent failed: {e}{detail}"), NoticeStyle::Error);
+                let text = format!("{e:#}");
+                if text.contains("free_pool_exhausted")
+                    || text.contains("free models are busy today")
+                    || text.contains(crate::agent::builtin::FREE_BUSY)
+                {
+                    self.notice(crate::agent::builtin::FREE_BUSY, NoticeStyle::Error);
+                } else if text.contains("used your free messages")
+                    || text.contains(crate::agent::builtin::FREE_EXHAUSTED)
+                {
+                    self.notice(crate::agent::builtin::FREE_EXHAUSTED, NoticeStyle::Error);
+                } else {
+                    self.notice(&format!("The agent failed: {e}{detail}"), NoticeStyle::Error);
+                }
             }
             (_, "cancelled") | (Err(_), _) => self.notice("Stopped.", NoticeStyle::Info),
             (_, "max_tokens") => self.notice("The agent hit its output limit.", NoticeStyle::Info),

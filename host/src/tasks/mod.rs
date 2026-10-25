@@ -744,6 +744,8 @@ pub fn costs(store: &Store) -> Result<Value> {
         // Free messages today (Hypurr's models); absent when this computer has no gateway.
         "freeTurnsLeft": crate::agent::builtin::gateway_ready().then(|| crate::agent::builtin::free_messages_left(store)),
         "freeTurnsLimit": crate::agent::builtin::gateway_ready().then_some(crate::agent::builtin::FREE_MESSAGES_PER_DAY),
+        // "Keep going free": the user's own account runs Hypurr Free (no message count).
+        "ownFree": crate::agent::builtin::own_free(),
     }))
 }
 
