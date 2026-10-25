@@ -222,7 +222,8 @@ async fn prepare_npx(package: &str, name: &str, progress: &impl Fn(&str)) -> Res
     }
     let _ = tokio::fs::remove_dir_all(&dir).await;
     progress(&format!("Downloading {name}…"));
-    let install = npm_command(&["exec", "--yes", "--package", package, "-c", "true"])?
+    // `-c` runs through the platform shell; cmd.exe has no `true`, so use `exit 0` (works in sh and cmd).
+    let install = npm_command(&["exec", "--yes", "--package", package, "-c", "exit 0"])?
         // Away from any project, so npx doesn't settle for a local node_modules.
         .current_dir(crate::service::data_dir())
         .stdin(std::process::Stdio::null())
