@@ -996,12 +996,9 @@ impl Actor {
         // Codex can inherit a model from ~/.codex/config.toml that this sign-in can't use
         // (e.g. one written by `ollama launch codex`); fall back to one Codex offers.
         let picked = self.cfg.model.clone().filter(|m| !m.is_empty());
-        let picked = picked.or_else(|| {
-            (self.cfg.backend == "codex")
-                .then(|| unusable_model_fallback(&crate::agent::auth::model_catalog(&res)))
-                .flatten()
-        });
+        let picked = picked.or_else(|| (self.cfg.backend == "codex").then(|| unusable_model_fallback(&res)).flatten());
         if let Some(model) = picked {
+            tracing::info!(backend = self.cfg.backend, model, "session model");
             if crate::agent::builtin::is_gateway_model(&model) && !crate::agent::builtin::gateway_ready() {
                 bail!(crate::agent::builtin::NO_GATEWAY);
             }
@@ -1560,13 +1557,21 @@ fn codex_launch_env(env: &mut Vec<(String, String)>) {
 }
 
 /// The model to switch to when the session's current model isn't one the agent offers.
-fn unusable_model_fallback(catalog: &Value) -> Option<String> {
-    let models = catalog["models"].as_array()?;
-    let current = catalog["currentModelId"].as_str()?;
-    if models.iter().any(|m| m["id"] == current) {
+/// codex-acp lists the current model first, with no description, when Codex's catalog
+/// for this sign-in doesn't have it; then use the first model Codex really offers
+/// (its catalog lists the default first).
+fn unusable_model_fallback(session: &Value) -> Option<String> {
+    let config = crate::agent::auth::model_config(session)?;
+    let current = config["currentValue"].as_str()?;
+    let options = config["options"].as_array()?;
+    if options.iter().any(|o| o["value"] == current && !o["description"].is_null()) {
         return None;
     }
-    models.first()?["id"].as_str().map(str::to_owned)
+    options
+        .iter()
+        .find(|o| !o["description"].is_null() && o["value"].as_str() != Some(current))
+        .and_then(|o| o["value"].as_str())
+        .map(str::to_owned)
 }
 
 pub(crate) async fn start_agent(command: &str, cwd: &str, env: &[(String, String)], budget: Duration) -> Result<Conn> {
@@ -1697,14 +1702,25 @@ mod tests {
 
     #[test]
     fn unusable_inherited_model_falls_back_to_an_offered_one() {
-        // ~/.codex/config.toml left by `ollama launch codex`: a model ChatGPT sign-in refuses.
-        let c =
-            json!({"models": [{"id": "gpt-5.5/medium"}, {"id": "gpt-5.5/high"}], "currentModelId": "gpt-5.6-sol/high"});
-        assert_eq!(unusable_model_fallback(&c).as_deref(), Some("gpt-5.5/medium"));
-        let ok = json!({"models": [{"id": "gpt-5.5/medium"}], "currentModelId": "gpt-5.5/medium"});
+        // codex-acp's model option when ~/.codex/config.toml (left by `ollama launch codex`)
+        // names a model ChatGPT sign-in refuses: it's put first, without a description.
+        let opt = |current: &str, options: Value| {
+            json!({"configOptions": [{"id": "model", "category": "model", "type": "select",
+                "currentValue": current, "options": options}]})
+        };
+        let bad = opt(
+            "gpt-5.6-sol",
+            json!([
+                {"value": "gpt-5.6-sol", "name": "5.6 Sol", "description": null},
+                {"value": "gpt-5.5", "name": "5.5", "description": "Frontier"},
+                {"value": "gpt-5.4-mini", "name": "5.4 Mini", "description": "Fast"}]),
+        );
+        assert_eq!(unusable_model_fallback(&bad).as_deref(), Some("gpt-5.5"));
+        let ok = opt("gpt-5.5", json!([{"value": "gpt-5.5", "name": "5.5", "description": "Frontier"}]));
         assert_eq!(unusable_model_fallback(&ok), None);
-        assert_eq!(unusable_model_fallback(&json!({"models": [], "currentModelId": "x"})), None);
-        assert_eq!(unusable_model_fallback(&json!({"models": [{"id": "a"}]})), None);
+        let only = opt("x", json!([{"value": "x", "name": "X", "description": null}]));
+        assert_eq!(unusable_model_fallback(&only), None);
+        assert_eq!(unusable_model_fallback(&json!({})), None);
     }
 
     #[test]
