@@ -23,7 +23,8 @@ const KEY_SLOT: &str = "own_free_key";
 const VERIFIER_SLOT: &str = "own_free_verifier";
 /// kv: when the pending flow started (unix ms); `OpenRouter` codes expire after 10 minutes.
 const STARTED: &str = "own_free_started";
-const FLOW_TTL_MS: i64 = 15 * 60 * 1000;
+/// How long a started sign-in stays usable here (the verifier); `OpenRouter` still checks its own code.
+const FLOW_TTL_MS: i64 = 60 * 60 * 1000;
 
 /// What Hypurr Free / Fast run on with the user's own account (the same `:free` models the
 /// gateway uses first).
