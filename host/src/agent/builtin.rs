@@ -222,6 +222,14 @@ pub fn agent_config(base: &str, key: &str) -> Value {
     })
 }
 
+/// Why the last Hypurr Agent launch had no gateway provider, shown instead of the bare
+/// [`NO_GATEWAY`] when selecting a free model then fails.
+static LAST_GATEWAY_ERROR: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+pub fn last_gateway_error() -> Option<String> {
+    LAST_GATEWAY_ERROR.locked().clone()
+}
+
 /// Extra environment for a Hypurr Agent launch: the gateway provider, when there is one.
 /// Never in local-only mode. Failures just leave the free models off (own keys still work).
 pub async fn launch_env(store: &crate::store::Store) -> Vec<(String, String)> {
@@ -230,9 +238,13 @@ pub async fn launch_env(store: &crate::store::Store) -> Vec<(String, String)> {
     }
     let Some(base) = gateway_url() else { return Vec::new() };
     match gateway_key(store, &base).await {
-        Ok(key) => vec![("OPENCODE_CONFIG_CONTENT".to_owned(), agent_config(&base, &key).to_string())],
+        Ok(key) => {
+            *LAST_GATEWAY_ERROR.locked() = None;
+            vec![("OPENCODE_CONFIG_CONTENT".to_owned(), agent_config(&base, &key).to_string())]
+        }
         Err(e) => {
             tracing::warn!(error = format!("{e:#}"), "no Hypurr gateway key");
+            *LAST_GATEWAY_ERROR.locked() = Some(format!("{e:#}"));
             Vec::new()
         }
     }
