@@ -880,6 +880,9 @@ impl Actor {
             {
                 env.extend(crate::agent::builtin::launch_env(&self.hub.store).await);
             }
+            if self.cfg.backend == "codex" {
+                codex_launch_env(&mut env);
+            }
             crate::admin::local_only::check_agent(&self.hub.store, &self.cfg.backend, &env)?;
             let mut last_err = None;
             for (i, command) in candidates.iter().enumerate() {
@@ -990,7 +993,12 @@ impl Actor {
         let res = conn.acp.request("session/new", params).await?;
         let sid = res["sessionId"].as_str().ok_or_else(|| anyhow!("agent returned no sessionId"))?.to_owned();
         conn.loaded.insert(sid.clone());
-        if let Some(model) = self.cfg.model.clone().filter(|m| !m.is_empty()) {
+        // Codex can inherit a model from ~/.codex/config.toml that this sign-in can't use
+        // (e.g. one written by `ollama launch codex`); fall back to one Codex offers.
+        let picked = self.cfg.model.clone().filter(|m| !m.is_empty());
+        let picked = picked.or_else(|| (self.cfg.backend == "codex").then(|| unusable_model_fallback(&res)).flatten());
+        if let Some(model) = picked {
+            tracing::info!(backend = self.cfg.backend, model, "session model");
             if crate::agent::builtin::is_gateway_model(&model) && !crate::agent::builtin::gateway_ready() {
                 bail!(crate::agent::builtin::NO_GATEWAY);
             }
@@ -1539,6 +1547,33 @@ pub(crate) async fn launch_commands(cfg: &BotConfig, progress: impl Fn(&str)) ->
 }
 
 /// Spawns an ACP agent and completes the `initialize` handshake.
+/// Codex runs on the user's own OpenAI/ChatGPT sign-in, whatever provider a tool like
+/// `ollama launch codex` left in ~/.codex/config.toml. The user's file is never edited;
+/// a provider they saved in Hypurr wins.
+fn codex_launch_env(env: &mut Vec<(String, String)>) {
+    if !env.iter().any(|(k, _)| k == "MODEL_PROVIDER") {
+        env.push(("MODEL_PROVIDER".into(), "openai".into()));
+    }
+}
+
+/// The model to switch to when the session's current model isn't one the agent offers.
+/// codex-acp lists the current model first, with no description, when Codex's catalog
+/// for this sign-in doesn't have it; then use the first model Codex really offers
+/// (its catalog lists the default first).
+fn unusable_model_fallback(session: &Value) -> Option<String> {
+    let config = crate::agent::auth::model_config(session)?;
+    let current = config["currentValue"].as_str()?;
+    let options = config["options"].as_array()?;
+    if options.iter().any(|o| o["value"] == current && !o["description"].is_null()) {
+        return None;
+    }
+    options
+        .iter()
+        .find(|o| !o["description"].is_null() && o["value"].as_str() != Some(current))
+        .and_then(|o| o["value"].as_str())
+        .map(str::to_owned)
+}
+
 pub(crate) async fn start_agent(command: &str, cwd: &str, env: &[(String, String)], budget: Duration) -> Result<Conn> {
     let (acp, rx) = Acp::spawn(command, cwd, env)?;
     let init = tokio::time::timeout(
@@ -1654,6 +1689,40 @@ fn turn_alert(failed: bool, stop_reason: &str, more: bool) -> Option<AlertKind> 
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn codex_uses_the_users_openai_sign_in_unless_hypurr_saved_a_provider() {
+        let mut env = vec![];
+        codex_launch_env(&mut env);
+        assert_eq!(env, vec![("MODEL_PROVIDER".to_owned(), "openai".to_owned())]);
+        let mut env = vec![("MODEL_PROVIDER".to_owned(), "azure".to_owned())];
+        codex_launch_env(&mut env);
+        assert_eq!(env.len(), 1);
+        assert_eq!(env[0].1, "azure");
+    }
+
+    #[test]
+    fn unusable_inherited_model_falls_back_to_an_offered_one() {
+        // codex-acp's model option when ~/.codex/config.toml (left by `ollama launch codex`)
+        // names a model ChatGPT sign-in refuses: it's put first, without a description.
+        let opt = |current: &str, options: Value| {
+            json!({"configOptions": [{"id": "model", "category": "model", "type": "select",
+                "currentValue": current, "options": options}]})
+        };
+        let bad = opt(
+            "gpt-5.6-sol",
+            json!([
+                {"value": "gpt-5.6-sol", "name": "5.6 Sol", "description": null},
+                {"value": "gpt-5.5", "name": "5.5", "description": "Frontier"},
+                {"value": "gpt-5.4-mini", "name": "5.4 Mini", "description": "Fast"}]),
+        );
+        assert_eq!(unusable_model_fallback(&bad).as_deref(), Some("gpt-5.5"));
+        let ok = opt("gpt-5.5", json!([{"value": "gpt-5.5", "name": "5.5", "description": "Frontier"}]));
+        assert_eq!(unusable_model_fallback(&ok), None);
+        let only = opt("x", json!([{"value": "x", "name": "X", "description": null}]));
+        assert_eq!(unusable_model_fallback(&only), None);
+        assert_eq!(unusable_model_fallback(&json!({})), None);
+    }
+
     #[test]
     fn only_finished_tasks_alert() {
         assert_eq!(turn_alert(false, "end_turn", false), Some(AlertKind::Done));
