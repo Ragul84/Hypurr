@@ -24,8 +24,8 @@ android {
         // Google Play requires API 36 for new apps and updates since Aug 31, 2026.
         targetSdk = 36
         // Same version as apps/project.yml MARKETING_VERSION and host/Cargo.toml.
-        versionName = "2.6.1"
-        versionCode = 20601
+        versionName = "2.6.2"
+        versionCode = 20602
         // The push relay (relay/, deployed at push.mindgains.ai): host -> relay -> FCM.
         // Override without editing: ./gradlew assembleRelease -Phypurr.relayUrl=https://relay.example.com
         val relayUrl = providers.gradleProperty("hypurr.relayUrl").getOrElse("https://push.mindgains.ai")
