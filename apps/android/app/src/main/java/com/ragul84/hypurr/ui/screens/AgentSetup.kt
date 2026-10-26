@@ -61,8 +61,8 @@ data class AgentInstallState(val busy: Boolean = false, val done: Boolean = fals
 data class KnownAgent(val id: String, val name: String, val install: String, val signIn: String)
 
 val KnownAgents = listOf(
-    KnownAgent("claude", "Claude Code", "npm install -g @anthropic-ai/claude-code", "Run  claude  once and sign in with your Claude account."),
-    KnownAgent("codex", "Codex", "npm install -g @openai/codex", "Run  codex  once and pick \"Sign in with ChatGPT\"."),
+    KnownAgent("claude", "Claude Code", "irm https://claude.ai/install.ps1 | iex", "Run  claude  once and sign in with your Claude account."),
+    KnownAgent("codex", "Codex", "irm https://chatgpt.com/codex/install.ps1 | iex", "Run  codex  once and pick \"Sign in with ChatGPT\"."),
     KnownAgent("gemini", "Gemini CLI", "npm install -g @google/gemini-cli", "Run  gemini  once and pick \"Login with Google\"."),
     KnownAgent("cursor", "Cursor CLI", "irm 'https://cursor.com/install?win32=true' | iex", "Run  cursor-agent login  and finish in the browser."),
 )

@@ -84,6 +84,9 @@ enum Sub {
         #[arg(long, default_value = "0.0.0.0")]
         bind: String,
     },
+    /// Print how each agent would be installed on this computer (dry run: nothing is installed).
+    #[command(hide = true)]
+    InstallPlan,
     /// Show a one-time pairing QR code for the Hypurr iOS or Android app (the host must be running).
     Pair {
         #[arg(long, default_value_t = service::DEFAULT_PORT)]
@@ -316,6 +319,10 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.cmd.unwrap_or(Sub::Serve { port: service::DEFAULT_PORT, bind: "0.0.0.0".into() }) {
         Sub::Serve { port, bind } => serve(&bind, port).await,
+        Sub::InstallPlan => {
+            println!("{}", serde_json::to_string_pretty(&backends::install_plan())?);
+            Ok(())
+        }
         Sub::Pair { port, json } => pair(port, json).await,
         Sub::Info { port, json } => info(port, json).await,
         Sub::Devices { port, action } => match action.unwrap_or(DevicesAction::List) {
