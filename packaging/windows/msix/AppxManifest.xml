@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSIX manifest for the Microsoft Store. The Store re-signs the package, so no certificate is needed.
+  PLACEHOLDERS (copy the exact values from Partner Center > your app > Product identity):
+    __STORE_IDENTITY_NAME__        Package/Identity/Name           e.g. 12345Ragul84.Hypurr
+    __STORE_PUBLISHER__            Package/Identity/Publisher      e.g. CN=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
+    __STORE_PUBLISHER_DISPLAY__    Package/Properties/PublisherDisplayName
+  __VERSION__ is filled by CI (x.y.z.0; the 4th part must be 0 for the Store).
+  packaging/windows/msix/build.ps1 fills these; it uses obvious test values when the
+  STORE_* variables are unset, which the Store will reject (on purpose).
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+  <Identity Name="__STORE_IDENTITY_NAME__" Publisher="__STORE_PUBLISHER__" Version="__VERSION__" ProcessorArchitecture="x64" />
+  <Properties>
+    <DisplayName>Hypurr</DisplayName>
+    <PublisherDisplayName>__STORE_PUBLISHER_DISPLAY__</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+  <Applications>
+    <Application Id="Hypurr" Executable="hypurr.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements DisplayName="Hypurr" Description="Run your coding agents from your phone"
+        BackgroundColor="transparent" Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+  <Capabilities>
+    <Capability Name="internetClient" />
+    <Capability Name="privateNetworkClientServer" />
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>

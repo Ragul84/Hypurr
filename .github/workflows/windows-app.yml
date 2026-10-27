@@ -39,8 +39,25 @@ jobs:
 
   installer:
     runs-on: windows-latest
+    permissions:
+      actions: read
+      contents: read
+    env:
+      # SignPath (free OSS signing) runs only once these exist; see docs/release/windows-signing.md.
+      SIGNPATH_ON: ${{ secrets.SIGNPATH_API_TOKEN != '' && vars.SIGNPATH_ORGANIZATION_ID != '' }}
+      STORE_IDENTITY_NAME: ${{ vars.STORE_IDENTITY_NAME }}
+      STORE_PUBLISHER: ${{ vars.STORE_PUBLISHER }}
+      STORE_PUBLISHER_DISPLAY: ${{ vars.STORE_PUBLISHER_DISPLAY }}
     steps:
       - uses: actions/checkout@v4
+      - name: Version (from apps/windows/Cargo.toml)
+        id: version
+        shell: pwsh
+        run: |
+          $v = (Select-String -Path apps/windows/Cargo.toml -Pattern '^version = "(.+)"' | Select-Object -First 1).Matches[0].Groups[1].Value
+          $h = (Select-String -Path host/Cargo.toml -Pattern '^version = "(.+)"' | Select-Object -First 1).Matches[0].Groups[1].Value
+          if ($v -ne $h) { throw "apps/windows ($v) and host ($h) versions differ" }
+          "version=$v" >> $env:GITHUB_OUTPUT
       - run: rustup toolchain install
       - uses: Swatinem/rust-cache@v2
         with:
@@ -77,12 +94,38 @@ jobs:
           WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
           WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
         run: packaging/windows/sign.ps1 dist/windows/hypurr.exe dist/windows/hypurr-host.exe
+      - name: Upload app + host for SignPath
+        id: unsigned-app
+        if: env.SIGNPATH_ON == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-app
+          path: |
+            dist/windows/hypurr.exe
+            dist/windows/hypurr-host.exe
+      - name: Sign app + host with SignPath
+        if: env.SIGNPATH_ON == 'true'
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'hypurr' }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG || 'release-signing' }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_APP_CONFIG || 'app' }}
+          github-artifact-id: ${{ steps.unsigned-app.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: dist/signed-app
+      - name: Use the SignPath-signed app + host
+        if: env.SIGNPATH_ON == 'true'
+        shell: pwsh
+        run: Copy-Item dist/signed-app/*.exe dist/windows/ -Force
       - name: Build installer (Inno Setup, per-user)
         shell: pwsh
         run: |
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress | Out-Null }
-          & $iscc /DAppVersion=0.1.0 "/DSrcDir=$PWD\dist\windows" "/O$PWD\dist" packaging\windows\hypurr.iss
+          & $iscc /DAppVersion=${{ steps.version.outputs.version }} "/DSrcDir=$PWD\dist\windows" "/O$PWD\dist" packaging\windows\hypurr.iss
           if ($LASTEXITCODE -ne 0) { throw "iscc failed" }
       - name: Sign installer (skipped without a cert secret)
         shell: pwsh
@@ -90,6 +133,33 @@ jobs:
           WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
           WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
         run: packaging/windows/sign.ps1 (Get-ChildItem dist\HypurrSetup-*.exe | Select -First 1).FullName
+      - name: Upload installer for SignPath
+        id: unsigned-setup
+        if: env.SIGNPATH_ON == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-installer
+          path: dist/HypurrSetup-*.exe
+      - name: Sign installer with SignPath
+        if: env.SIGNPATH_ON == 'true'
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'hypurr' }}
+          signing-policy-slug: ${{ vars.SIGNPATH_POLICY_SLUG || 'release-signing' }}
+          artifact-configuration-slug: ${{ vars.SIGNPATH_SETUP_CONFIG || 'installer' }}
+          github-artifact-id: ${{ steps.unsigned-setup.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 3600
+          output-artifact-directory: dist/signed-setup
+      - name: Use the SignPath-signed installer
+        if: env.SIGNPATH_ON == 'true'
+        shell: pwsh
+        run: Copy-Item dist/signed-setup/HypurrSetup-*.exe dist/ -Force
+      - name: Installer name matches the version
+        shell: pwsh
+        run: if (-not (Test-Path "dist/HypurrSetup-${{ steps.version.outputs.version }}.exe")) { throw "expected dist/HypurrSetup-${{ steps.version.outputs.version }}.exe" }
       - name: Silent per-user install + uninstall (no admin)
         shell: pwsh
         run: |
@@ -106,3 +176,10 @@ jobs:
         with:
           name: hypurr-windows-installer
           path: dist/HypurrSetup-*.exe
+      - name: Build MSIX for the Microsoft Store (unsigned; the Store signs it)
+        shell: pwsh
+        run: packaging/windows/msix/build.ps1 -Version ${{ steps.version.outputs.version }} -SrcDir dist\windows -Out dist\Hypurr-${{ steps.version.outputs.version }}.msix
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hypurr-windows-msix
+          path: dist/Hypurr-*.msix
