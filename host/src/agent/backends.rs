@@ -43,16 +43,88 @@ pub enum Install {
     Managed,
 }
 
+/// How a vendor installs its CLI on native Windows (from each vendor's install docs).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WinInstall {
+    /// A PowerShell script (`irm … | iex`), run with `powershell -NoProfile -ExecutionPolicy Bypass`.
+    PowerShell(&'static str),
+    /// `uv tool install <pkg>` (the vendor's documented Windows path).
+    Uv(&'static str),
+    /// The vendor has no native Windows install (WSL only).
+    Unavailable,
+}
+
+/// Shown instead of an install button when the vendor has no native Windows install.
+pub const NOT_ON_WINDOWS: &str = "Not available on Windows yet";
+/// Plain words when npm is missing.
+pub const NEEDS_NODE: &str =
+    "This needs Node.js first. Install the LTS version from https://nodejs.org, then try again.";
+
+/// Official native Windows install per agent whose Unix install is a `curl … | sh` script.
+/// Sources are listed in docs/features/agent-installs.md.
+pub fn windows_install(id: &str) -> WinInstall {
+    use WinInstall::{PowerShell, Unavailable, Uv};
+    match id {
+        "claude" => PowerShell("irm https://claude.ai/install.ps1 | iex"),
+        "codex" => PowerShell("irm https://chatgpt.com/codex/install.ps1 | iex"),
+        "cursor" => PowerShell("irm 'https://cursor.com/install?win32=true' | iex"),
+        "goose" => PowerShell(
+            "$f = Join-Path $env:TEMP 'goose_download_cli.ps1'; Invoke-WebRequest -UseBasicParsing -Uri 'https://raw.githubusercontent.com/aaif-goose/goose/main/download_cli.ps1' -OutFile $f; $env:CONFIGURE = 'false'; & $f",
+        ),
+        "kimi" => PowerShell("irm https://code.kimi.com/kimi-code/install.ps1 | iex"),
+        "vibe" => Uv("mistral-vibe"),
+        "kiro" => PowerShell("irm 'https://cli.kiro.dev/install.ps1' | iex"),
+        "devin" => PowerShell("irm https://static.devin.ai/cli/setup.ps1 | iex"),
+        "junie" => PowerShell("iex (irm 'https://junie.jetbrains.com/install.ps1')"),
+        "antigravity" => PowerShell("irm https://antigravity.google/cli/install.ps1 | iex"),
+        "cortex" => PowerShell("irm https://ai.snowflake.com/static/cc-scripts/install.ps1 | iex"),
+        "poolside" => PowerShell("irm https://downloads.poolside.ai/pool/install.ps1 | iex"),
+        // Amp documents WSL only for Windows.
+        _ => Unavailable,
+    }
+}
+
+/// A setup command and the shell that runs it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SetupCommand {
+    pub text: String,
+    /// Run with PowerShell (Windows installs) instead of the platform shell.
+    pub powershell: bool,
+}
+
 impl Install {
-    pub fn command(self) -> String {
-        match self {
-            Self::Script(s) => s.to_owned(),
-            Self::Npm(pkg) => format!(
-                "command -v npm >/dev/null || {{ echo 'This needs Node.js first: https://nodejs.org'; exit 1; }}; npm install -g {pkg}"
-            ),
+    /// The command for this machine.
+    pub fn command(self, id: &str) -> Result<SetupCommand, &'static str> {
+        self.command_for(id, cfg!(windows))
+    }
+
+    /// The command for Windows or Unix (split out so both are tested everywhere).
+    pub fn command_for(self, id: &str, windows: bool) -> Result<SetupCommand, &'static str> {
+        let unix = |text: String| Ok(SetupCommand { text, powershell: false });
+        let ps = |text: String| Ok(SetupCommand { text, powershell: true });
+        match (self, windows) {
+            (Self::Script(s), false) => unix(s.to_owned()),
+            (Self::Script(_), true) => match windows_install(id) {
+                WinInstall::PowerShell(s) => ps(s.to_owned()),
+                WinInstall::Uv(pkg) => ps(format!(
+                    "if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {{ Write-Host 'This needs uv first. Install it from https://docs.astral.sh/uv/getting-started/installation/, then try again.'; exit 1 }}; uv tool install {pkg}"
+                )),
+                WinInstall::Unavailable => Err(NOT_ON_WINDOWS),
+            },
+            (Self::Npm(pkg), false) => {
+                unix(format!("command -v npm >/dev/null || {{ echo '{NEEDS_NODE}'; exit 1; }}; npm install -g {pkg}"))
+            }
+            (Self::Npm(pkg), true) => ps(format!(
+                "if (-not (Get-Command npm.cmd -ErrorAction SilentlyContinue)) {{ Write-Host '{NEEDS_NODE}'; exit 1 }}; npm.cmd install -g {pkg}"
+            )),
             // Managed installs run inside the host (see `term` / `installBuiltinAgent`), not a shell.
-            Self::Managed => String::new(),
+            (Self::Managed, _) => unix(String::new()),
         }
+    }
+
+    /// Whether Hypurr can install it on this kind of machine.
+    pub fn available_for(self, id: &str, windows: bool) -> bool {
+        self.command_for(id, windows).is_ok()
     }
 }
 
@@ -78,6 +150,54 @@ fn qoder_signed_in(_: bool, out: &str) -> bool {
 fn says_logged_in(_: bool, out: &str) -> bool {
     let out = out.to_lowercase();
     out.contains("logged in") && !out.contains("not logged in")
+}
+
+/// Dry run for every agent with an install: the exact command, its shell, and whether the
+/// prerequisites it needs are on this computer. Installs nothing.
+pub fn install_plan() -> Value {
+    let windows = cfg!(windows);
+    let tool = |b: &str| which(b).is_some();
+    let rows: Vec<Value> = HARNESSES
+        .iter()
+        .filter_map(|h| h.install.map(|i| (h, i)))
+        .filter(|(_, i)| !matches!(i, Install::Managed))
+        .map(|(h, i)| {
+            let (command, shell, note) = match i.command_for(h.id, windows) {
+                Ok(c) => (
+                    Some(c.text),
+                    if c.powershell {
+                        "powershell"
+                    } else if windows {
+                        "cmd"
+                    } else {
+                        "sh"
+                    },
+                    None,
+                ),
+                Err(e) => (None, "", Some(e)),
+            };
+            let needs: Vec<(&str, bool)> = match (i, windows) {
+                (Install::Npm(_), true) => vec![("npm.cmd (Node.js)", tool("npm.cmd") || tool("npm"))],
+                (Install::Npm(_), false) => vec![("npm (Node.js)", tool("npm"))],
+                (Install::Script(_), true) if matches!(windows_install(h.id), WinInstall::Uv(_)) => {
+                    vec![("uv", tool("uv"))]
+                }
+                (Install::Script(_), true) => vec![("powershell", tool("powershell"))],
+                (Install::Script(_), false) => vec![("curl", tool("curl"))],
+                _ => vec![],
+            };
+            json!({
+                "id": h.id,
+                "name": h.name,
+                "installed": resolve(h).is_some(),
+                "shell": shell,
+                "command": command,
+                "note": note,
+                "prereqs": needs.iter().map(|(n, ok)| json!({"need": n, "found": ok})).collect::<Vec<_>>(),
+            })
+        })
+        .collect();
+    json!({"os": std::env::consts::OS, "agents": rows})
 }
 
 pub const HARNESSES: &[Harness] = &[
@@ -391,9 +511,34 @@ pub fn harness(id: &str) -> Option<&'static Harness> {
 
 static SEARCH_PATH: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
 
+/// The user's saved PATH on Windows (User + Machine), so a CLI installed after Hypurr started
+/// (installers add their folder there) is found without restarting Hypurr.
+fn windows_saved_path() -> Option<String> {
+    let mut cmd = std::process::Command::new("powershell.exe");
+    cmd.args([
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "[Environment]::GetEnvironmentVariable('Path','User') + ';' + [Environment]::GetEnvironmentVariable('Path','Machine')",
+    ])
+    .stdin(std::process::Stdio::null())
+    .stderr(std::process::Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    }
+    let out = cmd.output().ok()?;
+    out.status.success().then(|| String::from_utf8_lossy(&out.stdout).trim().to_owned())
+}
+
 /// Login-shell PATH, via `$SHELL -ilc` with a timeout (nvm/conda can make shells slow).
+/// On Windows, the saved User and Machine PATH instead.
 fn login_shell_path() -> Option<String> {
     const MARK: &str = "__HYPURR_PATH__";
+    if cfg!(windows) {
+        return windows_saved_path();
+    }
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into());
     let mut child = std::process::Command::new(shell)
         .args(["-ilc", &format!("printf '%s%s%s' '{MARK}' \"$PATH\" '{MARK}'")])
@@ -456,6 +601,12 @@ fn well_known_dirs() -> Vec<PathBuf> {
         "go/bin",
     ] {
         dirs.push(home.join(rel));
+    }
+    // Windows per-user installs (Cursor's PowerShell installer, global npm).
+    for var in ["LOCALAPPDATA", "APPDATA"] {
+        if let Some(base) = std::env::var_os(var).map(PathBuf::from) {
+            dirs.push(base.join(if var == "APPDATA" { "npm" } else { "cursor-agent" }));
+        }
     }
     // Every nvm-installed node, newest first (global npm CLIs live next to node).
     if let Ok(entries) = std::fs::read_dir(home.join(".nvm/versions/node")) {
@@ -565,6 +716,15 @@ pub fn on_path(bin: &str) -> bool {
 // MARK: listing + launching
 
 /// Every harness the phone can pick, installed ones first.
+/// Catalog entries that would show upstream names users must never see (Hypurr Agent's
+/// upstream, or the provider name outside its own sign-in option), e.g. "OpenCode V2".
+fn upstream_branded(agent: &Value) -> bool {
+    ["id", "name", "description"].iter().any(|k| {
+        let v = agent[*k].as_str().unwrap_or_default().to_lowercase();
+        v.contains("opencode") || v.contains("openrouter")
+    })
+}
+
 pub fn list() -> Vec<Value> {
     let registry = registry::agents();
     let mut out: Vec<Value> = HARNESSES
@@ -583,7 +743,7 @@ pub fn list() -> Vec<Value> {
                 "available": (path.is_some() && runnable) || (managed && (crate::agent::builtin::is_installed() || crate::agent::builtin::release_ok())),
                 "path": path.as_ref().map(|p| p.to_string_lossy().into_owned()),
                 "description": if managed {
-                    "Hypurr Agent with free models via the Hypurr gateway.".into()
+                    "Hypurr Agent with free models on your own account.".into()
                 } else if h.id == "opencode" {
                     // Legacy CLI: never show the upstream name.
                     "Hypurr Agent from a CLI already on your computer.".into()
@@ -592,7 +752,8 @@ pub fn list() -> Vec<Value> {
                 },
                 "installHint": h.setup,
                 "signedIn": signed_in(h.id),
-                "canInstall": h.install.is_some(),
+                "canInstall": h.install.is_some_and(|i| i.available_for(h.id, cfg!(windows))),
+                "installNote": h.install.filter(|i| !i.available_for(h.id, cfg!(windows))).map(|_| NOT_ON_WINDOWS),
                 "command": h.local.unwrap_or_default(),
                 "registry": h.registry,
                 "curated": true,
@@ -621,7 +782,7 @@ pub fn list() -> Vec<Value> {
     let known: HashSet<&str> = HARNESSES.iter().filter_map(|h| h.registry).collect();
     for a in &registry {
         let id = a["id"].as_str().unwrap_or_default();
-        if id.is_empty() || known.contains(id) || id == "github-copilot" {
+        if id.is_empty() || known.contains(id) || id == "github-copilot" || upstream_branded(a) {
             continue;
         }
         out.push(json!({
@@ -771,6 +932,65 @@ pub fn local_candidate(id: &str) -> Option<registry::Cmd> {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn windows_never_gets_a_unix_pipe_script() {
+        for h in HARNESSES {
+            let Some(i) = h.install else { continue };
+            match i.command_for(h.id, true) {
+                Ok(c) => {
+                    let t = c.text.to_lowercase();
+                    assert!(
+                        !t.contains("| bash") && !t.contains("| sh") && !t.contains("command -v"),
+                        "{}: {}",
+                        h.id,
+                        c.text
+                    );
+                    if !matches!(i, Install::Managed) {
+                        assert!(c.powershell, "{} runs in PowerShell on Windows", h.id);
+                    }
+                }
+                Err(e) => assert_eq!(e, NOT_ON_WINDOWS, "{}", h.id),
+            }
+        }
+    }
+
+    #[test]
+    fn windows_commands_follow_vendor_docs() {
+        let w = |id: &str| harness(id).unwrap().install.unwrap().command_for(id, true);
+        assert_eq!(w("claude").unwrap().text, "irm https://claude.ai/install.ps1 | iex");
+        assert_eq!(w("codex").unwrap().text, "irm https://chatgpt.com/codex/install.ps1 | iex");
+        assert_eq!(w("cursor").unwrap().text, "irm 'https://cursor.com/install?win32=true' | iex");
+        assert!(w("vibe").unwrap().text.ends_with("uv tool install mistral-vibe"));
+        assert_eq!(w("amp"), Err(NOT_ON_WINDOWS));
+        let g = w("gemini").unwrap();
+        assert!(
+            g.powershell
+                && g.text.contains("npm.cmd install -g @google/gemini-cli")
+                && g.text.contains("https://nodejs.org")
+        );
+    }
+
+    #[test]
+    fn unix_commands_are_unchanged() {
+        let u = |id: &str| harness(id).unwrap().install.unwrap().command_for(id, false).unwrap();
+        assert_eq!(u("claude").text, "curl -fsSL https://claude.ai/install.sh | bash");
+        assert!(!u("claude").powershell);
+        assert_eq!(u("amp").text, "curl -fsSL https://ampcode.com/install.sh | bash");
+        assert!(u("gemini").text.contains("npm install -g @google/gemini-cli") && u("gemini").text.contains("Node.js"));
+        // Every Unix install still works where it did.
+        assert!(
+            HARNESSES.iter().filter_map(|h| h.install.map(|i| (h.id, i))).all(|(id, i)| i.available_for(id, false))
+        );
+    }
+
+    #[test]
+    fn install_plan_lists_every_installable_agent() {
+        let p = install_plan();
+        let ids: Vec<&str> = p["agents"].as_array().unwrap().iter().map(|a| a["id"].as_str().unwrap()).collect();
+        assert!(ids.contains(&"cursor") && ids.contains(&"gemini") && !ids.contains(&"hypurr-agent"));
+        assert!(!p.to_string().to_lowercase().contains("opencode"));
+    }
     use super::*;
 
     #[test]
@@ -883,5 +1103,12 @@ mod tests {
     fn every_harness_is_unique() {
         let ids: HashSet<_> = HARNESSES.iter().map(|h| h.id).collect();
         assert_eq!(ids.len(), HARNESSES.len());
+    }
+
+    #[test]
+    fn upstream_branded_catalog_entries_are_hidden() {
+        assert!(upstream_branded(&json!({"id": "opencode-v2", "name": "OpenCode V2"})));
+        assert!(upstream_branded(&json!({"id": "x", "name": "X", "description": "Runs on OpenRouter"})));
+        assert!(!upstream_branded(&json!({"id": "goose", "name": "goose", "description": "An agent"})));
     }
 }

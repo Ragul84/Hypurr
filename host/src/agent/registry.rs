@@ -437,7 +437,17 @@ mod tests {
         let archive = dir.join("tool-darwin");
         std::fs::write(&archive, "#!/bin/sh\necho hi\n").unwrap();
         extract(&archive, &dir, Path::new("./bin/tool")).unwrap();
-        let out = std::process::Command::new(dir.join("bin/tool")).output().unwrap();
+        // Another test's fork can briefly hold the just-written file open ("Text file busy").
+        let run = || std::process::Command::new(dir.join("bin/tool")).output();
+        let mut out = run();
+        for _ in 0..20 {
+            if !matches!(&out, Err(e) if e.kind() == std::io::ErrorKind::ExecutableFileBusy) {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+            out = run();
+        }
+        let out = out.unwrap();
         assert_eq!(String::from_utf8_lossy(&out.stdout), "hi\n");
     }
 

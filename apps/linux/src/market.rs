@@ -161,6 +161,11 @@ pub fn agent(ui: &App, backend: &Value) {
         body.append(&install);
         let (ui, id) = (ui.clone(), id.clone());
         install.connect_clicked(move |_| setup(&ui, &id, "install", None));
+    } else if let Some(note) = backend["installNote"]
+        .as_str()
+        .filter(|_| backend["installed"] != true)
+    {
+        body.append(&gtk::Label::new(Some(note)));
     }
     let check = gtk::Button::with_label("Check sign-in");
     body.append(&check);
