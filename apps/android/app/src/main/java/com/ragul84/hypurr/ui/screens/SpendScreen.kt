@@ -43,7 +43,6 @@ import com.ragul84.hypurr.net.LinkState
 import com.ragul84.hypurr.ui.BotAvatar
 import com.ragul84.hypurr.ui.DotBars
 import com.ragul84.hypurr.ui.DotFigure
-import com.ragul84.hypurr.ui.DotProgress
 import com.ragul84.hypurr.ui.Eyebrow
 import com.ragul84.hypurr.ui.HairlineDivider
 import com.ragul84.hypurr.ui.PrimaryButton
@@ -76,6 +75,7 @@ fun SpendScreen(
     pricing: com.ragul84.hypurr.model.Pricing? = null,
     /** Day the chart ends on; tests pin it. */
     now: Long = System.currentTimeMillis(),
+    onDisconnectOwnFree: (() -> Unit)? = null,
 ) {
     val c = Hypurr.colors
     val ctx = LocalContext.current
@@ -88,11 +88,6 @@ fun SpendScreen(
         gatewayCreditsLabel = "$0.00",
         freeResetLabel = "",
     )
-    // Free messages exist only when the computer has Hypurr's gateway.
-    val freeOn = data.freeTurnsLimit != null
-    val left = data.freeTurnsLeft ?: 0
-    val limit = (data.freeTurnsLimit ?: 10).coerceAtLeast(1)
-    val used = (limit - left).coerceIn(0, limit)
     val byBot = data.tasks
         .groupBy { it.botId.ifEmpty { it.title } }
         .map { (id, rows) ->
@@ -122,8 +117,7 @@ fun SpendScreen(
                         Spacer(Modifier.height(6.dp))
                         DotFigure(data.gatewayCreditsLabel ?: "$0.00", SignalType.hero, c.text)
                         Spacer(Modifier.height(8.dp))
-                        if (freeOn) com.ragul84.hypurr.ui.FreeMessagesNote(left, limit, onAddCredits = { showPacks = true })
-                        else Text(paceLine(data, left), color = c.secondary, style = MaterialTheme.typography.bodyMedium)
+                        Text(paceLine(data), color = c.secondary, style = MaterialTheme.typography.bodyMedium)
                         Spacer(Modifier.height(16.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             PrimaryButton("Add credits", Modifier.weight(1f), icon = signalIcon(SignalIcons.Plus)) {
@@ -143,12 +137,12 @@ fun SpendScreen(
                     val appUser = data.gatewayAppUserId
                     SignalCard(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text("Credits keep Hypurr's models going after your free messages, paid through Google Play.", color = c.secondary,
+                            Text("Credits run Hypurr's models without connecting an account, paid through Google Play.", color = c.secondary,
                                 style = MaterialTheme.typography.bodyMedium)
                             if (!Credits.canBuy(appUser) || packs.isEmpty()) {
                                 Text(
                                     if (!Credits.configured) "Buying credits isn't switched on in this build yet."
-                                    else "Credits open once Hypurr's free models are live on your computer.",
+                                    else "Credits open once Hypurr's models are live on your computer.",
                                     color = c.tertiary, style = MaterialTheme.typography.bodySmall,
                                 )
                             }
@@ -182,7 +176,7 @@ fun SpendScreen(
                         }
                     }
                 }
-                item { HypurrFreeCard(freeOn, left, used, limit) }
+                item { HypurrFreeCard(data.ownFree, onDisconnectOwnFree) }
                 item {
                     SignalCard(Modifier.fillMaxWidth().padding(top = 6.dp)) {
                         Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 14.dp)) {
@@ -242,11 +236,11 @@ fun SpendScreen(
     }
 }
 
-private fun paceLine(data: TaskCosts, freeLeft: Int): String {
+private fun paceLine(data: TaskCosts): String {
     val credits = data.gatewayCreditsLabel?.filter { it.isDigit() || it == '.' }?.toDoubleOrNull() ?: 0.0
     val perDay = data.week / 7.0
     return when {
-        credits <= 0.0 && freeLeft > 0 -> "$freeLeft free messages left"
+        credits <= 0.0 -> "No credits needed for Hypurr Free on your own account"
         perDay <= 0.0 -> "No spend this week"
         else -> {
             val days = (credits / perDay).toInt()
@@ -255,9 +249,9 @@ private fun paceLine(data: TaskCosts, freeLeft: Int): String {
     }
 }
 
-/** Hypurr Free, said plainly: what it is, how much, and what not to use it for. */
+/** Hypurr Free, said plainly: free on your own account, and what not to use it for. */
 @Composable
-private fun HypurrFreeCard(on: Boolean, left: Int, used: Int, limit: Int) {
+private fun HypurrFreeCard(ownFree: Boolean = false, onDisconnectOwnFree: (() -> Unit)? = null) {
     val c = Hypurr.colors
     SignalCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -265,13 +259,22 @@ private fun HypurrFreeCard(on: Boolean, left: Int, used: Int, limit: Int) {
                 com.ragul84.hypurr.ui.DotCat(c.text, 20.dp)
                 Spacer(Modifier.width(10.dp))
                 Text("Hypurr Free", color = c.text, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-                com.ragul84.hypurr.ui.Pill(if (on) "$left of $limit left" else "$limit messages", c.text)
+                com.ragul84.hypurr.ui.Pill(if (ownFree) "On" else "Free", c.text)
             }
-            Text("Free AI built in, for people without Claude Code or Codex. For trying out, not for company code.",
+            Text("Free AI on your own free account, for people without Claude Code or Codex. For trying out, not for company code.",
                 color = c.secondary, style = MaterialTheme.typography.bodySmall)
-            if (on) DotProgress(used.toFloat() / limit, Modifier.padding(top = 6.dp, bottom = 2.dp))
             Text("Claude Code and Codex you already have work as they are, at no extra cost.",
                 color = c.tertiary, style = MaterialTheme.typography.bodySmall)
+            // The user's own free account (the only place OpenRouter is named).
+            val startFree = com.ragul84.hypurr.ui.LocalStartFree.current
+            if (ownFree) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
+                    Text("Your own OpenRouter account is connected", color = c.secondary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                    if (onDisconnectOwnFree != null) SoftButton("Disconnect", onClick = onDisconnectOwnFree)
+                }
+            } else if (startFree != null) {
+                PrimaryButton(com.ragul84.hypurr.ui.START_FREE, Modifier.fillMaxWidth().padding(top = 6.dp), onClick = startFree)
+            }
         }
     }
 }

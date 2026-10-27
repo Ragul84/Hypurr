@@ -36,7 +36,7 @@ object Pitch {
         Pillar(SignalIcons.Trace, "Proof it works",
             "Show me it works runs it and brings back screenshots. Trace a click and Page map show what calls what."),
         Pillar(SignalIcons.Credits, "Free AI built in",
-            "No AI account? Hypurr Free gives you 10 messages to try. For trying out, not for company code."),
+            "No AI account? Start free with your own account and Hypurr Free runs on it. For trying out, not for company code."),
     )
 }
 

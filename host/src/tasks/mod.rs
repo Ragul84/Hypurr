@@ -741,9 +741,8 @@ pub fn costs(store: &Store) -> Result<Value> {
         "buyCreditsUrl": std::env::var("HYPURR_BUY_CREDITS_URL").ok().filter(|u| !u.is_empty()),
         // RevenueCat app user id for in-app credit purchases: the gateway subject of this computer.
         "gatewayAppUserId": crate::agent::builtin::gateway_subject(store),
-        // Free messages today (Hypurr's models); absent when this computer has no gateway.
-        "freeTurnsLeft": crate::agent::builtin::gateway_ready().then(|| crate::agent::builtin::free_messages_left(store)),
-        "freeTurnsLimit": crate::agent::builtin::gateway_ready().then_some(crate::agent::builtin::FREE_MESSAGES_PER_DAY),
+        // Free use is only on the user's own account ("Start free with your own account").
+        "ownFree": crate::agent::builtin::own_free(),
     }))
 }
 

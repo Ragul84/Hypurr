@@ -166,7 +166,18 @@ class MainActivity : ComponentActivity() {
                 androidx.compose.runtime.CompositionLocalProvider(
                     com.ragul84.hypurr.voice.LocalVoiceSettings provides com.ragul84.hypurr.voice.VoiceSettings(
                         com.ragul84.hypurr.voice.VoiceLanguage.of(voiceProfile.voiceLanguage), voiceProfile.explainInMyLanguage),
-                ) { App(store) }
+                ) {
+                    var startFree by remember { mutableStateOf(false) }
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        com.ragul84.hypurr.ui.LocalStartFree provides { startFree = true },
+                    ) { App(store) }
+                    if (startFree) com.ragul84.hypurr.ui.StartFreeDialog(
+                        start = { store.ownFreeStart() },
+                        finish = { store.ownFreeFinish(it) },
+                        onDone = { startFree = false },
+                        onDismiss = { startFree = false },
+                    )
+                }
             }
         }
     }
@@ -582,8 +593,7 @@ class MainActivity : ComponentActivity() {
                     LaunchedEffect(Unit) { store.loadCosts() }
                     NewTaskScreen(
                         task.copy(setup = setup, models = com.ragul84.hypurr.ui.screens.runnableModels(taskHello)),
-                        freeLeft = taskCosts?.freeTurnsLeft,
-                        freeLimit = taskCosts?.freeTurnsLimit,
+                        ownFree = taskCosts?.ownFree == true,
                         onAddCredits = {
                             taskDraft = null
                             screen = "spend"
@@ -651,7 +661,8 @@ class MainActivity : ComponentActivity() {
                     }
                     val pricing by store.pricing.collectAsState()
                     LaunchedEffect(Unit) { store.loadPricing() }
-                    SpendScreen(current.name, linkState, costs, bots, onTab = ::go, pricing = pricing)
+                    SpendScreen(current.name, linkState, costs, bots, onTab = ::go, pricing = pricing,
+                        onDisconnectOwnFree = { scope.launch { runCatching { store.ownFreeDisconnect() } } })
                 }
                 target == "standup" -> {
                     var st by remember { mutableStateOf(com.ragul84.hypurr.ui.screens.StandupUiState(loading = true,

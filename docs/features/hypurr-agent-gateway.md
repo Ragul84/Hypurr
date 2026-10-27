@@ -19,13 +19,13 @@ only in `LICENSE` / `NOTICE`.
 |-------|---------|
 | `POST /v1/chat/completions` | OpenAI-compatible chat (streaming supported) |
 | `GET /v1/models` | Model list from gateway config |
-| `GET /v1/gateway/balance` | Free allowance + credits |
-| `POST /v1/gateway/trial-key` | Anonymous trial key bound to host install id |
+| `GET /v1/gateway/balance` | Credits (no shared free allowance) |
+| `POST /v1/gateway/trial-key` | Key bound to host install id, only once that PC has credits |
 | `POST /v1/gateway/checkout` | Stripe Checkout URL (placeholder in test) |
 | `POST /v1/webhooks/stripe` | Top-up ledger on `checkout.session.completed` |
 
 Auth: per-user API keys (Clerk account), device/trial keys with abuse limits.
-Free allowance: configurable daily token budget on cheap open models.
+Free use: none on Hypurr's key. Users start free with their own account (host `own_free`), which never touches the gateway.
 Paid credits: D1 ledger + Stripe (test placeholders) + markup metering.
 Privacy: request logs do **not** store prompts.
 

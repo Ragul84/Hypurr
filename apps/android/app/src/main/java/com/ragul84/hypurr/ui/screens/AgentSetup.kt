@@ -98,7 +98,7 @@ fun AgentSetupPanel(
                 }
                 AgentSetupMode.OneTap -> {
                     val win = isWindows(hello?.os.orEmpty())
-                    Title("Install Hypurr Agent", "One tap installs it on ${hello?.name?.ifEmpty { null } ?: "your computer"} with free models. No other AI account needed." +
+                    Title("Install Hypurr Agent", "One tap installs it on ${hello?.name?.ifEmpty { null } ?: "your computer"} . Then start free with your own account." +
                         if (win) " No admin rights needed; it goes in your own AppData folder." else "")
                     SignalCard(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(16.dp).semantics { contentDescription = "Install status" }) {
@@ -119,11 +119,15 @@ fun AgentSetupPanel(
             }
             Spacer(Modifier.height(16.dp))
         }
+        val startFree = com.ragul84.hypurr.ui.LocalStartFree.current
         Column(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 16.dp)) {
             when (mode) {
                 AgentSetupMode.NotPaired -> PrimaryButton("Pair with your PC", Modifier.fillMaxWidth(), onClick = onPair)
                 AgentSetupMode.Windows -> PrimaryButton("Check again", Modifier.fillMaxWidth(), onClick = onCheckAgain)
                 AgentSetupMode.OneTap -> when {
+                    // Free is only on the user's own account: make that the next step after installing.
+                    install.done && startFree != null && hello?.backends.orEmpty().none { it.builtin && it.ownFree } ->
+                        PrimaryButton(com.ragul84.hypurr.ui.START_FREE, Modifier.fillMaxWidth(), onClick = startFree)
                     install.done -> PrimaryButton("Done", Modifier.fillMaxWidth(), onClick = onClose)
                     else -> PrimaryButton(
                         when { install.busy -> "Installing…"; install.error != null -> "Try again"; else -> "Install Hypurr Agent" },

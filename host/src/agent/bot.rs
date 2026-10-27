@@ -502,8 +502,8 @@ impl Actor {
             // Keep the reason ("(gateway said …)") so the phone says why.
             e.to_string()[i..].clone_into(&mut msg);
         }
-        if e.to_string().contains(crate::agent::builtin::FREE_EXHAUSTED) {
-            crate::agent::builtin::FREE_EXHAUSTED.clone_into(&mut msg);
+        if e.to_string().contains(crate::agent::builtin::NEEDS_ACCOUNT) {
+            crate::agent::builtin::NEEDS_ACCOUNT.clone_into(&mut msg);
         }
         if e.to_string().to_lowercase().contains("auth")
             && let Some(h) = crate::agent::backends::harness(&self.cfg.backend)
@@ -716,7 +716,7 @@ impl Actor {
             prompt = format!("{prompt}\n\n{update}");
             self.announce = Some((snapshot, identity));
         }
-        // Hypurr's free models count user messages: open one per turn (agent calls inside are free).
+        // Hypurr models on the gateway are paid from credits: open one message per turn.
         if crate::agent::builtin::uses_gateway(&self.cfg.backend, self.cfg.model.as_deref()) {
             crate::agent::builtin::open_turn(&self.hub.store).await?;
         }
@@ -885,7 +885,7 @@ impl Actor {
                 if let Err(e) = crate::market::vault::unlock(self.hub.clone()).await {
                     tracing::warn!(error = format!("{e:#}"), "vault locked; Hypurr Free unavailable");
                 }
-                env.extend(crate::agent::builtin::launch_env(&self.hub.store).await);
+                env.extend(crate::agent::builtin::launch_env(&self.hub.store, self.cfg.model.as_deref()).await);
             }
             if self.cfg.backend == "codex" {
                 codex_launch_env(&mut env);
@@ -1006,7 +1006,7 @@ impl Actor {
         let picked = picked.or_else(|| (self.cfg.backend == "codex").then(|| unusable_model_fallback(&res)).flatten());
         if let Some(model) = picked {
             tracing::info!(backend = self.cfg.backend, model, "session model");
-            if crate::agent::builtin::is_gateway_model(&model) && !crate::agent::builtin::gateway_ready() {
+            if crate::agent::builtin::is_gateway_model(&model) && !crate::agent::builtin::free_ready() {
                 bail!(crate::agent::builtin::NO_GATEWAY);
             }
             let config_id = crate::agent::auth::model_config(&res).and_then(|c| c["id"].as_str());
@@ -1090,7 +1090,16 @@ impl Actor {
             (Err(e), _) if !self.stop_requested => {
                 let tail = self.exit_tail.take().filter(|t| !t.is_empty());
                 let detail = tail.map(|t| format!("\n\n{}", acp::truncate(&t, 1200))).unwrap_or_default();
-                self.notice(&format!("The agent failed: {e}{detail}"), NoticeStyle::Error);
+                let text = format!("{e:#}");
+                if text.contains("free_pool_exhausted")
+                    || text.contains("free_messages_exhausted")
+                    || text.contains("free_tier_retired")
+                    || text.contains(crate::agent::builtin::NEEDS_ACCOUNT)
+                {
+                    self.notice(crate::agent::builtin::NEEDS_ACCOUNT, NoticeStyle::Error);
+                } else {
+                    self.notice(&format!("The agent failed: {e}{detail}"), NoticeStyle::Error);
+                }
             }
             (_, "cancelled") | (Err(_), _) => self.notice("Stopped.", NoticeStyle::Info),
             (_, "max_tokens") => self.notice("The agent hit its output limit.", NoticeStyle::Info),

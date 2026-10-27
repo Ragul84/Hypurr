@@ -107,7 +107,7 @@ data class NewTaskUiState(
     val projectName: String? get() = setup?.projects?.firstOrNull { it.path == projectPath }?.name
         ?: route?.project?.takeIf { it.path == projectPath }?.name ?: projectPath?.substringAfterLast('/')
     /** The picked agent, else the computer's suggestion (an installed, signed-in agent) when it is runnable. */
-    /** The task runs on Hypurr's own (gateway) models, which count free messages. */
+    /** The task runs on Hypurr's models: free on the user's own account, or paid from credits. */
     val usesHypurrModels: Boolean get() = agentId == "hypurr-agent" && (model ?: "hypurr/").startsWith("hypurr/")
     val agentId: String? get() = agent?.takeIf { a -> setup == null || setup.agents.any { it.id == a } }
         ?: route?.agent?.id?.takeIf { a -> setup?.agents.orEmpty().any { it.id == a } }
@@ -131,10 +131,8 @@ fun NewTaskScreen(
     onPickIssue: () -> Unit = {},
     /** Opens the project-folder picker (folders listed by the computer). */
     onPickFolder: () -> Unit = {},
-    /** Free messages left (lifetime) on Hypurr's models (null: no gateway on this computer). */
-    freeLeft: Int? = null,
-    freeLimit: Int? = null,
     onAddCredits: () -> Unit = {},
+    ownFree: Boolean = false,
 ) {
     val c = Hypurr.colors
     val template = state.selectedTemplate
@@ -150,8 +148,8 @@ fun NewTaskScreen(
             Field(state.goal, template?.goalHint?.takeIf { it.isNotEmpty() } ?: "What do you need? e.g. Fix the login bug",
                 minHeight = 96.dp) { onChange(state.copy(goal = it, error = null)) }
             VoiceGoal(state, onChange)
-            if (freeLeft != null && freeLimit != null && state.usesHypurrModels) {
-                com.ragul84.hypurr.ui.FreeMessagesNote(freeLeft, freeLimit, onAddCredits, Modifier.padding(top = 8.dp))
+            if (state.usesHypurrModels) {
+                com.ragul84.hypurr.ui.StartFreeNote(ownFree, onAddCredits, Modifier.padding(top = 8.dp))
             }
             // Screenshot / error paste, and tickets.
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 10.dp),

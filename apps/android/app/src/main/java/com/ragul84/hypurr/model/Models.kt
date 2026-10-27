@@ -249,9 +249,8 @@ data class TaskCosts(
     val buyCreditsUrl: String? = null,
     /** RevenueCat app user id (the computer's gateway subject); null until the gateway is live. */
     val gatewayAppUserId: String? = null,
-    /** Free daily turns left / limit for the gauge (Sunfield Spend). */
-    val freeTurnsLeft: Int? = null,
-    val freeTurnsLimit: Int? = null,
+    /** "Start free with your own account": Hypurr Free runs on the user's own account. */
+    val ownFree: Boolean = false,
     /** e.g. "Resets at midnight IST". */
     val freeResetLabel: String? = null,
 )
@@ -298,8 +297,10 @@ data class Backend(
     val installHint: String? = null,
     /** Whether the agent looks signed in on the computer; null when the host can't tell. */
     val signedIn: Boolean? = null,
-    /** Built-in only: whether the Hypurr gateway (free models) is configured on the computer. */
+    /** Built-in only: whether the Hypurr gateway (paid from credits) is configured on the computer. */
     val gatewayReady: Boolean? = null,
+    /** Built-in only: Hypurr Free runs on the user's own connected account. */
+    val ownFree: Boolean = false,
 )
 
 /** A model an agent can run (Hypurr free gateway models, or whatever `agentModels` returns). */

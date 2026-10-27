@@ -8,7 +8,7 @@ Users never see the OpenCode name in product UI. Attribution is only in the agen
 
 - Binary id: `hypurr-agent` (ACP: `hypurr-agent acp`)
 - Install path: `~/.hypurr/agents/hypurr-agent/<version>/`
-- Default model: `hypurr/hypurr-free` via the Hypurr gateway
+- Default model: `hypurr/hypurr-free`, free on the user's own account ("Start free with your own account"), or paid from credits via the Hypurr gateway. No shared free messages.
 - Free models listed in host status / Android Free badge
 
 Optional: if the user already has a real OpenCode CLI on PATH, it can appear as agent

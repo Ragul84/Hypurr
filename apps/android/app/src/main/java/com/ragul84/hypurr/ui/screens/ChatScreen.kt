@@ -742,6 +742,7 @@ private fun Notice(entry: Entry) {
     val error = entry.data.style == "error"
     Text(entry.data.text.orEmpty(), color = if (error) c.danger else c.tertiary, style = MaterialTheme.typography.bodySmall,
         textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 4.dp))
+    if (error) com.ragul84.hypurr.ui.StartFreeAction(entry.data.text.orEmpty(), Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 4.dp))
 }
 
 @Composable

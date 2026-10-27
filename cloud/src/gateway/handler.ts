@@ -144,14 +144,16 @@ export function usageTap(
   });
 }
 
-export const FREE_EXHAUSTED = "You've used your free messages. Buy credits to keep going.";
+/** No shared free allowance: without credits, the user starts free on their own account. */
+export const FREE_EXHAUSTED = "Start free with your own account, or add credits.";
 
 const rateBuckets = new Map<string, { n: number; reset: number }>();
 
 function cfgFrom(env: GatewayEnv): GatewayConfig {
   if (!env.GATEWAY_CONFIG_JSON) return DEFAULT_GATEWAY_CONFIG;
   try {
-    return { ...DEFAULT_GATEWAY_CONFIG, ...JSON.parse(env.GATEWAY_CONFIG_JSON) };
+    // A config override can't bring back free use on Hypurr's key.
+    return { ...DEFAULT_GATEWAY_CONFIG, ...JSON.parse(env.GATEWAY_CONFIG_JSON), freeDailyMessages: 0, freeDailyTokens: 0 };
   } catch {
     return DEFAULT_GATEWAY_CONFIG;
   }
@@ -323,7 +325,7 @@ export async function chatCompletions(c: Ctx): Promise<Response> {
     // ":free" routes share a daily request cap on our key; never name the provider.
     if (upstreamRes.status === 429 && model.tier === "free") {
       return json(
-        { error: { message: "Hypurr Free is busy right now. Try again later, or buy credits.", type: "rate_limited", code: "free_busy" } },
+        { error: { message: "Hypurr Free is busy right now. Try again in a moment.", type: "rate_limited", code: "free_busy" } },
         429,
       );
     }
@@ -481,8 +483,8 @@ function stripeOn(c: Ctx): boolean {
 
 /**
  * Opens one user message (a task turn sent from the phone). The host calls this once per turn;
- * the agent's own model calls inside the turn don't count. Free while messages are left today,
- * then from credits; refused when neither.
+ * the agent's own model calls inside the turn don't count. Paid from credits; refused without
+ * (there is no shared free allowance).
  */
 export async function openTurn(c: Ctx) {
   const cfg = cfgFrom(c.env as unknown as GatewayEnv);
@@ -518,6 +520,11 @@ export async function issueTrial(c: Ctx) {
   // hostId is a hash of the PC's stable machine id (host/src/agent/builtin.rs), so reinstalling
   // gets a new key for the same subject and the same (used) free allowance.
   if (!body.hostId || !/^[a-f0-9]{64}$/.test(body.hostId)) throw new ApiError("badRequest");
+  // No more shared free keys: a key is only issued to a computer with credits (bought in the app
+  // for its subject trial:<hostId>). Free use is on the user's own account.
+  if ((await getCredits(c.env.DB, `trial:${body.hostId}`)) < cfg.minBalanceCents) {
+    return json({ error: { message: FREE_EXHAUSTED, type: "insufficient_quota", code: "free_tier_retired" } }, 403);
+  }
   // Free trial keys are the farmable resource: cap new ones per client IP per day.
   const ip = c.req.headers.get("cf-connecting-ip") ?? "unknown";
   if (!(await allowTrialIp(c.env.DB, ip, cfg.trialKeysPerIpPerDay, c.now))) throw new ApiError("rateLimited");
