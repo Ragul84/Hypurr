@@ -511,9 +511,34 @@ pub fn harness(id: &str) -> Option<&'static Harness> {
 
 static SEARCH_PATH: Mutex<Vec<PathBuf>> = Mutex::new(Vec::new());
 
+/// The user's saved PATH on Windows (User + Machine), so a CLI installed after Hypurr started
+/// (installers add their folder there) is found without restarting Hypurr.
+fn windows_saved_path() -> Option<String> {
+    let mut cmd = std::process::Command::new("powershell.exe");
+    cmd.args([
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        "[Environment]::GetEnvironmentVariable('Path','User') + ';' + [Environment]::GetEnvironmentVariable('Path','Machine')",
+    ])
+    .stdin(std::process::Stdio::null())
+    .stderr(std::process::Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    }
+    let out = cmd.output().ok()?;
+    out.status.success().then(|| String::from_utf8_lossy(&out.stdout).trim().to_owned())
+}
+
 /// Login-shell PATH, via `$SHELL -ilc` with a timeout (nvm/conda can make shells slow).
+/// On Windows, the saved User and Machine PATH instead.
 fn login_shell_path() -> Option<String> {
     const MARK: &str = "__HYPURR_PATH__";
+    if cfg!(windows) {
+        return windows_saved_path();
+    }
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into());
     let mut child = std::process::Command::new(shell)
         .args(["-ilc", &format!("printf '%s%s%s' '{MARK}' \"$PATH\" '{MARK}'")])
@@ -576,6 +601,12 @@ fn well_known_dirs() -> Vec<PathBuf> {
         "go/bin",
     ] {
         dirs.push(home.join(rel));
+    }
+    // Windows per-user installs (Cursor's PowerShell installer, global npm).
+    for var in ["LOCALAPPDATA", "APPDATA"] {
+        if let Some(base) = std::env::var_os(var).map(PathBuf::from) {
+            dirs.push(base.join(if var == "APPDATA" { "npm" } else { "cursor-agent" }));
+        }
     }
     // Every nvm-installed node, newest first (global npm CLIs live next to node).
     if let Ok(entries) = std::fs::read_dir(home.join(".nvm/versions/node")) {

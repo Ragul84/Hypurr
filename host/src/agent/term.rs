@@ -73,6 +73,8 @@ impl Term {
     }
 
     fn finish(&self, code: i32) {
+        // An install may have added a folder to PATH; pick it up for the next detection.
+        std::thread::spawn(backends::hydrate_path);
         self.output.locked().exit = Some(code);
         let _ = self.events.send(json!({"type": "exit", "code": code}));
     }
