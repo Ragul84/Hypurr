@@ -1,8 +1,8 @@
 ; Hypurr for Windows: per-user installer (no admin rights).
 ; Installs to %LOCALAPPDATA%\Programs\Hypurr with a Start menu shortcut and an uninstaller.
-; Build: iscc /DAppVersion=0.1.0 /DSrcDir=<dir with hypurr.exe + hypurr-host.exe> hypurr.iss
+; Build: iscc /DAppVersion=2.6.3 /DSrcDir=<dir with hypurr.exe + hypurr-host.exe> hypurr.iss
 #ifndef AppVersion
-  #define AppVersion "0.1.0"
+  #define AppVersion "2.6.3"
 #endif
 #ifndef SrcDir
   #define SrcDir "..\..\dist\windows"
