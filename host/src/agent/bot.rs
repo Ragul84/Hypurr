@@ -496,9 +496,11 @@ impl Actor {
         self.finish_routine(crate::routines::Status::Failed, Some(format!("Could not start routine: {e:#}")), None);
         self.complete_ask(Err(anyhow!("couldn't start recipient: {e:#}")));
         self.complete_group(Err(anyhow!("couldn't start: {e:#}")));
+        tracing::warn!(bot = self.id(), error = format!("{e:#}"), "agent didn't start");
         let mut msg = format!("Couldn't start the agent: {e}");
-        if e.to_string().contains(crate::agent::builtin::NO_GATEWAY) {
-            crate::agent::builtin::NO_GATEWAY.clone_into(&mut msg);
+        if let Some(i) = e.to_string().find(crate::agent::builtin::NO_GATEWAY) {
+            // Keep the reason ("(gateway said …)") so the phone says why.
+            e.to_string()[i..].clone_into(&mut msg);
         }
         if e.to_string().contains(crate::agent::builtin::FREE_EXHAUSTED) {
             crate::agent::builtin::FREE_EXHAUSTED.clone_into(&mut msg);
@@ -878,6 +880,11 @@ impl Actor {
             if self.cfg.backend == crate::agent::builtin::BACKEND_ID
                 && !env.iter().any(|(k, _)| k == "OPENCODE_CONFIG_CONTENT")
             {
+                // The free models' key lives in the vault: open it even for a bot with no
+                // connectors, or the key minted below can't be saved and Hypurr Free is off.
+                if let Err(e) = crate::market::vault::unlock(self.hub.clone()).await {
+                    tracing::warn!(error = format!("{e:#}"), "vault locked; Hypurr Free unavailable");
+                }
                 env.extend(crate::agent::builtin::launch_env(&self.hub.store).await);
             }
             if self.cfg.backend == "codex" {
@@ -1016,7 +1023,10 @@ impl Actor {
             if let Err(e) = r {
                 tracing::warn!(model, error = format!("{e:#}"), "couldn't set model");
                 if crate::agent::builtin::is_gateway_model(&model) {
-                    bail!(crate::agent::builtin::NO_GATEWAY);
+                    bail!(
+                        crate::agent::builtin::last_gateway_error()
+                            .unwrap_or_else(|| crate::agent::builtin::NO_GATEWAY.to_owned())
+                    );
                 }
                 bail!("Couldn't select model {model}: {e:#}");
             }

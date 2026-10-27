@@ -4,6 +4,7 @@
 //! Hypurr Agent is a rebranded fork of OpenCode (MIT). Attribution lives in the
 //! agent's LICENSE/NOTICE. User-facing UI never says "OpenCode".
 
+use crate::LockExt;
 use anyhow::{Context, Result, bail};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -90,6 +91,10 @@ const GATEWAY_KEY_SLOT: &str = "gateway_key";
 pub async fn gateway_key(store: &crate::store::Store, base: &str) -> Result<String> {
     if let Some(k) = crate::market::vault::read(store, GATEWAY_KEY_SLOT)?.filter(|k| !k.is_empty()) {
         return Ok(k);
+    }
+    // Never mint a key we can't keep: the gateway only shows it once.
+    if store.secret_key.locked().is_none() {
+        bail!("{NO_GATEWAY} (this computer's secure storage is locked)");
     }
     let host_id = gateway_host_id(store)?;
     let client = reqwest::Client::builder().timeout(Duration::from_secs(15)).build()?;
@@ -217,6 +222,14 @@ pub fn agent_config(base: &str, key: &str) -> Value {
     })
 }
 
+/// Why the last Hypurr Agent launch had no gateway provider, shown instead of the bare
+/// [`NO_GATEWAY`] when selecting a free model then fails.
+static LAST_GATEWAY_ERROR: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+pub fn last_gateway_error() -> Option<String> {
+    LAST_GATEWAY_ERROR.locked().clone()
+}
+
 /// Extra environment for a Hypurr Agent launch: the gateway provider, when there is one.
 /// Never in local-only mode. Failures just leave the free models off (own keys still work).
 pub async fn launch_env(store: &crate::store::Store) -> Vec<(String, String)> {
@@ -225,9 +238,13 @@ pub async fn launch_env(store: &crate::store::Store) -> Vec<(String, String)> {
     }
     let Some(base) = gateway_url() else { return Vec::new() };
     match gateway_key(store, &base).await {
-        Ok(key) => vec![("OPENCODE_CONFIG_CONTENT".to_owned(), agent_config(&base, &key).to_string())],
+        Ok(key) => {
+            *LAST_GATEWAY_ERROR.locked() = None;
+            vec![("OPENCODE_CONFIG_CONTENT".to_owned(), agent_config(&base, &key).to_string())]
+        }
         Err(e) => {
             tracing::warn!(error = format!("{e:#}"), "no Hypurr gateway key");
+            *LAST_GATEWAY_ERROR.locked() = Some(format!("{e:#}"));
             Vec::new()
         }
     }
@@ -524,6 +541,17 @@ pub fn install_from_bytes_for_test(bytes: &[u8], archive_name: &str, sha256: &st
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn never_mints_a_free_key_it_cannot_keep() {
+        // Regression: a Hypurr Agent bot without connectors never opened the vault, so the
+        // once-shown key was minted, couldn't be saved, and Hypurr Free said "not available".
+        let store = crate::store::Store::open(Path::new(":memory:")).unwrap();
+        *store.secret_key.locked() = None;
+        let err = gateway_key(&store, "http://127.0.0.1:9").await.unwrap_err().to_string();
+        assert!(err.starts_with(NO_GATEWAY), "{err}");
+        assert!(err.contains("secure storage is locked"), "{err}");
+    }
 
     #[test]
     fn free_models_use_hypurr_prefix() {
