@@ -444,7 +444,7 @@ mod tests {
             if !matches!(&out, Err(e) if e.kind() == std::io::ErrorKind::ExecutableFileBusy) {
                 break;
             }
-            std::thread::sleep(std::time::Duration::from_millis(50));
+            std::thread::sleep(Duration::from_millis(50));
             out = run();
         }
         let out = out.unwrap();
