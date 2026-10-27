@@ -192,7 +192,13 @@ impl Terms {
             return Ok(id.clone());
         }
         let pair = native_pty_system().openpty(size(cols, rows))?;
-        let mut cmd = shell_command(command, powershell);
+        // `NAME=value cmd …` is Unix shell syntax; set those through the process environment
+        // instead so the same command works under cmd.exe and PowerShell on Windows.
+        let (env, rest) = split_env(command);
+        let mut cmd = shell_command(rest, powershell);
+        for (k, v) in env {
+            cmd.env(k, v);
+        }
         cmd.env("TERM", "xterm-256color");
         cmd.env("COLORTERM", "truecolor");
         cmd.cwd(dirs::home_dir().unwrap_or_else(|| "/".into()));
@@ -236,6 +242,24 @@ impl Terms {
         let _ = t.input.send(input);
         Ok(())
     }
+}
+
+/// Leading `NAME=value` assignments of a setup command, and the command after them.
+fn split_env(command: &str) -> (Vec<(&str, &str)>, &str) {
+    let mut env = Vec::new();
+    let mut rest = command.trim_start();
+    while let Some((word, tail)) = rest.split_once(char::is_whitespace) {
+        let Some((k, v)) = word.split_once('=') else { break };
+        let name_ok = !k.is_empty()
+            && k.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
+            && !k.starts_with(|c: char| c.is_ascii_digit());
+        if !name_ok || v.contains(['"', '\'', '$', '`']) {
+            break;
+        }
+        env.push((k, v));
+        rest = tail.trim_start();
+    }
+    (env, rest)
 }
 
 fn size(cols: u16, rows: u16) -> PtySize {
@@ -328,6 +352,44 @@ async fn run(
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn unix_env_prefixes_become_process_env() {
+        assert_eq!(
+            split_env("NO_OPEN_BROWSER=1 C:\\a\\agent.exe login"),
+            (vec![("NO_OPEN_BROWSER", "1")], "C:\\a\\agent.exe login")
+        );
+        assert_eq!(split_env("NO_BROWSER=true gemini"), (vec![("NO_BROWSER", "true")], "gemini"));
+        assert_eq!(split_env("A=1 B_2=x run --x=y"), (vec![("A", "1"), ("B_2", "x")], "run --x=y"));
+        assert_eq!(split_env("codex login"), (vec![], "codex login"));
+        assert_eq!(split_env("irm https://x/install.ps1 | iex"), (vec![], "irm https://x/install.ps1 | iex"));
+        assert_eq!(split_env("X=$(evil) y"), (vec![], "X=$(evil) y"));
+        // Every agent's sign-in: nothing Unix-only left once the env is split off.
+        for h in backends::HARNESSES {
+            let (_, rest) = split_env(h.login);
+            assert!(!rest.split_whitespace().next().unwrap_or("").contains('='), "{}: {}", h.id, h.login);
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn env_prefix_reaches_the_process() {
+        let terms = Arc::new(Terms(Mutex::new(HashMap::new())));
+        let id =
+            terms.spawn(("test".into(), Step::Login), "HYPURR_T=ok sh -c 'echo got-$HYPURR_T'", false, 80, 24).unwrap();
+        let mut out = String::new();
+        for _ in 0..50 {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            out = terms
+                .get(&id)
+                .map(|t| String::from_utf8_lossy(&t.output.locked().scrollback).into_owned())
+                .unwrap_or_default();
+            if out.contains("got-ok") {
+                break;
+            }
+        }
+        assert!(out.contains("got-ok"), "{out}");
+    }
     use super::*;
 
     #[cfg(unix)]
