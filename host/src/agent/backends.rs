@@ -716,6 +716,15 @@ pub fn on_path(bin: &str) -> bool {
 // MARK: listing + launching
 
 /// Every harness the phone can pick, installed ones first.
+/// Catalog entries that would show upstream names users must never see (Hypurr Agent's
+/// upstream, or the provider name outside its own sign-in option), e.g. "OpenCode V2".
+fn upstream_branded(agent: &Value) -> bool {
+    ["id", "name", "description"].iter().any(|k| {
+        let v = agent[*k].as_str().unwrap_or_default().to_lowercase();
+        v.contains("opencode") || v.contains("openrouter")
+    })
+}
+
 pub fn list() -> Vec<Value> {
     let registry = registry::agents();
     let mut out: Vec<Value> = HARNESSES
@@ -773,7 +782,7 @@ pub fn list() -> Vec<Value> {
     let known: HashSet<&str> = HARNESSES.iter().filter_map(|h| h.registry).collect();
     for a in &registry {
         let id = a["id"].as_str().unwrap_or_default();
-        if id.is_empty() || known.contains(id) || id == "github-copilot" {
+        if id.is_empty() || known.contains(id) || id == "github-copilot" || upstream_branded(a) {
             continue;
         }
         out.push(json!({
@@ -1094,5 +1103,12 @@ mod tests {
     fn every_harness_is_unique() {
         let ids: HashSet<_> = HARNESSES.iter().map(|h| h.id).collect();
         assert_eq!(ids.len(), HARNESSES.len());
+    }
+
+    #[test]
+    fn upstream_branded_catalog_entries_are_hidden() {
+        assert!(upstream_branded(&json!({"id": "opencode-v2", "name": "OpenCode V2"})));
+        assert!(upstream_branded(&json!({"id": "x", "name": "X", "description": "Runs on OpenRouter"})));
+        assert!(!upstream_branded(&json!({"id": "goose", "name": "goose", "description": "An agent"})));
     }
 }
