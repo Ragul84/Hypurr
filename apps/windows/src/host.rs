@@ -73,6 +73,28 @@ impl Api {
     }
 }
 
+/// One host API call with a body (the work-account screen; blocking, call off the UI thread).
+pub fn call_with(method: &str, body: &Value) -> Result<Value, String> {
+    let token = std::fs::read_to_string(data_dir().join("token"))
+        .map_err(|_| "Hypurr isn't running yet".to_owned())?;
+    let res = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(60))
+        .build()
+        .map_err(|e| e.to_string())?
+        .post(format!("http://127.0.0.1:{PORT}/api/{method}"))
+        .bearer_auth(token.trim())
+        .json(body)
+        .send()
+        .map_err(|e| e.to_string())?;
+    let ok = res.status().is_success();
+    let v: Value = res.json().map_err(|e| e.to_string())?;
+    if ok {
+        Ok(v)
+    } else {
+        Err(v["error"].as_str().unwrap_or("the host refused").to_owned())
+    }
+}
+
 /// Owns the host process (if we started it) and the shared snapshot.
 pub struct Host {
     pub state: Arc<Mutex<Snapshot>>,
