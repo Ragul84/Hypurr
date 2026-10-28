@@ -276,7 +276,10 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
         || method == "setComposioKey"
         || method.starts_with("credential")
         || method == "computerCall"
-        || matches!(method, "agentAuth" | "agentAuthenticate" | "setAgentEnv")
+        || matches!(
+            method,
+            "agentAuth" | "agentAuthenticate" | "setAgentEnv" | "cloudOptions" | "cloudHandoff" | "setCursorKey"
+        )
     {
         market::vault::unlock(hub.clone()).await?;
     }
@@ -1013,6 +1016,13 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
         "agentAuth" => crate::agent::auth::check(&hub.store, str_arg(&b, "backend")?).await?,
         "agentAuthenticate" => {
             crate::agent::auth::authenticate(&hub.store, str_arg(&b, "backend")?, str_arg(&b, "method")?).await?
+        }
+        // Hand a task to the vendor's own cloud (the user's own account), so the PC can be off.
+        "cloudOptions" => crate::agent::cloud_handoff::options(&hub.store, str_arg(&b, "project")?).await?,
+        "cloudHandoff" => crate::agent::cloud_handoff::hand_off(&hub.store, &b).await?,
+        "setCursorKey" => {
+            crate::agent::cloud_handoff::set_cursor_key(&hub.store, b["key"].as_str().unwrap_or_default())?;
+            json!({})
         }
         "setAgentEnv" => {
             let vars = b["vars"].as_object().ok_or_else(|| anyhow!("`vars` is required"))?;

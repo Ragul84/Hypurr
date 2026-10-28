@@ -169,6 +169,8 @@ fun ChatScreen(
     learn: (@Composable () -> Unit)? = null,
     /** "Show me it works" proof card for a task; null hides it. */
     proof: (@Composable () -> Unit)? = null,
+    /** Hand the task to the agent maker's cloud; null hides "Continue in the cloud". */
+    cloud: com.ragul84.hypurr.ui.CloudHandoffActions? = null,
 ) {
     val c = Hypurr.colors
     val inThread = threadRoot != null
@@ -177,6 +179,7 @@ fun ChatScreen(
     val task = bot.task.takeIf { !inThread }
     val folder = (task?.project?.takeIf { it.isNotBlank() } ?: bot.cwd.takeIf { it.isNotBlank() && !bot.isGroup })?.takeIf { !inThread }
     var checkpointsOpen by remember { mutableStateOf(initialCheckpointsOpen) }
+    var cloudOpen by remember { mutableStateOf(false) }
     var actionsFor by remember { mutableStateOf(initialActionsFor?.let { id -> (entries + listOfNotNull(threadRoot)).firstOrNull { it.id == id } }) }
     var viewing by remember { mutableStateOf<Attachment?>(null) }
     val media = AttachmentUi(images, onLoadAttachment, onOpenFile) { viewing = it }
@@ -252,7 +255,9 @@ fun ChatScreen(
         if (task != null) {
             CheckpointSheet(checkpointsOpen, task, now, integrations, initialFinishOpen, onClose = { checkpointsOpen = false },
                 onRollback = { checkpointsOpen = false; onRollback(it) },
-                onFinish = { checkpointsOpen = false; onFinishTask(it) }, onSave = onSaveCheckpoint)
+                onFinish = { checkpointsOpen = false; onFinishTask(it) }, onSave = onSaveCheckpoint,
+                onCloud = cloud?.let { { checkpointsOpen = false; cloudOpen = true } })
+            if (cloudOpen && cloud != null) com.ragul84.hypurr.ui.CloudHandoffDialog(task.goal.ifEmpty { task.title }, cloud) { cloudOpen = false }
         }
         MessageActions(actionsFor, canThread = !inThread, onClose = { actionsFor = null },
             onReact = { e, emoji -> actionsFor = null; onReact(e, emoji) },
@@ -450,7 +455,8 @@ data class FinishOptions(val learning: Boolean, val openPr: Boolean?, val notify
 /** One-tap rollback: every checkpoint, newest first. Going back asks once, inline. */
 @Composable
 private fun CheckpointSheet(open: Boolean, task: TaskInfo, now: Long, integrations: Integrations?, initialFinish: Boolean,
-                            onClose: () -> Unit, onRollback: (Checkpoint) -> Unit, onFinish: (FinishOptions) -> Unit, onSave: () -> Unit) {
+                            onClose: () -> Unit, onRollback: (Checkpoint) -> Unit, onFinish: (FinishOptions) -> Unit, onSave: () -> Unit,
+                            onCloud: (() -> Unit)? = null) {
     val c = Hypurr.colors
     var confirm by remember { mutableStateOf<String?>(null) }
     var finishing by remember { mutableStateOf(initialFinish) }
@@ -517,6 +523,9 @@ private fun CheckpointSheet(open: Boolean, task: TaskInfo, now: Long, integratio
                                 onFinish(FinishOptions(learning, openPr, notify))
                             }
                         }
+                    }
+                    if (onCloud != null && !finishing) {
+                        SoftButton("Continue in the cloud", Modifier.fillMaxWidth().padding(top = 14.dp), onClick = onCloud)
                     }
                     Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         SoftButton("Save now", Modifier.weight(1f), icon = signalIcon(SignalIcons.Docs), onClick = onSave)

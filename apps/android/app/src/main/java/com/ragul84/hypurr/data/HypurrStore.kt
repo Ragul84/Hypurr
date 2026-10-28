@@ -595,6 +595,26 @@ class HypurrStore(
     private val _costs = MutableStateFlow<TaskCosts?>(null)
     val costs: StateFlow<TaskCosts?> = _costs.asStateFlow()
 
+    /** Cloud handoff for the task in `project` (the vendor's cloud, on the user's own account). */
+    fun cloudActions(project: String) = object : com.ragul84.hypurr.ui.CloudHandoffActions {
+        private fun c() = client ?: throw HostException.unreachable()
+        private fun s(o: kotlinx.serialization.json.JsonObject, k: String) =
+            (o[k] as? kotlinx.serialization.json.JsonPrimitive)?.takeIf { it.isString }?.content
+        override suspend fun options(): com.ragul84.hypurr.ui.CloudOptions {
+            val o = c().cloudOptions(project)
+            val vendors = (o["vendors"] as? kotlinx.serialization.json.JsonArray).orEmpty().mapNotNull { v ->
+                val j = v as? kotlinx.serialization.json.JsonObject ?: return@mapNotNull null
+                com.ragul84.hypurr.ui.CloudVendor(s(j, "id") ?: return@mapNotNull null, s(j, "name") ?: "",
+                    (j["ready"] as? kotlinx.serialization.json.JsonPrimitive)?.content == "true", s(j, "needs"))
+            }
+            return com.ragul84.hypurr.ui.CloudOptions(vendors, s(o, "repo"), s(o, "branch"),
+                (o["unpushed"] as? kotlinx.serialization.json.JsonPrimitive)?.content == "true", s(o, "codexEnv"))
+        }
+        override suspend fun handOff(vendor: String, prompt: String, codexEnv: String?): String =
+            s(c().cloudHandoff(project, vendor, prompt, codexEnv), "url") ?: "https://github.com"
+        override suspend fun saveCursorKey(key: String) = c().setCursorKey(key)
+    }
+
     suspend fun ownFreeStart(): String = (client ?: throw HostException.unreachable()).ownFreeStart()
     suspend fun ownFreeFinish(code: String) { (client ?: throw HostException.unreachable()).ownFreeFinish(code); loadCosts(); refreshHello() }
     suspend fun ownFreeDisconnect() { (client ?: throw HostException.unreachable()).ownFreeDisconnect(); loadCosts(); refreshHello() }

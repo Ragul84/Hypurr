@@ -338,6 +338,7 @@ const ADMIN_ONLY: &[&str] = &[
     "agentAuth",
     "agentAuthenticate",
     "setAgentEnv",
+    "setCursorKey",
 ];
 
 /// What a viewer may call: reading, plus its own device registration.
