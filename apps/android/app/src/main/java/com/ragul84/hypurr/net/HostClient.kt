@@ -385,6 +385,11 @@ class HostClient(val transport: ChannelTransport) {
 
     suspend fun taskCosts(): TaskCosts = call("taskCosts")
 
+    /** A finished hands-free voice chat, as a line in the chat ("Voice chat · 0:16"). */
+    suspend fun logCall(botId: String, seconds: Long) {
+        call<JsonObject>("logCall", buildJsonObject { put("botId", botId); put("seconds", seconds) })
+    }
+
     // "Keep going free": the user's own OpenRouter account (OAuth PKCE; the computer keeps the key).
     suspend fun ownFreeStart(): String = call<JsonObject>("ownFreeStart")["url"]!!.jsonPrimitive.content
     suspend fun ownFreeFinish(code: String) { call<JsonObject>("ownFreeFinish", buildJsonObject { put("code", code) }, timeoutMs = 30_000) }
