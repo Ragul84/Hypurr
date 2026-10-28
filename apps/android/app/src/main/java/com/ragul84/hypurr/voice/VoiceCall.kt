@@ -2,7 +2,15 @@ package com.ragul84.hypurr.voice
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
+import com.ragul84.hypurr.ui.SignalIcons
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -87,6 +95,7 @@ fun VoiceCallScreen(
     var elapsed by remember { mutableLongStateOf(0L) }
     val working = bot.status == "working"
     fun end() { speaker.stop(); onEnd(elapsed) }
+    androidx.activity.compose.BackHandler { end() }
     val mic = rememberVoiceInput(language) { said ->
         val a = asking
         when {
@@ -115,21 +124,31 @@ fun VoiceCallScreen(
             CallCue.Listen -> { delay(400); status = if (asking != null) "Say yes or no." else "Listening…"; mic.start() }
         }
     }
-    Column(Modifier.fillMaxSize().background(c.bg).safeDrawingPadding().padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Spacer(Modifier.height(48.dp))
-        Text(bot.name.ifBlank { "Voice chat" }, color = c.text, style = MaterialTheme.typography.headlineLarge, textAlign = TextAlign.Center)
-        Text("Voice chat · ${callLength(elapsed)}", color = c.secondary, style = MaterialTheme.typography.bodyLarge)
-        Spacer(Modifier.weight(1f))
-        Text(if (mic.listening && mic.partial.isNotBlank()) mic.partial else status, color = c.text,
-            style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
-        mic.error?.let {
-            Text(it, color = c.danger, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
-            SoftButton("Try again", Modifier.fillMaxWidth()) { mic.error = null }
+    // Header, a centered live area, and the actions pinned above the nav bar, all on 24dp margins.
+    Column(Modifier.fillMaxSize().background(c.bg).safeDrawingPadding().padding(horizontal = 24.dp, vertical = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally) {
+        Text("VOICE CHAT · ${callLength(elapsed)}", color = c.secondary, style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(top = 8.dp))
+        Spacer(Modifier.height(8.dp))
+        Text(bot.name.ifBlank { "Voice chat" }, color = c.text, style = MaterialTheme.typography.titleLarge,
+            textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Column(Modifier.weight(1f).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)) {
+            val live = mic.listening || speaker.speaking
+            Box(Modifier.size(112.dp).clip(CircleShape).background(if (live) c.accent else c.surface), contentAlignment = Alignment.Center) {
+                Icon(painterResource(if (speaker.speaking) SignalIcons.Speaker else SignalIcons.Mic), contentDescription = null,
+                    tint = if (live) c.onAccent else c.secondary, modifier = Modifier.size(40.dp))
+            }
+            Text(if (mic.listening && mic.partial.isNotBlank()) mic.partial else status, color = c.text,
+                style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center, maxLines = 4, overflow = TextOverflow.Ellipsis)
+            mic.error?.let {
+                Text(it, color = c.danger, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
+                SoftButton("Try again") { mic.error = null }
+            }
         }
         Text("Say \"end call\" to finish.", color = c.tertiary, style = MaterialTheme.typography.bodySmall)
-        Spacer(Modifier.weight(1f))
-        if (speaker.speaking) SoftButton("Skip reading", Modifier.fillMaxWidth()) { speaker.stop() }
+        Spacer(Modifier.height(12.dp))
+        if (speaker.speaking) { SoftButton("Skip reading", Modifier.fillMaxWidth()) { speaker.stop() }; Spacer(Modifier.height(8.dp)) }
         PrimaryButton("End call", Modifier.fillMaxWidth()) { end() }
     }
 }
