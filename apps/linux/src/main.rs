@@ -11,6 +11,7 @@ mod markup;
 mod orb;
 mod rows;
 mod ui;
+mod voice;
 
 use adw::prelude::*;
 

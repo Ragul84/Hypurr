@@ -1,4 +1,3 @@
-#if os(iOS)
 import AVFoundation
 import NaturalLanguage
 import Observation
@@ -68,22 +67,24 @@ final class CallSession {
 
     func start() async {
         guard await AVAudioApplication.requestRecordPermission() else {
-            return fail("Allow the microphone for Hypurr in Settings to talk to your bots.")
+            return fail("Allow the microphone for Hypurr in Settings (System Settings on a Mac) to talk to your bots.")
         }
         guard await Self.speechAuthorized() else {
-            return fail("Allow Speech Recognition for Hypurr in Settings to talk to your bots.")
+            return fail("Allow Speech Recognition for Hypurr in Settings (System Settings on a Mac) to talk to your bots.")
         }
         guard let recognizer, recognizer.isAvailable else {
             return fail("Speech recognition isn't available for this language right now.")
         }
         guard !ended else { return }
-        do {
-            let audio = AVAudioSession.sharedInstance()
-            try audio.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetoothHFP])
-            try audio.setActive(true)
-        } catch {
-            return fail("Couldn't start audio: \(error.localizedDescription)")
-        }
+        #if os(iOS)
+            do {
+                let audio = AVAudioSession.sharedInstance()
+                try audio.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetoothHFP])
+                try audio.setActive(true)
+            } catch {
+                return fail("Couldn't start audio: \(error.localizedDescription)")
+            }
+        #endif
         listen()
     }
 
@@ -92,7 +93,9 @@ final class CallSession {
         onActivityChanged?(false)
         stopListening()
         synthesizer.stopSpeaking(at: .immediate)
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        #if os(iOS)
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        #endif
     }
 
     /// Reads a reply aloud (the bot's final message), pausing the microphone meanwhile.
@@ -248,4 +251,3 @@ private final class SpeechDone: NSObject, AVSpeechSynthesizerDelegate, Sendable 
         onFinish()
     }
 }
-#endif

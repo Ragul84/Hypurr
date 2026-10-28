@@ -410,7 +410,17 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     LaunchedEffect(target, synced) { if (rootId != null) store.openThread(id, rootId) else store.openChat(id) }
-                    ChatScreen(
+                    var voiceCall by remember(id) { mutableStateOf(false) }
+                    // Voice chat is a full-screen overlay in this window (not a Dialog), so it gets the
+                    // real status/nav-bar insets and End call never sits under the nav bar.
+                    if (voiceCall) {
+                        com.ragul84.hypurr.voice.VoiceCallScreen(
+                                bot, entries[id].orEmpty(), com.ragul84.hypurr.voice.LocalVoiceSettings.current.language,
+                                onSend = { text -> scope.launch { runCatching { store.send(id, text, null, emptyList()) } } },
+                                onRespond = { entry, option -> scope.launch { runCatching { store.respond(entry.id, option) } } },
+                                onEnd = { secs -> voiceCall = false; scope.launch { runCatching { store.logCall(id, secs) } } },
+                            )
+                    } else ChatScreen(
                         bot, if (rootId != null) threads[rootId].orEmpty() else entries[id].orEmpty(), draft, { draft = it },
                         onBack = { screen = parentOf(target) },
                         onSend = {
@@ -447,6 +457,7 @@ class MainActivity : ComponentActivity() {
                         onLoadAttachment = { a -> scope.launch { store.loadAttachment(id, a) } },
                         onOpenFile = { a -> scope.launch { runCatching { openFile(a, store.fileBytes(id, a)) } } },
                         onOpenThread = { e -> screen = "thread:$id:${e.id}" },
+                        onVoiceCall = if (!bot.isGroup && you?.canAct != false) ({ voiceCall = true }) else null,
                         onReact = { e, emoji -> scope.launch { runCatching { store.react(e.id, emoji) } } },
                         onEdit = if (you?.canAct != false) ({ screen = "edit:$id" }) else null,
                         onChangeFolder = if (you?.canAct != false && !bot.isGroup) ({ screen = "folderpick:chat:$id" }) else null,

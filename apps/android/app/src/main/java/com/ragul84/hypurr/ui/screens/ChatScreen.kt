@@ -169,6 +169,8 @@ fun ChatScreen(
     learn: (@Composable () -> Unit)? = null,
     /** "Show me it works" proof card for a task; null hides it. */
     proof: (@Composable () -> Unit)? = null,
+    /** Starts a hands-free voice chat with this agent; null hides the button. */
+    onVoiceCall: (() -> Unit)? = null,
 ) {
     val c = Hypurr.colors
     val inThread = threadRoot != null
@@ -236,6 +238,7 @@ fun ChatScreen(
                             maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
+                if (onVoiceCall != null && !inThread) IconBubble(signalIcon(SignalIcons.Mic), "Voice chat", onClick = onVoiceCall)
                 if (onEdit != null && !inThread) IconBubble(signalIcon(SignalIcons.More), "More", onClick = onEdit)
             }
             if (folder != null || task != null) {

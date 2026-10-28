@@ -1,4 +1,3 @@
-#if os(iOS)
 import AVFoundation
 import HypurrKit
 import SwiftUI
@@ -190,4 +189,3 @@ private struct CallSettingsView: View {
         .background(Palette.background)
     }
 }
-#endif

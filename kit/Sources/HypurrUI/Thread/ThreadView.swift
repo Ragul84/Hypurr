@@ -155,13 +155,9 @@ public struct ThreadView: View {
         .background(Palette.background)
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 6) {
-                #if os(iOS)
-                    Composer(botId: botId,
-                             onCall: !calling && bot?.isGroup == false ? { calling = true } : nil,
-                             onInterrupt: callSpeaking ? interruptCall : nil)
-                #else
-                    Composer(botId: botId)
-                #endif
+                Composer(botId: botId,
+                         onCall: !calling && bot?.isGroup == false ? { calling = true } : nil,
+                         onInterrupt: callSpeaking ? interruptCall : nil)
             }
         }
         #if os(iOS)
@@ -179,18 +175,18 @@ public struct ThreadView: View {
                     ToolbarItem(placement: .topBarTrailing) { computerButton }
                 }
             }
-            // Grok Bot's call: a bar floating over the chat, which stays readable and usable.
-            .overlay(alignment: .top) {
-                if calling {
-                    CallView(botId: botId, isSpeaking: $callSpeaking, interrupt: $interruptCall) {
-                        withAnimation(Motion.reduced(Motion.layout, reduceMotion)) { calling = false }
-                    }
-                        .padding(.top, 4)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                }
-            }
-            .animation(Motion.reduced(Motion.layout, reduceMotion), value: calling)
         #endif
+        // Voice chat: a bar floating over the chat, which stays readable and usable.
+        .overlay(alignment: .top) {
+            if calling {
+                CallView(botId: botId, isSpeaking: $callSpeaking, interrupt: $interruptCall) {
+                    withAnimation(Motion.reduced(Motion.layout, reduceMotion)) { calling = false }
+                }
+                    .padding(.top, 4)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(Motion.reduced(Motion.layout, reduceMotion), value: calling)
         #if os(macOS)
             .safeAreaInset(edge: .top, spacing: 0) {
                 VStack(spacing: 0) {

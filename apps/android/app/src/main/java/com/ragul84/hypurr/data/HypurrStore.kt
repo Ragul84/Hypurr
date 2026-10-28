@@ -595,6 +595,8 @@ class HypurrStore(
     private val _costs = MutableStateFlow<TaskCosts?>(null)
     val costs: StateFlow<TaskCosts?> = _costs.asStateFlow()
 
+    suspend fun logCall(botId: String, seconds: Long) { client?.logCall(botId, seconds) }
+
     suspend fun ownFreeStart(): String = (client ?: throw HostException.unreachable()).ownFreeStart()
     suspend fun ownFreeFinish(code: String) { (client ?: throw HostException.unreachable()).ownFreeFinish(code); loadCosts(); refreshHello() }
     suspend fun ownFreeDisconnect() { (client ?: throw HostException.unreachable()).ownFreeDisconnect(); loadCosts(); refreshHello() }
