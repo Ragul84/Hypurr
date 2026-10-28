@@ -1665,6 +1665,16 @@ fn render_details(ui: &App, st: &State, bot: &Value) {
         agent.append(&l);
     }
     c.append(&agent);
+    if let Some(project) = bot["task"]["project"].as_str().filter(|p| !p.is_empty()) {
+        let goal = bot["task"]["goal"]
+            .as_str()
+            .or(bot["name"].as_str())
+            .unwrap_or_default();
+        let btn = gtk::Button::with_label("Continue in the cloud");
+        let (ui2, project, goal) = (ui.clone(), project.to_owned(), goal.to_owned());
+        btn.connect_clicked(move |_| crate::cloud::open(&ui2.window, &project, &goal));
+        c.append(&btn);
+    }
 }
 
 /// The thread open beside the chat: its root, the replies and a composer that replies there.

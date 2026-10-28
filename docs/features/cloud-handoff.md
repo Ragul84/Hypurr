@@ -15,3 +15,10 @@ GitHub remote. The phone gets the task link (Codex/Claude) or the agent's link (
 request or in the vendor's app.
 
 API: `cloudOptions {project}`, `cloudHandoff {project, vendor, prompt, codexEnv?, branch?}`, `setCursorKey {key}`.
+
+## Clients
+
+- **Android**: "Continue in the cloud" in the task chat.
+- **iPhone and Mac** (kit `CloudHandoffView`): the same button above the composer for task chats.
+- **Linux app**: "Continue in the cloud" in the conversation details pane.
+- **Windows app**: status and pairing only (no chat), so not applicable.

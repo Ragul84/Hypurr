@@ -155,6 +155,7 @@ public struct ThreadView: View {
         .background(Palette.background)
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 6) {
+                CloudHandoffButton(botId: botId).padding(.horizontal, 16)
                 #if os(iOS)
                     Composer(botId: botId,
                              onCall: !calling && bot?.isGroup == false ? { calling = true } : nil,
