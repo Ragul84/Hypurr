@@ -1018,10 +1018,17 @@ data class Proof(
     val log: String = "",
     val verdict: ProofVerdict? = null,
     val seconds: Int = 0,
+    /** The chat turn it was made for; a newer message hides it. */
+    val turn: Long = 0,
 )
 
+/** `web`: the project has a page "See it live" can open. */
 @Serializable
-data class ProofReply(val proof: Proof? = null)
+data class ProofReply(val proof: Proof? = null, val web: Boolean = false)
+
+/** "See it live": the page to open in the live preview, or the one-time OK it needs first. */
+@Serializable
+data class ProofLive(val port: Int = 0, val path: String = "/", val url: String = "", val needsApproval: Boolean = false, val command: String? = null)
 
 @Serializable
 data class ProofFileData(val name: String = "", val data: String = "")

@@ -20,6 +20,7 @@ mod routines;
 mod screen;
 mod service;
 mod standup;
+mod static_site;
 mod store;
 mod tasks;
 mod ticket;

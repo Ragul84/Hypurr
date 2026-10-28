@@ -15,6 +15,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.Insets
@@ -86,6 +87,21 @@ class InsetsScreenshotTest {
         ChatScreen(Samples.taskBot.copy(task = Samples.task.copy(status = "done"), status = "idle"), Samples.taskChat, "", {},
             onBack = {}, onSend = {}, onStop = {}, onRespond = { _, _ -> }, now = Samples.NOW,
             proof = { ProofCard(Proof(status = "unavailable", note = "Proof compares the task's changes with where it started, so it needs this folder to be a Git project.")) })
+    }
+
+    /** Like the phone report: one long voice message while the agent starts, and the oldest message at the top. */
+    @Test fun chatShortWhileStarting() = shoot("chat-short-small-buttons", 48.dp) {
+        val ask = com.ragul84.hypurr.model.Entry(id = "u1", botId = "b", kind = "user", turn = 1, createdAt = Samples.NOW,
+            data = com.ragul84.hypurr.model.EntryData(text = "what is this website, and how does it save the email from users for the wait list\n\n(I said this by voice, so expect small transcription mistakes.)"))
+        ChatScreen(Samples.taskBot.copy(status = "working"), listOf(ask), "", {}, onBack = {}, onSend = {}, onStop = {},
+            onRespond = { _, _ -> }, now = Samples.NOW)
+    }
+
+    @Test fun chatScrolledToOldest() = shoot("chat-top-small-buttons", 48.dp, then = {
+        compose.onNode(androidx.compose.ui.test.hasScrollToIndexAction()).performScrollToIndex(Samples.taskChat.size - 1)
+    }) {
+        ChatScreen(Samples.taskBot.copy(task = Samples.task.copy(status = "done"), status = "idle"), Samples.taskChat, "", {},
+            onBack = {}, onSend = {}, onStop = {}, onRespond = { _, _ -> }, now = Samples.NOW)
     }
 
     @Test fun pickerSmallGesture() = picker("folder-picker-small-gesture", 24.dp)

@@ -297,6 +297,9 @@ class HostClient(val transport: ChannelTransport) {
     suspend fun proofStart(taskId: String): com.ragul84.hypurr.model.ProofReply =
         call("proofStart", buildJsonObject { put("taskId", taskId) })
 
+    suspend fun proofLive(taskId: String): com.ragul84.hypurr.model.ProofLive =
+        call("proofLive", buildJsonObject { put("taskId", taskId) })
+
     suspend fun proofAllow(taskId: String): com.ragul84.hypurr.model.ProofReply =
         call("proofAllow", buildJsonObject { put("taskId", taskId) })
 

@@ -176,6 +176,8 @@ class HypurrStore(
     suspend fun learnCards(taskId: String) = client?.learnCards(taskId)
     suspend fun learnQuiz(taskId: String) = client?.learnQuiz(taskId)
     suspend fun proof(taskId: String) = client?.proof(taskId)?.proof
+    suspend fun proofReply(taskId: String) = client?.proof(taskId)
+    suspend fun proofLive(taskId: String) = client?.proofLive(taskId)
     suspend fun proofStart(taskId: String) = client?.proofStart(taskId)?.proof
     suspend fun proofAllow(taskId: String) = client?.proofAllow(taskId)?.proof
     suspend fun proofVerdict(taskId: String, ok: Boolean, text: String) = client?.proofVerdict(taskId, ok, text)

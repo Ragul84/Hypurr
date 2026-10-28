@@ -330,6 +330,7 @@ class MainActivity : ComponentActivity() {
         var quizzes by remember { mutableStateOf(mapOf<String, com.ragul84.hypurr.model.Quiz>()) }
         var learnHidden by remember { mutableStateOf(setOf<String>()) }
         var proofs by remember { mutableStateOf(mapOf<String, com.ragul84.hypurr.model.Proof>()) }
+        var proofWeb by remember { mutableStateOf(mapOf<String, Boolean>()) }
         var proofImages by remember { mutableStateOf(mapOf<String, androidx.compose.ui.graphics.ImageBitmap>()) }
         var proofLoading by remember { mutableStateOf(setOf<String>()) }
         var proofBusy by remember { mutableStateOf(setOf<String>()) }
@@ -394,12 +395,19 @@ class MainActivity : ComponentActivity() {
                     LaunchedEffect(learnTask?.id, learnTask?.status, entries[id]?.size) {
                         learnTask?.let { t -> runCatching { store.learnCards(t.id) }.getOrNull()?.let { learnCards = learnCards + (t.id to it.cards) } }
                     }
-                    val proofTask = bot.task?.takeIf { t ->
-                        bot.status != "working" && (!t.isActive || entries[id].orEmpty().any { it.kind == "agent" } || proofs[t.id] != null)
+                    // Asked of the host whenever the chat moves; shown only per [proofShow].
+                    LaunchedEffect(bot.task?.id, bot.task?.status, entries[id]?.size, bot.status) {
+                        val t = bot.task ?: return@LaunchedEffect
+                        if (bot.status == "working") return@LaunchedEffect
+                        runCatching { store.proofReply(t.id) }.getOrNull()?.let { r ->
+                            r.proof?.let { proofs = proofs + (t.id to it) }
+                            proofWeb = proofWeb + (t.id to r.web)
+                        }
                     }
-                    LaunchedEffect(proofTask?.id, proofTask?.status, entries[id]?.size) {
-                        proofTask?.let { t -> runCatching { store.proof(t.id) }.getOrNull()?.let { proofs = proofs + (t.id to it) } }
-                    }
+                    val proofShown = bot.task?.let {
+                        com.ragul84.hypurr.ui.screens.proofShow(entries[id].orEmpty(), proofs[it.id], bot.status == "working")
+                    } ?: com.ragul84.hypurr.ui.screens.ProofShow.None
+                    val proofTask = bot.task?.takeIf { proofShown != com.ragul84.hypurr.ui.screens.ProofShow.None }
                     val proofRunning = proofTask?.let { proofs[it.id]?.status == "running" } == true
                     LaunchedEffect(proofTask?.id, proofRunning) {
                         // While it runs, check every few seconds (the host also posts a chat note when done).
@@ -463,7 +471,7 @@ class MainActivity : ComponentActivity() {
                         },
                         proof = proofTask?.let { t ->
                             {
-                                val p = proofs[t.id]
+                                val p = proofs[t.id].takeIf { proofShown == com.ragul84.hypurr.ui.screens.ProofShow.Card }
                                 fun act(block: suspend () -> com.ragul84.hypurr.model.Proof?) {
                                     proofBusy = proofBusy + t.id
                                     scope.launch {

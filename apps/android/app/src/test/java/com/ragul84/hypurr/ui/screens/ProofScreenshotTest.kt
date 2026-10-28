@@ -124,6 +124,15 @@ class ProofScreenshotTest {
         chat { ProofCard(Proof(status = "unavailable", note = "Proof compares the task's changes with where it started, so it needs this folder to be a Git project.")) }
     }
 
+    @Test fun seeItLive() = shoot("proof-see-live") { chat { ProofCard(null, onSeeLive = {}) } }
+
+    @Test fun summaryWithLive() = shoot("proof-summary-live") {
+        ProofCardAlone {
+            ProofCard(Proof(status = "ready", kind = "tests", summary = "Changed 1 file (1 line added, 1 removed). Most work in waitlist.html (+1 −1).",
+                note = "This project has no automatic checks, so here's a summary of what changed."), onSeeLive = {})
+        }
+    }
+
     @Test fun webSlider() = shoot("proof-web") { ProofCardAlone { ProofCard(web, images, initialSplit = 0.42f) } }
 
     @Test fun webInChat() = shoot("proof-web-chat") { chat { ProofCard(web, images, initialSplit = 0.5f) } }

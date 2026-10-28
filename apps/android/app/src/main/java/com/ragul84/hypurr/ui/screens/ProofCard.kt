@@ -82,6 +82,26 @@ fun verdictActions(p: Proof): List<String> =
     if (p.tests?.let { it.failed > 0 } == true) listOf("Not right, fix it") else listOf("Not right, fix it", "Looks right")
 
 /** The card's title for each kind of proof. */
+/** What the chat shows for proof right now: nothing, the "Show me" offer, or the proof itself. */
+enum class ProofShow { None, ShowMe, Card }
+
+private val CHANGING_TOOLS = setOf("edit", "delete", "move")
+
+/**
+ * Proof belongs to the latest turn: shown while it runs or waits for an OK, or when it was made
+ * for this turn; "Show me" only after a turn whose tools changed files. Never for read-only Q&A,
+ * and a newer message hides an older proof.
+ */
+fun proofShow(entries: List<com.ragul84.hypurr.model.Entry>, proof: Proof?, working: Boolean): ProofShow {
+    val status = proof?.status.orEmpty()
+    if (status == "running" || status == "needsApproval") return ProofShow.Card
+    if (working) return ProofShow.None
+    val turn = entries.filter { it.kind == "user" }.maxOfOrNull { it.turn } ?: return ProofShow.None
+    if (status.isNotEmpty() && proof!!.turn >= turn) return ProofShow.Card
+    val changed = entries.any { it.kind == "tool" && it.turn == turn && it.data.toolKind in CHANGING_TOOLS }
+    return if (changed) ProofShow.ShowMe else ProofShow.None
+}
+
 fun proofTitle(p: Proof): String = when {
     p.status == "needsApproval" -> "Show me needs to run your project"
     p.status == "running" -> "Making the proof…"
@@ -107,6 +127,9 @@ fun ProofCard(
     onAllow: () -> Unit = {},
     onLoad: (String) -> Unit = {},
     onPlayClip: (String) -> Unit = {},
+    /** "See it live" for a web project: opens the page in the live preview. Null hides it. */
+    onSeeLive: (() -> Unit)? = null,
+    liveBusy: Boolean = false,
     onVerdict: (ok: Boolean, text: String) -> Unit = { _, _ -> },
     initialShot: Int = 0,
     initialSplit: Float = 0.5f,
@@ -131,6 +154,7 @@ fun ProofCard(
                 Text("Hypurr runs the result on your computer and shows you screenshots, a short clip or the test results.",
                     color = c.secondary, style = MaterialTheme.typography.bodySmall)
                 PrimaryButton(if (busy) "Starting…" else "Show me", Modifier.fillMaxWidth(), enabled = !busy, icon = signalIcon(SignalIcons.Play), onClick = onShowMe)
+                if (onSeeLive != null) SeeLive(liveBusy, onSeeLive)
                 return@Column
             }
             Text(proofTitle(proof), color = c.text, style = MaterialTheme.typography.titleMedium)
@@ -145,10 +169,19 @@ fun ProofCard(
                     Summary(proof)
                     LogBox(proof.log)
                 }
-                else -> Ready(proof, images, onLoad, onPlayClip, onVerdict, initialShot, initialSplit, initialFixing, initialFeedback)
+                else -> {
+                    if (onSeeLive != null) SeeLive(liveBusy, onSeeLive)
+                    Ready(proof, images, onLoad, onPlayClip, onVerdict, initialShot, initialSplit, initialFixing, initialFeedback)
+                }
             }
         }
     }
+}
+
+@Composable
+private fun SeeLive(busy: Boolean, onClick: () -> Unit) {
+    SoftButton(if (busy) "Opening…" else "See it live", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Play),
+        tint = Hypurr.colors.text, onClick = { if (!busy) onClick() })
 }
 
 @Composable
