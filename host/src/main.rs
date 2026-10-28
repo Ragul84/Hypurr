@@ -28,6 +28,7 @@ mod triage;
 mod tui;
 mod update;
 mod usage;
+mod work_team;
 
 use agent::{backends, registry};
 use remote::{identity, relay};

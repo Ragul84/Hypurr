@@ -277,6 +277,8 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
         || method.starts_with("credential")
         || method == "computerCall"
         || matches!(method, "agentAuth" | "agentAuthenticate" | "setAgentEnv")
+        || method.starts_with("work")
+        || method == "gatewayBalance"
     {
         market::vault::unlock(hub.clone()).await?;
     }
@@ -702,6 +704,15 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
         "ticketReview" => crate::ticket::review(hub, &b).await?,
         "ticketPublish" => crate::ticket::publish(hub, &b).await?,
         "taskCosts" => crate::tasks::costs(&hub.store)?,
+        // Work accounts and the team credit pool (host/src/work_team.rs).
+        "gatewayBalance" => crate::work_team::balance(&hub.store).await?,
+        "workSsoConfig" => crate::work_team::sso_config(str_arg(&b, "email")?).await?,
+        "workSignIn" => crate::work_team::sign_in(&hub.store, &b).await?,
+        "workTeamSetup" => crate::work_team::setup(&hub.store, &b).await?,
+        "workSignOut" => crate::work_team::sign_out(&hub.store)?,
+        "workTeam" => crate::work_team::team(&hub.store).await?,
+        "workTeamMember" => crate::work_team::member(&hub.store, &b).await?,
+        "workTeamPool" => crate::work_team::fill_pool(&hub.store, &b).await?,
         "integrations" => json!({"integrations": crate::integrations::Integrations::load(&hub.store).public()}),
         "setIntegrations" => json!({"integrations": crate::integrations::update(&hub.store, &b)?.public()}),
         "testIntegration" => crate::integrations::test(&hub.store, str_arg(&b, "kind")?).await?,

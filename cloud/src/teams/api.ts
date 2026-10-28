@@ -3,7 +3,7 @@
 // Docs: docs/features/teams-sso.md. Not deployed until the owner approves.
 
 import { ApiError, user, type Ctx } from "../api";
-import { hashKey, issueUserKey, mintKeySecret } from "../gateway/auth";
+import { bearer, hashKey, issueUserKey, mintKeySecret, resolveSubject } from "../gateway/auth";
 import { getCredits, spendCredits, topUp } from "../gateway/ledger";
 import { fetchKeys, OidcError, verifyIdToken, type Jwk, type Provider } from "./oidc";
 import { monthBucket } from "./pool";
@@ -49,8 +49,24 @@ async function ensureAccount(c: Ctx, userId: string, email: string) {
     .run();
 }
 
-async function admin(c: Ctx, teamId: string) {
+/**
+ * Who is calling: a signed-in Hypurr account (Clerk session), or a work-account gateway key
+ * (`hk_…`, from SSO) that a Hypurr computer forwards for its owner.
+ */
+async function actor(c: Ctx): Promise<{ userId: string; email: string | null }> {
+  const secret = bearer(c.req);
+  if (secret?.startsWith("hk_")) {
+    const sub = await resolveSubject(c.env.DB, secret);
+    if (!sub?.userId) throw new ApiError("unauthenticated");
+    const row = await c.env.DB.prepare(`SELECT email FROM accounts WHERE user_id = ?`).bind(sub.userId).first<{ email: string | null }>();
+    return { userId: sub.userId, email: row?.email ?? null };
+  }
   const u = await user(c);
+  return { userId: u.userId, email: u.email };
+}
+
+async function admin(c: Ctx, teamId: string) {
+  const u = await actor(c);
   const m = await c.env.DB.prepare(`SELECT role, status FROM team_members WHERE team_id = ? AND user_id = ?`)
     .bind(teamId, u.userId)
     .first<{ role: string; status: string }>();
@@ -59,7 +75,7 @@ async function admin(c: Ctx, teamId: string) {
 }
 
 export async function createTeam(c: Ctx) {
-  const u = await user(c);
+  const u = await actor(c);
   const name = String(body(c).name ?? "").trim();
   if (!name || name.length > 80) throw new ApiError("badRequest", "Give the team a name.");
   const already = await c.env.DB.prepare(`SELECT team_id FROM team_members WHERE user_id = ?`).bind(u.userId).first();
@@ -76,7 +92,7 @@ export async function createTeam(c: Ctx) {
 
 /** The caller's team. Admins also get the members, their spend this month, and the pool. */
 export async function myTeam(c: Ctx) {
-  const u = await user(c);
+  const u = await actor(c);
   const m = await c.env.DB.prepare(
     `SELECT t.id, t.name, t.sso_provider, t.sso_domain, m.role, m.status, m.monthly_limit_cents, m.spent_cents, m.period_start
      FROM team_members m JOIN teams t ON t.id = m.team_id WHERE m.user_id = ?`,
@@ -114,23 +130,89 @@ export async function myTeam(c: Ctx) {
 
 export async function setSso(c: Ctx, [teamId]: string[]) {
   await admin(c, teamId);
-  const b = body(c);
-  const provider = b.provider;
-  if (provider !== "google" && provider !== "microsoft") throw new ApiError("badRequest", "provider: google or microsoft");
-  const domain = String(b.domain ?? "").toLowerCase();
-  if (!DOMAIN.test(domain) || ["gmail.com", "outlook.com", "hotmail.com", "live.com", "yahoo.com"].includes(domain)) {
-    throw new ApiError("badRequest", "Use your company's own email domain.");
-  }
-  const clientId = String(b.clientId ?? "");
-  if (!clientId || clientId.length > 200) throw new ApiError("badRequest", "clientId is the OAuth client id from your identity provider.");
-  const tenant = provider === "microsoft" ? String(b.tenant ?? "") : null;
-  if (provider === "microsoft" && !/^[0-9a-f-]{36}$/i.test(tenant ?? "")) throw new ApiError("badRequest", "tenant is your Microsoft Entra tenant id.");
+  const { provider, domain, clientId, tenant } = ssoSettings(body(c));
   const taken = await c.env.DB.prepare(`SELECT id FROM teams WHERE sso_domain = ? AND id != ?`).bind(domain, teamId).first();
   if (taken) throw new ApiError("conflict", "Another team already uses this domain.");
   await c.env.DB.prepare(`UPDATE teams SET sso_provider = ?, sso_domain = ?, sso_client_id = ?, sso_tenant = ? WHERE id = ?`)
     .bind(provider, domain, clientId, tenant, teamId)
     .run();
   return { ok: true, provider, domain };
+}
+
+async function verifyFor(
+  c: Ctx,
+  cfg: { provider: Provider; tenant: string | null; clientId: string; domain: string },
+  idToken: string,
+) {
+  const testKeys = (c.env as unknown as { OIDC_TEST_JWKS?: string }).OIDC_TEST_JWKS;
+  try {
+    const keys: Jwk[] = testKeys ? JSON.parse(testKeys).keys : await fetchKeys(cfg.provider, cfg.tenant);
+    return await verifyIdToken(idToken, { ...cfg, keys, now: c.now });
+  } catch (e) {
+    if (e instanceof OidcError) throw new ApiError("unauthenticated", e.message);
+    throw e;
+  }
+}
+
+function ssoSettings(b: Record<string, unknown>) {
+  const provider = b.provider;
+  if (provider !== "google" && provider !== "microsoft") throw new ApiError("badRequest", "provider: google or microsoft");
+  const domain = String(b.domain ?? "").toLowerCase();
+  if (!DOMAIN.test(domain) || CONSUMER.includes(domain)) throw new ApiError("badRequest", "Use your company's own email domain.");
+  const clientId = String(b.clientId ?? "");
+  if (!clientId || clientId.length > 200) throw new ApiError("badRequest", "clientId is the OAuth client id from your identity provider.");
+  const tenant = provider === "microsoft" ? String(b.tenant ?? "") : null;
+  if (provider === "microsoft" && !/^[0-9a-f-]{36}$/i.test(tenant ?? "")) throw new ApiError("badRequest", "tenant is your Microsoft Entra tenant id.");
+  return { provider: provider as Provider, domain, clientId, tenant };
+}
+
+const CONSUMER = ["gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com", "yahoo.com", "icloud.com", "proton.me"];
+
+/** Where a work email signs in: the app needs this before it can open the provider's page. */
+export async function ssoConfig(c: Ctx) {
+  const email = (c.url.searchParams.get("email") ?? "").toLowerCase();
+  const domain = email.split("@")[1] ?? "";
+  const t = await c.env.DB.prepare(`SELECT sso_provider, sso_client_id, sso_tenant FROM teams WHERE sso_domain = ?`)
+    .bind(domain)
+    .first<{ sso_provider: Provider | null; sso_client_id: string | null; sso_tenant: string | null }>();
+  if (!t?.sso_provider || !t.sso_client_id) throw new ApiError("notFound", "Your company hasn't set up Hypurr sign-in yet.");
+  return { provider: t.sso_provider, clientId: t.sso_client_id, tenant: t.sso_tenant, ...endpoints(t.sso_provider, t.sso_tenant) };
+}
+
+function endpoints(provider: Provider, tenant: string | null) {
+  return provider === "google"
+    ? { authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth", tokenUrl: "https://oauth2.googleapis.com/token" }
+    : {
+        authorizeUrl: `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/authorize`,
+        tokenUrl: `https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`,
+      };
+}
+
+/**
+ * First-time setup by the company's IT person: creates the team with its SSO settings and
+ * makes the signed-in work account its admin. The ID token proves they own that domain.
+ */
+export async function setupTeam(c: Ctx) {
+  const b = body(c);
+  const name = String(b.name ?? "").trim();
+  if (!name || name.length > 80) throw new ApiError("badRequest", "Give the team a name.");
+  const cfg = ssoSettings(b);
+  const claims = await verifyFor(c, cfg, String(b.idToken ?? ""));
+  const taken = await c.env.DB.prepare(`SELECT id FROM teams WHERE sso_domain = ?`).bind(cfg.domain).first();
+  if (taken) throw new ApiError("conflict", "Your company already has a Hypurr team. Sign in with your work account instead.");
+  const id = `team_${rid()}`;
+  const userId = await ssoUserId(id, claims.email);
+  await ensureAccount(c, userId, claims.email);
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      `INSERT INTO teams(id, name, created_by, sso_provider, sso_domain, sso_client_id, sso_tenant, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(id, name, userId, cfg.provider, cfg.domain, cfg.clientId, cfg.tenant, c.now),
+    c.env.DB.prepare(
+      `INSERT INTO team_members(team_id, user_id, email, role, created_at, period_start) VALUES (?, ?, ?, 'admin', ?, ?)`,
+    ).bind(id, userId, claims.email, c.now, monthBucket(c.now)),
+  ]);
+  const key = await issueUserKey(c.env.DB, userId, "sso", c.now);
+  return { apiKey: key.secret, keyPrefix: key.prefix, team: { id, name }, email: claims.email, role: "admin" };
 }
 
 /**
@@ -151,22 +233,12 @@ export async function ssoExchange(c: Ctx) {
   if (!team?.sso_provider || !team.sso_client_id || !team.sso_domain) {
     throw new ApiError("notFound", "Your company hasn't set up Hypurr sign-in yet.");
   }
-  const testKeys = (c.env as unknown as { OIDC_TEST_JWKS?: string }).OIDC_TEST_JWKS;
-  let claims;
-  try {
-    const keys: Jwk[] = testKeys ? JSON.parse(testKeys).keys : await fetchKeys(team.sso_provider, team.sso_tenant);
-    claims = await verifyIdToken(idToken, {
-      provider: team.sso_provider,
-      tenant: team.sso_tenant,
-      clientId: team.sso_client_id,
-      domain: team.sso_domain,
-      keys,
-      now: c.now,
-    });
-  } catch (e) {
-    if (e instanceof OidcError) throw new ApiError("unauthenticated", e.message);
-    throw e;
-  }
+  const claims = await verifyFor(c, {
+    provider: team.sso_provider,
+    tenant: team.sso_tenant,
+    clientId: team.sso_client_id,
+    domain: team.sso_domain,
+  }, idToken);
   const userId = await ssoUserId(team.id, claims.email);
   const existing = await c.env.DB.prepare(`SELECT status, team_id FROM team_members WHERE user_id = ?`)
     .bind(userId)

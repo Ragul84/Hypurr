@@ -94,4 +94,27 @@ describe("teams", () => {
     const again = await call("POST", "/v1/teams/sso", { body: { email: "bob@acme.test", idToken: await idToken({ sub: "g-bob", email: "bob@acme.test" }) } });
     expect(again.status).toBe(403);
   });
+
+  it("IT sets up a team with a work account, then manages it with the computer's key", async () => {
+    const tok = (sub: string, email: string) => idToken({ sub, email, hd: "globex.test", aud: "cid-globex" });
+    const base = { name: "Globex", provider: "google", domain: "globex.test", clientId: "cid-globex" };
+    expect((await call("POST", "/v1/teams/setup", { body: { ...base, idToken: await tok("g-x", "x@other.test") } })).status).toBe(401);
+    const setup = await call("POST", "/v1/teams/setup", { body: { ...base, idToken: await tok("g-it", "it@globex.test") } });
+    expect(setup.status).toBe(200);
+    expect(setup.body.role).toBe("admin");
+    expect((await call("POST", "/v1/teams/setup", { body: { ...base, idToken: await tok("g-it2", "it2@globex.test") } })).status).toBe(409);
+
+    const cfg = await call("GET", "/v1/teams/sso-config?email=sam@globex.test");
+    expect(cfg.body).toMatchObject({ provider: "google", clientId: "cid-globex", authorizeUrl: "https://accounts.google.com/o/oauth2/v2/auth" });
+    expect((await call("GET", "/v1/teams/sso-config?email=sam@nowhere.test")).status).toBe(404);
+
+    const sam = await call("POST", "/v1/teams/sso", { body: { email: "sam@globex.test", idToken: await tok("g-sam", "sam@globex.test") } });
+    const mine = await call("GET", "/v1/teams/mine", { token: setup.body.apiKey });
+    expect(mine.body.role).toBe("admin");
+    expect(mine.body.members).toHaveLength(2);
+    const samId = mine.body.members.find((m: { email: string }) => m.email === "sam@globex.test").userId;
+    expect((await call("PATCH", `/v1/teams/${setup.body.team.id}/members/${samId}`, { token: setup.body.apiKey, body: { status: "suspended" } })).status).toBe(200);
+    // A member's key can't manage the team.
+    expect((await call("PATCH", `/v1/teams/${setup.body.team.id}/members/${samId}`, { token: sam.body.apiKey, body: { status: "active" } })).status).toBe(401);
+  });
 });

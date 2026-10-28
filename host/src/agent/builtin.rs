@@ -98,7 +98,7 @@ pub async fn health_loop() {
 
 /// kv: this computer's id at the gateway, and (vault) its trial key.
 const GATEWAY_HOST_ID: &str = "gateway_host_id";
-const GATEWAY_KEY_SLOT: &str = "gateway_key";
+pub const GATEWAY_KEY_SLOT: &str = "gateway_key";
 
 /// This computer's gateway key, minted once through `POST /v1/gateway/trial-key` and kept in
 /// the vault (shown once by the gateway).

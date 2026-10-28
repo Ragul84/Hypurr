@@ -97,6 +97,8 @@ const routes: [string, RegExp, Handler][] = [
   ["POST", /^\/v1\/teams$/, teams.createTeam],
   ["GET", /^\/v1\/teams\/mine$/, teams.myTeam],
   ["POST", /^\/v1\/teams\/sso$/, teams.ssoExchange],
+  ["GET", /^\/v1\/teams\/sso-config$/, teams.ssoConfig],
+  ["POST", /^\/v1\/teams\/setup$/, teams.setupTeam],
   ["PUT", new RegExp(`^/v1/teams/${ID}/sso$`), teams.setSso],
   ["POST", new RegExp(`^/v1/teams/${ID}/pool$`), teams.fillPool],
   ["PATCH", new RegExp(`^/v1/teams/${ID}/members/${ID}$`), teams.updateMember],
