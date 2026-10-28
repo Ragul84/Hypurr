@@ -86,6 +86,7 @@ fun proofTitle(p: Proof): String = when {
     p.status == "needsApproval" -> "Show me needs to run your project"
     p.status == "running" -> "Making the proof…"
     p.status == "failed" -> "Couldn't make the proof"
+    p.status == "unavailable" -> "Proof needs a Git project"
     p.kind == "web" -> "Your pages, before and after"
     p.kind == "android" -> if (p.shots.any { it.before != null }) "Your screens, before and after" else "Your app on the phone"
     p.tests?.let { it.failed > 0 } == true -> "Some tests failed"
@@ -136,6 +137,8 @@ fun ProofCard(
             when (proof.status) {
                 "needsApproval" -> Approval(proof, busy, onAllow)
                 "running" -> Text(proof.plan?.what?.let { "$it. Servers stop as soon as it's done." } ?: "Working on it.",
+                    color = c.secondary, style = MaterialTheme.typography.bodySmall)
+                "unavailable" -> Text(proof.note.ifBlank { "Proof needs this folder to be a Git project." },
                     color = c.secondary, style = MaterialTheme.typography.bodySmall)
                 "failed" -> {
                     if (proof.note.isNotBlank()) Text(proof.note, color = c.secondary, style = MaterialTheme.typography.bodySmall)

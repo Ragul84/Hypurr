@@ -1005,7 +1005,7 @@ data class ProofVerdict(val ok: Boolean = true, val text: String = "")
 /** Visual proof of a task's result: before/after shots, a clip, test counts, the diff in words. */
 @Serializable
 data class Proof(
-    /** needsApproval | running | ready | failed */
+    /** needsApproval | running | ready | failed | unavailable (folder is not a Git project) */
     val status: String = "",
     val plan: ProofPlan? = null,
     val kind: String = "",

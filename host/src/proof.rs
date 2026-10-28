@@ -208,9 +208,16 @@ fn base_rev(task: &Task, dir: &Path) -> Option<String> {
     if let Some(cp) = task.checkpoints.first() {
         return Some(cp.id.clone());
     }
-    let base = task.base.clone().unwrap_or_else(|| "main".into());
-    git(dir, &["merge-base", "HEAD", &base]).map(|s| s.trim().to_owned()).filter(|s| !s.is_empty())
+    // The task's base branch, else the usual default branches (a repo on `master` has no `main`).
+    let first = task.base.clone().unwrap_or_else(|| "main".into());
+    [first.as_str(), "main", "master", "origin/HEAD"]
+        .into_iter()
+        .find_map(|b| git(dir, &["merge-base", "HEAD", b]).map(|s| s.trim().to_owned()).filter(|s| !s.is_empty()))
 }
+
+/// Why there can't be a proof here, in plain words (no Git history to compare against).
+const NO_BASE: &str =
+    "Proof compares the task's changes with where it started, so it needs this folder to be a Git project.";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Change {
@@ -732,6 +739,18 @@ pub async fn start(hub: &Arc<Hub>, b: &Value) -> Result<Value> {
         return get(&hub.store, b);
     }
     let dir = work_dir(&task);
+    let has_base = {
+        let (t, d) = (task.clone(), dir.clone());
+        tokio::task::spawn_blocking(move || base_rev(&t, &d).is_some()).await?
+    };
+    if !has_base {
+        // After a finished task in a plain folder: no card and no "Couldn't make the proof".
+        if b["auto"] == true {
+            return get(&hub.store, b);
+        }
+        save(hub, &id, &json!({"status": "unavailable", "note": NO_BASE, "at": now()}))?;
+        return get(&hub.store, b);
+    }
     let p = tokio::task::spawn_blocking(move || plan(&dir, adb_device())).await?;
     if p.command.is_some() && !allowed(&hub.store, &task.project) {
         save(hub, &id, &json!({"status": "needsApproval", "plan": p.public(), "at": now()}))?;
@@ -754,7 +773,7 @@ pub async fn allow(hub: &Arc<Hub>, b: &Value) -> Result<Value> {
 pub fn after_finish(hub: &Arc<Hub>, task_id: &str) {
     let (h, id) = (hub.clone(), task_id.to_owned());
     tokio::spawn(async move {
-        if let Err(e) = start(&h, &json!({"taskId": id})).await {
+        if let Err(e) = start(&h, &json!({"taskId": id, "auto": true})).await {
             tracing::warn!(task = id, error = format!("{e:#}"), "proof after finish failed");
         }
     });
@@ -1129,5 +1148,19 @@ mod tests {
         std::fs::write(d.join(".hypurr/proof/after-0.png"), "x").unwrap();
         let ch = changes(&d, "HEAD");
         assert_eq!(ch, vec![Change { path: "a.txt".into(), added: 2, removed: 0 }]);
+    }
+
+    #[test]
+    fn base_falls_back_to_master_and_is_none_outside_git() {
+        let d = tmp("master");
+        let g = |a: &[&str]| {
+            assert!(std::process::Command::new("git").args(a).current_dir(&d).output().unwrap().status.success());
+        };
+        g(&["init", "-q", "-b", "master"]);
+        g(&["-c", "user.email=a@b", "-c", "user.name=a", "commit", "-q", "--allow-empty", "-m", "base"]);
+        let task: Task = serde_json::from_value(json!({"id": "t", "botId": "b", "goal": "g", "title": "x", "projectName": "p", "backend": "codex", "createdAt": 0, "updatedAt": 0, "project": d.display().to_string()}))
+            .expect("minimal task");
+        assert!(base_rev(&task, &d).is_some());
+        assert!(base_rev(&task, &tmp("plain")).is_none());
     }
 }

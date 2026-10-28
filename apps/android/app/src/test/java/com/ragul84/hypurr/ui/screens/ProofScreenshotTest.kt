@@ -120,6 +120,10 @@ class ProofScreenshotTest {
         chat { ProofCard(Proof(status = "running", plan = ProofPlan("web", "Start the web app (yours and the original) for a few minutes and capture the changed pages", "npm run dev"))) }
     }
 
+    @Test fun unavailable() = shoot("proof-unavailable") {
+        chat { ProofCard(Proof(status = "unavailable", note = "Proof compares the task's changes with where it started, so it needs this folder to be a Git project.")) }
+    }
+
     @Test fun webSlider() = shoot("proof-web") { ProofCardAlone { ProofCard(web, images, initialSplit = 0.42f) } }
 
     @Test fun webInChat() = shoot("proof-web-chat") { chat { ProofCard(web, images, initialSplit = 0.5f) } }

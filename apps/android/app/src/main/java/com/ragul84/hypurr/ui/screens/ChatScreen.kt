@@ -52,6 +52,8 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.height
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.SolidColor
@@ -180,13 +182,17 @@ fun ChatScreen(
     var actionsFor by remember { mutableStateOf(initialActionsFor?.let { id -> (entries + listOfNotNull(threadRoot)).firstOrNull { it.id == id } }) }
     var viewing by remember { mutableStateOf<Attachment?>(null) }
     val media = AttachmentUi(images, onLoadAttachment, onOpenFile) { viewing = it }
+    // The list clears the real header and composer (status bar, nav bar, keyboard, chips, files),
+    // measured rather than guessed, so the newest card is never hidden behind the composer.
+    val density = LocalDensity.current
+    var headerHeight by remember { mutableStateOf(92.dp) }
+    var composerHeight by remember { mutableStateOf(104.dp) }
     Box(Modifier.fillMaxSize().background(c.bg)) {
         LazyColumn(
             Modifier.fillMaxSize(),
             state = list,
             reverseLayout = true,
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 92.dp + (if (folder != null || task != null) 48.dp else 0.dp),
-                bottom = if (composer.files.isEmpty()) 104.dp else 172.dp),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = headerHeight + 12.dp, bottom = composerHeight + 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (proof != null && !inThread) item(key = "proof") { Box(Modifier.animateItem()) { proof() } }
@@ -212,7 +218,8 @@ fun ChatScreen(
             } else if (chat.isEmpty()) item(key = "empty") { EmptyChat(bot, bots) }
         }
         // Signal header: bare back chevron, bot tile, name + agent line, more. Chips row under a hairline.
-        Column(Modifier.fillMaxWidth().background(c.bg).statusBarsPadding()) {
+        Column(Modifier.fillMaxWidth().background(c.bg).statusBarsPadding()
+            .onSizeChanged { headerHeight = with(density) { it.height.toDp() } }) {
             Row(Modifier.padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconTile(signalIcon(SignalIcons.Back), "Back", onClick = onBack)
                 Spacer(Modifier.width(4.dp))
@@ -247,7 +254,8 @@ fun ChatScreen(
             }
             Box(Modifier.fillMaxWidth().height(1.dp).background(c.border))
         }
-        Composer(draft, onDraftChange, onSend, Modifier.align(Alignment.BottomCenter), composer, images, onAttach, onRemoveFile,
+        Composer(draft, onDraftChange, onSend, Modifier.align(Alignment.BottomCenter)
+            .onSizeChanged { composerHeight = with(density) { it.height.toDp() } }, composer, images, onAttach, onRemoveFile,
             if (inThread) "Reply in thread" else "Message ${bot.name}…", working = bot.status == "working", onStop = onStop)
         if (task != null) {
             CheckpointSheet(checkpointsOpen, task, now, integrations, initialFinishOpen, onClose = { checkpointsOpen = false },
