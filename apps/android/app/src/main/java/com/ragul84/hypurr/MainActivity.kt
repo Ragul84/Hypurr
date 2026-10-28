@@ -410,6 +410,24 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     LaunchedEffect(target, synced) { if (rootId != null) store.openThread(id, rootId) else store.openChat(id) }
+                    // Live preview: dev servers this task started on the computer.
+                    var previewPorts by remember(id) { mutableStateOf(emptyList<Int>()) }
+                    var previewOpen by remember(id) { mutableStateOf<Int?>(null) }
+                    LaunchedEffect(id, synced) {
+                        while (true) {
+                            previewPorts = runCatching { store.previewPorts(id) }.getOrDefault(previewPorts)
+                            kotlinx.coroutines.delay(8_000)
+                        }
+                    }
+                    previewOpen?.let { p ->
+                        androidx.compose.ui.window.Dialog(
+                            onDismissRequest = { previewOpen = null },
+                            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+                        ) {
+                            com.ragul84.hypurr.ui.PreviewScreen(p, fetch = { port, path, method, headers -> store.previewFetch(id, port, path, method, headers) },
+                                onClose = { previewOpen = null })
+                        }
+                    }
                     ChatScreen(
                         bot, if (rootId != null) threads[rootId].orEmpty() else entries[id].orEmpty(), draft, { draft = it },
                         onBack = { screen = parentOf(target) },
@@ -447,6 +465,8 @@ class MainActivity : ComponentActivity() {
                         onLoadAttachment = { a -> scope.launch { store.loadAttachment(id, a) } },
                         onOpenFile = { a -> scope.launch { runCatching { openFile(a, store.fileBytes(id, a)) } } },
                         onOpenThread = { e -> screen = "thread:$id:${e.id}" },
+                        previews = if (rootId == null) previewPorts else emptyList(),
+                        onOpenPreview = { previewOpen = it },
                         onReact = { e, emoji -> scope.launch { runCatching { store.react(e.id, emoji) } } },
                         onEdit = if (you?.canAct != false) ({ screen = "edit:$id" }) else null,
                         onChangeFolder = if (you?.canAct != false && !bot.isGroup) ({ screen = "folderpick:chat:$id" }) else null,
