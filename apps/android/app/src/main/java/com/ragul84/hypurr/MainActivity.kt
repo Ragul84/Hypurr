@@ -419,16 +419,14 @@ class MainActivity : ComponentActivity() {
                             kotlinx.coroutines.delay(8_000)
                         }
                     }
-                    previewOpen?.let { p ->
-                        androidx.compose.ui.window.Dialog(
-                            onDismissRequest = { previewOpen = null },
-                            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
-                        ) {
-                            com.ragul84.hypurr.ui.PreviewScreen(p, fetch = { port, path, method, headers -> store.previewFetch(id, port, path, method, headers) },
-                                onClose = { previewOpen = null })
-                        }
-                    }
-                    ChatScreen(
+                    // Live preview is a full-screen overlay in this window (not a Dialog), so it gets the
+                    // real status/nav-bar insets instead of drawing under the nav bar.
+                    val previewPort = previewOpen
+                    if (previewPort != null) {
+                        androidx.activity.compose.BackHandler { previewOpen = null }
+                        com.ragul84.hypurr.ui.PreviewScreen(previewPort, fetch = { port, path, method, headers -> store.previewFetch(id, port, path, method, headers) },
+                            onClose = { previewOpen = null })
+                    } else ChatScreen(
                         bot, if (rootId != null) threads[rootId].orEmpty() else entries[id].orEmpty(), draft, { draft = it },
                         onBack = { screen = parentOf(target) },
                         onSend = {
