@@ -18,6 +18,9 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -170,7 +173,12 @@ class MainActivity : ComponentActivity() {
                     var startFree by remember { mutableStateOf(false) }
                     androidx.compose.runtime.CompositionLocalProvider(
                         com.ragul84.hypurr.ui.LocalStartFree provides { startFree = true },
-                    ) { App(store) }
+                    ) {
+                        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize()) {
+                            App(store)
+                            RateWatcher(store, androidx.compose.ui.Modifier.align(androidx.compose.ui.Alignment.BottomCenter))
+                        }
+                    }
                     if (startFree) com.ragul84.hypurr.ui.StartFreeDialog(
                         start = { store.ownFreeStart() },
                         finish = { store.ownFreeFinish(it) },
@@ -222,6 +230,27 @@ class MainActivity : ComponentActivity() {
 
     private fun askForNotifications() {
         if (Build.VERSION.SDK_INT >= 33) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
+    /** Shows the "Rate Hypurr" card when a task finishes while the app is open (data/RatePolicy). */
+    @Composable
+    private fun RateWatcher(store: HypurrStore, modifier: androidx.compose.ui.Modifier) {
+        val bots by store.bots.collectAsState()
+        var lastStatus by remember { mutableStateOf<Map<String, String>?>(null) }
+        var show by remember { mutableStateOf(false) }
+        LaunchedEffect(bots) {
+            val now = bots.values.mapNotNull { b -> b.task?.let { it.id to it.status } }.toMap()
+            val before = lastStatus
+            lastStatus = now
+            if (before == null) return@LaunchedEffect // first sync: old tasks don't count
+            val justFinished = now.filter { (id, st) -> st == "finished" && before[id] != null && before[id] != "finished" }.keys
+            justFinished.forEach { id -> if (store.rate.taskFinished(id) && !show) { show = true; store.rate.asked() } }
+        }
+        if (show) com.ragul84.hypurr.ui.RateHypurrCard(
+            onRate = { show = false; store.rate.rated(); com.ragul84.hypurr.ui.launchPlayReview(this) },
+            onLater = { show = false; store.rate.declined() },
+            modifier = modifier.padding(16.dp),
+        )
     }
 
     @Composable
