@@ -595,6 +595,33 @@ class HypurrStore(
     private val _costs = MutableStateFlow<TaskCosts?>(null)
     val costs: StateFlow<TaskCosts?> = _costs.asStateFlow()
 
+    suspend fun previewPorts(botId: String): List<Int> = client?.previewPorts(botId).orEmpty()
+
+    /** A whole dev-server response, paged over the channel. */
+    suspend fun previewFetch(botId: String, port: Int, path: String, method: String, headers: List<Pair<String, String>>): com.ragul84.hypurr.ui.PreviewResponse {
+        val c = client ?: throw HostException.unreachable()
+        val out = java.io.ByteArrayOutputStream()
+        var offset = 0L
+        var status = 200
+        var hdrs = emptyList<Pair<String, String>>()
+        while (true) {
+            val r = c.previewFetch(botId, port, path, method, headers, offset)
+            fun prim(k: String) = (r[k] as? kotlinx.serialization.json.JsonPrimitive)?.content
+            status = prim("status")?.toIntOrNull() ?: 502
+            hdrs = (r["headers"] as? kotlinx.serialization.json.JsonArray).orEmpty().mapNotNull { h ->
+                val a = h as? kotlinx.serialization.json.JsonArray ?: return@mapNotNull null
+                val k = (a.getOrNull(0) as? kotlinx.serialization.json.JsonPrimitive)?.content ?: return@mapNotNull null
+                k to ((a.getOrNull(1) as? kotlinx.serialization.json.JsonPrimitive)?.content ?: "")
+            }
+            val bytes = android.util.Base64.decode(prim("body") ?: "", android.util.Base64.DEFAULT)
+            out.write(bytes)
+            offset += bytes.size
+            val total = prim("total")?.toLongOrNull() ?: offset
+            if (bytes.isEmpty() || offset >= total) break
+        }
+        return com.ragul84.hypurr.ui.PreviewResponse(status, hdrs, out.toByteArray())
+    }
+
     suspend fun ownFreeStart(): String = (client ?: throw HostException.unreachable()).ownFreeStart()
     suspend fun ownFreeFinish(code: String) { (client ?: throw HostException.unreachable()).ownFreeFinish(code); loadCosts(); refreshHello() }
     suspend fun ownFreeDisconnect() { (client ?: throw HostException.unreachable()).ownFreeDisconnect(); loadCosts(); refreshHello() }

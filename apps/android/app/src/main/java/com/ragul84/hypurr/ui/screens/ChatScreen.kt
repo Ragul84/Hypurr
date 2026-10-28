@@ -169,6 +169,9 @@ fun ChatScreen(
     learn: (@Composable () -> Unit)? = null,
     /** "Show me it works" proof card for a task; null hides it. */
     proof: (@Composable () -> Unit)? = null,
+    /** Dev servers this task started (live preview); empty hides the buttons. */
+    previews: List<Int> = emptyList(),
+    onOpenPreview: (Int) -> Unit = {},
 ) {
     val c = Hypurr.colors
     val inThread = threadRoot != null
@@ -189,6 +192,9 @@ fun ChatScreen(
                 bottom = if (composer.files.isEmpty()) 104.dp else 172.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            if (previews.isNotEmpty() && !inThread) item(key = "preview") {
+                com.ragul84.hypurr.ui.PreviewButtons(previews, onOpenPreview, Modifier.animateItem())
+            }
             if (proof != null && !inThread) item(key = "proof") { Box(Modifier.animateItem()) { proof() } }
             if (learn != null && !inThread) item(key = "learn") { Box(Modifier.animateItem()) { learn() } }
             if (bot.status == "working" && (if (inThread) bot.workingThread == threadRoot?.id else bot.workingThread == null)) {

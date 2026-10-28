@@ -452,6 +452,12 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
                 "usage": hub.usage.locked().clone(),
             })
         }
+        // Live preview of dev servers the bot started (loopback only, over this channel).
+        "previewPorts" => crate::preview::ports(&hub.store, str_arg(&b, "botId")?).await?,
+        "previewFetch" => {
+            crate::preview::set_own_port(hub.port);
+            crate::preview::fetch(&hub.store, &b).await?
+        }
         "history" => {
             let bot = str_arg(&b, "botId")?;
             let before = b["beforeSeq"].as_i64().unwrap_or(i64::MAX);

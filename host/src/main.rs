@@ -12,6 +12,7 @@ mod market;
 mod mcp;
 mod oscmd;
 mod pagemap;
+mod preview;
 mod pricing;
 mod proof;
 mod qa;

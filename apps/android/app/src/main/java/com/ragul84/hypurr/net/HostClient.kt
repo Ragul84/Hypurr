@@ -385,6 +385,18 @@ class HostClient(val transport: ChannelTransport) {
 
     suspend fun taskCosts(): TaskCosts = call("taskCosts")
 
+    /** Dev servers this bot started that are up now (live preview). */
+    suspend fun previewPorts(botId: String): List<Int> =
+        call<JsonObject>("previewPorts", buildJsonObject { put("botId", botId) })["previews"]?.let { it as? JsonArray }.orEmpty()
+            .mapNotNull { (it as? JsonObject)?.get("port")?.jsonPrimitive?.content?.toIntOrNull() }
+
+    /** One slice of a dev-server response, fetched on the computer from loopback. */
+    suspend fun previewFetch(botId: String, port: Int, path: String, method: String, headers: List<Pair<String, String>>, offset: Long): JsonObject =
+        call("previewFetch", buildJsonObject {
+            put("botId", botId); put("port", port); put("path", path); put("method", method); put("offset", offset)
+            put("headers", JsonArray(headers.map { (k, v) -> JsonArray(listOf(JsonPrimitive(k), JsonPrimitive(v))) }))
+        }, timeoutMs = 45_000)
+
     // "Keep going free": the user's own OpenRouter account (OAuth PKCE; the computer keeps the key).
     suspend fun ownFreeStart(): String = call<JsonObject>("ownFreeStart")["url"]!!.jsonPrimitive.content
     suspend fun ownFreeFinish(code: String) { call<JsonObject>("ownFreeFinish", buildJsonObject { put("code", code) }, timeoutMs = 30_000) }
