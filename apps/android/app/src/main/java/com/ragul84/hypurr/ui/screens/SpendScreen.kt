@@ -76,6 +76,8 @@ fun SpendScreen(
     /** Day the chart ends on; tests pin it. */
     now: Long = System.currentTimeMillis(),
     onDisconnectOwnFree: (() -> Unit)? = null,
+    /** Work account and team pool card (ui/WorkTeam.kt); null hides it. */
+    work: (@Composable () -> Unit)? = null,
 ) {
     val c = Hypurr.colors
     val ctx = LocalContext.current
@@ -111,6 +113,7 @@ fun SpendScreen(
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 128.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
+                if (work != null) item { work() }
                 item {
                     Column(Modifier.padding(horizontal = 4.dp)) {
                         Eyebrow("Credits left")

@@ -385,6 +385,10 @@ class HostClient(val transport: ChannelTransport) {
 
     suspend fun taskCosts(): TaskCosts = call("taskCosts")
 
+    // Work accounts and the team credit pool (host work_team.rs). Results are passed through as JSON.
+    suspend fun raw(method: String, body: JsonObject = JsonObject(emptyMap()), timeoutMs: Long = 30_000): JsonObject =
+        transport.call(method, body, timeoutMs) as? JsonObject ?: JsonObject(emptyMap())
+
     // "Keep going free": the user's own OpenRouter account (OAuth PKCE; the computer keeps the key).
     suspend fun ownFreeStart(): String = call<JsonObject>("ownFreeStart")["url"]!!.jsonPrimitive.content
     suspend fun ownFreeFinish(code: String) { call<JsonObject>("ownFreeFinish", buildJsonObject { put("code", code) }, timeoutMs = 30_000) }
