@@ -30,6 +30,8 @@ impl Caller {
 
 /// Methods only this computer may call.
 const LOCAL_ONLY: &[&str] = &[
+    "workDesktopStart",
+    "workDesktopResult",
     "hostUpdateStatus",
     "checkHostUpdate",
     "installHostUpdate",

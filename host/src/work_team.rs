@@ -203,6 +203,179 @@ pub async fn fill_pool(store: &Store, b: &Value) -> Result<Value> {
     checked(res).await
 }
 
+// ---- Desktop sign-in (this computer's own browser, loopback redirect, RFC 8252) ----
+
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+use sha2::{Digest, Sha256};
+use std::collections::HashMap;
+use std::sync::{LazyLock, Mutex};
+
+/// Finished desktop sign-ins by attempt id (the app polls `workDesktopResult`).
+/// `None` while the browser is still out.
+type Pending = Option<Result<Value, String>>;
+static DESKTOP: LazyLock<Mutex<HashMap<String, Pending>>> = LazyLock::new(Default::default);
+
+fn random_b64() -> Result<String> {
+    let mut raw = [0u8; 32];
+    getrandom::fill(&mut raw).map_err(|_| anyhow!("random bytes unavailable"))?;
+    Ok(URL_SAFE_NO_PAD.encode(raw))
+}
+
+/// Provider endpoints for first-time setup (before the gateway knows the team).
+fn setup_config(b: &Value) -> Result<Value> {
+    let provider = b["provider"].as_str().unwrap_or_default();
+    let client =
+        b["clientId"].as_str().filter(|c| !c.is_empty()).ok_or_else(|| anyhow!("Enter the OAuth client id"))?;
+    Ok(match provider {
+        "google" => json!({"provider": "google", "clientId": client,
+            "authorizeUrl": "https://accounts.google.com/o/oauth2/v2/auth", "tokenUrl": "https://oauth2.googleapis.com/token"}),
+        "microsoft" => {
+            let t = b["tenant"]
+                .as_str()
+                .filter(|t| t.len() == 36)
+                .ok_or_else(|| anyhow!("Enter the Microsoft tenant id"))?;
+            json!({"provider": "microsoft", "clientId": client, "tenant": t,
+                "authorizeUrl": format!("https://login.microsoftonline.com/{t}/oauth2/v2.0/authorize"),
+                "tokenUrl": format!("https://login.microsoftonline.com/{t}/oauth2/v2.0/token")})
+        }
+        _ => bail!("Pick Google or Microsoft"),
+    })
+}
+
+/// The company sign-in page for `email`, with a loopback redirect to this computer.
+pub fn authorize_url(cfg: &Value, email: &str, redirect: &str, state: &str, verifier: &str) -> Result<String> {
+    let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
+    let domain = email.split('@').nth(1).unwrap_or_default().to_owned();
+    let mut params = vec![
+        ("client_id", cfg["clientId"].as_str().unwrap_or_default().to_owned()),
+        ("response_type", "code".into()),
+        ("redirect_uri", redirect.into()),
+        ("scope", "openid email profile".into()),
+        ("state", state.into()),
+        ("code_challenge", challenge),
+        ("code_challenge_method", "S256".into()),
+        ("login_hint", email.into()),
+        ("prompt", "select_account".into()),
+    ];
+    if cfg["provider"] == "google" {
+        params.push(("hd", domain));
+    }
+    Ok(reqwest::Url::parse_with_params(cfg["authorizeUrl"].as_str().unwrap_or_default(), &params)?.to_string())
+}
+
+/// `workDesktopStart {email, setup?: {name, provider, clientId, tenant?}}` (this computer only):
+/// returns the company sign-in page for the desktop app to open; poll `workDesktopResult {attempt}`.
+pub async fn desktop_start(hub: std::sync::Arc<crate::hub::Hub>, b: &Value) -> Result<Value> {
+    let email = b["email"].as_str().unwrap_or_default().trim().to_lowercase();
+    if !email.contains('@') {
+        bail!("Enter your work email.");
+    }
+    let setup = b.get("setup").filter(|s| s.is_object()).cloned();
+    let cfg = match &setup {
+        Some(s) => setup_config(s)?,
+        None => sso_config(&email).await?,
+    };
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+    let redirect = format!("http://127.0.0.1:{}/callback", listener.local_addr()?.port());
+    let (state, verifier) = (random_b64()?, random_b64()?);
+    let url = authorize_url(&cfg, &email, &redirect, &state, &verifier)?;
+    let attempt = random_b64()?;
+    DESKTOP.lock().map_err(|_| anyhow!("busy"))?.insert(attempt.clone(), None);
+    let id = attempt.clone();
+    tokio::spawn(async move {
+        let r = desktop_finish(&hub.store, listener, &cfg, &email, setup, &redirect, &state, &verifier)
+            .await
+            .map_err(|e| format!("{e:#}"));
+        if let Ok(mut m) = DESKTOP.lock() {
+            m.insert(id, Some(r));
+        }
+    });
+    Ok(json!({"attempt": attempt, "url": url}))
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn desktop_finish(
+    store: &Store,
+    listener: tokio::net::TcpListener,
+    cfg: &Value,
+    email: &str,
+    setup: Option<Value>,
+    redirect: &str,
+    state: &str,
+    verifier: &str,
+) -> Result<Value> {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let (mut sock, _) = tokio::time::timeout(Duration::from_secs(600), listener.accept())
+        .await
+        .map_err(|_| anyhow!("Sign-in didn't finish within 10 minutes."))??;
+    let mut buf = vec![0u8; 8192];
+    let n = sock.read(&mut buf).await?;
+    let req = String::from_utf8_lossy(&buf[..n]);
+    let path = req.split_whitespace().nth(1).unwrap_or("/");
+    let url = reqwest::Url::parse(&format!("http://127.0.0.1{path}"))?;
+    let q: HashMap<String, String> = url.query_pairs().into_owned().collect();
+    let page = "<!doctype html><meta charset=utf-8><title>Hypurr</title><body style=\"font-family:sans-serif;padding:40px\">You can close this tab and go back to Hypurr.";
+    let _ = sock
+        .write_all(
+            format!(
+                "HTTP/1.1 200 OK\r\ncontent-type: text/html\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{page}",
+                page.len()
+            )
+            .as_bytes(),
+        )
+        .await;
+    if let Some(e) = q.get("error") {
+        bail!("{}", q.get("error_description").unwrap_or(e));
+    }
+    if q.get("state").map(String::as_str) != Some(state) {
+        bail!("That sign-in didn't come from Hypurr. Try again.");
+    }
+    let code = q.get("code").ok_or_else(|| anyhow!("Sign-in was cancelled."))?;
+    let form = reqwest::Url::parse_with_params(
+        "http://x/",
+        &[
+            ("grant_type", "authorization_code"),
+            ("code", code),
+            ("redirect_uri", redirect),
+            ("client_id", cfg["clientId"].as_str().unwrap_or_default()),
+            ("code_verifier", verifier),
+        ],
+    )?;
+    let res = http()?
+        .post(cfg["tokenUrl"].as_str().unwrap_or_default())
+        .header("content-type", "application/x-www-form-urlencoded")
+        .body(form.query().unwrap_or_default().to_owned())
+        .send()
+        .await
+        .context("reaching your company's sign-in")?;
+    let v: Value = res.json().await.unwrap_or(Value::Null);
+    let Some(id_token) = v["id_token"].as_str() else {
+        bail!("{}", v["error_description"].as_str().unwrap_or("Your company's sign-in didn't finish."));
+    };
+    match setup {
+        Some(mut s) => {
+            s["idToken"] = json!(id_token);
+            s["domain"] = json!(email.split('@').nth(1).unwrap_or_default());
+            self::setup(store, &s).await
+        }
+        None => sign_in(store, &json!({"email": email, "idToken": id_token})).await,
+    }
+}
+
+/// `workDesktopResult {attempt}`: `{done:false}` while waiting, the sign-in result when done.
+pub fn desktop_result(attempt: &str) -> Result<Value> {
+    let mut m = DESKTOP.lock().map_err(|_| anyhow!("busy"))?;
+    match m.get(attempt) {
+        None => bail!("Start the sign-in again."),
+        Some(None) => Ok(json!({"done": false})),
+        Some(Some(_)) => match m.remove(attempt).flatten() {
+            Some(Ok(v)) => Ok(json!({"done": true, "result": v})),
+            Some(Err(e)) => bail!("{e}"),
+            None => Ok(json!({"done": false})),
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -213,6 +386,16 @@ mod tests {
         let p = public(&v);
         assert!(p.get("apiKey").is_none());
         assert_eq!(p["team"]["name"], "Acme");
+    }
+
+    #[test]
+    fn desktop_url_has_pkce_and_domain() {
+        let cfg = setup_config(&json!({"provider": "google", "clientId": "cid"})).unwrap();
+        let u = authorize_url(&cfg, "sam@acme.com", "http://127.0.0.1:5000/callback", "st", "ver").unwrap();
+        assert!(u.starts_with("https://accounts.google.com/o/oauth2/v2/auth?client_id=cid"));
+        assert!(u.contains("code_challenge_method=S256") && u.contains("hd=acme.com") && u.contains("state=st"));
+        assert!(setup_config(&json!({"provider": "microsoft", "clientId": "c"})).is_err());
+        assert!(desktop_result("nope").is_err());
     }
 
     #[tokio::test]

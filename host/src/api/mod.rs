@@ -710,6 +710,8 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
         "workSignIn" => crate::work_team::sign_in(&hub.store, &b).await?,
         "workTeamSetup" => crate::work_team::setup(&hub.store, &b).await?,
         "workSignOut" => crate::work_team::sign_out(&hub.store)?,
+        "workDesktopStart" => crate::work_team::desktop_start(hub.clone(), &b).await?,
+        "workDesktopResult" => crate::work_team::desktop_result(str_arg(&b, "attempt")?)?,
         "workTeam" => crate::work_team::team(&hub.store).await?,
         "workTeamMember" => crate::work_team::member(&hub.store, &b).await?,
         "workTeamPool" => crate::work_team::fill_pool(&hub.store, &b).await?,
