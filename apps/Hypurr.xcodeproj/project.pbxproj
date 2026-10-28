@@ -861,7 +861,10 @@
 				INFOPLIST_FILE = macos/Resources/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Hypurr;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Talk to your bots in a voice chat.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Your words are transcribed on this Mac and sent to your bot as a message.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -1144,7 +1147,10 @@
 				INFOPLIST_FILE = macos/Resources/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Hypurr;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Talk to your bots in a voice chat.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Your words are transcribed on this Mac and sent to your bot as a message.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",

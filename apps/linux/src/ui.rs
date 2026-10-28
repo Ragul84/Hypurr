@@ -955,7 +955,10 @@ fn handle(ui: &App, ev: Event) {
                         st.bots.insert(id, bot.clone());
                     }
                 }
-                "entry" => upsert(&mut st, m["entry"].clone()),
+                "entry" => {
+                    crate::voice::on_entry(&m["entry"]);
+                    upsert(&mut st, m["entry"].clone());
+                }
                 _ => {}
             },
         }
@@ -1665,6 +1668,14 @@ fn render_details(ui: &App, st: &State, bot: &Value) {
         agent.append(&l);
     }
     c.append(&agent);
+    let voice = gtk::Button::with_label("Voice chat");
+    let (ui2, vid, vname) = (
+        ui.clone(),
+        id.to_owned(),
+        bot["name"].as_str().unwrap_or("bot").to_owned(),
+    );
+    voice.connect_clicked(move |_| crate::voice::open(&ui2.window, &vid, &vname));
+    c.append(&voice);
 }
 
 /// The thread open beside the chat: its root, the replies and a composer that replies there.
