@@ -21,3 +21,10 @@ host (e.g. an API on a second port) need that port previewed separately.
 
 API: `previewPorts {botId}` → `{previews:[{port,url}]}`; `previewFetch {botId, port, path, method, headers, offset}` →
 `{status, headers, body(base64), offset, total}`.
+
+## Clients
+
+- **Android**: WebView, every `localhost:<port>` request intercepted and fetched with `previewFetch`.
+- **iPhone and Mac** (kit `PreviewView`): WKWebView on the `hypurr-preview://localhost:<port>` scheme, each request fetched with `previewFetch`. Relative URLs work; absolute `http://localhost:…` URLs inside the page don't.
+- **Linux app**: runs on the computer itself, so the details pane lists the servers (`previewPorts`) and opens them in the browser.
+- **Windows app**: status and pairing only (no chat), so no preview.

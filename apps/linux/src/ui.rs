@@ -1665,6 +1665,34 @@ fn render_details(ui: &App, st: &State, bot: &Value) {
         agent.append(&l);
     }
     c.append(&agent);
+    c.append(&preview_box(id));
+}
+
+/// Live preview: dev servers this bot started open in the browser (this app runs on the computer).
+fn preview_box(bot: &str) -> gtk::Box {
+    let b = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(8)
+        .visible(false)
+        .build();
+    b.append(&label("Live preview", &["body13", "semibold"]));
+    let b2 = b.clone();
+    crate::client::call("previewPorts", serde_json::json!({"botId": bot}), move |r| {
+        let Ok(v) = r else { return };
+        for p in v["previews"].as_array().into_iter().flatten() {
+            let Some(port) = p["port"].as_u64() else { continue };
+            let btn = gtk::Button::with_label(&format!("Open localhost:{port}"));
+            btn.connect_clicked(move |_| {
+                let _ = gtk::gio::AppInfo::launch_default_for_uri(
+                    &format!("http://localhost:{port}/"),
+                    None::<&gtk::gio::AppLaunchContext>,
+                );
+            });
+            b2.append(&btn);
+            b2.set_visible(true);
+        }
+    });
+    b
 }
 
 /// The thread open beside the chat: its root, the replies and a composer that replies there.
