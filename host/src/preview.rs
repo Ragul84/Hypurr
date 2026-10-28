@@ -60,11 +60,20 @@ fn own_ports() -> [u16; 2] {
     [crate::service::DEFAULT_PORT, OWN_PORT.load(std::sync::atomic::Ordering::Relaxed)]
 }
 
+/// The loopback address the dev server answers on. Node on Windows binds `localhost` to `::1`
+/// only (Vite's default), so IPv4 alone misses it.
+async fn loopback(port: u16) -> Option<&'static str> {
+    for (ip, host) in [("127.0.0.1", "127.0.0.1"), ("::1", "[::1]")] {
+        let connect = tokio::net::TcpStream::connect((ip, port));
+        if matches!(tokio::time::timeout(Duration::from_millis(400), connect).await, Ok(Ok(_))) {
+            return Some(host);
+        }
+    }
+    None
+}
+
 async fn listening(port: u16) -> bool {
-    matches!(
-        tokio::time::timeout(Duration::from_millis(400), tokio::net::TcpStream::connect(("127.0.0.1", port))).await,
-        Ok(Ok(_))
-    )
+    loopback(port).await.is_some()
 }
 
 /// Dev servers this bot started that are up right now: `[{port, url}]`.
@@ -149,8 +158,9 @@ pub async fn fetch(store: &Store, b: &Value) -> Result<Value> {
             .redirect(reqwest::redirect::Policy::none())
             .timeout(Duration::from_secs(30))
             .build()?;
+        let ip = loopback(port).await.ok_or_else(|| anyhow::anyhow!("The dev server on port {port} didn't answer."))?;
         let mut req = client
-            .request(method.parse()?, format!("http://127.0.0.1:{port}{path}"))
+            .request(method.parse()?, format!("http://{ip}:{port}{path}"))
             .header("host", format!("localhost:{port}"));
         for h in b["headers"].as_array().into_iter().flatten() {
             if let (Some(k), Some(v)) = (h[0].as_str(), h[1].as_str())
@@ -279,5 +289,13 @@ mod tests {
         assert!(fetch(&store, &json!({"botId": bot, "port": port + 1, "path": "/"})).await.is_err());
         let found = ports(&store, bot).await.unwrap();
         assert_eq!(found["previews"][0]["port"], port);
+    }
+
+    #[tokio::test]
+    async fn finds_servers_bound_to_ipv6_loopback_only() {
+        // Vite on Windows binds `localhost` to ::1 only.
+        let Ok(listener) = tokio::net::TcpListener::bind("[::1]:0").await else { return };
+        let port = listener.local_addr().unwrap().port();
+        assert_eq!(loopback(port).await, Some("[::1]"));
     }
 }
