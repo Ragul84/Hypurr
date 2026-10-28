@@ -391,6 +391,7 @@ private struct ChatSplitView: View {
     @State private var previousSelection: BotReference?
     @State private var hoveredBot: BotReference?
     @State private var marketplace: ComputerID?
+    @State private var workTeam: ComputerID?
     @State private var showComputers = false
     @State private var search = ""
     @State private var showUsage = false
@@ -647,6 +648,12 @@ private struct ChatSplitView: View {
                 .frame(width: min(920, windowSize.width - 80), height: sheetHeight)
             }
         }
+        .hypurrSheet(isPresented: Binding(get: { workTeam != nil }, set: { if !$0 { workTeam = nil } })) {
+            if let client = workTeam.flatMap(accounts.store(for:))?.client {
+                NavigationStack { WorkTeamView(client: client) }
+                    .frame(width: 520, height: min(680, sheetHeight))
+            }
+        }
         .hypurrSheet(isPresented: $showComputers) {
             ComputersView()
                 .frame(width: 620, height: sheetHeight)
@@ -885,6 +892,25 @@ extension ChatSplitView {
                 .contentShape(Rectangle())
             }
             .onHover { hoveredFooter = $0 ? "marketplace" : nil }
+
+            Button {
+                workTeam = (selectedStore ?? host.store ?? onlineStores.first)?.computer.id
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "building.2")
+                        .font(.system(size: 14, weight: .regular))
+                        .frame(width: 30, height: 30)
+                        .background(Palette.text.opacity(0.025), in: Circle())
+                    Text("Work account")
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 8)
+                .frame(height: 36)
+                .background(hoveredFooter == "work" ? Palette.bubbleAgent : .clear,
+                            in: RoundedRectangle(cornerRadius: 10))
+                .contentShape(Rectangle())
+            }
+            .onHover { hoveredFooter = $0 ? "work" : nil }
 
             Button {
                 showAccount.toggle()
