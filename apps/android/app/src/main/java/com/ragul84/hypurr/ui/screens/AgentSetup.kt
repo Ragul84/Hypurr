@@ -16,6 +16,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.semantics
@@ -63,7 +65,7 @@ data class KnownAgent(val id: String, val name: String, val install: String, val
 val KnownAgents = listOf(
     KnownAgent("claude", "Claude Code", "irm https://claude.ai/install.ps1 | iex", "Run  claude  once and sign in with your Claude account."),
     KnownAgent("codex", "Codex", "irm https://chatgpt.com/codex/install.ps1 | iex", "Run  codex  once and pick \"Sign in with ChatGPT\"."),
-    KnownAgent("gemini", "Gemini CLI", "npm install -g @google/gemini-cli", "Run  gemini  once and pick \"Login with Google\"."),
+    KnownAgent("gemini", "Gemini CLI", "npm install -g @google/gemini-cli", "Run  gemini  once and pick \"Login with Google\", or use a Gemini API key."),
     KnownAgent("cursor", "Cursor CLI", "irm 'https://cursor.com/install?win32=true' | iex", "Run  cursor-agent login  and finish in the browser."),
 )
 
@@ -75,6 +77,8 @@ fun AgentSetupPanel(
     onPair: () -> Unit = {},
     onCheckAgain: () -> Unit = {},
     onClose: () -> Unit = {},
+    /** Saves a Gemini API key on the computer; null hides the option. */
+    saveGeminiKey: (suspend (String) -> Unit)? = null,
 ) {
     val c = Hypurr.colors
     val mode = agentSetupMode(hello)
@@ -92,7 +96,7 @@ fun AgentSetupPanel(
                 }
                 AgentSetupMode.Windows -> {
                     Title("Use an agent you already have", "Update Hypurr on ${hello?.name?.ifEmpty { null } ?: "your PC"} to install Hypurr Agent with one tap. Until then, Hypurr can drive one of these.")
-                    AgentList(hello?.backends.orEmpty())
+                    AgentList(hello?.backends.orEmpty(), saveGeminiKey = saveGeminiKey)
                     Spacer(Modifier.height(12.dp))
                     Text("After installing, tap Check again.", color = c.tertiary, style = MaterialTheme.typography.bodySmall)
                 }
@@ -114,7 +118,7 @@ fun AgentSetupPanel(
                     Spacer(Modifier.height(16.dp))
                     Eyebrow("Or use one you have")
                     Spacer(Modifier.height(8.dp))
-                    AgentList(hello?.backends.orEmpty(), windows = win)
+                    AgentList(hello?.backends.orEmpty(), windows = win, saveGeminiKey = saveGeminiKey)
                 }
             }
             Spacer(Modifier.height(16.dp))
@@ -168,8 +172,12 @@ private fun Steps(lines: List<String>) {
 }
 
 @Composable
-private fun AgentList(backends: List<Backend>, windows: Boolean = true) {
+private fun AgentList(backends: List<Backend>, windows: Boolean = true, saveGeminiKey: (suspend (String) -> Unit)? = null) {
     val c = Hypurr.colors
+    var keyOpen by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    if (keyOpen && saveGeminiKey != null) {
+        com.ragul84.hypurr.ui.GeminiKeyDialog(saveGeminiKey, onDone = { keyOpen = false }, onDismiss = { keyOpen = false })
+    }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         KnownAgents.forEach { a ->
             val b = backends.firstOrNull { it.id == a.id }
@@ -189,6 +197,9 @@ private fun AgentList(backends: List<Backend>, windows: Boolean = true) {
                             color = c.text, style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace))
                     }
                     if (!installed || b?.signedIn == false) Text(a.signIn, color = c.secondary, style = MaterialTheme.typography.bodySmall)
+                    if (a.id == "gemini" && installed && b?.signedIn != true && saveGeminiKey != null) {
+                        SoftButton("Use a Gemini API key", Modifier.fillMaxWidth()) { keyOpen = true }
+                    }
                 }
             }
         }

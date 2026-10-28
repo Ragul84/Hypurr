@@ -259,6 +259,7 @@ class MainActivity : ComponentActivity() {
                     onPair = { setupOpen = false; startScan() },
                     onCheckAgain = { store.reconnect() },
                     onClose = { setupOpen = false },
+                    saveGeminiKey = { store.saveGeminiKey(it) },
                 )
             }
         }

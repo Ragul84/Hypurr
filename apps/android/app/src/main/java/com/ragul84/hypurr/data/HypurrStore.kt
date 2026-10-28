@@ -595,6 +595,17 @@ class HypurrStore(
     private val _costs = MutableStateFlow<TaskCosts?>(null)
     val costs: StateFlow<TaskCosts?> = _costs.asStateFlow()
 
+    /** Gemini with an API key; throws the computer's plain words when it still can't sign in. */
+    suspend fun saveGeminiKey(key: String) {
+        val res = (client ?: throw HostException.unreachable()).setAgentEnv("gemini", "GEMINI_API_KEY", key)
+        refreshHello()
+        val signedIn = (res["signedIn"] as? kotlinx.serialization.json.JsonPrimitive)?.content
+        if (signedIn == "false") {
+            val why = (res["detail"] as? kotlinx.serialization.json.JsonPrimitive)?.content
+            throw IllegalStateException(why ?: "Gemini didn't accept that key. Check it and try again.")
+        }
+    }
+
     suspend fun ownFreeStart(): String = (client ?: throw HostException.unreachable()).ownFreeStart()
     suspend fun ownFreeFinish(code: String) { (client ?: throw HostException.unreachable()).ownFreeFinish(code); loadCosts(); refreshHello() }
     suspend fun ownFreeDisconnect() { (client ?: throw HostException.unreachable()).ownFreeDisconnect(); loadCosts(); refreshHello() }

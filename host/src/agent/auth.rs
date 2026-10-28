@@ -188,7 +188,13 @@ async fn probe(store: &Store, backend: &str) -> Result<Status> {
         Ok(Ok(_)) => (Some(true), None),
         Ok(Err(e)) => match e.downcast_ref::<RpcError>() {
             Some(r) if r.code == AUTH_REQUIRED => (Some(false), Some(r.message.clone())),
-            _ => (None, Some(format!("{e:#}"))),
+            _ => {
+                let text = format!("{e:#}");
+                match plain_error(&text) {
+                    Some(plain) => (Some(false), Some(plain.to_owned())),
+                    None => (None, Some(text)),
+                }
+            }
         },
         Err(_) => (None, None),
     };
@@ -320,7 +326,46 @@ fn methods(backend: &str, init: &Value, cmd: &Cmd) -> Vec<Method> {
     let keyed: Vec<String> =
         out.iter().filter(|m| matches!(m.kind, MethodKind::EnvVar { .. })).map(|m| m.name.clone()).collect();
     out.retain(|m| !matches!(m.kind, MethodKind::Agent) || !keyed.contains(&m.name));
+    // Gemini CLI reads GEMINI_API_KEY but doesn't advertise it as an env-var method; Google
+    // refuses free Google sign-in for many accounts, so always offer a key.
+    if backend == "gemini" && !out.iter().any(|m| has_var(m, GEMINI_KEY)) {
+        out.insert(0, gemini_key_method());
+    }
     out
+}
+
+pub const GEMINI_KEY: &str = "GEMINI_API_KEY";
+const GEMINI_KEY_METHOD: &str = "gemini-api-key";
+
+/// What Google's refusal of free Google sign-in means, in plain words.
+pub const GEMINI_FREE_REFUSED: &str = "Google no longer lets Gemini CLI use a free Google sign-in on this account. Use a Gemini API key instead (free from Google AI Studio).";
+
+/// Plain words for an agent error we recognise, or None.
+pub fn plain_error(text: &str) -> Option<&'static str> {
+    let t = text.to_lowercase();
+    (t.contains("no longer supported for gemini code assist") || t.contains("migrate to the antigravity"))
+        .then_some(GEMINI_FREE_REFUSED)
+}
+
+fn has_var(m: &Method, name: &str) -> bool {
+    matches!(&m.kind, MethodKind::EnvVar { vars, .. } if vars.iter().any(|v| v.name == name))
+}
+
+fn gemini_key_method() -> Method {
+    Method {
+        id: GEMINI_KEY_METHOD.into(),
+        name: "Use a Gemini API key".into(),
+        description: Some("Free from Google AI Studio. Saved only on this computer.".into()),
+        kind: MethodKind::EnvVar {
+            vars: vec![EnvVar {
+                name: GEMINI_KEY.into(),
+                label: "Gemini API key".into(),
+                secret: true,
+                optional: false,
+            }],
+            link: Some("https://aistudio.google.com/apikey".into()),
+        },
+    }
 }
 
 /// The terminal command for a method found by the last check.
@@ -333,6 +378,11 @@ pub fn terminal_command(backend: &str, method: &str) -> Option<String> {
 
 /// Lets the agent sign itself in (it usually opens a browser on this computer).
 pub async fn authenticate(store: &Store, backend: &str, method: &str) -> Result<Value> {
+    authenticate_once(store, backend, method).await?;
+    check(store, backend).await
+}
+
+async fn authenticate_once(store: &Store, backend: &str, method: &str) -> Result<()> {
     let (acp, _inbox, _, _) = start(store, backend).await?;
     let res =
         tokio::time::timeout(Duration::from_secs(10 * 60), acp.request("authenticate", json!({"methodId": method})))
@@ -340,11 +390,11 @@ pub async fn authenticate(store: &Store, backend: &str, method: &str) -> Result<
     acp.kill().await;
     match res {
         Ok(r) => {
-            r.context("signing in")?;
+            r.map_err(|e| plain_error(&format!("{e:#}")).map_or(e, |p| anyhow!(p))).context("signing in")?;
+            Ok(())
         }
         Err(_) => bail!("Sign-in didn't finish within 10 minutes."),
     }
-    check(store, backend).await
 }
 
 /// Saves the keys for an env-var method (empty values remove them), then re-checks.
@@ -360,6 +410,14 @@ pub async fn set_env(store: &Store, backend: &str, vars: &Map<String, Value>) ->
         };
     }
     crate::market::vault::write(store, &env_slot(backend), &serde_json::to_string(&saved)?)?;
+    // Gemini keeps using the sign-in it picked last (Google sign-in) until told to use the key.
+    if backend == "gemini" && saved.contains_key(GEMINI_KEY) {
+        let switched = authenticate_once(store, backend, GEMINI_KEY_METHOD).await;
+        if let Err(e) = switched {
+            // Never log the key: only the agent's error text.
+            tracing::warn!(error = %e, "gemini didn't accept the API key method");
+        }
+    }
     check(store, backend).await
 }
 
@@ -446,5 +504,26 @@ mod tests {
         let init = json!({"authMethods": [{"id": "k", "name": "Kilo", "_meta": {"terminal-auth": {"command": "opencode", "args": ["auth", "login"]}}}]});
         assert!(methods("kilo", &init, &cmd()).is_empty());
         assert_eq!(methods("opencode", &init, &cmd()).len(), 1);
+    }
+
+    #[test]
+    fn gemini_always_offers_an_api_key() {
+        let init = json!({"authMethods": [{"id": "oauth-personal", "name": "Log in with Google"}]});
+        let m = methods("gemini", &init, &cmd());
+        assert_eq!(m[0].id, "gemini-api-key");
+        assert!(has_var(&m[0], GEMINI_KEY));
+        assert!(serde_json::to_string(&m[0]).unwrap().contains("aistudio.google.com"));
+        // Not for other agents, and not twice when Gemini advertises it itself.
+        assert!(methods("claude", &init, &cmd()).iter().all(|m| m.id != "gemini-api-key"));
+        let own = json!({"authMethods": [{"id": "k", "name": "Key", "type": "env_var", "vars": [{"name": "GEMINI_API_KEY"}]}]});
+        assert_eq!(methods("gemini", &own, &cmd()).len(), 1);
+    }
+
+    #[test]
+    fn google_refusal_reads_plainly() {
+        let raw = "This client is no longer supported for Gemini Code Assist for individuals. To continue using Gemini, please migrate to the Antigravity suite of products: https://antigravity.google";
+        assert_eq!(plain_error(raw), Some(GEMINI_FREE_REFUSED));
+        assert_eq!(plain_error("rate limited"), None);
+        assert!(!GEMINI_FREE_REFUSED.contains("Antigravity"));
     }
 }
