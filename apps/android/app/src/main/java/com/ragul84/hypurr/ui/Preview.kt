@@ -55,7 +55,7 @@ fun PreviewButtons(ports: List<Int>, onOpen: (Int) -> Unit, modifier: Modifier =
 /** Full-screen live preview of `http://localhost:<port>` from the computer. */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun PreviewScreen(port: Int, fetch: PreviewFetch, onClose: () -> Unit) {
+fun PreviewScreen(port: Int, fetch: PreviewFetch, onClose: () -> Unit, path: String = "/") {
     val c = Hypurr.colors
     var web by remember { mutableStateOf<WebView?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -63,7 +63,7 @@ fun PreviewScreen(port: Int, fetch: PreviewFetch, onClose: () -> Unit) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             IconTile(signalIcon(SignalIcons.Back), "Close preview", onClick = onClose)
             Spacer(Modifier.width(8.dp))
-            Text("localhost:$port", color = c.text, style = MaterialTheme.typography.titleMedium, maxLines = 1,
+            Text("localhost:$port" + path.takeIf { it != "/" }.orEmpty(), color = c.text, style = MaterialTheme.typography.titleMedium, maxLines = 1,
                 overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             SoftButton("Reload") { error = null; web?.reload() }
         }
@@ -96,7 +96,7 @@ fun PreviewScreen(port: Int, fetch: PreviewFetch, onClose: () -> Unit) {
                             }
                         }
                     }
-                    loadUrl("http://localhost:$port/")
+                    loadUrl("http://localhost:$port" + (if (path.startsWith("/")) path else "/$path"))
                     web = this
                 }
             },
