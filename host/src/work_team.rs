@@ -17,11 +17,16 @@ const PERSONAL_KEY_SLOT: &str = "gateway_key_personal";
 /// kv: the work email this computer is signed in with.
 const WORK_EMAIL: &str = "work_email";
 
-fn base() -> String {
-    gateway_url()
+const GATEWAY_OFF: &str = "Work accounts need the Hypurr gateway, which is turned off on this computer.";
+
+fn base() -> Result<String> {
+    if crate::agent::builtin::gateway_off() {
+        bail!(GATEWAY_OFF);
+    }
+    Ok(gateway_url()
         .unwrap_or_else(|| crate::agent::builtin::DEFAULT_GATEWAY_URL.to_owned())
         .trim_end_matches('/')
-        .to_owned()
+        .to_owned())
 }
 
 fn http() -> Result<reqwest::Client> {
@@ -60,11 +65,14 @@ fn work_key(store: &Store) -> Result<String> {
 /// `gatewayBalance`: what this computer can spend at the gateway, and the team paying for it.
 pub async fn balance(store: &Store) -> Result<Value> {
     // No key yet (no credits, never signed in): nothing to show, not an error.
-    let Ok(key) = gateway_key(store, &base()).await else {
+    let Ok(base) = base() else {
+        return Ok(json!({"credits": null, "team": null, "workEmail": work_email(store), "gateway": "off"}));
+    };
+    let Ok(key) = gateway_key(store, &base).await else {
         return Ok(json!({"credits": null, "team": null, "workEmail": work_email(store)}));
     };
     let res = http()?
-        .get(format!("{}/v1/gateway/balance", base()))
+        .get(format!("{base}/v1/gateway/balance"))
         .bearer_auth(key)
         .send()
         .await
@@ -85,7 +93,10 @@ pub async fn sso_config(email: &str) -> Result<Value> {
         bail!("Enter your work email.");
     }
     let res = http()?
-        .get(reqwest::Url::parse_with_params(&format!("{}/v1/teams/sso-config", base()), &[("email", email.as_str())])?)
+        .get(reqwest::Url::parse_with_params(
+            &format!("{}/v1/teams/sso-config", base()?),
+            &[("email", email.as_str())],
+        )?)
         .send()
         .await
         .context("reaching the Hypurr gateway")?;
@@ -115,7 +126,7 @@ fn public(v: &Value) -> Value {
 /// `workSignIn {email, idToken}`.
 pub async fn sign_in(store: &Store, b: &Value) -> Result<Value> {
     let res = http()?
-        .post(format!("{}/v1/teams/sso", base()))
+        .post(format!("{}/v1/teams/sso", base()?))
         .json(&json!({"email": b["email"], "idToken": b["idToken"]}))
         .send()
         .await
@@ -132,7 +143,7 @@ pub async fn setup(store: &Store, b: &Value) -> Result<Value> {
         "clientId": b["clientId"], "tenant": b["tenant"], "idToken": b["idToken"],
     });
     let res = http()?
-        .post(format!("{}/v1/teams/setup", base()))
+        .post(format!("{}/v1/teams/setup", base()?))
         .json(&body)
         .send()
         .await
@@ -155,7 +166,7 @@ pub fn sign_out(store: &Store) -> Result<Value> {
 pub async fn team(store: &Store) -> Result<Value> {
     let key = work_key(store)?;
     let res = http()?
-        .get(format!("{}/v1/teams/mine", base()))
+        .get(format!("{}/v1/teams/mine", base()?))
         .bearer_auth(key)
         .send()
         .await
@@ -181,7 +192,7 @@ pub async fn member(store: &Store, b: &Value) -> Result<Value> {
     }
     let (key, id) = team_id(store).await?;
     let res = http()?
-        .patch(format!("{}/v1/teams/{id}/members/{user}", base()))
+        .patch(format!("{}/v1/teams/{id}/members/{user}", base()?))
         .bearer_auth(key)
         .json(&Value::Object(patch))
         .send()
@@ -194,7 +205,7 @@ pub async fn member(store: &Store, b: &Value) -> Result<Value> {
 pub async fn fill_pool(store: &Store, b: &Value) -> Result<Value> {
     let (key, id) = team_id(store).await?;
     let res = http()?
-        .post(format!("{}/v1/teams/{id}/pool", base()))
+        .post(format!("{}/v1/teams/{id}/pool", base()?))
         .bearer_auth(key)
         .json(&json!({"amountCents": b["amountCents"]}))
         .send()

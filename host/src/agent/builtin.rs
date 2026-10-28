@@ -55,6 +55,11 @@ pub fn gateway_url() -> Option<String> {
     }
 }
 
+/// The gateway is explicitly turned off on this computer (`HYPURR_GATEWAY_URL=off`).
+pub fn gateway_off() -> bool {
+    configured_gateway().is_some_and(|v| v.is_empty())
+}
+
 pub fn gateway_ready() -> bool {
     gateway_url().is_some()
 }
