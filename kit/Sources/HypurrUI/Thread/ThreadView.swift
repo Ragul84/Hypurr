@@ -217,6 +217,7 @@ public struct ThreadView: View {
             }
         #endif
         .readingConversation(botId)
+        .modifier(RatePrompt(taskId: bot?.task?.id, status: bot?.task?.status))
         .hypurrSheet(isPresented: $showTrace) {
             TraceView(botId: botId)
                 #if os(macOS)
