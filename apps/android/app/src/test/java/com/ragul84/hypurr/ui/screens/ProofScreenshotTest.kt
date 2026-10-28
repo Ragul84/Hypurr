@@ -133,6 +133,25 @@ class ProofScreenshotTest {
         }
     }
 
+    // The compact chat card and the full Changes screen.
+    @Test fun cardViewChanges() = shoot("changes-card-offer") { chat { ProofCard(null, onSeeLive = {}, onOpen = {}) } }
+    @Test fun cardPreparing() = shoot("changes-card-preparing") {
+        chat { ProofCard(Proof(status = "running", plan = ProofPlan("web", "Open the changed pages (yours and the original) and capture them")), onOpen = {}) }
+    }
+    @Test fun cardReady() = shoot("changes-card-ready") { chat { ProofCard(web, images, onSeeLive = {}, onOpen = {}) } }
+    @Test fun screenPreparing() = shoot("changes-screen-preparing") {
+        ChangesScreen(Proof(status = "running"), onBack = {}, animateHint = false)
+    }
+    @Test fun screenReady() = shoot("changes-screen-ready") {
+        ChangesScreen(web, images, onBack = {}, onSeeLive = {}, animateHint = false, initialSplit = 0.5f)
+    }
+    @Test fun screenHint() {
+        compose.mainClock.autoAdvance = false
+        compose.setContent { HypurrTheme(ThemeMode.Dark) { ChangesScreen(web, images, onBack = {}, onSeeLive = {}) } }
+        compose.mainClock.advanceTimeBy(500)
+        compose.onRoot().captureRoboImage("${System.getProperty("roborazzi.output.dir")}/android-changes-screen-slide-hint-dark.png")
+    }
+
     @Test fun webSlider() = shoot("proof-web") { ProofCardAlone { ProofCard(web, images, initialSplit = 0.42f) } }
 
     @Test fun webInChat() = shoot("proof-web-chat") { chat { ProofCard(web, images, initialSplit = 0.5f) } }

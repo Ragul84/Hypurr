@@ -1,5 +1,11 @@
 package com.ragul84.hypurr.ui.screens
 
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -104,7 +110,7 @@ fun proofShow(entries: List<com.ragul84.hypurr.model.Entry>, proof: Proof?, work
 
 fun proofTitle(p: Proof): String = when {
     p.status == "needsApproval" -> "Show me needs to run your project"
-    p.status == "running" -> "Making the proof…"
+    p.status == "running" -> "Preparing your changes…"
     p.status == "failed" -> "Couldn't make the proof"
     p.status == "unavailable" -> "Proof needs a Git project"
     p.kind == "web" -> "Your pages, before and after"
@@ -130,6 +136,8 @@ fun ProofCard(
     /** "See it live" for a web project: opens the page in the live preview. Null hides it. */
     onSeeLive: (() -> Unit)? = null,
     liveBusy: Boolean = false,
+    /** Opens the full Changes screen; when set, the chat card stays compact. */
+    onOpen: (() -> Unit)? = null,
     onVerdict: (ok: Boolean, text: String) -> Unit = { _, _ -> },
     initialShot: Int = 0,
     initialSplit: Float = 0.5f,
@@ -142,26 +150,25 @@ fun ProofCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(signalIcon(SignalIcons.Image), null, tint = c.text, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))
-                Eyebrow("Proof", Modifier.weight(1f), pulse = proof?.status == "running")
+                Eyebrow("Changes", Modifier.weight(1f), pulse = proof?.status == "running")
                 if (proof?.status == "ready" || proof?.status == "failed") {
-                    Text("Again", color = c.tertiary, style = MaterialTheme.typography.labelMedium,
+                    Text("Redo", color = c.tertiary, style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.clip(RoundedCornerShape(50)).pressable("Make the proof again", onClick = onShowMe)
                             .padding(horizontal = 6.dp, vertical = 2.dp))
                 }
             }
             if (proof == null || proof.status.isEmpty()) {
-                Text("See it working", color = c.text, style = MaterialTheme.typography.titleMedium)
-                Text("Hypurr runs the result on your computer and shows you screenshots, a short clip or the test results.",
+                Text("Your agent changed files", color = c.text, style = MaterialTheme.typography.titleMedium)
+                Text("See before and after pictures, test results and a summary of what changed.",
                     color = c.secondary, style = MaterialTheme.typography.bodySmall)
-                PrimaryButton(if (busy) "Starting…" else "Show me", Modifier.fillMaxWidth(), enabled = !busy, icon = signalIcon(SignalIcons.Play), onClick = onShowMe)
+                PrimaryButton(if (busy) "Preparing…" else "View changes", Modifier.fillMaxWidth(), enabled = !busy, icon = signalIcon(SignalIcons.Play), onClick = onShowMe)
                 if (onSeeLive != null) SeeLive(liveBusy, onSeeLive)
                 return@Column
             }
             Text(proofTitle(proof), color = c.text, style = MaterialTheme.typography.titleMedium)
             when (proof.status) {
                 "needsApproval" -> Approval(proof, busy, onAllow)
-                "running" -> Text(proof.plan?.what?.let { "$it. Servers stop as soon as it's done." } ?: "Working on it.",
-                    color = c.secondary, style = MaterialTheme.typography.bodySmall)
+                "running" -> Preparing(proof)
                 "unavailable" -> Text(proof.note.ifBlank { "Proof needs this folder to be a Git project." },
                     color = c.secondary, style = MaterialTheme.typography.bodySmall)
                 "failed" -> {
@@ -169,7 +176,11 @@ fun ProofCard(
                     Summary(proof)
                     LogBox(proof.log)
                 }
-                else -> {
+                else -> if (onOpen != null) {
+                    Summary(proof)
+                    PrimaryButton("View changes", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Image), onClick = onOpen)
+                    if (onSeeLive != null) SeeLive(liveBusy, onSeeLive)
+                } else {
                     if (onSeeLive != null) SeeLive(liveBusy, onSeeLive)
                     Ready(proof, images, onLoad, onPlayClip, onVerdict, initialShot, initialSplit, initialFixing, initialFeedback)
                 }
@@ -180,8 +191,145 @@ fun ProofCard(
 
 @Composable
 private fun SeeLive(busy: Boolean, onClick: () -> Unit) {
-    SoftButton(if (busy) "Opening…" else "See it live", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Play),
+    SoftButton(if (busy) "Opening…" else "Open local preview", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Play),
         tint = Hypurr.colors.text, onClick = { if (!busy) onClick() })
+}
+
+/** While the proof is built: the Hypurr cat filling in, and plain words for what's happening. */
+@Composable
+private fun Preparing(proof: Proof?) {
+    val c = Hypurr.colors
+    val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "preparing")
+    val reveal by t.animateFloat(0.15f, 1f, androidx.compose.animation.core.infiniteRepeatable(
+        androidx.compose.animation.core.tween(1400), androidx.compose.animation.core.RepeatMode.Reverse), label = "reveal")
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        com.ragul84.hypurr.ui.DotCat(c.text, 28.dp, off = c.dotOff, reveal = reveal)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text("Preparing your changes…", color = c.text, style = MaterialTheme.typography.titleSmall)
+            Text(proof?.plan?.what?.let { "$it. This can take a minute." } ?: "This can take a minute.",
+                color = c.secondary, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+/**
+ * The full Changes screen: a top bar, the pictures and results scrolling in between, and the
+ * verdict pinned at the bottom above the nav bar. While the proof is built, a clear loading state.
+ */
+@Composable
+fun ChangesScreen(
+    proof: Proof?,
+    images: Map<String, ImageBitmap> = emptyMap(),
+    busy: Boolean = false,
+    onBack: () -> Unit,
+    onRedo: () -> Unit = {},
+    onAllow: () -> Unit = {},
+    onLoad: (String) -> Unit = {},
+    onPlayClip: (String) -> Unit = {},
+    onVerdict: (ok: Boolean, text: String) -> Unit = { _, _ -> },
+    onSeeLive: (() -> Unit)? = null,
+    liveBusy: Boolean = false,
+    animateHint: Boolean = true,
+    initialSplit: Float = 0.5f,
+) {
+    val c = Hypurr.colors
+    val status = proof?.status.orEmpty()
+    Column(Modifier.fillMaxSize().background(c.bg).safeDrawingPadding()) {
+        Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            com.ragul84.hypurr.ui.IconTile(signalIcon(SignalIcons.Back), "Back", onClick = onBack)
+            Spacer(Modifier.width(8.dp))
+            Text("Your changes", color = c.text, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            if (status == "ready" || status == "failed") SoftButton("Redo", onClick = onRedo)
+        }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(c.border))
+        if (status.isEmpty() || status == "running") {
+            Column(Modifier.weight(1f).fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center) {
+                val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "preparing")
+                val reveal by t.animateFloat(0.15f, 1f, androidx.compose.animation.core.infiniteRepeatable(
+                    androidx.compose.animation.core.tween(1400), androidx.compose.animation.core.RepeatMode.Reverse), label = "reveal")
+                com.ragul84.hypurr.ui.DotCat(c.text, 88.dp, off = c.dotOff, reveal = if (animateHint) reveal else 1f)
+                Spacer(Modifier.height(24.dp))
+                Text("Preparing your changes…", color = c.text, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(8.dp))
+                Text(proof?.plan?.what?.let { "$it. This can take a minute." }
+                    ?: "Hypurr is comparing your project before and after. This can take a minute.",
+                    color = c.secondary, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
+            }
+            return@Column
+        }
+        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text(proofTitle(proof!!), color = c.text, style = MaterialTheme.typography.titleMedium)
+            when (status) {
+                "needsApproval" -> Approval(proof, busy, onAllow)
+                "unavailable" -> Text(proof.note, color = c.secondary, style = MaterialTheme.typography.bodyMedium)
+                "failed" -> {
+                    if (proof.note.isNotBlank()) Text(proof.note, color = c.secondary, style = MaterialTheme.typography.bodyMedium)
+                    Summary(proof)
+                    LogBox(proof.log)
+                }
+                else -> Body(proof, images, onLoad, onPlayClip, animateHint, initialSplit)
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+        if (status == "ready" || onSeeLive != null) {
+            Box(Modifier.fillMaxWidth().height(1.dp).background(c.border))
+            Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (onSeeLive != null) SeeLive(liveBusy, onSeeLive)
+                if (status == "ready") Verdict(proof!!, onVerdict, false, "")
+            }
+        }
+    }
+}
+
+@Composable
+private fun Body(proof: Proof, images: Map<String, ImageBitmap>, onLoad: (String) -> Unit, onPlayClip: (String) -> Unit,
+                 animateHint: Boolean, initialSplit: Float) {
+    val c = Hypurr.colors
+    var pick by remember(proof.shots.size) { mutableStateOf(0) }
+    if (proof.shots.isNotEmpty()) {
+        if (proof.shots.size > 1) {
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                proof.shots.take(4).forEachIndexed { i, s ->
+                    val on = i == pick
+                    Text(s.label.ifBlank { "Shot ${i + 1}" }, color = if (on) c.onAccent else c.text, style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1, modifier = Modifier.clip(RoundedCornerShape(50)).background(if (on) c.accent else c.surface2)
+                            .pressable(s.label) { pick = i }.padding(horizontal = 12.dp, vertical = 8.dp))
+                }
+            }
+        }
+        val shot = proof.shots[pick.coerceIn(0, proof.shots.size - 1)]
+        LaunchedEffect(shot) { listOfNotNull(shot.before, shot.after).forEach { if (it !in images) onLoad(it) } }
+        BeforeAfter(shot, images, initialSplit, animateHint)
+    }
+    proof.clip?.let { clip -> SoftButton("Play the clip", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Play)) { onPlayClip(clip) } }
+    proof.tests?.let { t ->
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(c.surface2).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(signalIcon(if (t.failed > 0) SignalIcons.Close else SignalIcons.Check), null, tint = if (t.failed > 0) c.danger else c.text,
+                modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(testLine(t.passed, t.failed, t.seconds), color = c.text, style = MaterialTheme.typography.titleSmall)
+                Text(t.command, color = c.tertiary, fontFamily = FontFamily.Monospace, fontSize = 11.sp, maxLines = 1)
+            }
+        }
+        if (t.failed > 0) LogBox(t.output)
+    }
+    if (proof.note.isNotBlank()) Text(proof.note, color = c.secondary, style = MaterialTheme.typography.bodyMedium)
+    if (proof.summary.isNotBlank()) Text(proof.summary, color = c.secondary, style = MaterialTheme.typography.bodyMedium)
+    if (proof.files.isNotEmpty()) {
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(c.surface2).padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            proof.files.forEach { f ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(f.path, color = c.text, fontFamily = FontFamily.Monospace, fontSize = 12.sp, maxLines = 1,
+                        overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    Text("+${f.added} −${f.removed}", color = c.tertiary, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -268,12 +416,28 @@ private fun LogBox(log: String) {
 
 /** A before/after slider: drag (or tap) to move the line; with one side only, just that picture. */
 @Composable
-fun BeforeAfter(shot: ProofShot, images: Map<String, ImageBitmap>, initialSplit: Float = 0.5f) {
+fun BeforeAfter(shot: ProofShot, images: Map<String, ImageBitmap>, initialSplit: Float = 0.5f, animateHint: Boolean = false) {
     val c = Hypurr.colors
     val before = shot.before?.let { images[it] }
     val after = shot.after?.let { images[it] }
     val both = shot.before != null && shot.after != null
     var split by remember(shot) { mutableFloatStateOf(initialSplit) }
+    // First look: the line glides right, then left, then settles, with a short hint, so it's
+    // clear the picture can be dragged. Any touch stops it.
+    var hint by remember(shot) { mutableStateOf(false) }
+    var touched by remember(shot) { mutableStateOf(false) }
+    val ready = before != null && after != null
+    LaunchedEffect(shot, ready, animateHint) {
+        if (!animateHint || !both || !ready) return@LaunchedEffect
+        hint = true
+        val spec = androidx.compose.animation.core.tween<Float>(650, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+        for (to in listOf(0.82f, 0.18f, 0.5f)) {
+            if (touched) break
+            androidx.compose.animation.core.animate(split, to, animationSpec = spec) { v, _ -> if (!touched) split = v }
+        }
+        kotlinx.coroutines.delay(1200)
+        hint = false
+    }
     val ratio = (after ?: before)?.let { it.width.toFloat() / it.height } ?: (412f / 860f)
     Box(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(c.surface2).border(1.dp, c.border, RoundedCornerShape(16.dp)).padding(vertical = 12.dp),
@@ -283,10 +447,10 @@ fun BeforeAfter(shot: ProofShot, images: Map<String, ImageBitmap>, initialSplit:
             Modifier.fillMaxWidth(0.8f).aspectRatio(ratio.coerceIn(0.3f, 2f)).align(Alignment.Center)
                 .then(if (both) Modifier.semantics { contentDescription = "Before and after"; stateDescription = "${(split * 100).roundToInt()}% before" }
                     .pointerInput(Unit) {
-                        detectTapGestures { o -> split = (o.x / size.width).coerceIn(0f, 1f) }
+                        detectTapGestures { o -> touched = true; hint = false; split = (o.x / size.width).coerceIn(0f, 1f) }
                     }
                     .pointerInput(Unit) {
-                        detectHorizontalDragGestures { change, _ -> split = (change.position.x / size.width).coerceIn(0f, 1f) }
+                        detectHorizontalDragGestures { change, _ -> touched = true; hint = false; split = (change.position.x / size.width).coerceIn(0f, 1f) }
                     } else Modifier),
         ) {
             Picture(after ?: before, if (after != null) shot.after else shot.before)
@@ -306,6 +470,10 @@ fun BeforeAfter(shot: ProofShot, images: Map<String, ImageBitmap>, initialSplit:
                 }
                 Tag("Before", Modifier.align(Alignment.TopStart))
                 Tag("After", Modifier.align(Alignment.TopEnd))
+                androidx.compose.animation.AnimatedVisibility(hint, Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp)) {
+                    Text("‹  Slide to compare  ›", color = Color.White, style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.clip(RoundedCornerShape(50)).background(Overlay).padding(horizontal = 14.dp, vertical = 8.dp))
+                }
             } else {
                 Tag(if (after != null) "After" else "Before", Modifier.align(Alignment.TopEnd))
             }

@@ -104,6 +104,17 @@ class InsetsScreenshotTest {
             onBack = {}, onSend = {}, onStop = {}, onRespond = { _, _ -> }, now = Samples.NOW)
     }
 
+    @Test fun startingAgent() = shoot("starting-agent-small-buttons", 48.dp) {
+        com.ragul84.hypurr.ui.screens.StartingScreen("Make the waitlist button say Join the waitlist", animate = false)
+    }
+
+    @Test fun changesScreen() = shoot("changes-screen-small-buttons", 48.dp) {
+        com.ragul84.hypurr.ui.screens.ChangesScreen(Proof(status = "ready", kind = "tests",
+            summary = "Changed 1 file (1 line added, 1 removed). Most work in waitlist.html (+1 −1).",
+            note = "This project has no automatic checks, so here's a summary of what changed.",
+            files = listOf(com.ragul84.hypurr.model.ProofChange("waitlist.html", 1, 1))), onBack = {}, onSeeLive = {}, animateHint = false)
+    }
+
     @Test fun pickerSmallGesture() = picker("folder-picker-small-gesture", 24.dp)
     @Test fun pickerSmallButtons() = picker("folder-picker-small-buttons", 48.dp)
     @Test @Config(qualifiers = "w800dp-h1280dp-xhdpi") fun pickerLargeGesture() = picker("folder-picker-large-gesture", 24.dp)

@@ -90,12 +90,9 @@ fun ProjectFolderPickerScreen(
             }
         }
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            // This PC (drives and home) first; recent projects after it.
             if (atTop && projects.isNotEmpty()) {
-                item { com.ragul84.hypurr.ui.Eyebrow("Recent projects", Modifier.padding(start = 4.dp, top = 4.dp, bottom = 4.dp)) }
-                items(projects, key = { "p:" + it.path }) { p ->
-                    FolderRow(p.name, p.path, project = true, selected = p.path == selectedPath, onOpen = { onBrowse(p.path) }) { onSelect(p.path) }
-                }
-                item { com.ragul84.hypurr.ui.Eyebrow("This PC", Modifier.padding(start = 4.dp, top = 12.dp, bottom = 4.dp)) }
+                item { com.ragul84.hypurr.ui.Eyebrow("This PC", Modifier.padding(start = 4.dp, top = 4.dp, bottom = 4.dp)) }
             }
             when {
                 browsing == null -> item { Text("Loading…", color = c.tertiary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(8.dp)) }
@@ -103,6 +100,12 @@ fun ProjectFolderPickerScreen(
                 else -> items(browsing.dirs, key = { "d:" + it.path }) { d ->
                     FolderRow(d.name, null, project = d.isProject, selected = d.path == selectedPath, onOpen = { onBrowse(d.path) },
                         onPick = if (atTop) null else ({ onSelect(d.path) }))
+                }
+            }
+            if (atTop && projects.isNotEmpty()) {
+                item { com.ragul84.hypurr.ui.Eyebrow("Recent projects", Modifier.padding(start = 4.dp, top = 16.dp, bottom = 4.dp)) }
+                items(projects, key = { "p:" + it.path }) { p ->
+                    FolderRow(p.name, p.path, project = true, selected = p.path == selectedPath, onOpen = { onBrowse(p.path) }) { onSelect(p.path) }
                 }
             }
         }
