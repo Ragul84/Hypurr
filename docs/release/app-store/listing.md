@@ -40,7 +40,7 @@ Hypurr needs the free Hypurr host running on your computer. It is open source (M
 
 **Support URL:** https://github.com/Ragul84/Hypurr/issues
 **Marketing URL:** https://hypurr.mindgains.ai
-**Privacy policy URL:** needs a public page before submission (none exists yet)
+**Privacy policy URL:** https://hypurr.mindgains.ai/privacy (page in `web/app/privacy`; confirm it is live before submission)
 
 ## App privacy answers (draft, verify against PrivacyInfo.xcprivacy)
 
