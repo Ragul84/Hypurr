@@ -180,75 +180,78 @@ fun ChatScreen(
     var actionsFor by remember { mutableStateOf(initialActionsFor?.let { id -> (entries + listOfNotNull(threadRoot)).firstOrNull { it.id == id } }) }
     var viewing by remember { mutableStateOf<Attachment?>(null) }
     val media = AttachmentUi(images, onLoadAttachment, onOpenFile) { viewing = it }
+    // Header, messages, composer stacked: messages scroll only in the space between them, with
+    // 16dp breathing room at both ends, so nothing is ever drawn behind the header or composer.
     Box(Modifier.fillMaxSize().background(c.bg)) {
-        LazyColumn(
-            Modifier.fillMaxSize(),
-            state = list,
-            reverseLayout = true,
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 92.dp + (if (folder != null || task != null) 48.dp else 0.dp),
-                bottom = if (composer.files.isEmpty()) 104.dp else 172.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (proof != null && !inThread) item(key = "proof") { Box(Modifier.animateItem()) { proof() } }
-            if (learn != null && !inThread) item(key = "learn") { Box(Modifier.animateItem()) { learn() } }
-            if (bot.status == "working" && (if (inThread) bot.workingThread == threadRoot?.id else bot.workingThread == null)) {
-                item(key = "working") { WorkingRow(bot, bots, Modifier.animateItem()) }
-            }
-            items(chat, key = { it.data.clientNonce ?: it.id }) { entry ->
-                Box(Modifier.animateItem(fadeInSpec = Motion.effects(), placementSpec = Motion.offset)) {
-                    Message(entry, bot, bots, task, you, media, inThread, onRespond, onUndo, onOpenLink, onOpenThread, onReact,
-                        live = bot.status == "working" && entry.kind == "agent" && entry.data.final != true && entry == chat.firstOrNull()) { actionsFor = it }
-                }
-            }
-            if (threadRoot != null) {
-                item(key = "root-divider") {
-                    val n = chat.count { it.kind == "user" || it.kind == "agent" }
-                    Text(if (n == 1) "1 reply" else "$n replies", color = c.tertiary, style = MaterialTheme.typography.labelMedium,
-                        textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp))
-                }
-                item(key = "root") {
-                    Message(threadRoot, bot, bots, task, you, media, true, onRespond, onUndo, onOpenLink, onOpenThread, onReact) { actionsFor = it }
-                }
-            } else if (chat.isEmpty()) item(key = "empty") { EmptyChat(bot, bots) }
-        }
-        // Signal header: bare back chevron, bot tile, name + agent line, more. Chips row under a hairline.
-        Column(Modifier.fillMaxWidth().background(c.bg).statusBarsPadding()) {
-            Row(Modifier.padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconTile(signalIcon(SignalIcons.Back), "Back", onClick = onBack)
-                Spacer(Modifier.width(4.dp))
-                Row(Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).then(if (onEdit != null && !inThread) Modifier.pressable("${bot.name} settings", onClick = onEdit) else Modifier),
-                    verticalAlignment = Alignment.CenterVertically) {
-                    if (bot.isGroup) GroupAvatar(bot, bots, 38.dp) else BotAvatar(bot, 38.dp)
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(if (inThread) "Thread" else bot.name, style = MaterialTheme.typography.titleMedium, color = c.text, maxLines = 1,
-                            overflow = TextOverflow.Ellipsis)
-                        val sub = when {
-                            inThread -> "in ${bot.name}"
-                            bot.isGroup -> groupMembersLine(bot, bots)
-                            else -> listOfNotNull(agentName(bot.backend), when {
-                                bot.needsInput -> "waiting on you"
-                                bot.status == "working" -> "working"
-                                else -> null
-                            }).joinToString(" · ").ifEmpty { bot.description.ifEmpty { "Ready" } }
+        Column(Modifier.fillMaxSize()) {
+            // Signal header: bare back chevron, bot tile, name + agent line, more. Chips row under a hairline.
+            Column(Modifier.fillMaxWidth().background(c.bg).statusBarsPadding()) {
+                Row(Modifier.padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconTile(signalIcon(SignalIcons.Back), "Back", onClick = onBack)
+                    Spacer(Modifier.width(4.dp))
+                    Row(Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).then(if (onEdit != null && !inThread) Modifier.pressable("${bot.name} settings", onClick = onEdit) else Modifier),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        if (bot.isGroup) GroupAvatar(bot, bots, 38.dp) else BotAvatar(bot, 38.dp)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(if (inThread) "Thread" else bot.name, style = MaterialTheme.typography.titleMedium, color = c.text, maxLines = 1,
+                                overflow = TextOverflow.Ellipsis)
+                            val sub = when {
+                                inThread -> "in ${bot.name}"
+                                bot.isGroup -> groupMembersLine(bot, bots)
+                                else -> listOfNotNull(agentName(bot.backend), when {
+                                    bot.needsInput -> "waiting on you"
+                                    bot.status == "working" -> "working"
+                                    else -> null
+                                }).joinToString(" · ").ifEmpty { bot.description.ifEmpty { "Ready" } }
+                            }
+                            Text(sub, color = if (bot.needsInput && !inThread) c.needsText else c.tertiary, style = MaterialTheme.typography.labelMedium,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
-                        Text(sub, color = if (bot.needsInput && !inThread) c.needsText else c.tertiary, style = MaterialTheme.typography.labelMedium,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    if (onEdit != null && !inThread) IconBubble(signalIcon(SignalIcons.More), "More", onClick = onEdit)
+                }
+                if (folder != null || task != null) {
+                    Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        if (folder != null) FolderChip(folder, onClick = onChangeFolder)
+                        if (task != null) TaskChip(task) { checkpointsOpen = true }
                     }
                 }
-                if (onEdit != null && !inThread) IconBubble(signalIcon(SignalIcons.More), "More", onClick = onEdit)
+                Box(Modifier.fillMaxWidth().height(1.dp).background(c.border))
             }
-            if (folder != null || task != null) {
-                Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically) {
-                    if (folder != null) FolderChip(folder, onClick = onChangeFolder)
-                    if (task != null) TaskChip(task) { checkpointsOpen = true }
+            LazyColumn(
+                Modifier.weight(1f).fillMaxWidth(),
+                state = list,
+                reverseLayout = true,
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                if (proof != null && !inThread) item(key = "proof") { Box(Modifier.animateItem()) { proof() } }
+                if (learn != null && !inThread) item(key = "learn") { Box(Modifier.animateItem()) { learn() } }
+                if (bot.status == "working" && (if (inThread) bot.workingThread == threadRoot?.id else bot.workingThread == null)) {
+                    item(key = "working") { WorkingRow(bot, bots, Modifier.animateItem()) }
                 }
+                items(chat, key = { it.data.clientNonce ?: it.id }) { entry ->
+                    Box(Modifier.animateItem(fadeInSpec = Motion.effects(), placementSpec = Motion.offset)) {
+                        Message(entry, bot, bots, task, you, media, inThread, onRespond, onUndo, onOpenLink, onOpenThread, onReact,
+                            live = bot.status == "working" && entry.kind == "agent" && entry.data.final != true && entry == chat.firstOrNull()) { actionsFor = it }
+                    }
+                }
+                if (threadRoot != null) {
+                    item(key = "root-divider") {
+                        val n = chat.count { it.kind == "user" || it.kind == "agent" }
+                        Text(if (n == 1) "1 reply" else "$n replies", color = c.tertiary, style = MaterialTheme.typography.labelMedium,
+                            textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp))
+                    }
+                    item(key = "root") {
+                        Message(threadRoot, bot, bots, task, you, media, true, onRespond, onUndo, onOpenLink, onOpenThread, onReact) { actionsFor = it }
+                    }
+                } else if (chat.isEmpty()) item(key = "empty") { EmptyChat(bot, bots) }
             }
-            Box(Modifier.fillMaxWidth().height(1.dp).background(c.border))
+            Composer(draft, onDraftChange, onSend, Modifier, composer, images, onAttach, onRemoveFile,
+                if (inThread) "Reply in thread" else "Message ${bot.name}…", working = bot.status == "working", onStop = onStop)
         }
-        Composer(draft, onDraftChange, onSend, Modifier.align(Alignment.BottomCenter), composer, images, onAttach, onRemoveFile,
-            if (inThread) "Reply in thread" else "Message ${bot.name}…", working = bot.status == "working", onStop = onStop)
         if (task != null) {
             CheckpointSheet(checkpointsOpen, task, now, integrations, initialFinishOpen, onClose = { checkpointsOpen = false },
                 onRollback = { checkpointsOpen = false; onRollback(it) },

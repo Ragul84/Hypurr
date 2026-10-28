@@ -677,6 +677,7 @@ async fn run(hub: &Arc<Hub>, caller: &Caller, actor: &crate::admin::Actor, metho
         "qaRun" => crate::qa::run(hub, &b).await?,
         "proofGet" => crate::proof::get(&hub.store, &b)?,
         "proofStart" => crate::proof::start(hub, &b).await?,
+        "proofLive" => crate::proof::live(hub, &b).await?,
         "proofAllow" => crate::proof::allow(hub, &b).await?,
         "proofFile" => crate::proof::file(&hub.store, &b)?,
         "proofVerdict" => crate::proof::verdict(hub, &b)?,

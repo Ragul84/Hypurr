@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -89,12 +90,9 @@ fun ProjectFolderPickerScreen(
             }
         }
         LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            // This PC (drives and home) first; recent projects after it.
             if (atTop && projects.isNotEmpty()) {
-                item { com.ragul84.hypurr.ui.Eyebrow("Recent projects", Modifier.padding(start = 4.dp, top = 4.dp, bottom = 4.dp)) }
-                items(projects, key = { "p:" + it.path }) { p ->
-                    FolderRow(p.name, p.path, project = true, selected = p.path == selectedPath, onOpen = { onBrowse(p.path) }) { onSelect(p.path) }
-                }
-                item { com.ragul84.hypurr.ui.Eyebrow("This PC", Modifier.padding(start = 4.dp, top = 12.dp, bottom = 4.dp)) }
+                item { com.ragul84.hypurr.ui.Eyebrow("This PC", Modifier.padding(start = 4.dp, top = 4.dp, bottom = 4.dp)) }
             }
             when {
                 browsing == null -> item { Text("Loading…", color = c.tertiary, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(8.dp)) }
@@ -104,29 +102,39 @@ fun ProjectFolderPickerScreen(
                         onPick = if (atTop) null else ({ onSelect(d.path) }))
                 }
             }
-        }
-        if (pickedRoot && rootWarned) {
-            Text("The agent can see and change everything on this drive.", color = c.needsText,
-                style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(bottom = 6.dp))
-        }
-        if (!atTop && browsing != null && selectedPath != browsing.path) {
-            SoftButton("Use this folder", Modifier.fillMaxWidth().padding(bottom = 8.dp), icon = signalIcon(SignalIcons.Check), tint = c.text) {
-                onSelect(browsing.path)
+            if (atTop && projects.isNotEmpty()) {
+                item { com.ragul84.hypurr.ui.Eyebrow("Recent projects", Modifier.padding(start = 4.dp, top = 16.dp, bottom = 4.dp)) }
+                items(projects, key = { "p:" + it.path }) { p ->
+                    FolderRow(p.name, p.path, project = true, selected = p.path == selectedPath, onOpen = { onBrowse(p.path) }) { onSelect(p.path) }
+                }
             }
         }
-        PrimaryButton(
-            when {
-                selectedPath == null -> "Pick a folder first"
-                pickedRoot && !rootWarned -> "Use whole drive ${folderName(selectedPath)}"
-                pickedRoot -> "Yes, use the whole drive"
-                else -> confirmLabel ?: "Use ${folderName(selectedPath)}"
-            },
-            Modifier.fillMaxWidth().padding(bottom = if (onLater != null) 10.dp else 16.dp),
-            enabled = selectedPath != null,
-            onClick = { if (pickedRoot && !rootWarned) rootWarned = true else onConfirm() },
-        )
-        if (onLater != null) {
-            SoftButton("Later", Modifier.fillMaxWidth().padding(bottom = 16.dp), tint = c.text, onClick = onLater)
+        // One action group above the nav bar: a hairline, then the warning centered directly
+        // over the button it belongs to.
+        Box(Modifier.fillMaxWidth().height(1.dp).background(c.border))
+        Column(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally) {
+            if (!atTop && browsing != null && selectedPath != browsing.path) {
+                SoftButton("Use this folder", Modifier.fillMaxWidth(), icon = signalIcon(SignalIcons.Check), tint = c.text) {
+                    onSelect(browsing.path)
+                }
+            }
+            if (pickedRoot && rootWarned) {
+                Text("The agent can see and change everything on this drive.", color = c.needsText,
+                    style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            }
+            PrimaryButton(
+                when {
+                    selectedPath == null -> "Pick a folder first"
+                    pickedRoot && !rootWarned -> "Use whole drive ${folderName(selectedPath)}"
+                    pickedRoot -> "Yes, use the whole drive"
+                    else -> confirmLabel ?: "Use ${folderName(selectedPath)}"
+                },
+                Modifier.fillMaxWidth(),
+                enabled = selectedPath != null,
+                onClick = { if (pickedRoot && !rootWarned) rootWarned = true else onConfirm() },
+            )
+            if (onLater != null) SoftButton("Later", Modifier.fillMaxWidth(), tint = c.text, onClick = onLater)
         }
     }
 }

@@ -324,12 +324,14 @@ class MainActivity : ComponentActivity() {
         var screen by rememberSaveable { mutableStateOf("list") }
         // The new-task draft survives a trip to the folder picker.
         var taskDraft by remember { mutableStateOf<NewTaskUiState?>(null) }
+        var startingGoal by remember { mutableStateOf("") }
         var guide by remember { mutableStateOf(com.ragul84.hypurr.ui.screens.GuideUiState()) }
         // Learning mode per task: cards, quiz, and tasks where the panel was hidden.
         var learnCards by remember { mutableStateOf(mapOf<String, List<com.ragul84.hypurr.model.LearnCard>>()) }
         var quizzes by remember { mutableStateOf(mapOf<String, com.ragul84.hypurr.model.Quiz>()) }
         var learnHidden by remember { mutableStateOf(setOf<String>()) }
         var proofs by remember { mutableStateOf(mapOf<String, com.ragul84.hypurr.model.Proof>()) }
+        var proofWeb by remember { mutableStateOf(mapOf<String, Boolean>()) }
         var proofImages by remember { mutableStateOf(mapOf<String, androidx.compose.ui.graphics.ImageBitmap>()) }
         var proofLoading by remember { mutableStateOf(setOf<String>()) }
         var proofBusy by remember { mutableStateOf(setOf<String>()) }
@@ -394,12 +396,19 @@ class MainActivity : ComponentActivity() {
                     LaunchedEffect(learnTask?.id, learnTask?.status, entries[id]?.size) {
                         learnTask?.let { t -> runCatching { store.learnCards(t.id) }.getOrNull()?.let { learnCards = learnCards + (t.id to it.cards) } }
                     }
-                    val proofTask = bot.task?.takeIf { t ->
-                        bot.status != "working" && (!t.isActive || entries[id].orEmpty().any { it.kind == "agent" } || proofs[t.id] != null)
+                    // Asked of the host whenever the chat moves; shown only per [proofShow].
+                    LaunchedEffect(bot.task?.id, bot.task?.status, entries[id]?.size, bot.status) {
+                        val t = bot.task ?: return@LaunchedEffect
+                        if (bot.status == "working") return@LaunchedEffect
+                        runCatching { store.proofReply(t.id) }.getOrNull()?.let { r ->
+                            r.proof?.let { proofs = proofs + (t.id to it) }
+                            proofWeb = proofWeb + (t.id to r.web)
+                        }
                     }
-                    LaunchedEffect(proofTask?.id, proofTask?.status, entries[id]?.size) {
-                        proofTask?.let { t -> runCatching { store.proof(t.id) }.getOrNull()?.let { proofs = proofs + (t.id to it) } }
-                    }
+                    val proofShown = bot.task?.let {
+                        com.ragul84.hypurr.ui.screens.proofShow(entries[id].orEmpty(), proofs[it.id], bot.status == "working")
+                    } ?: com.ragul84.hypurr.ui.screens.ProofShow.None
+                    val proofTask = bot.task?.takeIf { proofShown != com.ragul84.hypurr.ui.screens.ProofShow.None }
                     val proofRunning = proofTask?.let { proofs[it.id]?.status == "running" } == true
                     LaunchedEffect(proofTask?.id, proofRunning) {
                         // While it runs, check every few seconds (the host also posts a chat note when done).
@@ -410,7 +419,53 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     LaunchedEffect(target, synced) { if (rootId != null) store.openThread(id, rootId) else store.openChat(id) }
-                    ChatScreen(
+                    // Proof (the "View changes" card and screen) for this chat's task.
+                    var changesOpen by remember(id) { mutableStateOf(false) }
+                    val pt = bot.task
+                    fun proofAct(block: suspend () -> com.ragul84.hypurr.model.Proof?) {
+                        val t = pt ?: return
+                        proofBusy = proofBusy + t.id
+                        scope.launch {
+                            runCatching { block() }.getOrNull()?.let { proofs = proofs + (t.id to it) }
+                            proofBusy = proofBusy - t.id
+                        }
+                    }
+                    val proofImagesFor = pt?.let { t -> proofImages.filterKeys { it.startsWith("${t.id}/") }.mapKeys { it.key.substringAfter('/') } }.orEmpty()
+                    val proofLoad: (String) -> Unit = { name -> val t = pt!!; val key = "${t.id}/$name"
+                                        if (key !in proofImages && key !in proofLoading) {
+                                            proofLoading = proofLoading + key
+                                            scope.launch {
+                                                val bmp = runCatching { store.proofFile(t.id, name) }.getOrNull()
+                                                    ?.let { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size) }
+                                                if (bmp != null) proofImages = proofImages + (key to bmp.asImageBitmap())
+                                            }
+                                        } }
+                    val proofPlay: (String) -> Unit = { name -> val t = pt!!; scope.launch {
+                                            runCatching {
+                                                val bytes = store.proofFile(t.id, name) ?: return@runCatching
+                                                val dir = java.io.File(cacheDir, "shared").apply { mkdirs() }
+                                                val f = java.io.File(dir, "proof-${t.id.take(8)}-$name").apply { writeBytes(bytes) }
+                                                val uri = androidx.core.content.FileProvider.getUriForFile(this@MainActivity, "$packageName.files", f)
+                                                val mime = if (name.endsWith(".mp4")) "video/mp4" else "video/webm"
+                                                startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+                                            }
+                                        } }
+                    val proofVerdict: (Boolean, String) -> Unit = { ok, text -> val t = pt!!; scope.launch {
+                                            runCatching { store.proofVerdict(t.id, ok, text) }
+                                            runCatching { store.proof(t.id) }.getOrNull()?.let { proofs = proofs + (t.id to it) }
+                                        } }
+                    val proofStartOpen: () -> Unit = { pt?.let { t -> proofAct { store.proofStart(t.id) } }; changesOpen = true }
+                    if (changesOpen && pt != null) {
+                        androidx.activity.compose.BackHandler { changesOpen = false }
+                        com.ragul84.hypurr.ui.screens.ChangesScreen(
+                            proofs[pt.id], proofImagesFor, busy = pt.id in proofBusy,
+                            onBack = { changesOpen = false },
+                            onRedo = { proofAct { store.proofStart(pt.id) } },
+                            onAllow = { proofAct { store.proofAllow(pt.id) } },
+                            onLoad = proofLoad, onPlayClip = proofPlay,
+                            onVerdict = { ok, text -> proofVerdict(ok, text); if (!ok) changesOpen = false },
+                        )
+                    } else ChatScreen(
                         bot, if (rootId != null) threads[rootId].orEmpty() else entries[id].orEmpty(), draft, { draft = it },
                         onBack = { screen = parentOf(target) },
                         onSend = {
@@ -463,48 +518,14 @@ class MainActivity : ComponentActivity() {
                         },
                         proof = proofTask?.let { t ->
                             {
-                                val p = proofs[t.id]
-                                fun act(block: suspend () -> com.ragul84.hypurr.model.Proof?) {
-                                    proofBusy = proofBusy + t.id
-                                    scope.launch {
-                                        runCatching { block() }.getOrNull()?.let { proofs = proofs + (t.id to it) }
-                                        proofBusy = proofBusy - t.id
-                                    }
-                                }
+                                val p = proofs[t.id].takeIf { proofShown == com.ragul84.hypurr.ui.screens.ProofShow.Card }
                                 com.ragul84.hypurr.ui.screens.ProofCard(
-                                    p, proofImages.filterKeys { it.startsWith("${t.id}/") }.mapKeys { it.key.substringAfter('/') },
+                                    p, proofImagesFor,
                                     busy = t.id in proofBusy,
-                                    onShowMe = { act { store.proofStart(t.id) } },
-                                    onAllow = { act { store.proofAllow(t.id) } },
-                                    onLoad = { name ->
-                                        val key = "${t.id}/$name"
-                                        if (key !in proofImages && key !in proofLoading) {
-                                            proofLoading = proofLoading + key
-                                            scope.launch {
-                                                val bmp = runCatching { store.proofFile(t.id, name) }.getOrNull()
-                                                    ?.let { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size) }
-                                                if (bmp != null) proofImages = proofImages + (key to bmp.asImageBitmap())
-                                            }
-                                        }
-                                    },
-                                    onPlayClip = { name ->
-                                        scope.launch {
-                                            runCatching {
-                                                val bytes = store.proofFile(t.id, name) ?: return@runCatching
-                                                val dir = java.io.File(cacheDir, "shared").apply { mkdirs() }
-                                                val f = java.io.File(dir, "proof-${t.id.take(8)}-$name").apply { writeBytes(bytes) }
-                                                val uri = androidx.core.content.FileProvider.getUriForFile(this@MainActivity, "$packageName.files", f)
-                                                val mime = if (name.endsWith(".mp4")) "video/mp4" else "video/webm"
-                                                startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
-                                            }
-                                        }
-                                    },
-                                    onVerdict = { ok, text ->
-                                        scope.launch {
-                                            runCatching { store.proofVerdict(t.id, ok, text) }
-                                            runCatching { store.proof(t.id) }.getOrNull()?.let { proofs = proofs + (t.id to it) }
-                                        }
-                                    },
+                                    onShowMe = proofStartOpen,
+                                    onAllow = { proofAct { store.proofAllow(t.id) } },
+                                    onLoad = proofLoad, onPlayClip = proofPlay, onVerdict = proofVerdict,
+                                    onOpen = { changesOpen = true },
                                 )
                             }
                         },
@@ -570,6 +591,10 @@ class MainActivity : ComponentActivity() {
                 target == "qa" -> QaRoute(store, projectFolder, qaDraft, { qaDraft = it }) { screen = it }
                 target == "trace" -> TraceMapRoute(store, projectFolder, traceDraft, { traceDraft = it }) { screen = it }
                 target == "ticket" -> TicketRoute(store, projectFolder, ticketDraft, { ticketDraft = it }) { screen = it }
+                target == "starting" -> {
+                    androidx.activity.compose.BackHandler { }
+                    com.ragul84.hypurr.ui.screens.StartingScreen(startingGoal)
+                }
                 target == "newtask" -> {
                     val setup by store.setup.collectAsState()
                     var task by remember {
@@ -601,6 +626,9 @@ class MainActivity : ComponentActivity() {
                         onChange = { task = it },
                         onStart = {
                             task = task.copy(busy = true, error = null)
+                            // Leave the form at once: a branded "Starting your agent…" while the computer sets up.
+                            startingGoal = task.goal
+                            screen = "starting"
                             scope.launch {
                                 try {
                                     val voice = store.userProfile.value
@@ -612,7 +640,8 @@ class MainActivity : ComponentActivity() {
                                     taskDraft = null
                                     screen = "chat:$botId"
                                 } catch (e: Exception) {
-                                    task = task.copy(busy = false, error = e.message ?: "Couldn't start the task.")
+                                    taskDraft = task.copy(busy = false, error = e.message ?: "Couldn't start the task.")
+                                    screen = "newtask"
                                 }
                             }
                         },

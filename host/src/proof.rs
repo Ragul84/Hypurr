@@ -105,6 +105,49 @@ pub fn web_command(dir: &Path) -> Option<String> {
     Some(if runner == "npm" && script != "start" { format!("npm run {script}") } else { format!("{runner} {script}") })
 }
 
+/// The folder to serve for a plain HTML project (no dev server): the project itself or its
+/// `public/` folder. `None` when there's no HTML to show or a dev server exists.
+pub fn static_root(dir: &Path) -> Option<PathBuf> {
+    if web_command(dir).is_some() {
+        return None;
+    }
+    let has_html = |d: &Path| {
+        std::fs::read_dir(d).is_ok_and(|rd| {
+            rd.flatten().any(|e| {
+                let n = e.file_name().to_string_lossy().into_owned();
+                !n.starts_with('.') && is_html(&n)
+            })
+        })
+    };
+    if has_html(dir) {
+        return Some(dir.to_owned());
+    }
+    let public = dir.join("public");
+    has_html(&public).then_some(public)
+}
+
+fn is_html(name: &str) -> bool {
+    Path::new(name).extension().is_some_and(|e| e.eq_ignore_ascii_case("html") || e.eq_ignore_ascii_case("htm"))
+}
+
+/// Pages for a plain HTML project: the changed HTML files, else the home page.
+pub fn static_pages(ch: &[Change], root_prefix: &str) -> Vec<String> {
+    let mut out: Vec<String> = ch
+        .iter()
+        .filter_map(|c| {
+            let p = c.path.replace('\\', "/");
+            let p = p.strip_prefix(root_prefix).unwrap_or(&p).to_owned();
+            is_html(&p).then(|| format!("/{p}"))
+        })
+        .collect();
+    out.dedup();
+    if out.is_empty() {
+        out.push("/".into());
+    }
+    out.truncate(MAX_PAGES);
+    out
+}
+
 fn gradle_files(dir: &Path) -> String {
     let mut all = String::new();
     for f in
@@ -142,6 +185,15 @@ pub fn plan(dir: &Path, device: bool) -> Plan {
             device: false,
         };
     }
+    if static_root(dir).is_some() {
+        // Served by Hypurr itself: no project code runs, so nothing to approve.
+        return Plan {
+            kind: Kind::Web,
+            what: "Open the changed pages (yours and the original) and capture them".into(),
+            command: None,
+            device: false,
+        };
+    }
     if is_android(dir) {
         let g = gradlew(dir);
         if device {
@@ -175,7 +227,7 @@ pub fn plan(dir: &Path, device: bool) -> Plan {
         what: if tests.is_some() {
             "Run the project's tests and summarise what changed".into()
         } else {
-            "Summarise what changed (no tests found to run)".into()
+            "Summarise what changed".into()
         },
         command: tests.map(|f| f.command),
         device: false,
@@ -208,9 +260,16 @@ fn base_rev(task: &Task, dir: &Path) -> Option<String> {
     if let Some(cp) = task.checkpoints.first() {
         return Some(cp.id.clone());
     }
-    let base = task.base.clone().unwrap_or_else(|| "main".into());
-    git(dir, &["merge-base", "HEAD", &base]).map(|s| s.trim().to_owned()).filter(|s| !s.is_empty())
+    // The task's base branch, else the usual default branches (a repo on `master` has no `main`).
+    let first = task.base.clone().unwrap_or_else(|| "main".into());
+    [first.as_str(), "main", "master", "origin/HEAD"]
+        .into_iter()
+        .find_map(|b| git(dir, &["merge-base", "HEAD", b]).map(|s| s.trim().to_owned()).filter(|s| !s.is_empty()))
 }
+
+/// Why there can't be a proof here, in plain words (no Git history to compare against).
+const NO_BASE: &str =
+    "Proof compares the task's changes with where it started, so it needs this folder to be a Git project.";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Change {
@@ -511,14 +570,45 @@ fn chrome() -> Option<String> {
         "google-chrome-stable",
         "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
         "/Applications/Chromium.app/Contents/MacOS/Chromium",
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
     ];
     names.into_iter().map(str::to_owned).find(|n| {
-        if n.starts_with('/') {
+        if Path::new(n).is_absolute() || n.contains('\\') {
             Path::new(n).is_file()
         } else {
             std::process::Command::new("which").arg(n).output().is_ok_and(|o| o.status.success())
         }
     })
+}
+
+/// One headless phone-sized screenshot, run directly (no shell quoting). Returns its output.
+async fn chrome_shot(ch: &str, shot: &Path, url: &str, out: &Path) -> String {
+    let profile = out.join("chrome-profile");
+    let mut c = tokio::process::Command::new(ch);
+    c.args([
+        "--headless=new",
+        "--disable-gpu",
+        "--no-sandbox",
+        "--no-first-run",
+        "--hide-scrollbars",
+        "--window-size=412,860",
+        "--virtual-time-budget=4000",
+    ])
+    .arg(format!("--user-data-dir={}", profile.to_string_lossy()))
+    .arg(format!("--screenshot={}", shot.to_string_lossy()))
+    .arg(url)
+    .stdin(Stdio::null())
+    .kill_on_drop(true);
+    let text = match tokio::time::timeout(Duration::from_secs(60), c.output()).await {
+        Ok(Ok(o)) => format!("{}{}", String::from_utf8_lossy(&o.stdout), String::from_utf8_lossy(&o.stderr)),
+        Ok(Err(e)) => format!("couldn't start the browser: {e}"),
+        Err(_) => "the browser took too long".into(),
+    };
+    let _ = std::fs::remove_dir_all(profile);
+    text
 }
 
 fn has_playwright(dir: &Path) -> bool {
@@ -534,18 +624,24 @@ fn has_playwright(dir: &Path) -> bool {
 /// Screenshots (and with Playwright, one clip) of `pages` served from `dir`.
 async fn capture_web(
     dir: &Path,
-    cmd: &str,
+    cmd: Option<&str>,
     out: &Path,
     prefix: &str,
     pages: &[String],
     video: bool,
     log: &mut String,
 ) -> Result<bool> {
-    let port = free_port()?;
-    let full =
-        if cmd.starts_with("npm run") { format!("{cmd} -- --port {port}") } else { format!("{cmd} --port {port}") };
     let logf = out.join(format!("{prefix}-server.log"));
-    let server = spawn(dir, &full, &[("PORT", port.to_string()), ("HOST", "127.0.0.1".into())], &logf)?;
+    let (port, server, files) = if let Some(cmd) = cmd {
+        let port = free_port()?;
+        let full =
+            if cmd.starts_with("npm run") { format!("{cmd} -- --port {port}") } else { format!("{cmd} --port {port}") };
+        (port, Some(spawn(dir, &full, &[("PORT", port.to_string()), ("HOST", "127.0.0.1".into())], &logf)?), None)
+    } else {
+        let root = static_root(dir).unwrap_or_else(|| dir.to_owned());
+        let s = crate::static_site::serve(root).await?;
+        (s.port, None, Some(s))
+    };
     let up = wait_port(port, SERVER_START).await;
     let base = format!("http://127.0.0.1:{port}");
     let mut ok = false;
@@ -565,11 +661,7 @@ async fn capture_web(
         if !ok && let Some(ch) = chrome() {
             for (i, p) in pages.iter().enumerate() {
                 let shot = out.join(format!("{prefix}-{i}.png"));
-                let c = format!(
-                    "'{ch}' --headless=new --disable-gpu --no-sandbox --hide-scrollbars --window-size=412,860 --virtual-time-budget=4000 --screenshot='{}' '{base}{p}'",
-                    shot.to_string_lossy()
-                );
-                let (_, text) = run(dir, &c, Duration::from_secs(60)).await;
+                let text = chrome_shot(&ch, &shot, &format!("{base}{p}"), out).await;
                 if shot.is_file() {
                     ok = true;
                 } else {
@@ -584,6 +676,7 @@ async fn capture_web(
         let _ = writeln!(log, "{prefix}: the dev server didn't start within {} seconds.", SERVER_START.as_secs());
     }
     drop(server);
+    drop(files);
     let _ = writeln!(log, "{prefix} server: {}", clean_log(&std::fs::read_to_string(&logf).unwrap_or_default()));
     let _ = std::fs::remove_file(logf);
     Ok(ok)
@@ -701,7 +794,10 @@ async fn capture_device(dir: &Path, cmd: &str, out: &Path, log: &mut String) -> 
 
 fn save(hub: &Arc<Hub>, task_id: &str, proof: &Value) -> Result<()> {
     let mut task = Task::load(&hub.store, task_id).ok_or_else(|| anyhow!("unknown task"))?;
-    task.extra.insert("proof".into(), proof.clone());
+    let mut proof = proof.clone();
+    // The chat turn it belongs to: the phone hides it once a newer message is sent.
+    proof["turn"] = json!(hub.store.max_turn(&task.bot_id));
+    task.extra.insert("proof".into(), proof);
     task.save(&hub.store)?;
     hub.emit_bot(&task.bot_id);
     Ok(())
@@ -721,7 +817,10 @@ fn now() -> i64 {
 pub fn get(store: &Store, b: &Value) -> Result<Value> {
     let id = b["taskId"].as_str().ok_or_else(|| anyhow!("missing taskId"))?;
     let task = Task::load(store, id).ok_or_else(|| anyhow!("unknown task"))?;
-    Ok(json!({"proof": task.extra.get("proof").cloned().unwrap_or(Value::Null)}))
+    let dir = work_dir(&task);
+    // Whether "See it live" can open a page (plain HTML or a web app's dev server).
+    let web = static_root(&dir).is_some() || web_command(&dir).is_some();
+    Ok(json!({"proof": task.extra.get("proof").cloned().unwrap_or(Value::Null), "web": web}))
 }
 
 /// "Show me" (and a finished task): run now if this project is allowed, else ask once.
@@ -732,6 +831,28 @@ pub async fn start(hub: &Arc<Hub>, b: &Value) -> Result<Value> {
         return get(&hub.store, b);
     }
     let dir = work_dir(&task);
+    let has_base = {
+        let (t, d) = (task.clone(), dir.clone());
+        tokio::task::spawn_blocking(move || base_rev(&t, &d).is_some()).await?
+    };
+    if !has_base {
+        // After a finished task in a plain folder: no card and no "Couldn't make the proof".
+        if b["auto"] == true {
+            return get(&hub.store, b);
+        }
+        save(hub, &id, &json!({"status": "unavailable", "note": NO_BASE, "at": now()}))?;
+        return get(&hub.store, b);
+    }
+    if b["auto"] == true {
+        // Only after a turn that actually changed files (never after read-only Q&A).
+        let (t, d) = (task.clone(), dir.clone());
+        let changed =
+            tokio::task::spawn_blocking(move || base_rev(&t, &d).is_some_and(|base| !changes(&d, &base).is_empty()))
+                .await?;
+        if !changed {
+            return get(&hub.store, b);
+        }
+    }
     let p = tokio::task::spawn_blocking(move || plan(&dir, adb_device())).await?;
     if p.command.is_some() && !allowed(&hub.store, &task.project) {
         save(hub, &id, &json!({"status": "needsApproval", "plan": p.public(), "at": now()}))?;
@@ -754,10 +875,80 @@ pub async fn allow(hub: &Arc<Hub>, b: &Value) -> Result<Value> {
 pub fn after_finish(hub: &Arc<Hub>, task_id: &str) {
     let (h, id) = (hub.clone(), task_id.to_owned());
     tokio::spawn(async move {
-        if let Err(e) = start(&h, &json!({"taskId": id})).await {
+        if let Err(e) = start(&h, &json!({"taskId": id, "auto": true})).await {
             tracing::warn!(task = id, error = format!("{e:#}"), "proof after finish failed");
         }
     });
+}
+
+static DEV_SERVERS: std::sync::LazyLock<tokio::sync::Mutex<std::collections::HashMap<PathBuf, (u16, Running)>>> =
+    std::sync::LazyLock::new(Default::default);
+
+/// "See it live": starts (or reuses) the project's web server on this computer and returns the
+/// page to open in the phone's live preview. Plain HTML is served by Hypurr itself; a dev server
+/// runs project code, so it needs the same one-time OK as proof.
+pub async fn live(hub: &Arc<Hub>, b: &Value) -> Result<Value> {
+    let id = b["taskId"].as_str().ok_or_else(|| anyhow!("missing taskId"))?;
+    let task = Task::load(&hub.store, id).ok_or_else(|| anyhow!("unknown task"))?;
+    let dir = work_dir(&task);
+    ensure!(dir.is_dir(), "The task's folder is gone.");
+    let ch = {
+        let (t, d) = (task.clone(), dir.clone());
+        tokio::task::spawn_blocking(move || base_rev(&t, &d).map(|base| changes(&d, &base)).unwrap_or_default()).await?
+    };
+    let (port, page) = if let Some(root) = static_root(&dir) {
+        let prefix = root.strip_prefix(&dir).map(|r| r.to_string_lossy().replace('\\', "/")).unwrap_or_default();
+        let page = static_pages(&ch, &if prefix.is_empty() { String::new() } else { format!("{prefix}/") }).remove(0);
+        (crate::static_site::live(&root).await?, page)
+    } else if let Some(cmd) = web_command(&dir) {
+        if !allowed(&hub.store, &task.project) {
+            return Ok(json!({"needsApproval": true, "command": cmd}));
+        }
+        let mut all = DEV_SERVERS.lock().await;
+        let reuse = match all.get(&dir) {
+            Some((p, _)) if wait_port(*p, Duration::from_millis(300)).await => Some(*p),
+            _ => None,
+        };
+        let port = if let Some(p) = reuse {
+            p
+        } else {
+            let port = free_port()?;
+            let full = if cmd.starts_with("npm run") {
+                format!("{cmd} -- --port {port}")
+            } else {
+                format!("{cmd} --port {port}")
+            };
+            let mut log = String::new();
+            ensure_deps(&dir, Instant::now() + INSTALL_BY, &mut log).await;
+            let logf = std::env::temp_dir().join(format!("hypurr-live-{port}.log"));
+            let server = spawn(&dir, &full, &[("PORT", port.to_string()), ("HOST", "127.0.0.1".into())], &logf)?;
+            ensure!(
+                wait_port(port, SERVER_START).await,
+                "The dev server didn't start within {} seconds.",
+                SERVER_START.as_secs()
+            );
+            all.insert(dir.clone(), (port, server));
+            port
+        };
+        (port, pages(&ch).remove(0))
+    } else {
+        bail!("This project has no web page to show.");
+    };
+    let url = format!("http://localhost:{port}{page}");
+    // Said in the chat so the live preview knows this server belongs to the task.
+    let mut task = task;
+    if task.extra.get("liveUrl").and_then(Value::as_str) != Some(url.as_str()) {
+        task.extra.insert("liveUrl".into(), json!(url));
+        task.save(&hub.store)?;
+        hub.add_entry(
+            &Lane::main(&task.bot_id),
+            EntryKind::Notice,
+            hub.store.max_turn(&task.bot_id),
+            &json!({"text": format!("Live at {url}"), "style": "info"}),
+        );
+        hub.emit_bot(&task.bot_id);
+    }
+    Ok(json!({"port": port, "path": page, "url": url}))
 }
 
 fn launch(hub: &Arc<Hub>, id: &str, p: Plan) -> Result<()> {
@@ -777,7 +968,15 @@ fn launch(hub: &Arc<Hub>, id: &str, p: Plan) -> Result<()> {
         proof["at"] = json!(now());
         proof["seconds"] = json!(started.elapsed().as_secs());
         let _ = save(&h, &id, &proof);
-        if let Some(task) = Task::load(&h.store, &id) {
+        if let Some(mut task) = Task::load(&h.store, &id) {
+            // At most one proof line per chat turn.
+            let turn = h.store.max_turn(&task.bot_id);
+            if task.extra.get("proofNoticeTurn").and_then(Value::as_i64) == Some(turn) {
+                h.emit_bot(&task.bot_id);
+                return;
+            }
+            task.extra.insert("proofNoticeTurn".into(), json!(turn));
+            let _ = task.save(&h.store);
             let text = if proof["status"] == "ready" {
                 "Proof is ready: see how it looks."
             } else {
@@ -811,15 +1010,26 @@ async fn produce(hub: &Arc<Hub>, id: &str, p: &Plan) -> Result<Value> {
     let mut tests = Value::Null;
     let mut note = String::new();
     match (p.kind, p.command.as_deref()) {
-        (Kind::Web, Some(cmd)) => {
-            let pg = pages(&ch);
+        (Kind::Web, cmd) => {
+            let pg = match (cmd, static_root(&work)) {
+                (None, Some(root)) => {
+                    let prefix =
+                        root.strip_prefix(&work).map(|r| r.to_string_lossy().replace('\\', "/")).unwrap_or_default();
+                    static_pages(&ch, &if prefix.is_empty() { String::new() } else { format!("{prefix}/") })
+                }
+                _ => pages(&ch),
+            };
             let project = PathBuf::from(&task.project);
-            let deadline = Instant::now() + INSTALL_BY;
-            link_deps(&[&project], &work);
-            ensure_deps(&work, deadline, &mut log).await;
-            let after = capture_web(&work, cmd, &out, "after", &pg, true, &mut log).await?;
+            if cmd.is_some() {
+                let deadline = Instant::now() + INSTALL_BY;
+                link_deps(&[&project], &work);
+                ensure_deps(&work, deadline, &mut log).await;
+            }
+            let after = capture_web(&work, cmd, &out, "after", &pg, cmd.is_some(), &mut log).await?;
             let copy = BaseCopy::new(&work, &out, &base)?;
-            link_deps(&[&work, &project], &copy.path);
+            if cmd.is_some() {
+                link_deps(&[&work, &project], &copy.path);
+            }
             let before = capture_web(&copy.path, cmd, &out, "before", &pg, false, &mut log).await?;
             drop(copy);
             if !after && !before {
@@ -867,7 +1077,7 @@ async fn produce(hub: &Arc<Hub>, id: &str, p: &Plan) -> Result<Value> {
                 tests = json!({"ok": ok, "passed": passed, "failed": failed, "command": cmd,
                     "seconds": started.elapsed().as_secs(), "output": clean_log(&text)});
             } else {
-                note = "No tests found to run, so here's what changed.".into();
+                note = "This project has no automatic checks, so here's a summary of what changed.".into();
             }
         }
     }
@@ -1129,5 +1339,30 @@ mod tests {
         std::fs::write(d.join(".hypurr/proof/after-0.png"), "x").unwrap();
         let ch = changes(&d, "HEAD");
         assert_eq!(ch, vec![Change { path: "a.txt".into(), added: 2, removed: 0 }]);
+    }
+
+    #[test]
+    fn base_falls_back_to_master_and_is_none_outside_git() {
+        let d = tmp("master");
+        let g = |a: &[&str]| {
+            assert!(std::process::Command::new("git").args(a).current_dir(&d).output().unwrap().status.success());
+        };
+        g(&["init", "-q", "-b", "master"]);
+        g(&["-c", "user.email=a@b", "-c", "user.name=a", "commit", "-q", "--allow-empty", "-m", "base"]);
+        let task: Task = serde_json::from_value(json!({"id": "t", "botId": "b", "goal": "g", "title": "x", "projectName": "p", "backend": "codex", "createdAt": 0, "updatedAt": 0, "project": d.display().to_string()}))
+            .expect("minimal task");
+        assert!(base_rev(&task, &d).is_some());
+        assert!(base_rev(&task, &tmp("plain")).is_none());
+    }
+
+    #[test]
+    fn plain_html_is_a_web_proof_without_a_command() {
+        let d = tmp("static");
+        std::fs::write(d.join("waitlist.html"), "<button>Join</button>").unwrap();
+        let p = plan(&d, false);
+        assert_eq!((p.kind, p.command), (Kind::Web, None));
+        let ch = vec![Change { path: "waitlist.html".into(), added: 1, removed: 1 }];
+        assert_eq!(static_pages(&ch, ""), vec!["/waitlist.html".to_owned()]);
+        assert_eq!(static_pages(&[], ""), vec!["/".to_owned()]);
     }
 }

@@ -120,6 +120,38 @@ class ProofScreenshotTest {
         chat { ProofCard(Proof(status = "running", plan = ProofPlan("web", "Start the web app (yours and the original) for a few minutes and capture the changed pages", "npm run dev"))) }
     }
 
+    @Test fun unavailable() = shoot("proof-unavailable") {
+        chat { ProofCard(Proof(status = "unavailable", note = "Proof compares the task's changes with where it started, so it needs this folder to be a Git project.")) }
+    }
+
+    @Test fun seeItLive() = shoot("proof-see-live") { chat { ProofCard(null, onSeeLive = {}) } }
+
+    @Test fun summaryWithLive() = shoot("proof-summary-live") {
+        ProofCardAlone {
+            ProofCard(Proof(status = "ready", kind = "tests", summary = "Changed 1 file (1 line added, 1 removed). Most work in waitlist.html (+1 −1).",
+                note = "This project has no automatic checks, so here's a summary of what changed."), onSeeLive = {})
+        }
+    }
+
+    // The compact chat card and the full Changes screen.
+    @Test fun cardViewChanges() = shoot("changes-card-offer") { chat { ProofCard(null, onSeeLive = {}, onOpen = {}) } }
+    @Test fun cardPreparing() = shoot("changes-card-preparing") {
+        chat { ProofCard(Proof(status = "running", plan = ProofPlan("web", "Open the changed pages (yours and the original) and capture them")), onOpen = {}) }
+    }
+    @Test fun cardReady() = shoot("changes-card-ready") { chat { ProofCard(web, images, onSeeLive = {}, onOpen = {}) } }
+    @Test fun screenPreparing() = shoot("changes-screen-preparing") {
+        ChangesScreen(Proof(status = "running"), onBack = {}, animateHint = false)
+    }
+    @Test fun screenReady() = shoot("changes-screen-ready") {
+        ChangesScreen(web, images, onBack = {}, onSeeLive = {}, animateHint = false, initialSplit = 0.5f)
+    }
+    @Test fun screenHint() {
+        compose.mainClock.autoAdvance = false
+        compose.setContent { HypurrTheme(ThemeMode.Dark) { ChangesScreen(web, images, onBack = {}, onSeeLive = {}) } }
+        compose.mainClock.advanceTimeBy(500)
+        compose.onRoot().captureRoboImage("${System.getProperty("roborazzi.output.dir")}/android-changes-screen-slide-hint-dark.png")
+    }
+
     @Test fun webSlider() = shoot("proof-web") { ProofCardAlone { ProofCard(web, images, initialSplit = 0.42f) } }
 
     @Test fun webInChat() = shoot("proof-web-chat") { chat { ProofCard(web, images, initialSplit = 0.5f) } }
