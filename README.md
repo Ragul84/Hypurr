@@ -10,19 +10,22 @@ Ask in plain words. Hypurr keeps it safe, proves it works, and comes with free A
 [![License: MIT](https://img.shields.io/badge/license-MIT-a78bfa)](LICENSE)
 ![iOS](https://img.shields.io/badge/iOS-18+-f472b6?logo=apple)
 ![macOS](https://img.shields.io/badge/macOS-14+-f472b6?logo=apple)
+![Android](https://img.shields.io/badge/Android-8+-3DDC84?logo=android&logoColor=white)
+![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?logo=windows&logoColor=white)
 ![Linux](https://img.shields.io/badge/Linux-x86__64%20%7C%20arm64-22d3ee?logo=linux&logoColor=white)
 ![Rust](https://img.shields.io/badge/host-Rust-B7410E?logo=rust)
 ![Swift](https://img.shields.io/badge/apps-SwiftUI-F05138?logo=swift&logoColor=white)
 
 </div>
 
-> **Status:** Hypurr is a fresh fork. Hosted services (cloud relay, push, sign-in),
-> App Store listing, Homebrew tap and signed releases are not live yet; the
-> placeholders and how to set them up are listed in
-> [docs/guides/hypurr-setup.md](docs/guides/hypurr-setup.md). Local, LAN, Tailscale
-> and SSH use work from source today.
+> **Status:** The Android app and the Windows, macOS and Linux host work today. The
+> Hypurr gateway (`hypurr.mindgains.ai`) is live and runs paid Hypurr credits. Test
+> builds (signed APK and the Windows installer `HypurrSetup.exe`) are on
+> [Releases](https://github.com/Ragul84/Hypurr/releases). Not live yet: Play Store and
+> App Store listings, a code-signed Windows installer, and the Homebrew tap. See
+> [docs/guides/hypurr-setup.md](docs/guides/hypurr-setup.md).
 
-Hypurr turns the coding agents on your computer — Claude Code, Codex, Cursor, Pi, Hypurr Agent, Grok Build, Gemini, Copilot and ~40 more — into persistent *bots* you delegate to from your iPhone, Mac, Linux desktop or any terminal, the way you'd message a colleague. Pick who, say what, put the phone away. You get a notification when a bot finishes or needs your approval.
+Hypurr turns the coding agents on your computer — Claude Code, Codex, Cursor, Pi, Hypurr Agent, Grok Build, Gemini, Copilot and ~40 more — into persistent *bots* you delegate to from your Android phone, iPhone, Mac, Linux desktop or any terminal, the way you'd message a colleague. Pick who, say what, put the phone away. You get a notification when a bot finishes or needs your approval.
 
 > Why bots? On a phone, "find the right working session, then pick an environment" is too slow. With bots you already know who to hand the intent to: open the chat, type, done.
 
@@ -39,27 +42,28 @@ aren't experts, and leads with three things the others don't do:
 2. **Proof it works.** *Show me it works* runs your app and brings back screenshots. *Trace a
    click* follows a button to the function, API call and file:line behind it. *Page map* lists
    every screen and its APIs. *What changed* shows each file, lines added and removed, and the diff.
-3. **Free AI built in.** No AI account? *Start free with your own account*: sign in once and
-   *Hypurr Free* runs on it at no cost (for trying out, not for company code). Claude Code or Codex you already have work as they are,
-   at no extra cost.
+3. **AI included, free or paid.** No AI account? *Start free with your own account*: sign in
+   once and Hypurr runs on it at no cost (for trying out, not for company code). Or buy
+   **Hypurr credits** in the app (Google Play) and use Hypurr's models with no account at all.
+   Claude Code, Codex or a model key you already have work as they are, at no extra cost.
 
 See [marketing/pitch.md](marketing/pitch.md) for the full positioning.
 
 ### Everything else
 
-- **Free and open source.** No subscription, no paid tier, MIT licensed. It runs on your computer with the agents and accounts you already have.
+- **Open source, pay only if you want.** MIT licensed and free with the agents and accounts you already have. Hypurr credits and the Pro/Team plans are optional; prices live in [`pricing/plans.json`](pricing/plans.json) ([plans and payments](docs/pricing/payments.md)).
 - **Bring any coding agent.** Claude Code, Codex, Cursor, Gemini, Copilot, Hypurr Agent, Pi, Grok Build and ~40 more — everything in the [ACP registry](https://agentclientprotocol.com/registry). Installed agents are found automatically, the rest are fetched on first use, and every bot picks its own. Mix them freely: a Claude bot can ask a Codex bot for a review.
 - **Many bots, one team.** Run as many bots as you like side by side, each with its own agent, project folder and approvals, all working at once. Put several in a **group chat** and they answer in turn, like a team channel; `@name` picks who replies. Start a **thread** on any message to branch off without cluttering the main chat.
 - **Safe for beginners at work.** Describe what you need in plain words or pick a template (write tests, fix this error, review my PR, update dependencies, explain this code). Hypurr picks the project and agent, runs the task on its own branch with checkpoints you can go back to in one tap, explains every approval in plain words with a risk level, and blocks risky moves like pushing to `main`. See [tasks and the safety net](docs/features/tasks-and-safety.md).
 - **Fits how your team works.** Paste a screenshot or error into a new task, or start from a GitHub issue or Jira ticket. When it's done, Hypurr explains what changed and why in plain words (learning mode), opens a pull request, comments on the ticket, posts to Slack or Teams, and shows what each task cost. See [work tools](docs/features/integrations.md).
 - **Ready for teams.** Give each phone a role (admin, member, viewer), set the rules once (allowed agents, daily and per-task spending limits, which risks always ask or need an admin, protected branches), see what everyone's agents did, and keep an append-only, tamper-evident audit log. See [team admin](docs/features/team-admin.md).
-- **Built in Rust.** `hypurr-host` is one small, fast Rust binary for macOS and Linux (static on Linux, runs on any distro) that drives every agent, keeps the transcripts and serves every client.
+- **Built in Rust.** `hypurr-host` is one small, fast Rust binary for Windows, macOS and Linux (static on Linux, runs on any distro) that drives every agent, keeps the transcripts and serves every client.
 - **Native on every platform.** SwiftUI on iPhone and Mac, Jetpack Compose on Android, GTK 4 / libadwaita on Linux, and a terminal UI for SSH. No web views, no Electron.
 - **A 1:1 Grok Bot / Muse alternative.** Persistent named bots, group chats, reply threads, bots asking each other for help, approval cards, per-bot memory, remote screen, voice calls and "needs you / done" notifications — the same features, without being tied to one model or one subscription.
 - **Reach your computer from anywhere.** Deploy the included Cloudflare relay (`cloud/`) on your own account: no Tailscale, no VPN, no port forwarding. Traffic is end-to-end encrypted between your phone and your computer, so the relay only forwards ciphertext. Same Wi-Fi or Tailscale? The phone connects directly instead.
 - **Every computer, one app.** Sign in and your iPhone lists every computer on your account (Mac, Linux desktop, server or cloud VM); tap **Connect**, confirm a 6-digit code on that computer, and its bots show up next to the others. A new bot can live on any of them, and the Mac app reaches your SSH machines too. Each computer approves each device itself, so an account alone never unlocks a computer.
-- **Remote screen.** See and control your computer from the iPhone over WebRTC (hardware H.264), and let bots use the screen themselves through the built-in `computer` tool.
-- **Voice calls.** Talk to a bot hands-free from the iPhone and hear its replies read aloud.
+- **Remote screen.** See and control your computer from your phone over WebRTC (hardware H.264), and let bots use the screen themselves through the built-in `computer` tool.
+- **Voice.** Speak tasks and approvals and hear replies read aloud on Android (eight Indian languages); hands-free voice calls on iPhone.
 - **Private push.** Notification text is sealed to your phone's key, so the push relay never sees what your bots said.
 
 ## Platforms
@@ -67,12 +71,13 @@ See [marketing/pitch.md](marketing/pitch.md) for the full positioning.
 | | Platform | App | Highlights |
 |---|---|---|---|
 | 📱 | **iPhone** | Native SwiftUI | Chat with bots, approvals, push notifications, Live Activity, widgets, remote screen, voice calls |
-| 🤖 | **Android** | Native Kotlin + Jetpack Compose (Material 3) | QR pairing, chat with bots, approvals, "needs you", push via FCM (remote screen and voice not yet) |
+| 🤖 | **Android** | Native Kotlin + Jetpack Compose (Material 3) | QR pairing, chat with bots, approvals, "needs you", push via FCM, remote screen, voice tasks and approvals, Hypurr credits |
 | 💻 | **macOS** | Native SwiftUI, menu bar + window | Runs the host, chat window, usage in the menu bar, iPhone pairing |
+| 🪟 | **Windows** | Host + installer (`HypurrSetup.exe`) | Runs the host as a background app, pairs your phone |
 | 🐧 | **Linux** | Native GTK 4 / libadwaita | Runs the host (desktop or headless server), chat app |
 | ⌨️ | **Terminal** | `hypurr-host tui` | Message your bots from any terminal, over SSH too |
 
-The host (`hypurr-host`, Rust) runs on macOS and Linux; every client talks to it, so all your bots and chats are the same everywhere.
+The host (`hypurr-host`, Rust) runs on Windows, macOS and Linux; every client talks to it, so all your bots and chats are the same everywhere.
 
 ## How it works
 
@@ -87,7 +92,7 @@ Host notifications → push worker (relay/) → APNs → iPhone · FCM → Andro
 - **Bots can ask each other for help.** Tell one “ask Reviewer to check these changes.” The built-in `team` MCP server lets it discover your other visible bots and wait for a reply. Requests appear in both chats; each recipient keeps its own agent, folder and approvals. Native subagents stay under the coding agent's control. See [bot collaboration](docs/features/bot-collaboration.md).
 - **The chat only shows what matters**: your messages, each turn's final reply, approval cards and notices. Every tool call, diff, plan and thought is one tap away in *Full conversation*. While a bot works, its row shows what it's doing right now.
 - **Agents are detected automatically**: the host hydrates PATH from your login shell (plus Homebrew, ~/.local/bin, nvm, bun, volta, asdf, mise, pnpm…), finds every harness you have installed, and prefers its native ACP mode. Anything else in the official [ACP registry](https://agentclientprotocol.com/registry) can be picked too — Hypurr fetches it on first use (npx, uvx or a checksummed binary).
-- **hypurr-host** (Rust, macOS + Linux) runs on your computer. It speaks the [Agent Client Protocol](https://agentclientprotocol.com) to each agent, keeps transcripts in SQLite, and serves the phone. Every change carries a global `rev`, so the phone reconnects with `since: rev` and never misses anything.
+- **hypurr-host** (Rust, Windows + macOS + Linux) runs on your computer. It speaks the [Agent Client Protocol](https://agentclientprotocol.com) to each agent, keeps transcripts in SQLite, and serves the phone. Every change carries a global `rev`, so the phone reconnects with `since: rev` and never misses anything.
 - **Usage limits** come from your local installs, with no extra login: Claude via `claude -p /usage` (a local command, no model call) plus Claude Code's status line, Codex via `~/.codex/sessions`. The phone, widgets and menu bar only see percentages.
 - **Push** goes through a tiny relay that holds the APNs key. The phone trades its device token for an encrypted ticket; the host only ever holds tickets.
 
@@ -113,9 +118,11 @@ All three install the same signed, notarized app.
 
 Open Hypurr: it sets up the host on first launch. **Open Hypurr** opens the full window; **Pair iPhone…** shows the QR code.
 
-**iPhone** — [get Hypurr on the App Store](https://apps.apple.com/app/hypurr/id0000000000) (iOS 18+, free), then scan the QR code from **Pair iPhone…** on the Mac, the Linux app or `hypurr-host pair`.
+**Windows** — download `HypurrSetup-<version>.exe` from [Releases](https://github.com/Ragul84/Hypurr/releases), run it (it isn't code-signed yet, so SmartScreen asks once: *More info → Run anyway*), then scan the QR code it shows with your phone.
 
-**Android** — build the debug APK from `apps/android/` (`./gradlew assembleDebug`, JDK 17+ and the Android SDK; CI attaches it to every run as `hypurr-debug-apk`), install it, then scan the same QR code. Details and push setup: [Android guide](docs/guides/android.md).
+**iPhone** — not on the App Store yet; build from `apps/` with Xcode (iOS 18+), then scan the QR code from **Pair iPhone…** on the Mac, the Linux app or `hypurr-host pair`.
+
+**Android** — install the signed APK from [Releases](https://github.com/Ragul84/Hypurr/releases), or build the debug APK from `apps/android/` (`./gradlew assembleDebug`, JDK 17+ and the Android SDK; CI attaches it to every run as `hypurr-debug-apk`), install it, then scan the same QR code. Details and push setup: [Android guide](docs/guides/android.md).
 
 **Linux** — the host, plus the native GTK 4 / libadwaita app:
 
