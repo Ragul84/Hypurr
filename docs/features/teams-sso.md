@@ -62,3 +62,16 @@ the SCIM token. Map `userName` to the work email.
   tested end to end. The gateway half is ready for it.
 - Moving credits back out of a pool, and per-member usage history (the ledger has it in `meta.member`).
 - SCIM groups and `PUT` (full replace).
+
+## App side (2.6.4)
+
+**Gateway:** `GET /v1/teams/sso-config?email=` (provider, client id, endpoints for that email's domain) and `POST /v1/teams/setup` (IT creates the team with a work-account ID token and becomes admin). Admin calls accept the team key (`hk_`) as well as a Clerk session.
+
+**Host methods:** `gatewayBalance` (reads `/v1/gateway/balance`), `workSsoConfig`, `workSignIn`, `workTeamSetup`, `workTeam`, `workTeamMember`, `workTeamPool`, `workSignOut`; desktop only (loopback): `workDesktopStart` / `workDesktopResult`. The work key sits in the vault slot `gateway_key`; the personal key is kept in `gateway_key_personal` and comes back on sign-out.
+
+**Clients:**
+- Android: Spend → "Sign in with work account"; team screen (pool, people, limits, pause, make admin). Redirect `hypurr://oauth/work`.
+- iPhone and Mac: Settings (iPhone) / sidebar "Work account" (Mac); system web sign-in sheet, redirect `hypurr://oauth/work`.
+- Windows and Linux apps: "Work account"; sign-in in the browser with a loopback redirect `http://127.0.0.1:<port>/callback` run by the host.
+
+**OAuth client:** configuration only; no real client is registered yet. Microsoft: one app registration (public client) with both redirects works. Google: the client type limits redirects (iOS/Android client for the custom scheme, Desktop client for loopback), so one Google client id may not cover every app. Untested against a real tenant.
