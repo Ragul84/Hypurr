@@ -114,4 +114,29 @@ class AgentSetupTest {
     @Test fun shotWindows() = shoot("agent-setup-windows") { AgentSetupPanel(win) }
     @Test fun shotOneTapFailed() = shoot("agent-setup-install-failed") { AgentSetupPanel(linux, AgentInstallState(error = "download blocked by the network")) }
     @Test fun shotOneTapBusy() = shoot("agent-setup-installing") { AgentSetupPanel(linux, AgentInstallState(busy = true)) }
+
+    private val winGemini = win.copy(backends = listOf(
+        Backend("claude", "Claude Code", installed = true, signedIn = true),
+        Backend("gemini", "Gemini CLI", installed = true, signedIn = false),
+    ))
+
+    @Test fun geminiKeyOptionOpensTheKeyForm() {
+        compose.setContent { HypurrTheme(ThemeMode.Light) { AgentSetupPanel(winGemini, saveGeminiKey = {}) } }
+        compose.onNodeWithText("Use a Gemini API key").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test fun geminiKeyFormSavesOnlyAKey() {
+        compose.setContent { HypurrTheme(ThemeMode.Light) { GeminiKeyForm(save = {}, onDone = {}) } }
+        compose.onNodeWithText("saved only on your computer", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("Save").assertIsNotEnabled()
+    }
+
+    @Test fun geminiKeyHiddenWhenSignedIn() {
+        val ok = winGemini.copy(backends = listOf(Backend("gemini", "Gemini CLI", installed = true, signedIn = true)))
+        compose.setContent { HypurrTheme(ThemeMode.Light) { AgentSetupPanel(ok, saveGeminiKey = {}) } }
+        assertEquals(0, compose.onAllNodesWithText("Use a Gemini API key").fetchSemanticsNodes().size)
+    }
+
+    @Test fun shotGeminiKeyOption() = shoot("agent-setup-gemini-key") { AgentSetupPanel(winGemini, saveGeminiKey = {}) }
+    @Test fun shotGeminiKeyForm() = shoot("gemini-key-form") { GeminiKeyForm(save = {}, onDone = {}) }
 }

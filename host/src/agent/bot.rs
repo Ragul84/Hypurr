@@ -502,6 +502,9 @@ impl Actor {
             // Keep the reason ("(gateway said …)") so the phone says why.
             e.to_string()[i..].clone_into(&mut msg);
         }
+        if let Some(plain) = crate::agent::auth::plain_error(&format!("{e:#}")) {
+            plain.clone_into(&mut msg);
+        }
         if e.to_string().contains(crate::agent::builtin::NEEDS_ACCOUNT) {
             crate::agent::builtin::NEEDS_ACCOUNT.clone_into(&mut msg);
         }

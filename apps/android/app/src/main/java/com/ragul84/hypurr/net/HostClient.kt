@@ -385,6 +385,10 @@ class HostClient(val transport: ChannelTransport) {
 
     suspend fun taskCosts(): TaskCosts = call("taskCosts")
 
+    /** Saves a key for an agent on the computer (its vault); returns the agent's new sign-in check. */
+    suspend fun setAgentEnv(backend: String, name: String, value: String): JsonObject =
+        call("setAgentEnv", buildJsonObject { put("backend", backend); put("vars", buildJsonObject { put(name, value) }) }, timeoutMs = 120_000)
+
     // "Keep going free": the user's own OpenRouter account (OAuth PKCE; the computer keeps the key).
     suspend fun ownFreeStart(): String = call<JsonObject>("ownFreeStart")["url"]!!.jsonPrimitive.content
     suspend fun ownFreeFinish(code: String) { call<JsonObject>("ownFreeFinish", buildJsonObject { put("code", code) }, timeoutMs = 30_000) }
