@@ -385,6 +385,13 @@ class HostClient(val transport: ChannelTransport) {
 
     suspend fun taskCosts(): TaskCosts = call("taskCosts")
 
+    suspend fun cloudOptions(project: String): JsonObject = call("cloudOptions", buildJsonObject { put("project", project) }, timeoutMs = 30_000)
+    suspend fun cloudHandoff(project: String, vendor: String, prompt: String, codexEnv: String?): JsonObject =
+        call("cloudHandoff", buildJsonObject {
+            put("project", project); put("vendor", vendor); put("prompt", prompt); codexEnv?.let { put("codexEnv", it) }
+        }, timeoutMs = 200_000)
+    suspend fun setCursorKey(key: String) { call<JsonObject>("setCursorKey", buildJsonObject { put("key", key) }) }
+
     // "Keep going free": the user's own OpenRouter account (OAuth PKCE; the computer keeps the key).
     suspend fun ownFreeStart(): String = call<JsonObject>("ownFreeStart")["url"]!!.jsonPrimitive.content
     suspend fun ownFreeFinish(code: String) { call<JsonObject>("ownFreeFinish", buildJsonObject { put("code", code) }, timeoutMs = 30_000) }

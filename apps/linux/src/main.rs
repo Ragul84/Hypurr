@@ -2,6 +2,7 @@
 
 mod avatar;
 mod client;
+mod cloud;
 mod compose;
 mod connections;
 mod dialogs;

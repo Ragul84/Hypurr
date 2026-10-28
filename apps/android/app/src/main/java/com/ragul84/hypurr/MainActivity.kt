@@ -447,6 +447,7 @@ class MainActivity : ComponentActivity() {
                         onLoadAttachment = { a -> scope.launch { store.loadAttachment(id, a) } },
                         onOpenFile = { a -> scope.launch { runCatching { openFile(a, store.fileBytes(id, a)) } } },
                         onOpenThread = { e -> screen = "thread:$id:${e.id}" },
+                        cloud = (bot.task?.project ?: "").takeIf { it.isNotBlank() && you?.canAct != false }?.let { store.cloudActions(it) },
                         onReact = { e, emoji -> scope.launch { runCatching { store.react(e.id, emoji) } } },
                         onEdit = if (you?.canAct != false) ({ screen = "edit:$id" }) else null,
                         onChangeFolder = if (you?.canAct != false && !bot.isGroup) ({ screen = "folderpick:chat:$id" }) else null,
