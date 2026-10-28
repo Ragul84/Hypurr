@@ -115,7 +115,7 @@ interface User {
   createdAt: number;
 }
 
-async function user(c: Ctx): Promise<User> {
+export async function user(c: Ctx): Promise<User> {
   const clerk = await verifyClerk(c.req, c.env);
   if (!clerk) throw new ApiError("unauthenticated");
   const row = await c.env.DB.prepare(

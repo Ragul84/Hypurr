@@ -5,6 +5,7 @@
 import * as api from "./api";
 import * as gateway from "./gateway/handler";
 import { revenuecatWebhook } from "./gateway/revenuecat";
+import * as teams from "./teams/api";
 import { ApiError, type Ctx } from "./api";
 import type { ComputerRelay } from "./relay";
 
@@ -44,6 +45,8 @@ export interface Env {
   REVENUECAT_ALLOW_SANDBOX?: string;
   GATEWAY_LIMITER?: RateLimit;
   GATEWAY_PUBLIC_URL?: string;
+  /** dev / tests only: OIDC signing keys (JWKS JSON) instead of fetching Google/Microsoft. */
+  OIDC_TEST_JWKS?: string;
 }
 
 
@@ -90,6 +93,19 @@ const routes: [string, RegExp, Handler][] = [
   ["POST", /^\/v1\/gateway\/turn$/, gateway.openTurn],
   ["POST", /^\/v1\/gateway\/checkout$/, gateway.createCheckout],
   ["POST", /^\/v1\/webhooks\/revenuecat$/, revenuecatWebhook],
+  // Teams: SSO, shared credit pool, SCIM stub (docs/features/teams-sso.md).
+  ["POST", /^\/v1\/teams$/, teams.createTeam],
+  ["GET", /^\/v1\/teams\/mine$/, teams.myTeam],
+  ["POST", /^\/v1\/teams\/sso$/, teams.ssoExchange],
+  ["PUT", new RegExp(`^/v1/teams/${ID}/sso$`), teams.setSso],
+  ["POST", new RegExp(`^/v1/teams/${ID}/pool$`), teams.fillPool],
+  ["PATCH", new RegExp(`^/v1/teams/${ID}/members/${ID}$`), teams.updateMember],
+  ["POST", new RegExp(`^/v1/teams/${ID}/scim-token$`), teams.newScimToken],
+  ["GET", /^\/scim\/v2\/ServiceProviderConfig$/, teams.scimConfig],
+  ["GET", /^\/scim\/v2\/Users$/, teams.scimListUsers],
+  ["POST", /^\/scim\/v2\/Users$/, teams.scimCreateUser],
+  ["PATCH", new RegExp(`^/scim/v2/Users/${ID}$`), teams.scimDeactivate],
+  ["DELETE", new RegExp(`^/scim/v2/Users/${ID}$`), teams.scimDeactivate],
   // Off unless PAYMENTS_STRIPE=1 (404 otherwise).
   ["POST", /^\/v1\/webhooks\/stripe$/, gateway.stripeWebhook],
 ];
