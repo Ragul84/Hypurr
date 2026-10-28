@@ -6,6 +6,7 @@ use eframe::egui::{
     self, Align2, Color32, CornerRadius, FontData, FontDefinitions, FontFamily, FontId, Pos2, Rect,
     Sense, Stroke, Vec2,
 };
+use serde_json::{Value, json};
 
 pub const CAT: [&str; 9] = [
     "#ooooooo#",
@@ -108,6 +109,7 @@ pub struct Actions {
     pub back_to_status: bool,
     pub hide: bool,
     pub toggle_autostart: Option<bool>,
+    pub show_team: Option<bool>,
 }
 
 pub struct View<'a> {
@@ -115,6 +117,8 @@ pub struct View<'a> {
     pub show_qr: bool,
     pub autostart: bool,
     pub now_ms: i64,
+    /// The work account / team screen (crate::team), when open.
+    pub team: Option<&'a crate::team::Team>,
 }
 
 pub fn draw(ctx: &egui::Context, p: &Palette, v: &View) -> Actions {
@@ -126,7 +130,9 @@ pub fn draw(ctx: &egui::Context, p: &Palette, v: &View) -> Actions {
         ui.spacing_mut().item_spacing = Vec2::new(0.0, 0.0);
         header(ui, p, &v.snap.computer);
         ui.add_space(22.0);
-        if v.show_qr {
+        if let Some(t) = v.team {
+            egui::ScrollArea::vertical().show(ui, |ui| team_screen(ui, p, t, &mut a));
+        } else if v.show_qr {
             qr_screen(ui, p, v, &mut a);
         } else {
             status_screen(ui, p, v, &mut a);
@@ -400,6 +406,10 @@ fn status_screen(ui: &mut egui::Ui, p: &Palette, v: &View, a: &mut Actions) {
         a.pair_another = true;
     }
     ui.add_space(10.0);
+    if button(ui, p, "Work account", false) {
+        a.show_team = Some(true);
+    }
+    ui.add_space(10.0);
     if button(ui, p, "Hide to tray", false) {
         a.hide = true;
     }
@@ -457,6 +467,208 @@ pub fn cat_icon_rgba(size: u32) -> (Vec<u8>, u32) {
         }
     }
     (px, size)
+}
+
+fn text_field(ui: &mut egui::Ui, value: &mut String, hint: &str) {
+    ui.add(
+        egui::TextEdit::singleline(value)
+            .hint_text(hint)
+            .font(inter(14.0))
+            .desired_width(f32::INFINITY),
+    );
+    ui.add_space(8.0);
+}
+
+fn small(ui: &mut egui::Ui, p: &Palette, t: &str) {
+    ui.add(egui::Label::new(egui::RichText::new(t).font(inter(13.0)).color(p.tertiary)).wrap());
+}
+
+/// Work account: sign in with the company account, then (admins) the team pool and people.
+fn team_screen(ui: &mut egui::Ui, p: &Palette, team: &crate::team::Team, a: &mut Actions) {
+    use crate::team::{Action, dollars, parse_dollars};
+    let mut s = team.state.lock().unwrap();
+    let mut run: Option<Action> = None;
+    if button(ui, p, "Back", false) {
+        a.show_team = Some(false);
+    }
+    ui.add_space(14.0);
+    if !s.signed_in() {
+        title(
+            ui,
+            p,
+            "Work account",
+            "Sign in with your company's Google or Microsoft account. Hypurr is then paid from your team's credits.",
+        );
+        card(ui, p, |ui| {
+            text_field(ui, &mut s.email, "you@company.com");
+            ui.checkbox(&mut s.setup, "Set up Hypurr for my company (IT)");
+            if s.setup {
+                ui.add_space(6.0);
+                text_field(ui, &mut s.team_name, "Team name");
+                ui.horizontal(|ui| {
+                    ui.radio_value(&mut s.provider_ms, false, "Google");
+                    ui.radio_value(&mut s.provider_ms, true, "Microsoft");
+                });
+                ui.add_space(6.0);
+                text_field(ui, &mut s.client_id, "OAuth client id");
+                if s.provider_ms {
+                    text_field(ui, &mut s.tenant, "Tenant id");
+                }
+                small(
+                    ui,
+                    p,
+                    "The client id comes from your company's Google or Microsoft admin console. You become the team's admin.",
+                );
+            }
+        });
+        ui.add_space(14.0);
+        if s.busy.is_none()
+            && button(
+                ui,
+                p,
+                if s.setup {
+                    "Sign in and create team"
+                } else {
+                    "Sign in with work account"
+                },
+                true,
+            )
+        {
+            run = Some(Action::SignIn);
+        }
+    } else {
+        let name = s.team["team"]["name"]
+            .as_str()
+            .unwrap_or("Your team")
+            .to_owned();
+        let email = s.balance["workEmail"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned();
+        title(
+            ui,
+            p,
+            &name,
+            &format!("Signed in as {email}. Hypurr is paid from the team's credits."),
+        );
+        let lim = s.team["monthlyLimitCents"].as_i64();
+        card(ui, p, |ui| {
+            small(
+                ui,
+                p,
+                &format!(
+                    "You used {} this month{}.",
+                    dollars(s.team["spentThisMonthCents"].as_i64().or(Some(0))),
+                    lim.map(|l| format!(" of {}", dollars(Some(l))))
+                        .unwrap_or_default()
+                ),
+            );
+        });
+        if s.is_admin() {
+            ui.add_space(14.0);
+            card(ui, p, |ui| {
+                ui.label(
+                    egui::RichText::new("Team credits")
+                        .font(inter(12.0))
+                        .color(p.tertiary),
+                );
+                ui.label(
+                    egui::RichText::new(dollars(s.team["poolCents"].as_i64()))
+                        .font(semibold(24.0))
+                        .color(p.text),
+                );
+                ui.add_space(8.0);
+                text_field(ui, &mut s.pool_input, "Add from your credits, in $");
+                if s.busy.is_none()
+                    && button(ui, p, "Add to team pool", false)
+                    && let Some(c) = parse_dollars(&s.pool_input).filter(|c| *c > 0)
+                {
+                    run = Some(Action::Pool(c));
+                }
+            });
+            ui.add_space(14.0);
+            let members = s.team["members"].as_array().cloned().unwrap_or_default();
+            for m in members {
+                let id = m["userId"].as_str().unwrap_or_default().to_owned();
+                let paused = m["status"] == "suspended";
+                let admin = m["role"] == "admin";
+                card(ui, p, |ui| {
+                    ui.label(
+                        egui::RichText::new(m["email"].as_str().unwrap_or(&id))
+                            .font(semibold(15.0))
+                            .color(p.text),
+                    );
+                    let limit = m["monthlyLimitCents"].as_i64().map_or_else(
+                        || "no limit".to_owned(),
+                        |l| format!("limit {}", dollars(Some(l))),
+                    );
+                    let tag = if paused {
+                        "Paused"
+                    } else if admin {
+                        "Admin"
+                    } else {
+                        "Member"
+                    };
+                    small(
+                        ui,
+                        p,
+                        &format!(
+                            "{tag} · {} this month · {limit}",
+                            dollars(m["spentThisMonthCents"].as_i64().or(Some(0)))
+                        ),
+                    );
+                    if !admin && s.busy.is_none() {
+                        ui.add_space(8.0);
+                        if s.editing.as_deref() == Some(&id) {
+                            text_field(ui, &mut s.limit_input, "Monthly limit in $ (empty = none)");
+                            if button(ui, p, "Save limit", false) {
+                                let v =
+                                    parse_dollars(&s.limit_input).map_or(Value::Null, |c| json!(c));
+                                run = Some(Action::Member(id.clone(), "monthlyLimitCents", v));
+                                s.editing = None;
+                            }
+                        } else {
+                            ui.horizontal(|ui| {
+                                if ui.button("Limit").clicked() {
+                                    s.editing = Some(id.clone());
+                                    s.limit_input.clear();
+                                }
+                                if ui.button(if paused { "Resume" } else { "Pause" }).clicked() {
+                                    run = Some(Action::Member(
+                                        id.clone(),
+                                        "status",
+                                        json!(if paused { "active" } else { "suspended" }),
+                                    ));
+                                }
+                                if ui.button("Make admin").clicked() {
+                                    run = Some(Action::Member(id.clone(), "role", json!("admin")));
+                                }
+                            });
+                        }
+                    }
+                });
+                ui.add_space(10.0);
+            }
+        }
+        ui.add_space(14.0);
+        if s.busy.is_none() && button(ui, p, "Sign out of work account", false) {
+            run = Some(Action::SignOut);
+        }
+    }
+    if let Some(b) = &s.busy {
+        ui.add_space(10.0);
+        small(ui, p, b);
+    }
+    if let Some(e) = &s.error {
+        ui.add_space(10.0);
+        ui.add(
+            egui::Label::new(egui::RichText::new(e).font(inter(13.0)).color(p.needs_text)).wrap(),
+        );
+    }
+    drop(s);
+    if let Some(r) = run {
+        team.run(r);
+    }
 }
 
 #[cfg(test)]

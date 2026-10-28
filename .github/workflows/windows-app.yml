@@ -28,7 +28,7 @@ jobs:
       - name: Screenshots (QR + status, light + dark)
         run: |
           mkdir -p shots
-          for s in qr status public; do for t in light dark; do
+          for s in qr status public team work; do for t in light dark; do
             LIBGL_ALWAYS_SOFTWARE=1 timeout 60 xvfb-run -a -s "-screen 0 1280x1024x24" target/debug/hypurr --demo $s --theme $t --screenshot shots/$s-$t.png
             test -s shots/$s-$t.png
           done; done

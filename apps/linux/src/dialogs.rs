@@ -1183,8 +1183,14 @@ pub fn account_menu(ui: &App, anchor: &gtk::Button) {
             );
         })
     };
-    let (ui2, ui3, ui4) = (ui.clone(), ui.clone(), ui.clone());
+    let (ui2, ui3, ui4, ui5) = (ui.clone(), ui.clone(), ui.clone(), ui.clone());
     let items = vec![
+        MenuItem::new(
+            "system-users-symbolic",
+            "Work account",
+            Box::new(move || crate::team::open(&ui5)),
+        )
+        .chevron(),
         MenuItem::new(
             "power-profile-balanced-symbolic",
             "Usage",

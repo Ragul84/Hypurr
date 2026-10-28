@@ -5,6 +5,7 @@
 mod autostart;
 mod host;
 mod model;
+mod team;
 #[cfg(windows)]
 mod tray;
 mod ui;
@@ -34,6 +35,22 @@ fn parse_args() -> Args {
         }
     }
     a
+}
+
+/// A team admin's view for screenshots.
+fn demo_team() -> team::TeamState {
+    team::TeamState {
+        balance: serde_json::json!({"workEmail": "it@acme.com"}),
+        team: serde_json::json!({
+            "team": {"id": "t", "name": "Acme"}, "role": "admin", "poolCents": 42000, "spentThisMonthCents": 300,
+            "members": [
+                {"userId": "u1", "email": "it@acme.com", "role": "admin", "status": "active", "spentThisMonthCents": 300},
+                {"userId": "u2", "email": "sam@acme.com", "role": "member", "status": "active", "monthlyLimitCents": 5000, "spentThisMonthCents": 1234},
+                {"userId": "u3", "email": "ana@acme.com", "role": "member", "status": "suspended", "spentThisMonthCents": 0},
+            ],
+        }),
+        ..Default::default()
+    }
 }
 
 /// Fixed data for screenshots and UI checks (no host is started).
@@ -66,6 +83,8 @@ struct App {
     autostart: bool,
     frames: u32,
     shot_requested: bool,
+    team: team::Team,
+    show_team: bool,
     #[cfg(windows)]
     _tray: Option<tray::Tray>,
 }
@@ -101,7 +120,21 @@ impl App {
         } else {
             None
         };
+        let team = match args.demo.as_deref() {
+            Some("team") => team::Team::demo(demo_team()),
+            Some("work") => team::Team::demo(team::TeamState {
+                email: "sam@acme.com".into(),
+                ..Default::default()
+            }),
+            _ => {
+                let ctx = cc.egui_ctx.clone();
+                team::Team::new(move || ctx.request_repaint())
+            }
+        };
+        let show_team = matches!(args.demo.as_deref(), Some("team" | "work"));
         App {
+            team,
+            show_team,
             autostart: args.demo.is_none() && autostart::is_enabled(),
             args,
             state,
@@ -138,6 +171,7 @@ impl eframe::App for App {
             show_qr,
             autostart: self.autostart,
             now_ms: host::now_ms(),
+            team: self.show_team.then_some(&self.team),
         };
         let act = ui::draw(ctx, &palette, &view);
         if act.pair_another {
@@ -148,6 +182,12 @@ impl eframe::App for App {
         }
         if act.back_to_status {
             self.show_qr_override = Some(false);
+        }
+        if let Some(open) = act.show_team {
+            self.show_team = open;
+            if open && self.args.demo.is_none() {
+                self.team.run(team::Action::Refresh);
+            }
         }
         if act.hide {
             ctx.send_viewport_cmd(egui::ViewportCommand::Visible(false));

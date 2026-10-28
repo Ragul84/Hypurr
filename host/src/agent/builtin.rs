@@ -55,6 +55,11 @@ pub fn gateway_url() -> Option<String> {
     }
 }
 
+/// The gateway is explicitly turned off on this computer (`HYPURR_GATEWAY_URL=off`).
+pub fn gateway_off() -> bool {
+    configured_gateway().is_some_and(|v| v.is_empty())
+}
+
 pub fn gateway_ready() -> bool {
     gateway_url().is_some()
 }
@@ -98,7 +103,7 @@ pub async fn health_loop() {
 
 /// kv: this computer's id at the gateway, and (vault) its trial key.
 const GATEWAY_HOST_ID: &str = "gateway_host_id";
-const GATEWAY_KEY_SLOT: &str = "gateway_key";
+pub const GATEWAY_KEY_SLOT: &str = "gateway_key";
 
 /// This computer's gateway key, minted once through `POST /v1/gateway/trial-key` and kept in
 /// the vault (shown once by the gateway).

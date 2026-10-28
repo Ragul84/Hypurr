@@ -55,6 +55,21 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
             }
 
+            CardSection("Work account", footer: "Sign in with your company account so a computer is paid from your team's credits.") {
+                ForEach(accounts.computers) { computer in
+                    if let store = accounts.store(for: computer.id), let client = store.client {
+                        NavigationLink {
+                            WorkTeamView(client: client)
+                        } label: {
+                            Label(store.hostName, systemImage: "building.2")
+                                .foregroundStyle(Palette.text)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
             CardSection("Notifications", footer: "Get a result summary, a request for input, or a failure notice. Notification previews follow your iOS settings.") {
                 Toggle("Push notifications", isOn: $notificationsEnabled)
                     .toggleStyle(.hypurr)

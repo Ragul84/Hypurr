@@ -1,5 +1,6 @@
 import { ApiError, type Ctx } from "../api";
 import { DEFAULT_GATEWAY_CONFIG, type GatewayConfig } from "./config";
+import { payerBalance, payerFor, payerSpend } from "../teams/pool";
 import { bearer, issueTrialKey, issueUserKey, resolveSubject, type GatewaySubject } from "./auth";
 import {
   addGlobalFree,
@@ -10,7 +11,6 @@ import {
   getAllowance,
   getCredits,
   recordUsage,
-  spendCredits,
   topUp,
 } from "./ledger";
 import { CREDIT_PACKS } from "./revenuecat";
@@ -199,6 +199,7 @@ export async function chatCompletions(c: Ctx): Promise<Response> {
   const env = c.env as unknown as GatewayEnv;
   const cfg = cfgFrom(env);
   const sub = await requireSubject(c);
+  const payer = await payerFor(c.env.DB, sub, c.now);
   if (!rateLimit(sub.subjectId, cfg.rateLimitPerMinute, c.now)) {
     throw new ApiError("rateLimited");
   }
@@ -252,11 +253,11 @@ export async function chatCompletions(c: Ctx): Promise<Response> {
       );
     }
   } else if (paidTurn) {
-    if ((await getCredits(c.env.DB, sub.subjectId)) < cfg.minBalanceCents) {
+    if ((await payerBalance(c.env.DB, payer)) < cfg.minBalanceCents) {
       return json({ error: { message: FREE_EXHAUSTED, type: "insufficient_quota", code: "free_messages_exhausted" } }, 402);
     }
   } else {
-    const bal = await getCredits(c.env.DB, sub.subjectId);
+    const bal = await payerBalance(c.env.DB, payer);
     if (bal < cfg.minBalanceCents) {
       return json(
         {
@@ -353,7 +354,7 @@ export async function chatCompletions(c: Ctx): Promise<Response> {
       );
     } else {
       const cost = estimateCostCents(cfg, modelId, approxIn, estOut);
-      const spent = await spendCredits(c.env.DB, sub.subjectId, cost, { model: modelId }, c.now);
+      const spent = await payerSpend(c.env.DB, payer, cost, { model: modelId }, c.now);
       if (!spent.ok) {
         return json({ error: { message: spent.message, type: "insufficient_quota" } }, 402);
       }
@@ -381,7 +382,7 @@ export async function chatCompletions(c: Ctx): Promise<Response> {
         await addGlobalFree(db, extra, now);
       } else {
         const more = Math.max(0, estimateCostCents(cfg, modelId, realIn, realOut) - estimateCostCents(cfg, modelId, approxIn, estOut));
-        if (more > 0) await spendCredits(db, sub.subjectId, more, { model: modelId, reconcile: true }, now);
+        if (more > 0) await payerSpend(db, payer, more, { model: modelId, reconcile: true }, now);
       }
     };
     const body2 = upstreamRes.body.pipeThrough(scrubSse(modelId)).pipeThrough(usageTap(reconcile));
@@ -419,7 +420,7 @@ export async function chatCompletions(c: Ctx): Promise<Response> {
     );
   } else {
     const cost = estimateCostCents(cfg, modelId, promptTokens, completionTokens);
-    const spent = await spendCredits(c.env.DB, sub.subjectId, cost, { model: modelId }, c.now);
+    const spent = await payerSpend(c.env.DB, payer, cost, { model: modelId }, c.now);
     if (!spent.ok) {
       return json({ error: { message: spent.message, type: "insufficient_quota" } }, 402);
     }
@@ -454,8 +455,9 @@ export async function chatCompletions(c: Ctx): Promise<Response> {
 export async function spendingBalance(c: Ctx) {
   const cfg = cfgFrom(c.env as unknown as GatewayEnv);
   const sub = await requireSubject(c);
+  const payer = await payerFor(c.env.DB, sub, c.now);
   const allowance = await getAllowance(c.env.DB, sub.subjectId, cfg, sub.kind, c.now);
-  const credits = await getCredits(c.env.DB, sub.subjectId);
+  const credits = await payerBalance(c.env.DB, payer);
   return {
     free: {
       messagesLeft: Math.max(0, cfg.freeDailyMessages - allowance.messagesUsed),
@@ -469,6 +471,8 @@ export async function spendingBalance(c: Ctx) {
       balanceCents: credits,
       balanceUsd: credits / 100,
     },
+    // Set when the credits come from a team pool (teams/pool.ts).
+    team: payer.team ? { id: payer.team.id, monthlyLimitCents: payer.team.limitCents, spentThisMonthCents: payer.team.spentCents } : null,
     // RevenueCat app user id the phone must log in as, so purchases credit this subject.
     appUserId: sub.subjectId,
     payments: "revenuecat",
@@ -489,9 +493,10 @@ function stripeOn(c: Ctx): boolean {
 export async function openTurn(c: Ctx) {
   const cfg = cfgFrom(c.env as unknown as GatewayEnv);
   const sub = await requireSubject(c);
+  const payer = await payerFor(c.env.DB, sub, c.now);
   const a = await getAllowance(c.env.DB, sub.subjectId, cfg, sub.kind, c.now);
   const limit = cfg.freeDailyMessages;
-  const credits = await getCredits(c.env.DB, sub.subjectId);
+  const credits = await payerBalance(c.env.DB, payer);
   if (a.messagesUsed >= limit && credits < cfg.minBalanceCents) {
     return json(
       { error: { message: FREE_EXHAUSTED, type: "insufficient_quota", code: "free_messages_exhausted" }, freeMessagesLeft: 0, freeMessagesLimit: limit },

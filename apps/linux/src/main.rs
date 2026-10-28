@@ -10,6 +10,7 @@ mod market;
 mod markup;
 mod orb;
 mod rows;
+mod team;
 mod ui;
 
 use adw::prelude::*;

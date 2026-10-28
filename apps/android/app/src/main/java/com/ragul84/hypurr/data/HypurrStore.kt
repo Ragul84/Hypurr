@@ -595,6 +595,10 @@ class HypurrStore(
     private val _costs = MutableStateFlow<TaskCosts?>(null)
     val costs: StateFlow<TaskCosts?> = _costs.asStateFlow()
 
+    /** Host passthrough for the work-account / team-pool methods (ui/WorkTeam.kt). */
+    suspend fun hostRaw(method: String, body: kotlinx.serialization.json.JsonObject = kotlinx.serialization.json.JsonObject(emptyMap())) =
+        (client ?: throw HostException.unreachable()).raw(method, body)
+
     suspend fun ownFreeStart(): String = (client ?: throw HostException.unreachable()).ownFreeStart()
     suspend fun ownFreeFinish(code: String) { (client ?: throw HostException.unreachable()).ownFreeFinish(code); loadCosts(); refreshHello() }
     suspend fun ownFreeDisconnect() { (client ?: throw HostException.unreachable()).ownFreeDisconnect(); loadCosts(); refreshHello() }

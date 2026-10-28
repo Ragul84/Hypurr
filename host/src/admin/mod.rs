@@ -306,6 +306,9 @@ impl std::error::Error for NotAllowed {}
 
 /// Only admins: the rules, roles, the audit log, and what changes the computer's setup.
 const ADMIN_ONLY: &[&str] = &[
+    "workTeamSetup",
+    "workTeamMember",
+    "workTeamPool",
     "setPolicies",
     "setSafetySettings",
     "setRole",

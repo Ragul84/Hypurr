@@ -42,6 +42,13 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="hypurr" android:host="pair" />
             </intent-filter>
+            <!-- Back from the company's sign-in page (work account, OAuth PKCE). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="hypurr" android:host="oauth" android:path="/work" />
+            </intent-filter>
             <!-- Share a log, stack trace, screenshot or text file into "Fix from a log". -->
             <intent-filter android:label="@string/share_to_triage">
                 <action android:name="android.intent.action.SEND" />

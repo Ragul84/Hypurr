@@ -90,11 +90,16 @@ import com.ragul84.hypurr.ui.screens.rosterOrder
 import com.ragul84.hypurr.ui.theme.HypurrTheme
 import com.ragul84.hypurr.ui.theme.Motion
 import kotlinx.coroutines.flow.MutableStateFlow
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private val app get() = application as HypurrApp
     private val pendingLink = MutableStateFlow<String?>(null)
+    /** The browser coming back from the company's sign-in page. */
+    private val workReturn = MutableStateFlow<Uri?>(null)
     private val openBot = MutableStateFlow<String?>(null)
     /** A log, stack trace, text file or screenshot shared into Hypurr (opens Fix from a log). */
     private val sharedLog = MutableStateFlow<SharedLog?>(null)
@@ -195,7 +200,8 @@ class MainActivity : ComponentActivity() {
 
     private fun handle(intent: Intent?) {
         // A pairing link fills the pairing screen; the user still confirms it with Pair.
-        intent?.data?.takeIf { it.scheme == "hypurr" }?.let { pendingLink.value = it.toString() }
+        intent?.data?.takeIf { it.scheme == "hypurr" && it.host == "oauth" }?.let { workReturn.value = it }
+        intent?.data?.takeIf { it.scheme == "hypurr" && it.host != "oauth" }?.let { pendingLink.value = it.toString() }
         intent?.getStringExtra(EXTRA_BOT)?.let { openBot.value = it }
         if (intent?.action == Intent.ACTION_SEND) {
             val type = intent.type.orEmpty()
@@ -322,6 +328,72 @@ class MainActivity : ComponentActivity() {
         val requested by openBot.collectAsState()
         val you by store.you.collectAsState()
         var screen by rememberSaveable { mutableStateOf("list") }
+        // Work account and team pool (ui/WorkTeam.kt).
+        var workBalance by remember { mutableStateOf<kotlinx.serialization.json.JsonObject?>(null) }
+        var workTeam by remember { mutableStateOf<kotlinx.serialization.json.JsonObject?>(null) }
+        var workError by remember { mutableStateOf<String?>(null) }
+        var workBusy by remember { mutableStateOf(false) }
+        var workForm by remember { mutableStateOf<String?>(null) } // "signin" | "setup"
+        suspend fun loadWork() {
+            workBalance = runCatching { store.hostRaw("gatewayBalance") }.getOrNull()
+            if (workBalance?.get("workEmail") is kotlinx.serialization.json.JsonPrimitive && screen == "workteam") {
+                workTeam = runCatching { store.hostRaw("workTeam") }.onFailure { workError = it.message }.getOrNull()
+            }
+        }
+        fun openWork(attempt: com.ragul84.hypurr.ui.WorkOAuthAttempt) {
+            workAttempt.value = attempt
+            runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(com.ragul84.hypurr.ui.WorkOAuth.authorizeUrl(attempt)))) }
+                .onFailure { workError = "Couldn't open a browser." }
+        }
+        val backFromSignIn by workReturn.collectAsState()
+        LaunchedEffect(backFromSignIn) {
+            val uri = backFromSignIn ?: return@LaunchedEffect
+            workReturn.value = null
+            val attempt = workAttempt.value ?: return@LaunchedEffect
+            workAttempt.value = null
+            workBusy = true; workError = null
+            try {
+                val code = com.ragul84.hypurr.ui.WorkOAuth.codeFrom(uri, attempt)
+                val idToken = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { com.ragul84.hypurr.ui.WorkOAuth.exchange(attempt, code) }
+                val body = kotlinx.serialization.json.buildJsonObject {
+                    attempt.setup?.forEach { (k, v) -> put(k, v) }
+                    put("email", kotlinx.serialization.json.JsonPrimitive(attempt.email))
+                    put("idToken", kotlinx.serialization.json.JsonPrimitive(idToken))
+                }
+                store.hostRaw(if (attempt.setup != null) "workTeamSetup" else "workSignIn", body)
+                workForm = null
+                screen = "workteam"
+                loadWork()
+            } catch (e: Exception) {
+                workError = e.message ?: "Sign-in didn't finish."
+            } finally { workBusy = false }
+        }
+        workForm?.let { form ->
+            androidx.compose.ui.window.Dialog(onDismissRequest = { workForm = null; workError = null }) {
+                androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier
+                    .background(com.ragul84.hypurr.ui.theme.Hypurr.colors.bg, androidx.compose.foundation.shape.RoundedCornerShape(24.dp))
+                    .padding(20.dp)) {
+                    if (form == "setup") com.ragul84.hypurr.ui.TeamSetupForm(workBusy, workError) { name, email, provider, clientId, tenant ->
+                        val cfg = com.ragul84.hypurr.ui.SsoConfig.forSetup(provider, clientId, tenant)
+                        val setup = kotlinx.serialization.json.buildJsonObject {
+                            put("name", kotlinx.serialization.json.JsonPrimitive(name)); put("provider", kotlinx.serialization.json.JsonPrimitive(provider))
+                            put("domain", kotlinx.serialization.json.JsonPrimitive(email.substringAfter('@').lowercase()))
+                            put("clientId", kotlinx.serialization.json.JsonPrimitive(clientId)); tenant?.let { put("tenant", kotlinx.serialization.json.JsonPrimitive(it)) }
+                        }
+                        openWork(com.ragul84.hypurr.ui.WorkOAuth.start(cfg, email, setup))
+                    } else com.ragul84.hypurr.ui.WorkSignInForm(workBusy, workError, onContinue = { email ->
+                        workBusy = true; workError = null
+                        scope.launch {
+                            try {
+                                val cfg = com.ragul84.hypurr.ui.SsoConfig.from(store.hostRaw("workSsoConfig",
+                                    kotlinx.serialization.json.buildJsonObject { put("email", kotlinx.serialization.json.JsonPrimitive(email)) }))
+                                openWork(com.ragul84.hypurr.ui.WorkOAuth.start(cfg, email))
+                            } catch (e: Exception) { workError = e.message } finally { workBusy = false }
+                        }
+                    }, onSetup = { workForm = "setup"; workError = null })
+                }
+            }
+        }
         // The new-task draft survives a trip to the folder picker.
         var taskDraft by remember { mutableStateOf<NewTaskUiState?>(null) }
         var guide by remember { mutableStateOf(com.ragul84.hypurr.ui.screens.GuideUiState()) }
@@ -661,8 +733,32 @@ class MainActivity : ComponentActivity() {
                     }
                     val pricing by store.pricing.collectAsState()
                     LaunchedEffect(Unit) { store.loadPricing() }
+                    LaunchedEffect(Unit) { loadWork() }
                     SpendScreen(current.name, linkState, costs, bots, onTab = ::go, pricing = pricing,
-                        onDisconnectOwnFree = { scope.launch { runCatching { store.ownFreeDisconnect() } } })
+                        onDisconnectOwnFree = { scope.launch { runCatching { store.ownFreeDisconnect() } } },
+                        work = {
+                            com.ragul84.hypurr.ui.WorkTeamCard(workBalance,
+                                onSignIn = { workForm = "signin"; workError = null },
+                                onManage = { screen = "workteam" },
+                                onSignOut = { scope.launch { runCatching { store.hostRaw("workSignOut") }; workTeam = null; loadWork() } })
+                        })
+                }
+                target == "workteam" -> {
+                    LaunchedEffect(Unit) { workError = null; loadWork() }
+                    fun act(method: String, body: kotlinx.serialization.json.JsonObject) {
+                        scope.launch {
+                            workError = null
+                            runCatching { store.hostRaw(method, body) }.onFailure { workError = it.message }
+                            loadWork()
+                        }
+                    }
+                    fun member(id: String, k: String, v: kotlinx.serialization.json.JsonElement) = act("workTeamMember",
+                        kotlinx.serialization.json.buildJsonObject { put("userId", kotlinx.serialization.json.JsonPrimitive(id)); put(k, v) })
+                    com.ragul84.hypurr.ui.WorkTeamScreen(workTeam, workError, onBack = { screen = "spend" },
+                        onLimit = { id, cents -> member(id, "monthlyLimitCents", cents?.let { kotlinx.serialization.json.JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull) },
+                        onPause = { id, paused -> member(id, "status", kotlinx.serialization.json.JsonPrimitive(if (paused) "suspended" else "active")) },
+                        onAdmin = { id -> member(id, "role", kotlinx.serialization.json.JsonPrimitive("admin")) },
+                        onFillPool = { cents -> act("workTeamPool", kotlinx.serialization.json.buildJsonObject { put("amountCents", kotlinx.serialization.json.JsonPrimitive(cents)) }) })
                 }
                 target == "standup" -> {
                     var st by remember { mutableStateOf(com.ragul84.hypurr.ui.screens.StandupUiState(loading = true,
@@ -1146,6 +1242,7 @@ class MainActivity : ComponentActivity() {
         screen == "folderpick:guide" -> "guide"
         screen == "guide" -> "tasks"
         screen.startsWith("folderpick:chat:") -> screen.removePrefix("folderpick:")
+        screen == "workteam" -> "spend"
         screen == "spend" || screen == "tasks" -> "list"
         screen == "ticket" || screen == "qa" || screen == "trace" -> "tasks"
         else -> "list"
@@ -1583,6 +1680,8 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
+        /** A work sign-in waiting for the browser to come back (survives the activity, not the process). */
+        val workAttempt = MutableStateFlow<com.ragul84.hypurr.ui.WorkOAuthAttempt?>(null)
         const val EXTRA_BOT = "botId"
         const val MAX_FILE = 100 * 1024 * 1024
     }
