@@ -126,6 +126,7 @@ dependencies {
     // Remote screen: WebRTC (Google's libwebrtc, packaged by Stream), receive-only video + data channels.
     implementation(libs.webrtc)
     implementation(libs.revenuecat)
+    implementation(libs.play.review)
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.ui.test.manifest)
 

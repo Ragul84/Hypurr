@@ -125,6 +125,9 @@ class HypurrStore(
     /** The first sync finished: the roster is real, not just empty. */
     val synced: StateFlow<Boolean> = _synced.asStateFlow()
 
+    /** When to show the "Rate Hypurr" card (ui/RateHypurr.kt). */
+    val rate = RatePolicy(persistence)
+
     val themeMode = MutableStateFlow(persistence.read(THEME)?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: ThemeMode.System)
     val dynamicColor = MutableStateFlow(persistence.read(DYNAMIC) == "1")
     val notifications = MutableStateFlow(persistence.read(NOTIFY) != "0")
